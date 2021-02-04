@@ -2605,15 +2605,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 "lng_settings_enhanced" = "Extra Settings";
 "lng_settings_network" = "Network";
-"lng_settings_net_speed_boost" = "Upload Speed boost";
-"lng_settings_show_message_id" = "Show Message ID";
+"lng_settings_net_speed_boost" = "Upload speed boost";
+"lng_settings_show_message_id" = "Show message ID";
 "lng_settings_button" = "Button";
-"lng_settings_show_emoji_button_as_text" = "Show Emoji Button As Text";
-"lng_settings_show_repeater_option" = "Show Repeater Option";
+"lng_settings_show_emoji_button_as_text" = "Show emoji button as text";
+"lng_settings_show_repeater_option" = "Show repeater option";
 "lng_settings_repeater_reply_to_orig_msg" = "Reply to original message";
-"lng_settings_disable_cloud_draft_sync" = "Disable Cloud Draft Sync To Local";
+"lng_settings_disable_cloud_draft_sync" = "Disable cloud draft sync";
 "lng_settings_show_phone_number" = "Show Phone Number";
-"lng_settings_show_scheduled_button" = "Always Show Scheduled Button";
+"lng_settings_show_scheduled_button" = "Always show scheduled button";
 "lng_settings_voice_chat" = "Voice Chat";
 "lng_settings_radio_mode" = "Radio mode";
 "lng_settings_restart_hint" = "WARNING: Changing options that are colored in red will take effect only after the app restarts.";
@@ -2625,7 +2625,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_delete_for_both" = "Why not both?";
 
 "lng_net_speed_boost_title" = "Network speed boost";
-"lng_net_speed_boost_desc" = "Warning: changing this parameter to high values on slow networks can make even worse. Use at your own risk.";
+"lng_net_speed_boost_desc" = "Warning: changing this parameter to high values on slow networks can make it even worse. Use it at your own risk.";
 
 "lng_net_speed_boost_default" = "Disabled";
 "lng_net_speed_boost_slight" = "Slight";

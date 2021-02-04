@@ -2616,7 +2616,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_show_scheduled_button" = "Always Show Scheduled Button";
 "lng_settings_voice_chat" = "Voice Chat";
 "lng_settings_radio_mode" = "Radio mode";
-"lng_settings_restart_hint" = "WARNING: Changing options marked with \"*\" will take effect immediately with restart.";
+"lng_settings_restart_hint" = "WARNING: Changing options that are colored in red will take effect only after the app restarts.";
 
 "lng_settings_always_delete_for" = "Auto check delete message for";
 "lng_settings_delete_disabled" = "Disabled";

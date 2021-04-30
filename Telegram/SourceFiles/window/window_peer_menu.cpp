@@ -45,6 +45,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/profile/info_profile_values.h"
 #include "data/data_changes.h"
 #include "data/data_session.h"
+#include "data/data_file_origin.h"
 #include "data/data_folder.h"
 #include "data/data_poll.h"
 #include "data/data_channel.h"
@@ -1264,6 +1265,51 @@ QPointer<Ui::RpWidget> ShowForwardNoQuoteMessagesBox(
 		auto &api = owner->session().api();
 		auto &histories = owner->histories();
 		const auto requestType = Data::Histories::RequestType::Send;
+
+		auto mediaAlbums = QMap<uint64, QVector<MTPInputSingleMedia>>();
+
+		for (const auto it : items) {
+			auto media = it->media();
+			if (!media) {
+				continue;
+			}
+
+			// Get newest file reference for forward as copy
+			auto refreshed = [=](const Data::UpdatedFileReferences &updates) {
+				if (updates.data.empty()) {
+					return;
+				}
+				if (media->photo()) {
+					media->photo()->refreshFileReference(updates.data.cbegin()->second);
+				} else if (media->document()) {
+					media->document()->refreshFileReference(updates.data.cbegin()->second);
+				}
+			};
+			auto origin = media->photo() ? Data::FileOrigin(it->fullId())
+					: media->document() ? media->document()->stickerOrGifOrigin()
+					: Data::FileOrigin();
+			api.refreshFileReference(origin, std::move(refreshed));
+
+			if (it->groupId().value == 0) continue;
+
+			if (media != nullptr && media->webpage() == nullptr) {
+				auto inputMedia = media->photo()
+						? MTP_inputMediaPhoto(MTP_flags(0), media->photo()->mtpInput(), MTPint())
+						: MTP_inputMediaDocument(MTP_flags(0), media->document()->mtpInput(), MTPint(), MTPstring());
+				auto caption = it->originalText();
+				auto entities = Api::EntitiesToMTP(session, caption.entities, Api::ConvertOption::SkipLocal);
+				const auto flags = !entities.v.isEmpty() ? MTPDinputSingleMedia::Flag::f_entities : MTPDinputSingleMedia::Flag(0);
+				auto randomId = openssl::RandomValue<uint64>();
+
+				mediaAlbums[it->groupId().value].push_back(MTP_inputSingleMedia(
+					MTP_flags(flags),
+					inputMedia,
+					MTP_long(randomId),
+					MTP_string(caption.text),
+					entities));
+			}
+		}
+
 		for (const auto peer : result) {
 			const auto history = owner->history(peer);
 			if (!comment.text.isEmpty()) {
@@ -1272,30 +1318,6 @@ QPointer<Ui::RpWidget> ShowForwardNoQuoteMessagesBox(
 				message.action.options = options;
 				message.action.clearDraft = false;
 				api.sendMessage(std::move(message));
-			}
-
-			auto mediaAlbums = QMap<uint64, QVector<MTPInputSingleMedia>>();
-
-			for (const auto it : items) {
-				if (it->groupId().value == 0) continue;
-
-				const auto media = it->media();
-				if (media != nullptr && media->webpage() == nullptr) {
-					auto inputMedia = media->photo()
-									  ? MTP_inputMediaPhoto(MTP_flags(0), media->photo()->mtpInput(), MTPint())
-									  : MTP_inputMediaDocument(MTP_flags(0), media->document()->mtpInput(), MTPint(), MTPstring());
-					auto caption = it->originalText();
-					auto entities = Api::EntitiesToMTP(session, caption.entities, Api::ConvertOption::SkipLocal);
-					const auto flags = !entities.v.isEmpty() ? MTPDinputSingleMedia::Flag::f_entities : MTPDinputSingleMedia::Flag(0);
-					auto randomId = openssl::RandomValue<uint64>();
-
-					mediaAlbums[it->groupId().value].push_back(MTP_inputSingleMedia(
-							MTP_flags(flags),
-							inputMedia,
-							MTP_long(randomId),
-							MTP_string(caption.text),
-							entities));
-				}
 			}
 
 			if (!mediaAlbums.isEmpty()) {

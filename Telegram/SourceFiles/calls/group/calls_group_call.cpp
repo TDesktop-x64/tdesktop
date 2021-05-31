@@ -2024,8 +2024,6 @@ bool GroupCall::tryCreateController() {
 			});
 			return result;
 		},
-		.enableRadioMode = cRadioMode(),
-		.customBitrate = getCustomBitrate(),
 		.videoContentType = tgcalls::VideoContentType::Generic,
 		.requestMediaChannelDescriptions = [=, call = base::make_weak(this)](
 			const std::vector<uint32_t> &ssrcs,
@@ -2040,6 +2038,8 @@ bool GroupCall::tryCreateController() {
 			});
 			return result;
 		},
+		.enableRadioMode = cRadioMode(),
+		.customBitrate = getCustomBitrate(),
 	};
 	if (Logs::DebugEnabled()) {
 		auto callLogFolder = cWorkingDir() + qsl("DebugLogs");

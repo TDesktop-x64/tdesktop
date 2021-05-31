@@ -424,23 +424,41 @@ parts:
   webrtc:
     source: https://github.com/desktop-app/tg_owt.git
     source-depth: 1
-    source-commit: 7f965710b93c4dadd7e6f1ac739e708694df7929
+    source-commit: 56f0e53eaccfaed54c513f8795cc03a25e2a72f8
     plugin: cmake
     build-packages:
       - yasm
+      - libglib2.0-dev
       - libopus-dev
+      - libpipewire-0.2-dev
       - libssl-dev
+      - libx11-dev
+      - libxcomposite-dev
+      - libxdamage-dev
+      - libxext-dev
+      - libxfixes-dev
+      - libxrender-dev
+      - libxrandr-dev
+      - libxtst-dev
     stage-packages:
+      - libglib2.0-0
       - libopus0
+      - libpipewire-0.2-1
       - libssl1.1
+      - libx11-6
+      - libxcomposite1
+      - libxdamage1
+      - libxext6
+      - libxfixes3
+      - libxrender1
+      - libxrandr2
+      - libxtst6
     cmake-parameters:
       - -DCMAKE_BUILD_TYPE=Release
       - -DCMAKE_INSTALL_PREFIX=/usr
       - -DBUILD_SHARED_LIBS=OFF
       - -DJPEG_LIBRARY_RELEASE=$SNAPCRAFT_STAGE/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/libjpeg.so
       - -DJPEG_INCLUDE_DIR=$SNAPCRAFT_STAGE/usr/include
-      # NEON support for arm 32-bit is broken and no one seem to fix it
-      - -DTG_OWT_ARCH_ARMV7_USE_NEON=OFF
     prime: [-./*]
     after:
       - ffmpeg

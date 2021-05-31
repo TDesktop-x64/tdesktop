@@ -22,6 +22,10 @@ namespace Ui {
 class IconButton;
 template <typename Widget>
 class FadeWrap;
+namespace GL {
+struct ChosenRenderer;
+struct Capabilities;
+} // namespace GL
 } // namespace Ui
 
 namespace Media {
@@ -34,21 +38,11 @@ namespace View {
 class PlaybackProgress;
 
 [[nodiscard]] QRect RotatedRect(QRect rect, int rotation);
-[[nodiscard]] bool UsePainterRotation(int rotation);
+[[nodiscard]] bool UsePainterRotation(int rotation, bool opengl);
 [[nodiscard]] QSize FlipSizeByRotation(QSize size, int rotation);
 [[nodiscard]] QImage RotateFrameImage(QImage image, int rotation);
 
-#if defined Q_OS_MAC && !defined OS_MAC_OLD
-#define USE_OPENGL_OVERLAY_WIDGET
-#endif // Q_OS_MAC && !OS_MAC_OLD
-
-#ifdef USE_OPENGL_OVERLAY_WIDGET
-using PipParent = Ui::RpWidgetWrap<QOpenGLWidget>;
-#else // USE_OPENGL_OVERLAY_WIDGET
-using PipParent = Ui::RpWidget;
-#endif // USE_OPENGL_OVERLAY_WIDGET
-
-class PipPanel final : public PipParent {
+class PipPanel final {
 public:
 	struct Position {
 		RectParts attached = RectPart(0);
@@ -60,7 +54,14 @@ public:
 
 	PipPanel(
 		QWidget *parent,
-		Fn<void(QPainter&, FrameRequest)> paint);
+		Fn<void(QPainter&, FrameRequest, bool)> paint);
+	void init();
+
+	[[nodiscard]] not_null<QWidget*> widget() const;
+	[[nodiscard]] not_null<Ui::RpWidgetWrap*> rp() const;
+
+	void update();
+	void setGeometry(QRect geometry);
 
 	void setAspectRatio(QSize ratio);
 	[[nodiscard]] Position countPosition() const;
@@ -70,17 +71,15 @@ public:
 	void setDragDisabled(bool disabled);
 	[[nodiscard]] bool dragging() const;
 
+	void handleMousePress(QPoint position, Qt::MouseButton button);
+	void handleMouseRelease(QPoint position, Qt::MouseButton button);
+	void handleMouseMove(QPoint position);
+
 	[[nodiscard]] rpl::producer<> saveGeometryRequests() const;
 
-protected:
-	void paintEvent(QPaintEvent *e) override;
-	void mousePressEvent(QMouseEvent *e) override;
-	void mouseReleaseEvent(QMouseEvent *e) override;
-	void mouseMoveEvent(QMouseEvent *e) override;
-
-	void setVisibleHook(bool visible) override;
-
 private:
+	void paint(QPainter &p, const QRegion &clip, bool opengl);
+
 	void setPositionDefault();
 	void setPositionOnScreen(Position position, QRect available);
 
@@ -93,8 +92,12 @@ private:
 	void moveAnimated(QPoint to);
 	void updateDecorations();
 
-	QPointer<QWidget> _parent;
-	Fn<void(QPainter&, FrameRequest)> _paint;
+	[[nodiscard]] Ui::GL::ChosenRenderer chooseRenderer(
+		Ui::GL::Capabilities capabilities);
+
+	const std::unique_ptr<Ui::RpWidgetWrap> _content;
+	const QPointer<QWidget> _parent;
+	Fn<void(QPainter&, FrameRequest, bool)> _paint;
 	RectParts _attached = RectParts();
 	RectParts _snapped = RectParts();
 	QSize _ratio;
@@ -161,7 +164,7 @@ private:
 	void setupPanel();
 	void setupButtons();
 	void setupStreaming();
-	void paint(QPainter &p, FrameRequest request);
+	void paint(QPainter &p, FrameRequest request, bool opengl);
 	void playbackPauseResume();
 	void waitingAnimationCallback();
 	void handleStreamingUpdate(Streaming::Update &&update);
@@ -234,10 +237,10 @@ private:
 	FnMut<void()> _closeAndContinue;
 	FnMut<void()> _destroy;
 
-#ifdef USE_OPENGL_OVERLAY_WIDGET
+#if USE_OPENGL_PIP_WIDGET
 	mutable QImage _frameForDirectPaint;
 	mutable QImage _radialCache;
-#endif // USE_OPENGL_OVERLAY_WIDGET
+#endif // USE_OPENGL_PIP_WIDGET
 
 	mutable QImage _preparedCoverStorage;
 	mutable FrameRequest _preparedCoverRequest;

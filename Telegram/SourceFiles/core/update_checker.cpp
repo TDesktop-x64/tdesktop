@@ -45,6 +45,10 @@ extern "C" {
 #include <lzma.h>
 #endif // else of Q_OS_WIN && !DESKTOP_APP_USE_PACKAGED
 
+#ifdef Q_OS_UNIX
+#include <unistd.h>
+#endif // Q_OS_UNIX
+
 namespace Core {
 namespace {
 
@@ -71,6 +75,18 @@ using VersionChar = wchar_t;
 #endif // Q_OS_WIN
 
 using Loader = MTP::AbstractDedicatedLoader;
+
+struct BIODeleter {
+	void operator()(BIO *value) {
+		BIO_free(value);
+	}
+};
+
+inline auto MakeBIO(const void *buf, int len) {
+	return std::unique_ptr<BIO, BIODeleter>{
+		BIO_new_mem_buf(buf, len),
+	};
+}
 
 class Checker : public base::has_weak_ptr {
 public:
@@ -285,7 +301,15 @@ bool UnpackUpdate(const QString &filepath) {
 		return false;
 	}
 
-	RSA *pbKey = PEM_read_bio_RSAPublicKey(BIO_new_mem_buf(const_cast<char*>(AppBetaVersion ? UpdatesPublicBetaKey : UpdatesPublicKey), -1), 0, 0, 0);
+	RSA *pbKey = [] {
+		const auto bio = MakeBIO(
+			const_cast<char*>(
+				AppBetaVersion
+					? UpdatesPublicBetaKey
+					: UpdatesPublicKey),
+			-1);
+		return PEM_read_bio_RSAPublicKey(bio.get(), 0, 0, 0);
+	}();
 	if (!pbKey) {
 		LOG(("Update Error: cant read public rsa key!"));
 		return false;
@@ -294,7 +318,15 @@ bool UnpackUpdate(const QString &filepath) {
 		RSA_free(pbKey);
 
 		// try other public key, if we update from beta to stable or vice versa
-		pbKey = PEM_read_bio_RSAPublicKey(BIO_new_mem_buf(const_cast<char*>(AppBetaVersion ? UpdatesPublicKey : UpdatesPublicBetaKey), -1), 0, 0, 0);
+		pbKey = [] {
+			const auto bio = MakeBIO(
+				const_cast<char*>(
+					AppBetaVersion
+						? UpdatesPublicKey
+						: UpdatesPublicBetaKey),
+				-1);
+			return PEM_read_bio_RSAPublicKey(bio.get(), 0, 0, 0);
+		}();
 		if (!pbKey) {
 			LOG(("Update Error: cant read public rsa key!"));
 			return false;
@@ -1553,9 +1585,32 @@ bool checkReadyUpdate() {
 		return false;
 	}
 #elif defined Q_OS_UNIX // Q_OS_MAC
+	// if the files in the directory are owned by user, while the directory is not,
+	// update will still fail since it's not possible to remove files
+	if (QFile::exists(curUpdater)
+		&& unlink(QFile::encodeName(curUpdater).constData())) {
+		if (errno == EACCES) {
+			DEBUG_LOG(("Update Info: "
+				"could not unlink current Updater, access denied."));
+			cSetWriteProtected(true);
+			return true;
+		} else {
+			DEBUG_LOG(("Update Error: could not unlink current Updater."));
+			ClearAll();
+			return false;
+		}
+	}
 	if (!linuxMoveFile(QFile::encodeName(updater.absoluteFilePath()).constData(), QFile::encodeName(curUpdater).constData())) {
-		ClearAll();
-		return false;
+		if (errno == EACCES) {
+			DEBUG_LOG(("Update Info: "
+				"could not copy new Updater, access denied."));
+			cSetWriteProtected(true);
+			return true;
+		} else {
+			DEBUG_LOG(("Update Error: could not copy new Updater."));
+			ClearAll();
+			return false;
+		}
 	}
 #endif // Q_OS_UNIX
 
@@ -1622,7 +1677,12 @@ QString countAlphaVersionSignature(uint64 version) { // duplicated in packer.cpp
 
 	uint32 siglen = 0;
 
-	RSA *prKey = PEM_read_bio_RSAPrivateKey(BIO_new_mem_buf(const_cast<char*>(cAlphaPrivateKey().constData()), -1), 0, 0, 0);
+	RSA *prKey = [] {
+		const auto bio = MakeBIO(
+			const_cast<char*>(cAlphaPrivateKey().constData()),
+			-1);
+		return PEM_read_bio_RSAPrivateKey(bio.get(), 0, 0, 0);
+	}();
 	if (!prKey) {
 		LOG(("Error: Could not read alpha private key!"));
 		return QString();

@@ -211,7 +211,7 @@ void StickerSetBox::archiveStickers() {
 		}
 		if (result.type() == mtpc_messages_stickerSetInstallResultSuccess) {
 			Ui::Toast::Show(tr::lng_stickers_has_been_archived(tr::now));
-
+            
 			const auto &session = controller->session();
 			auto &order = session.data().stickers().setsOrderRef();
 			const auto index = order.indexOf(setId);
@@ -219,10 +219,10 @@ void StickerSetBox::archiveStickers() {
 				return;
 			}
 			order.removeAt(index);
-
+            
 			session.local().writeInstalledStickers();
 			session.local().writeArchivedStickers();
-
+            
 			session.data().stickers().notifyUpdated();
 		}
 	}).fail([](const MTP::Error &error) {

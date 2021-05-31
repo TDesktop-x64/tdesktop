@@ -23,6 +23,7 @@ class GroupInstanceCustomImpl;
 struct GroupLevelsUpdate;
 struct GroupNetworkState;
 struct GroupParticipantDescription;
+class VideoCaptureInterface;
 } // namespace tgcalls
 
 namespace base {
@@ -32,6 +33,7 @@ class GlobalShortcutValue;
 
 namespace Webrtc {
 class MediaDevices;
+class VideoTrack;
 } // namespace Webrtc
 
 namespace Data {
@@ -48,6 +50,8 @@ struct VolumeRequest;
 struct ParticipantState;
 struct JoinInfo;
 struct RejoinEvent;
+enum class VideoQuality;
+enum class Error;
 } // namespace Group
 
 enum class MuteState {
@@ -75,6 +79,94 @@ struct LevelUpdate {
 	bool me = false;
 };
 
+enum class VideoEndpointType {
+	Camera,
+	Screen,
+};
+
+struct VideoEndpoint {
+	VideoEndpointType type = VideoEndpointType::Camera;
+	PeerData *peer = nullptr;
+	std::string id;
+
+	[[nodiscard]] bool empty() const noexcept {
+		return id.empty();
+	}
+	[[nodiscard]] explicit operator bool() const noexcept {
+		return !empty();
+	}
+};
+
+inline bool operator==(
+		const VideoEndpoint &a,
+		const VideoEndpoint &b) noexcept {
+	return (a.id == b.id);
+}
+
+inline bool operator!=(
+		const VideoEndpoint &a,
+		const VideoEndpoint &b) noexcept {
+	return !(a == b);
+}
+
+inline bool operator<(
+		const VideoEndpoint &a,
+		const VideoEndpoint &b) noexcept {
+	return (a.peer < b.peer)
+		|| (a.peer == b.peer && a.id < b.id);
+}
+
+inline bool operator>(
+		const VideoEndpoint &a,
+		const VideoEndpoint &b) noexcept {
+	return (b < a);
+}
+
+inline bool operator<=(
+		const VideoEndpoint &a,
+		const VideoEndpoint &b) noexcept {
+	return !(b < a);
+}
+
+inline bool operator>=(
+		const VideoEndpoint &a,
+		const VideoEndpoint &b) noexcept {
+	return !(a < b);
+}
+
+struct VideoActiveToggle {
+	VideoEndpoint endpoint;
+	bool active = false;
+};
+
+struct VideoQualityRequest {
+	VideoEndpoint endpoint;
+	Group::VideoQuality quality = Group::VideoQuality();
+};
+
+struct VideoParams {
+	std::string endpoint;
+	QByteArray json;
+	uint32 hash = 0;
+
+	[[nodiscard]] bool empty() const {
+		return endpoint.empty() || json.isEmpty();
+	}
+	[[nodiscard]] explicit operator bool() const {
+		return !empty();
+	}
+};
+
+struct ParticipantVideoParams {
+	VideoParams camera;
+	VideoParams screen;
+};
+
+[[nodiscard]] std::shared_ptr<ParticipantVideoParams> ParseVideoParams(
+	const QByteArray &camera,
+	const QByteArray &screen,
+	const std::shared_ptr<ParticipantVideoParams> &existing);
+
 class GroupCall final : public base::has_weak_ptr {
 public:
 	class Delegate {
@@ -93,6 +185,10 @@ public:
 			Ended,
 		};
 		virtual void groupCallPlaySound(GroupCallSound sound) = 0;
+		virtual auto groupCallGetVideoCapture(const QString &deviceId)
+			-> std::shared_ptr<tgcalls::VideoCaptureInterface> = 0;
+
+		[[nodiscard]] virtual FnMut<void()> groupCallAddAsyncWaiter() = 0;
 	};
 
 	using GlobalShortcutManager = base::GlobalShortcutManager;
@@ -129,6 +225,8 @@ public:
 	void join(const MTPInputGroupCall &inputCall);
 	void handleUpdate(const MTPUpdate &update);
 	void handlePossibleCreateOrJoinResponse(const MTPDupdateGroupCall &data);
+	void handlePossibleCreateOrJoinResponse(
+		const MTPDupdateGroupCallConnection &data);
 	void changeTitle(const QString &title);
 	void toggleRecording(bool enabled, const QString &title);
 	[[nodiscard]] bool recordingStoppedByMe() const {
@@ -136,6 +234,17 @@ public:
 	}
 	void startScheduledNow();
 	void toggleScheduleStartSubscribed(bool subscribed);
+
+	bool emitShareScreenError();
+	bool emitShareCameraError();
+
+	[[nodiscard]] rpl::producer<Group::Error> errors() const {
+		return _errors.events();
+	}
+
+	void addVideoOutput(
+		const std::string &endpoint,
+		not_null<Webrtc::VideoTrack*> track);
 
 	void setMuted(MuteState mute);
 	void setMutedAndUpdate(MuteState mute);
@@ -182,6 +291,59 @@ public:
 	[[nodiscard]] rpl::producer<LevelUpdate> levelUpdates() const {
 		return _levelUpdates.events();
 	}
+	[[nodiscard]] auto videoStreamActiveUpdates() const
+	-> rpl::producer<VideoActiveToggle> {
+		return _videoStreamActiveUpdates.events();
+	}
+	[[nodiscard]] auto videoStreamShownUpdates() const
+	-> rpl::producer<VideoActiveToggle> {
+		return _videoStreamShownUpdates.events();
+	}
+	void requestVideoQuality(
+		const VideoEndpoint &endpoint,
+		Group::VideoQuality quality);
+
+	[[nodiscard]] bool videoEndpointPinned() const {
+		return _videoEndpointPinned.current();
+	}
+	[[nodiscard]] rpl::producer<bool> videoEndpointPinnedValue() const {
+		return _videoEndpointPinned.value();
+	}
+	void pinVideoEndpoint(VideoEndpoint endpoint);
+
+	void showVideoEndpointLarge(VideoEndpoint endpoint);
+	[[nodiscard]] const VideoEndpoint &videoEndpointLarge() const {
+		return _videoEndpointLarge.current();
+	}
+	[[nodiscard]] auto videoEndpointLargeValue() const
+	-> rpl::producer<VideoEndpoint> {
+		return _videoEndpointLarge.value();
+	}
+
+	struct VideoTrack {
+		std::unique_ptr<Webrtc::VideoTrack> track;
+		PeerData *peer = nullptr;
+		rpl::lifetime lifetime;
+		Group::VideoQuality quality = Group::VideoQuality();
+
+		[[nodiscard]] explicit operator bool() const {
+			return (track != nullptr);
+		}
+		[[nodiscard]] bool operator==(const VideoTrack &other) const {
+			return (track == other.track) && (peer == other.peer);
+		}
+		[[nodiscard]] bool operator!=(const VideoTrack &other) const {
+			return !(*this == other);
+		}
+	};
+	[[nodiscard]] auto activeVideoTracks() const
+	-> const base::flat_map<VideoEndpoint, VideoTrack> & {
+		return _activeVideoTracks;
+	}
+	[[nodiscard]] auto shownVideoTracks() const
+	-> const base::flat_set<VideoEndpoint> & {
+		return _shownVideoTracks;
+	}
 	[[nodiscard]] rpl::producer<Group::RejoinEvent> rejoinEvents() const {
 		return _rejoinEvents.events();
 	}
@@ -193,9 +355,23 @@ public:
 	}
 	static constexpr auto kSpeakLevelThreshold = 0.2;
 
+	[[nodiscard]] bool mutedByAdmin() const;
+	[[nodiscard]] bool canManage() const;
+	[[nodiscard]] rpl::producer<bool> canManageValue() const;
+
 	void setCurrentAudioDevice(bool input, const QString &deviceId);
-	//void setAudioVolume(bool input, float level);
-	void setAudioDuckingEnabled(bool enabled);
+	void setCurrentVideoDevice(const QString &deviceId);
+	[[nodiscard]] bool isSharingScreen() const;
+	[[nodiscard]] rpl::producer<bool> isSharingScreenValue() const;
+	[[nodiscard]] const std::string &screenSharingEndpoint() const;
+	[[nodiscard]] bool isSharingCamera() const;
+	[[nodiscard]] rpl::producer<bool> isSharingCameraValue() const;
+	[[nodiscard]] const std::string &cameraSharingEndpoint() const;
+	[[nodiscard]] QString screenSharingDeviceId() const;
+	void toggleVideo(bool active);
+	void toggleScreenSharing(std::optional<QString> uniqueId);
+	[[nodiscard]] bool hasVideoWithFrames() const;
+	[[nodiscard]] rpl::producer<bool> hasVideoWithFramesValue() const;
 
 	void toggleMute(const Group::MuteRequest &data);
 	void changeVolume(const Group::VolumeRequest &data);
@@ -206,6 +382,7 @@ public:
 	void applyGlobalShortcutChanges();
 
 	void pushToTalk(bool pressed, crl::time delay);
+	void setNotRequireARGB32();
 
 	[[nodiscard]] rpl::lifetime &lifetime() {
 		return _lifetime;
@@ -213,13 +390,22 @@ public:
 
 private:
 	class LoadPartTask;
+	class MediaChannelDescriptionsTask;
 
 public:
 	void broadcastPartStart(std::shared_ptr<LoadPartTask> task);
 	void broadcastPartCancel(not_null<LoadPartTask*> task);
+	void mediaChannelDescriptionsStart(
+		std::shared_ptr<MediaChannelDescriptionsTask> task);
+	void mediaChannelDescriptionsCancel(
+		not_null<MediaChannelDescriptionsTask*> task);
 
 private:
 	using GlobalShortcutValue = base::GlobalShortcutValue;
+	using Error = Group::Error;
+	struct SinkPointer;
+
+	static constexpr uint32 kDisabledSsrc = uint32(-1);
 
 	struct LoadingPart {
 		std::shared_ptr<LoadPartTask> task;
@@ -239,16 +425,40 @@ private:
 	enum class SendUpdateType {
 		Mute,
 		RaiseHand,
+		VideoMuted,
 	};
+	enum class JoinAction {
+		None,
+		Joining,
+		Leaving,
+	};
+	struct JoinState {
+		uint32 ssrc = 0;
+		JoinAction action = JoinAction::None;
+		bool nextActionPending = false;
+
+		void finish(uint32 updatedSsrc = 0) {
+			action = JoinAction::None;
+			ssrc = updatedSsrc;
+		}
+	};
+
+	[[nodiscard]] bool mediaChannelDescriptionsFill(
+		not_null<MediaChannelDescriptionsTask*> task,
+		Fn<bool(uint32)> resolved = nullptr);
+	void checkMediaChannelDescriptions(Fn<bool(uint32)> resolved = nullptr);
 
 	void handlePossibleCreateOrJoinResponse(const MTPDgroupCall &data);
 	void handlePossibleDiscarded(const MTPDgroupCallDiscarded &data);
 	void handleUpdate(const MTPDupdateGroupCall &data);
 	void handleUpdate(const MTPDupdateGroupCallParticipants &data);
-	void handleRequestError(const MTP::Error &error);
-	void handleControllerError(const QString &error);
-	void ensureControllerCreated();
+	bool tryCreateController();
 	void destroyController();
+	bool tryCreateScreencast();
+	void destroyScreencast();
+
+	void emitShareCameraError(Error error);
+	void emitShareScreenError(Error error);
 
 	void setState(State state);
 	void finish(FinishType type);
@@ -258,15 +468,21 @@ private:
 	void updateInstanceVolumes();
 	void applyMeInCallLocally();
 	void rejoin();
+	void leave();
 	void rejoin(not_null<PeerData*> as);
 	void setJoinAs(not_null<PeerData*> as);
 	void saveDefaultJoinAs(not_null<PeerData*> as);
 	void subscribeToReal(not_null<Data::GroupCall*> real);
 	void setScheduledDate(TimeId date);
+	void rejoinPresentation();
+	void leavePresentation();
+	void checkNextJoinAction();
 
 	void audioLevelsUpdated(const tgcalls::GroupLevelsUpdate &data);
 	void setInstanceConnected(tgcalls::GroupNetworkState networkState);
 	void setInstanceMode(InstanceMode mode);
+	void setScreenInstanceConnected(tgcalls::GroupNetworkState networkState);
+	void setScreenInstanceMode(InstanceMode mode);
 	void checkLastSpoke();
 	void pushToTalkCancel();
 
@@ -279,12 +495,9 @@ private:
 	void stopConnectingSound();
 	void playConnectingSoundOnce();
 
-	void requestParticipantsInformation(const std::vector<uint32_t> &ssrcs);
-	void addParticipantsToInstance();
-	void prepareParticipantForAdding(
-		const Data::GroupCallParticipant &participant);
-	void addPreparedParticipants();
-	void addPreparedParticipantsDelayed();
+	void updateRequestedVideoChannels();
+	void updateRequestedVideoChannelsDelayed();
+	void fillActiveVideoEndpoints();
 
 	void editParticipant(
 		not_null<PeerData*> participantPeer,
@@ -298,6 +511,16 @@ private:
 	void applySelfUpdate(const MTPDgroupCallParticipant &data);
 	void applyOtherParticipantUpdate(const MTPDgroupCallParticipant &data);
 
+	void setupMediaDevices();
+	void ensureOutgoingVideo();
+	void setScreenEndpoint(std::string endpoint);
+	void setCameraEndpoint(std::string endpoint);
+	void addVideoOutput(const std::string &endpoint, SinkPointer sink);
+	void setVideoEndpointLarge(VideoEndpoint endpoint);
+
+	void markEndpointActive(VideoEndpoint endpoint, bool active);
+	void markTrackShown(const VideoEndpoint &endpoint, bool shown);
+
 	[[nodiscard]] MTPInputGroupCall inputCall() const;
 
 	const not_null<Delegate*> _delegate;
@@ -307,23 +530,24 @@ private:
 	MTP::Sender _api;
 	rpl::event_stream<not_null<Data::GroupCall*>> _realChanges;
 	rpl::variable<State> _state = State::Creating;
-	rpl::variable<InstanceState> _instanceState
-		= InstanceState::Disconnected;
-	bool _instanceTransitioning = false;
-	InstanceMode _instanceMode = InstanceMode::None;
 	base::flat_set<uint32> _unresolvedSsrcs;
-	std::vector<tgcalls::GroupParticipantDescription> _preparedParticipants;
-	bool _addPreparedParticipantsScheduled = false;
+	rpl::event_stream<Error> _errors;
 	bool _recordingStoppedByMe = false;
+	bool _requestedVideoChannelsUpdateScheduled = false;
 
 	MTP::DcId _broadcastDcId = 0;
 	base::flat_map<not_null<LoadPartTask*>, LoadingPart> _broadcastParts;
+	base::flat_set<
+		std::shared_ptr<
+			MediaChannelDescriptionsTask>,
+		base::pointer_comparator<MediaChannelDescriptionsTask>> _mediaChannelDescriptionses;
 
 	not_null<PeerData*> _joinAs;
 	std::vector<not_null<PeerData*>> _possibleJoinAs;
 	QString _joinHash;
 
 	rpl::variable<MuteState> _muted = MuteState::Muted;
+	rpl::variable<bool> _canManage = false;
 	bool _initialMuteStateSent = false;
 	bool _acceptFields = false;
 
@@ -332,14 +556,46 @@ private:
 
 	uint64 _id = 0;
 	uint64 _accessHash = 0;
-	uint32 _mySsrc = 0;
+	JoinState _joinState;
+	JoinState _screenJoinState;
+	std::string _cameraEndpoint;
+	std::string _screenEndpoint;
 	TimeId _scheduleDate = 0;
 	base::flat_set<uint32> _mySsrcs;
 	mtpRequestId _createRequestId = 0;
 	mtpRequestId _updateMuteRequestId = 0;
 
+	rpl::variable<InstanceState> _instanceState
+		= InstanceState::Disconnected;
+	bool _instanceTransitioning = false;
+	InstanceMode _instanceMode = InstanceMode::None;
 	std::unique_ptr<tgcalls::GroupInstanceCustomImpl> _instance;
+	base::has_weak_ptr _instanceGuard;
+	std::shared_ptr<tgcalls::VideoCaptureInterface> _cameraCapture;
+	std::unique_ptr<Webrtc::VideoTrack> _cameraOutgoing;
+	rpl::variable<bool> _isSharingCamera = false;
+	base::flat_map<std::string, SinkPointer> _pendingVideoOutputs;
+
+	rpl::variable<InstanceState> _screenInstanceState
+		= InstanceState::Disconnected;
+	InstanceMode _screenInstanceMode = InstanceMode::None;
+	std::unique_ptr<tgcalls::GroupInstanceCustomImpl> _screenInstance;
+	base::has_weak_ptr _screenInstanceGuard;
+	std::shared_ptr<tgcalls::VideoCaptureInterface> _screenCapture;
+	std::unique_ptr<Webrtc::VideoTrack> _screenOutgoing;
+	rpl::variable<bool> _isSharingScreen = false;
+	QString _screenDeviceId;
+
+	bool _requireARGB32 = true;
+
 	rpl::event_stream<LevelUpdate> _levelUpdates;
+	rpl::event_stream<VideoActiveToggle> _videoStreamActiveUpdates;
+	rpl::event_stream<VideoActiveToggle> _videoStreamShownUpdates;
+	base::flat_map<VideoEndpoint, VideoTrack> _activeVideoTracks;
+	base::flat_set<VideoEndpoint> _shownVideoTracks;
+	rpl::variable<VideoEndpoint> _videoEndpointLarge;
+	rpl::variable<bool> _videoEndpointPinned = false;
+	crl::time _videoLargeTillTime = 0;
 	base::flat_map<uint32, Data::LastSpokeTimes> _lastSpoke;
 	rpl::event_stream<Group::RejoinEvent> _rejoinEvents;
 	rpl::event_stream<> _allowedToSpeakNotifications;
@@ -358,6 +614,7 @@ private:
 	std::unique_ptr<Webrtc::MediaDevices> _mediaDevices;
 	QString _audioInputId;
 	QString _audioOutputId;
+	QString _cameraInputId;
 
 	rpl::lifetime _lifetime;
 

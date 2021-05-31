@@ -82,7 +82,7 @@ public:
 		return _id;
 	}
 
-	[[nodiscard]] std::shared_ptr<Data::CloudImageView> ensureUserpicView();
+	[[nodiscard]] std::shared_ptr<Data::CloudImageView> &ensureUserpicView();
 
 	[[nodiscard]] virtual QString generateName();
 	[[nodiscard]] virtual QString generateShortName();
@@ -124,7 +124,7 @@ public:
 		bool actionSelected) {
 	}
 
-	void refreshName(const style::PeerListItem &st);
+	virtual void refreshName(const style::PeerListItem &st);
 	const Ui::Text::String &name() const {
 		return _name;
 	}
@@ -163,7 +163,7 @@ public:
 	template <typename UpdateCallback>
 	void setChecked(
 			bool checked,
-		const style::RoundImageCheckbox &st,
+			const style::RoundImageCheckbox &st,
 			anim::type animated,
 			UpdateCallback callback) {
 		if (checked && !_checkbox) {
@@ -171,15 +171,21 @@ public:
 		}
 		setCheckedInternal(checked, animated);
 	}
+	void setHidden(bool hidden) {
+		_hidden = hidden;
+	}
+	[[nodiscard]] bool hidden() const {
+		return _hidden;
+	}
 	void finishCheckedAnimation();
 	void invalidatePixmapsCache();
 
-	template <typename UpdateCallback>
+	template <typename MaskGenerator, typename UpdateCallback>
 	void addRipple(
 		const style::PeerListItem &st,
-		QSize size,
+		MaskGenerator &&maskGenerator,
 		QPoint point,
-		UpdateCallback updateCallback);
+		UpdateCallback &&updateCallback);
 	void stopLastRipple();
 	void paintRipple(Painter &p, int x, int y, int outerWidth);
 	void paintUserpic(
@@ -239,6 +245,7 @@ private:
 	base::flat_set<QChar> _nameFirstLetters;
 	int _absoluteIndex = -1;
 	State _disabledState = State::Active;
+	bool _hidden : 1;
 	bool _initialized : 1;
 	bool _isSearchResult : 1;
 	bool _isSavedMessagesChat : 1;
@@ -276,6 +283,7 @@ public:
 	virtual void peerListConvertRowToSearchResult(not_null<PeerListRow*> row) = 0;
 	virtual bool peerListIsRowChecked(not_null<PeerListRow*> row) = 0;
 	virtual void peerListSetRowChecked(not_null<PeerListRow*> row, bool checked) = 0;
+	virtual void peerListSetRowHidden(not_null<PeerListRow*> row, bool hidden) = 0;
 	virtual void peerListSetForeignRowChecked(
 		not_null<PeerListRow*> row,
 		bool checked,
@@ -306,6 +314,7 @@ public:
 
 	virtual void peerListShowRowMenu(
 		not_null<PeerListRow*> row,
+		bool highlightRow,
 		Fn<void(not_null<Ui::PopupMenu*>)> destroyed = nullptr) = 0;
 	virtual int peerListSelectedRowsCount() = 0;
 	virtual std::unique_ptr<PeerListState> peerListSaveState() const = 0;
@@ -452,6 +461,25 @@ public:
 	[[nodiscard]] virtual bool respectSavedMessagesChat() const {
 		return false;
 	}
+	[[nodiscard]] virtual int customRowHeight() {
+		Unexpected("PeerListController::customRowHeight.");
+	}
+	virtual void customRowPaint(
+			Painter &p,
+			crl::time now,
+			not_null<PeerListRow*> row,
+			bool selected) {
+		Unexpected("PeerListController::customRowPaint.");
+	}
+	[[nodiscard]] virtual bool customRowSelectionPoint(
+			not_null<PeerListRow*> row,
+			int x,
+			int y) {
+		Unexpected("PeerListController::customRowSelectionPoint.");
+	}
+	[[nodiscard]] virtual Fn<QImage()> customRowRippleMaskGenerator() {
+		Unexpected("PeerListController::customRowRippleMaskGenerator.");
+	}
 
 	[[nodiscard]] virtual rpl::producer<int> onlineCountValue() const;
 
@@ -516,6 +544,12 @@ public:
 	SkipResult selectSkip(int direction);
 	void selectSkipPage(int height, int direction);
 
+	enum class Mode {
+		Default,
+		Custom,
+	};
+	void setMode(Mode mode);
+
 	[[nodiscard]] rpl::producer<int> selectedIndexValue() const;
 	[[nodiscard]] bool hasSelection() const;
 	[[nodiscard]] bool hasPressed() const;
@@ -554,6 +588,9 @@ public:
 		not_null<PeerListRow*> row,
 		bool checked,
 		anim::type animated);
+	void setRowHidden(
+		not_null<PeerListRow*> row,
+		bool hidden);
 
 	template <typename ReorderCallback>
 	void reorderRows(ReorderCallback &&callback) {
@@ -562,6 +599,9 @@ public:
 			callback(searchEntity.second.begin(), searchEntity.second.end());
 		}
 		refreshIndices();
+		if (!_hiddenRows.empty()) {
+			callback(_filterResults.begin(), _filterResults.end());
+		}
 		update();
 	}
 
@@ -570,6 +610,7 @@ public:
 
 	void showRowMenu(
 		not_null<PeerListRow*> row,
+		bool highlightRow,
 		Fn<void(not_null<Ui::PopupMenu*>)> destroyed);
 
 	auto scrollToRequests() const {
@@ -657,10 +698,12 @@ private:
 
 	bool showRowMenu(
 		RowIndex index,
+		PeerListRow *row,
 		QPoint globalPos,
+		bool highlightRow,
 		Fn<void(not_null<Ui::PopupMenu*>)> destroyed = nullptr);
 
-	crl::time paintRow(Painter &p, crl::time ms, RowIndex index);
+	crl::time paintRow(Painter &p, crl::time now, RowIndex index);
 
 	void addRowEntry(not_null<PeerListRow*> row);
 	void addToSearchIndex(not_null<PeerListRow*> row);
@@ -668,7 +711,7 @@ private:
 	void removeFromSearchIndex(not_null<PeerListRow*> row);
 	void setSearchQuery(const QString &query, const QString &normalizedQuery);
 	bool showingSearch() const {
-		return !_searchQuery.isEmpty();
+		return !_hiddenRows.empty() || !_searchQuery.isEmpty();
 	}
 	int shownRowsCount() const {
 		return showingSearch() ? _filterResults.size() : _rows.size();
@@ -690,6 +733,7 @@ private:
 	not_null<PeerListController*> _controller;
 	PeerListSearchMode _searchMode = PeerListSearchMode::Disabled;
 
+	Mode _mode = Mode::Default;
 	int _rowHeight = 0;
 	int _visibleTop = 0;
 	int _visibleBottom = 0;
@@ -713,6 +757,7 @@ private:
 	QString _normalizedSearchQuery;
 	QString _mentionHighlight;
 	std::vector<not_null<PeerListRow*>> _filterResults;
+	base::flat_set<not_null<PeerListRow*>> _hiddenRows;
 
 	int _aboveHeight = 0;
 	int _belowHeight = 0;
@@ -776,6 +821,11 @@ public:
 			not_null<PeerListRow*> row,
 			bool checked) override {
 		_content->changeCheckState(row, checked, anim::type::normal);
+	}
+	void peerListSetRowHidden(
+			not_null<PeerListRow*> row,
+			bool hidden) override {
+		_content->setRowHidden(row, hidden);
 	}
 	void peerListSetForeignRowChecked(
 		not_null<PeerListRow*> row,
@@ -847,10 +897,9 @@ public:
 		_content->restoreState(std::move(state));
 	}
 	void peerListShowRowMenu(
-			not_null<PeerListRow*> row,
-			Fn<void(not_null<Ui::PopupMenu*>)> destroyed = nullptr) override {
-		_content->showRowMenu(row, std::move(destroyed));
-	}
+		not_null<PeerListRow*> row,
+		bool highlightRow,
+		Fn<void(not_null<Ui::PopupMenu*>)> destroyed = nullptr) override;
 
 protected:
 	not_null<PeerListContent*> content() const {

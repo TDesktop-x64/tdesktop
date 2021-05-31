@@ -53,6 +53,11 @@ struct Error {
 	QString details;
 };
 
+enum class CallType {
+	Incoming,
+	Outgoing,
+};
+
 class Call : public base::has_weak_ptr {
 public:
 	class Delegate {
@@ -72,7 +77,7 @@ public:
 			Fn<void()> onSuccess,
 			bool video) = 0;
 
-		virtual auto getVideoCapture()
+		virtual auto callGetVideoCapture()
 			-> std::shared_ptr<tgcalls::VideoCaptureInterface> = 0;
 
 		virtual ~Delegate() = default;
@@ -81,11 +86,12 @@ public:
 
 	static constexpr auto kSoundSampleMs = 100;
 
-	enum class Type {
-		Incoming,
-		Outgoing,
-	};
-	Call(not_null<Delegate*> delegate, not_null<UserData*> user, Type type, bool video);
+	using Type = CallType;
+	Call(
+		not_null<Delegate*> delegate,
+		not_null<UserData*> user,
+		Type type,
+		bool video);
 
 	[[nodiscard]] Type type() const {
 		return _type;

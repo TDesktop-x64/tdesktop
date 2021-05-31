@@ -451,6 +451,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_system_integration" = "System integration";
 "lng_settings_performance" = "Performance";
 "lng_settings_enable_animations" = "Enable animations";
+"lng_settings_enable_opengl" = "Enable OpenGL rendering for video";
 "lng_settings_sensitive_title" = "Sensitive content";
 "lng_settings_sensitive_disable_filtering" = "Disable filtering";
 "lng_settings_sensitive_about" = "Display sensitive media in public channels on all your Telegram devices.";
@@ -1112,6 +1113,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_action_group_call_scheduled_group" = "{from} scheduled a voice chat for {date}";
 "lng_action_group_call_scheduled_channel" = "Voice chat scheduled for {date}";
 "lng_action_group_call_finished" = "Voice chat finished ({duration})";
+"lng_action_group_call_finished_group" = "{from} ended the voice chat ({duration})";
 "lng_action_add_user" = "{from} added {user}";
 "lng_action_add_users_many" = "{from} added {users}";
 "lng_action_add_users_and_one" = "{accumulated}, {user}";
@@ -2006,8 +2008,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_group_call_raised_hand_status" = "wants to speak";
 "lng_group_call_settings" = "Settings";
 "lng_group_call_share_button" = "Share";
+"lng_group_call_video" = "Video";
+"lng_group_call_screen_share_start" = "Share Screen";
+"lng_group_call_screen_share_stop" = "Stop Sharing";
+"lng_group_call_screen_title" = "Screen {index}";
+"lng_group_call_unmute_small" = "Unmute";
+"lng_group_call_more" = "More";
 "lng_group_call_unmute" = "Unmute";
-"lng_group_call_unmute_sub" = "or hold spacebar to talk";
+"lng_group_call_unmute_sub" = "Hold space bar to temporarily unmute.";
 "lng_group_call_you_are_live" = "You are Live";
 "lng_group_call_force_muted" = "Muted by admin";
 "lng_group_call_force_muted_sub" = "You are in Listen Only mode";
@@ -2025,6 +2033,17 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_group_call_create_sure" = "Do you really want to start a voice chat in this group?";
 "lng_group_call_create_sure_channel" = "Are you sure you want to start a voice chat in this channel as your personal account?";
 "lng_group_call_join_sure_personal" = "Are you sure you want to join this voice chat as your personal account?";
+"lng_group_call_muted_no_camera" = "You can't turn on video while you're muted by admin.";
+"lng_group_call_muted_no_screen" = "You can't share your screen while you're muted by admin.";
+"lng_group_call_chat_no_camera" = "You can't turn on video in this chat.";
+"lng_group_call_chat_no_screen" = "You can't share your screen in this chat.";
+"lng_group_call_failed_screen" = "An error occured. Screencast has stopped.";
+"lng_group_call_tooltip_screen" = "Share screen";
+"lng_group_call_tooltip_camera" = "Your camera is off. Click here to enable camera.";
+"lng_group_call_tooltip_microphone" = "You are on mute. Click here to speak.";
+"lng_group_call_tooltip_camera_off" = "Disable camera";
+"lng_group_call_tooltip_force_muted" = "Muted by admin. Click if you want to speak.";
+"lng_group_call_tooltip_raised_hand" = "You asked to speak. We let the speakers know.";
 "lng_group_call_also_end" = "End voice chat";
 "lng_group_call_settings_title" = "Settings";
 "lng_group_call_invite" = "Invite Member";
@@ -2067,6 +2086,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_group_call_context_remove_hand" = "Cancel request to speak";
 "lng_group_call_context_mute_for_me" = "Mute for me";
 "lng_group_call_context_unmute_for_me" = "Unmute for me";
+"lng_group_call_context_pin_camera" = "Pin video";
+"lng_group_call_context_unpin_camera" = "Unpin video";
+"lng_group_call_context_pin_screen" = "Pin screencast";
+"lng_group_call_context_unpin_screen" = "Unpin screencast";
 "lng_group_call_context_remove" = "Remove";
 "lng_group_call_remove_channel" = "Remove {channel} from the voice chat?";
 "lng_group_call_duration_days#one" = "{count} day";
@@ -2116,6 +2139,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_group_call_recording_started" = "Voice chat recording started.";
 "lng_group_call_recording_stopped" = "Voice chat recording stopped.";
 "lng_group_call_recording_saved" = "Audio saved to Saved Messages.";
+"lng_group_call_pinned_camera_me" = "Your video is pinned.";
+"lng_group_call_pinned_screen_me" = "Your screencast is pinned.";
+"lng_group_call_pinned_camera" = "{user}'s video is pinned.";
+"lng_group_call_pinned_screen" = "{user}'s screencast is pinned.";
+"lng_group_call_unpinned_camera_me" = "Your video is unpinned.";
+"lng_group_call_unpinned_screen_me" = "Your screencast is unpinned.";
+"lng_group_call_unpinned_camera" = "{user}'s video is unpinned.";
+"lng_group_call_unpinned_screen" = "{user}'s screencast is unpinned.";
+"lng_group_call_sure_screencast" = "{user} is screensharing. This action will make your screencast pinned for all participants.";
 "lng_group_call_recording_start_sure" = "Do you want to start recording this chat and save the result into an audio file?\n\nOther members will see the chat is being recorded.";
 "lng_group_call_recording_stop_sure" = "Do you want to stop recording this chat?";
 "lng_group_call_recording_start_field" = "Recording Title";
@@ -2781,6 +2813,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_mac_menu_new_channel" = "New Channel";
 "lng_mac_menu_show" = "Show Telegram";
 "lng_mac_menu_emoji_and_symbols" = "Emoji & Symbols";
+
+"lng_mac_menu_player_pause" = "Pause";
+"lng_mac_menu_player_resume" = "Resume";
+"lng_mac_menu_player_next" = "Next";
+"lng_mac_menu_player_previous" = "Previous";
+"lng_mac_menu_player_stop" = "Stop";
 
 "lng_mac_touchbar_favorite_stickers" = "Favorite stickers";
 

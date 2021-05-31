@@ -25,6 +25,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_session_controller.h"
 #include "core/application.h"
 #include "core/core_settings.h"
+#include "calls/calls_call.h"
 #include "calls/calls_instance.h"
 #include "calls/calls_video_bubble.h"
 #include "webrtc/webrtc_media_devices.h"
@@ -154,7 +155,9 @@ void Calls::setupContent() {
 		track->renderNextFrame(
 		) | rpl::start_with_next([=] {
 			const auto size = track->frameSize();
-			if (size.isEmpty() || Core::App().calls().currentCall()) {
+			if (size.isEmpty()
+				|| Core::App().calls().currentCall()
+				|| Core::App().calls().currentGroupCall()) {
 				return;
 			}
 			const auto width = bubbleWrap->width();
@@ -166,9 +169,13 @@ void Calls::setupContent() {
 			bubbleWrap->update();
 		}, bubbleWrap->lifetime());
 
-		Core::App().calls().currentCallValue(
-		) | rpl::start_with_next([=](::Calls::Call *value) {
-			if (value) {
+		using namespace rpl::mappers;
+		rpl::combine(
+			Core::App().calls().currentCallValue(),
+			Core::App().calls().currentGroupCallValue(),
+			_1 || _2
+		) | rpl::start_with_next([=](bool has) {
+			if (has) {
 				track->setState(VideoState::Inactive);
 				bubbleWrap->resize(bubbleWrap->width(), 0);
 			} else {
@@ -244,40 +251,6 @@ void Calls::setupContent() {
 	AddSkip(content);
 	AddSubsectionTitle(content, tr::lng_settings_call_section_other());
 
-//#if defined Q_OS_MAC && !defined OS_MAC_STORE
-//	AddButton(
-//		content,
-//		tr::lng_settings_call_audio_ducking(),
-//		st::settingsButton
-//	)->toggleOn(
-//		rpl::single(settings.callAudioDuckingEnabled())
-//	)->toggledValue() | rpl::filter([](bool enabled) {
-//		return (enabled != Core::App().settings().callAudioDuckingEnabled());
-//	}) | rpl::start_with_next([=](bool enabled) {
-//		Core::App().settings().setCallAudioDuckingEnabled(enabled);
-//		Core::App().saveSettingsDelayed();
-//		if (const auto call = Core::App().calls().currentCall()) {
-//			call->setAudioDuckingEnabled(enabled);
-//		}
-//	}, content->lifetime());
-//#endif // Q_OS_MAC && !OS_MAC_STORE
-
-	//const auto backend = [&]() -> QString {
-	//	using namespace Webrtc;
-	//	switch (settings.callAudioBackend()) {
-	//	case Backend::OpenAL: return "OpenAL";
-	//	case Backend::ADM: return "WebRTC ADM";
-	//	case Backend::ADM2: return "WebRTC ADM2";
-	//	}
-	//	Unexpected("Value in backend.");
-	//}();
-	//AddButton(
-	//	content,
-	//	rpl::single("Call audio backend: " + backend),
-	//	st::settingsButton
-	//)->addClickHandler([] {
-	//	Ui::show(ChooseAudioBackendBox());
-	//});
 	AddButton(
 		content,
 		tr::lng_settings_call_accept_calls(),

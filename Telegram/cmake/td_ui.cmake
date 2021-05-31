@@ -47,6 +47,9 @@ nice_target_sources(td_ui ${src_loc}
 PRIVATE
     ${style_files}
     
+    calls/group/ui/desktop_capture_choose_source.cpp
+    calls/group/ui/desktop_capture_choose_source.h
+
     core/file_location.cpp
     core/file_location.h
     core/mime_type.cpp
@@ -134,6 +137,8 @@ PRIVATE
     ui/controls/invite_link_label.h
     ui/controls/send_button.cpp
     ui/controls/send_button.h
+    ui/text/format_song_name.cpp
+    ui/text/format_song_name.h
     ui/text/format_values.cpp
     ui/text/format_values.h
     ui/text/text_options.cpp
@@ -163,7 +168,9 @@ PUBLIC
     desktop-app::lib_ui
     desktop-app::lib_lottie
 PRIVATE
+    tdesktop::lib_tgcalls
     desktop-app::lib_ffmpeg
     desktop-app::lib_webview
+    desktop-app::lib_webrtc
     desktop-app::lib_stripe
 )

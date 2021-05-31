@@ -13,6 +13,7 @@ namespace Calls::Group {
 
 constexpr auto kDefaultVolume = 10000;
 constexpr auto kMaxVolume = 20000;
+constexpr auto kBlobsEnterDuration = crl::time(250);
 
 struct MuteRequest {
 	not_null<PeerData*> peer;
@@ -45,6 +46,26 @@ struct JoinInfo {
 	std::vector<not_null<PeerData*>> possibleJoinAs;
 	QString joinHash;
 	TimeId scheduleDate = 0;
+};
+
+enum class PanelMode {
+	Default,
+	Wide,
+};
+
+enum class VideoQuality {
+	Thumbnail,
+	Medium,
+	Full,
+};
+
+enum class Error {
+	NoCamera,
+	ScreenFailed,
+	MutedNoCamera,
+	MutedNoScreen,
+	DisabledNoCamera,
+	DisabledNoScreen,
 };
 
 } // namespace Calls::Group

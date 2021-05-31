@@ -12,6 +12,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_session.h"
 #include "data/data_user.h"
 #include "base/timer.h"
+#include "base/event_filter.h"
 #include "base/concurrent_timer.h"
 #include "base/qt_signal_producer.h"
 #include "base/unixtime.h"
@@ -371,8 +372,6 @@ void Application::showPhoto(not_null<PhotoData*> photo, HistoryItem *item) {
 	Expects(_mediaView != nullptr);
 
 	_mediaView->showPhoto(photo, item);
-	_mediaView->activateWindow();
-	_mediaView->setFocus();
 }
 
 void Application::showPhoto(
@@ -381,8 +380,6 @@ void Application::showPhoto(
 	Expects(_mediaView != nullptr);
 
 	_mediaView->showPhoto(photo, peer);
-	_mediaView->activateWindow();
-	_mediaView->setFocus();
 }
 
 void Application::showDocument(not_null<DocumentData*> document, HistoryItem *item) {
@@ -394,8 +391,6 @@ void Application::showDocument(not_null<DocumentData*> document, HistoryItem *it
 		File::Launch(document->location(false).fname);
 	} else {
 		_mediaView->showDocument(document, item);
-		_mediaView->activateWindow();
-		_mediaView->setFocus();
 	}
 }
 
@@ -405,8 +400,6 @@ void Application::showTheme(
 	Expects(_mediaView != nullptr);
 
 	_mediaView->showTheme(document, cloud);
-	_mediaView->activateWindow();
-	_mediaView->setFocus();
 }
 
 PeerData *Application::ui_getPeerForMouseAction() {
@@ -979,7 +972,7 @@ bool Application::minimizeActiveWindow() {
 }
 
 QWidget *Application::getFileDialogParent() {
-	return (_mediaView && _mediaView->isVisible())
+	return (_mediaView && !_mediaView->isHidden())
 		? (QWidget*)_mediaView.get()
 		: activeWindow()
 		? (QWidget*)activeWindow()->widget()
@@ -994,9 +987,7 @@ void Application::notifyFileDialogShown(bool shown) {
 
 void Application::checkMediaViewActivation() {
 	if (_mediaView && !_mediaView->isHidden()) {
-		_mediaView->activateWindow();
-		QApplication::setActiveWindow(_mediaView.get());
-		_mediaView->setFocus();
+		_mediaView->activate();
 	}
 }
 
@@ -1010,30 +1001,49 @@ QPoint Application::getPointForCallPanelCenter() const {
 // macOS Qt bug workaround, sometimes no leaveEvent() gets to the nested widgets.
 void Application::registerLeaveSubscription(not_null<QWidget*> widget) {
 #ifdef Q_OS_MAC
-	if (const auto topLevel = widget->window()) {
-		if (topLevel == _window->widget()) {
-			auto weak = Ui::MakeWeak(widget);
-			auto subscription = _window->widget()->leaveEvents(
-			) | rpl::start_with_next([weak] {
-				if (const auto window = weak.data()) {
-					QEvent ev(QEvent::Leave);
-					QGuiApplication::sendEvent(window, &ev);
+	if (const auto window = widget->window()) {
+		auto i = _leaveFilters.find(window);
+		if (i == end(_leaveFilters)) {
+			const auto check = [=](not_null<QEvent*> e) {
+				if (e->type() == QEvent::Leave) {
+					if (const auto taken = _leaveFilters.take(window)) {
+						for (const auto weak : taken->registered) {
+							if (const auto widget = weak.data()) {
+								QEvent ev(QEvent::Leave);
+								QCoreApplication::sendEvent(widget, &ev);
+							}
+						}
+						delete taken->filter.data();
+					}
 				}
+				return base::EventFilterResult::Continue;
+			};
+			const auto filter = base::install_event_filter(window, check);
+			QObject::connect(filter, &QObject::destroyed, [=] {
+				_leaveFilters.remove(window);
 			});
-			_leaveSubscriptions.emplace_back(weak, std::move(subscription));
+			i = _leaveFilters.emplace(
+				window,
+				LeaveFilter{ .filter = filter.get() }).first;
 		}
+		i->second.registered.push_back(widget.get());
 	}
 #endif // Q_OS_MAC
 }
 
 void Application::unregisterLeaveSubscription(not_null<QWidget*> widget) {
 #ifdef Q_OS_MAC
-	_leaveSubscriptions = std::move(
-		_leaveSubscriptions
-	) | ranges::actions::remove_if([&](const LeaveSubscription &subscription) {
-		auto pointer = subscription.pointer.data();
-		return !pointer || (pointer == widget);
-	});
+	if (const auto topLevel = widget->window()) {
+		const auto i = _leaveFilters.find(topLevel);
+		if (i != end(_leaveFilters)) {
+			i->second.registered = std::move(
+				i->second.registered
+			) | ranges::actions::remove_if([&](QPointer<QWidget> widget) {
+				const auto pointer = widget.data();
+				return !pointer || (pointer == widget);
+			});
+		}
+	}
 #endif // Q_OS_MAC
 }
 

@@ -838,7 +838,7 @@ void Session::registerInvitedToCallUser(
 		const auto inCall = ranges::contains(
 			call->participants(),
 			user,
-			&Data::GroupCall::Participant::peer);
+			&Data::GroupCallParticipant::peer);
 		if (inCall) {
 			return;
 		}

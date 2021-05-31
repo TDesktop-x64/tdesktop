@@ -17,7 +17,7 @@ RUN yum -y install centos-release-scl
 RUN yum -y install git cmake3 meson ninja-build autoconf automake libtool \
 	zlib-devel gtk2-devel gtk3-devel libdrm-devel fontconfig-devel \
 	freetype-devel libX11-devel at-spi2-core-devel alsa-lib-devel \
-	pulseaudio-libs-devel mesa-libGL-devel mesa-libEGL-devel \
+	pulseaudio-libs-devel mesa-libGL-devel mesa-libEGL-devel libudev-devel \
 	webkitgtk4-devel pkgconfig bison yasm file which xorg-x11-util-macros \
 	devtoolset-9-make devtoolset-9-gcc devtoolset-9-gcc-c++ \
 	devtoolset-9-binutils
@@ -67,6 +67,23 @@ RUN DESTDIR="$LibrariesPath/xz-cache" cmake3 --install build
 WORKDIR ..
 RUN rm -rf xz
 
+FROM patches AS libproxy
+RUN git clone -b 0.4.17 --depth=1 $GIT/libproxy/libproxy.git
+
+WORKDIR libproxy
+RUN git apply ../patches/libproxy.patch
+RUN cmake3 -B build . \
+	-DCMAKE_BUILD_TYPE=Release \
+	-DWITH_DBUS=OFF \
+	-DWITH_NM=OFF \
+	-DWITH_NMold=OFF
+
+RUN cmake3 --build build -j$(nproc)
+RUN DESTDIR="$LibrariesPath/libproxy-cache" cmake3 --install build
+
+WORKDIR ..
+RUN rm -rf libproxy
+
 FROM builder AS mozjpeg
 RUN git clone -b v4.0.1-rc2 --depth=1 $GIT/mozilla/mozjpeg.git
 
@@ -94,6 +111,22 @@ RUN make DESTDIR="$LibrariesPath/opus-cache" install
 
 WORKDIR ..
 RUN rm -rf opus
+
+FROM builder AS rnnoise
+RUN git clone -b master --depth=1 $GIT/desktop-app/rnnoise
+
+WORKDIR rnnoise
+RUN cmake3 -B build . \
+	-DCMAKE_BUILD_TYPE=Release
+
+RUN cmake3 --build build -j$(nproc)
+RUN mkdir -p "$LibrariesPath/rnnoise-cache/usr/local/include"
+RUN cp "include/rnnoise.h" "$LibrariesPath/rnnoise-cache/usr/local/include/"
+RUN mkdir -p "$LibrariesPath/rnnoise-cache/usr/local/lib"
+RUN cp "build/librnnoise.a" "$LibrariesPath/rnnoise-cache/usr/local/lib/"
+
+WORKDIR ..
+RUN rm -rf rnnoise
 
 FROM builder AS xcb-proto
 RUN git clone -b xcb-proto-1.14 --depth=1 https://gitlab.freedesktop.org/xorg/proto/xcbproto.git
@@ -176,6 +209,17 @@ RUN make DESTDIR="$LibrariesPath/libXext-cache" install
 WORKDIR ..
 RUN rm -rf libxext
 
+FROM builder AS libXtst
+RUN git clone -b libXtst-1.2.3 --depth=1 https://gitlab.freedesktop.org/xorg/lib/libxtst.git
+
+WORKDIR libxtst
+RUN ./autogen.sh --enable-static
+RUN make -j$(nproc)
+RUN make DESTDIR="$LibrariesPath/libXtst-cache" install
+
+WORKDIR ..
+RUN rm -rf libxtst
+
 FROM builder AS libXfixes
 RUN git clone -b libXfixes-5.0.3 --depth=1 https://gitlab.freedesktop.org/xorg/lib/libxfixes.git
 
@@ -199,6 +243,50 @@ RUN make DESTDIR="$LibrariesPath/libXv-cache" install
 
 WORKDIR ..
 RUN rm -rf libxv
+
+FROM builder AS libXrandr
+RUN git clone -b libXrandr-1.5.2 --depth=1 https://gitlab.freedesktop.org/xorg/lib/libxrandr.git
+
+WORKDIR libxrandr
+RUN ./autogen.sh --enable-static
+RUN make -j$(nproc)
+RUN make DESTDIR="$LibrariesPath/libXrandr-cache" install
+
+WORKDIR ..
+RUN rm -rf libxrandr
+
+FROM builder AS libXrender
+RUN git clone -b libXrender-0.9.10 --depth=1 https://gitlab.freedesktop.org/xorg/lib/libxrender.git
+
+WORKDIR libxrender
+RUN ./autogen.sh --enable-static
+RUN make -j$(nproc)
+RUN make DESTDIR="$LibrariesPath/libXrender-cache" install
+
+WORKDIR ..
+RUN rm -rf libxrender
+
+FROM builder AS libXdamage
+RUN git clone -b libXdamage-1.1.5 --depth=1 https://gitlab.freedesktop.org/xorg/lib/libxdamage.git
+
+WORKDIR libxdamage
+RUN ./autogen.sh --enable-static
+RUN make -j$(nproc)
+RUN make DESTDIR="$LibrariesPath/libXdamage-cache" install
+
+WORKDIR ..
+RUN rm -rf libxdamage
+
+FROM builder AS libXcomposite
+RUN git clone -b libXcomposite-0.4.5 --depth=1 https://gitlab.freedesktop.org/xorg/lib/libxcomposite.git
+
+WORKDIR libxcomposite
+RUN ./autogen.sh --enable-static
+RUN make -j$(nproc)
+RUN make DESTDIR="$LibrariesPath/libXcomposite-cache" install
+
+WORKDIR ..
+RUN rm -rf libxcomposite
 
 FROM builder AS wayland
 COPY --from=libffi ${LibrariesPath}/libffi-cache /
@@ -271,6 +359,7 @@ WORKDIR libvdpau
 RUN sed -i 's/shared_library/library/g' src/meson.build
 
 RUN meson build \
+	--buildtype=release \
 	--default-library=both \
 	--sysconfdir=/etc \
 	-Ddocumentation=false \
@@ -291,10 +380,12 @@ COPY --from=libXv ${LibrariesPath}/libXv-cache /
 COPY --from=libva ${LibrariesPath}/libva-cache /
 COPY --from=libvdpau ${LibrariesPath}/libvdpau-cache /
 
-RUN git clone -b release/4.2 --depth=1 $GIT/FFmpeg/FFmpeg.git ffmpeg
+RUN git clone -b release/4.4 --depth=1 $GIT/FFmpeg/FFmpeg.git ffmpeg
 
 WORKDIR ffmpeg
 RUN ./configure \
+	--extra-cflags="-DCONFIG_SAFE_BITSTREAM_READER=1" \
+	--extra-cxxflags="-DCONFIG_SAFE_BITSTREAM_READER=1" \
 	--disable-debug \
 	--disable-programs \
 	--disable-doc \
@@ -445,6 +536,7 @@ RUN git clone -b xkbcommon-1.0.3 --depth=1 $GIT/xkbcommon/libxkbcommon.git
 
 WORKDIR libxkbcommon
 RUN meson build \
+	--buildtype=release \
 	--default-library=both \
 	-Denable-docs=false \
 	-Denable-wayland=false \
@@ -508,6 +600,7 @@ RUN rm -rf glibmm
 FROM patches AS qt
 
 COPY --from=libffi ${LibrariesPath}/libffi-cache /
+COPY --from=libproxy ${LibrariesPath}/libproxy-cache /
 COPY --from=mozjpeg ${LibrariesPath}/mozjpeg-cache /
 COPY --from=xcb ${LibrariesPath}/xcb-cache /
 COPY --from=xcb-wm ${LibrariesPath}/xcb-wm-cache /
@@ -537,6 +630,7 @@ RUN echo './configure -prefix '$'\"''$QT_PREFIX'$'\"'' \
 	-opensource \
 	-confirm-license \
 	-xcb \
+	-libproxy \
 	-qt-libpng \
 	-qt-harfbuzz \
 	-qt-pcre \
@@ -549,6 +643,7 @@ RUN echo './configure -prefix '$'\"''$QT_PREFIX'$'\"'' \
 	-openssl-linked \
 	-I '$'\"''$OPENSSL_PREFIX/include'$'\"'' \
 	OPENSSL_LIBS='$'\"''$OPENSSL_PREFIX/lib/libssl.a $OPENSSL_PREFIX/lib/libcrypto.a -lz -ldl -lpthread'$'\"'' \
+	LIBPROXY_LIBS='$'\"''-lproxy -ldl'$'\"'' \
 	-nomake examples \
 	-nomake tests' >> ./run_configure.sh
 RUN cat ./run_configure.sh
@@ -566,6 +661,7 @@ FROM builder AS kwayland
 
 COPY --from=extra-cmake-modules ${LibrariesPath}/extra-cmake-modules-cache /
 COPY --from=libffi ${LibrariesPath}/libffi-cache /
+COPY --from=libproxy ${LibrariesPath}/libproxy-cache /
 COPY --from=mozjpeg ${LibrariesPath}/mozjpeg-cache /
 COPY --from=xcb ${LibrariesPath}/xcb-cache /
 COPY --from=xcb-wm ${LibrariesPath}/xcb-wm-cache /
@@ -635,14 +731,26 @@ COPY --from=mozjpeg ${LibrariesPath}/mozjpeg-cache /
 COPY --from=opus ${LibrariesPath}/opus-cache /
 COPY --from=ffmpeg ${LibrariesPath}/ffmpeg-cache /
 COPY --from=openssl ${LibrariesPath}/openssl-cache /
+COPY --from=libXtst ${LibrariesPath}/libXtst-cache /
 
-ADD https://api.github.com/repos/desktop-app/tg_owt/git/refs/heads/master tg_owt-version.json
-RUN git clone --depth=1 --recursive $GIT/desktop-app/tg_owt.git
-
+# Shallow clone on a specific commit.
+RUN mkdir tg_owt
 WORKDIR tg_owt
+RUN git init
+RUN git remote add origin $GIT/desktop-app/tg_owt.git
+RUN git fetch --depth=1 origin 56f0e53eaccfaed54c513f8795cc03a25e2a72f8
+RUN git reset --hard FETCH_HEAD
+RUN git submodule init
+RUN git submodule update
+
+WORKDIR src/third_party/pipewire
+RUN meson build
+
+WORKDIR ../../..
 
 RUN cmake3 -B out/Release . \
 	-DCMAKE_BUILD_TYPE=Release \
+	-DTG_OWT_BUILD_AUDIO_BACKENDS=OFF \
 	-DTG_OWT_SPECIAL_TARGET=linux \
 	-DTG_OWT_LIBJPEG_INCLUDE_PATH=/usr/local/include \
 	-DTG_OWT_OPENSSL_INCLUDE_PATH=$OPENSSL_PREFIX/include \
@@ -665,8 +773,10 @@ FROM builder
 
 COPY --from=libffi ${LibrariesPath}/libffi-cache /
 COPY --from=xz ${LibrariesPath}/xz-cache /
+COPY --from=libproxy ${LibrariesPath}/libproxy-cache /
 COPY --from=mozjpeg ${LibrariesPath}/mozjpeg-cache /
 COPY --from=opus ${LibrariesPath}/opus-cache /
+COPY --from=rnnoise ${LibrariesPath}/rnnoise-cache /
 COPY --from=xcb ${LibrariesPath}/xcb-cache /
 COPY --from=xcb-wm ${LibrariesPath}/xcb-wm-cache /
 COPY --from=xcb-util ${LibrariesPath}/xcb-util-cache /
@@ -676,6 +786,11 @@ COPY --from=xcb-render-util ${LibrariesPath}/xcb-render-util-cache /
 COPY --from=libXext ${LibrariesPath}/libXext-cache /
 COPY --from=libXfixes ${LibrariesPath}/libXfixes-cache /
 COPY --from=libXv ${LibrariesPath}/libXv-cache /
+COPY --from=libXtst ${LibrariesPath}/libXtst-cache /
+COPY --from=libXrandr ${LibrariesPath}/libXrandr-cache /
+COPY --from=libXrender ${LibrariesPath}/libXrender-cache /
+COPY --from=libXdamage ${LibrariesPath}/libXdamage-cache /
+COPY --from=libXcomposite ${LibrariesPath}/libXcomposite-cache /
 COPY --from=wayland ${LibrariesPath}/wayland-cache /
 COPY --from=libva ${LibrariesPath}/libva-cache /
 COPY --from=libvdpau ${LibrariesPath}/libvdpau-cache /

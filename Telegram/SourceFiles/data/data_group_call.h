@@ -13,6 +13,10 @@ class PeerData;
 
 class ApiWrap;
 
+namespace Calls {
+struct ParticipantVideoParams;
+} // namespace Calls
+
 namespace Data {
 
 struct LastSpokeTimes {
@@ -22,6 +26,7 @@ struct LastSpokeTimes {
 
 struct GroupCallParticipant {
 	not_null<PeerData*> peer;
+	std::shared_ptr<Calls::ParticipantVideoParams> videoParams;
 	TimeId date = 0;
 	TimeId lastActive = 0;
 	uint64 raisedHandRating = 0;
@@ -34,6 +39,9 @@ struct GroupCallParticipant {
 	bool mutedByMe = false;
 	bool canSelfUnmute = false;
 	bool onlyMinLoaded = false;
+
+	[[nodiscard]] const std::string &cameraEndpoint() const;
+	[[nodiscard]] const std::string &screenEndpoint() const;
 };
 
 class GroupCall final {
@@ -82,6 +90,12 @@ public:
 	[[nodiscard]] rpl::producer<bool> scheduleStartSubscribedValue() const {
 		return _scheduleStartSubscribed.value();
 	}
+	[[nodiscard]] bool canStartVideo() const {
+		return _canStartVideo.current();
+	}
+	[[nodiscard]] rpl::producer<bool> canStartVideoValue() const {
+		return _canStartVideo.value();
+	}
 
 	void setPeer(not_null<PeerData*> peer);
 
@@ -91,16 +105,23 @@ public:
 		std::optional<Participant> now;
 	};
 
-	static constexpr auto kSoundStatusKeptFor = crl::time(350);
+	static constexpr auto kSoundStatusKeptFor = crl::time(1500);
 
 	[[nodiscard]] auto participants() const
 		-> const std::vector<Participant> &;
 	void requestParticipants();
 	[[nodiscard]] bool participantsLoaded() const;
-	[[nodiscard]] PeerData *participantPeerBySsrc(uint32 ssrc) const;
+	[[nodiscard]] PeerData *participantPeerByAudioSsrc(uint32 ssrc) const;
+	[[nodiscard]] const Participant *participantByPeer(
+		not_null<PeerData*> peer) const;
+	[[nodiscard]] const Participant *participantByEndpoint(
+		const std::string &endpoint) const;
 
-	[[nodiscard]] rpl::producer<> participantsSliceAdded();
-	[[nodiscard]] rpl::producer<ParticipantUpdate> participantUpdated() const;
+	[[nodiscard]] rpl::producer<> participantsReloaded();
+	[[nodiscard]] auto participantUpdated() const
+		-> rpl::producer<ParticipantUpdate>;
+	[[nodiscard]] auto participantSpeaking() const
+		-> rpl::producer<not_null<Participant*>>;
 
 	void enqueueUpdate(const MTPUpdate &update);
 	void applyLocalUpdate(
@@ -113,6 +134,12 @@ public:
 		PeerData *participantPeerLoaded);
 
 	void resolveParticipants(const base::flat_set<uint32> &ssrcs);
+	[[nodiscard]] rpl::producer<
+		not_null<const base::flat_map<
+			uint32,
+			LastSpokeTimes>*>> participantsResolved() const {
+		return _participantsResolved.events();
+	}
 
 	[[nodiscard]] int fullCount() const;
 	[[nodiscard]] rpl::producer<int> fullCountValue() const;
@@ -128,9 +155,11 @@ public:
 
 private:
 	enum class ApplySliceSource {
+		FullReloaded,
 		SliceLoaded,
 		UnknownLoaded,
 		UpdateReceived,
+		UpdateConstructed,
 	};
 	enum class QueuedType : uint8 {
 		VersionedParticipant,
@@ -156,8 +185,9 @@ private:
 	void processFullCallFields(const MTPphone_GroupCall &call);
 	[[nodiscard]] bool requestParticipantsAfterReload(
 		const MTPphone_GroupCall &call) const;
-	void processSavedFullCall();
+	[[nodiscard]] bool processSavedFullCall();
 	void finishParticipantsSliceRequest();
+	[[nodiscard]] Participant *findParticipant(not_null<PeerData*> peer);
 
 	const uint64 _id = 0;
 	const uint64 _accessHash = 0;
@@ -175,7 +205,7 @@ private:
 	std::optional<MTPphone_GroupCall> _savedFull;
 
 	std::vector<Participant> _participants;
-	base::flat_map<uint32, not_null<PeerData*>> _participantPeerBySsrc;
+	base::flat_map<uint32, not_null<PeerData*>> _participantPeerByAudioSsrc;
 	base::flat_map<not_null<PeerData*>, crl::time> _speakingByActiveFinishes;
 	base::Timer _speakingByActiveFinishTimer;
 	QString _nextOffset;
@@ -184,13 +214,19 @@ private:
 	rpl::variable<TimeId> _recordStartDate = 0;
 	rpl::variable<TimeId> _scheduleDate = 0;
 	rpl::variable<bool> _scheduleStartSubscribed = false;
+	rpl::variable<bool> _canStartVideo = false;
 
 	base::flat_map<uint32, LastSpokeTimes> _unknownSpokenSsrcs;
 	base::flat_map<PeerId, LastSpokeTimes> _unknownSpokenPeerIds;
+	rpl::event_stream<
+		not_null<const base::flat_map<
+			uint32,
+			LastSpokeTimes>*>> _participantsResolved;
 	mtpRequestId _unknownParticipantPeersRequestId = 0;
 
 	rpl::event_stream<ParticipantUpdate> _participantUpdates;
-	rpl::event_stream<> _participantsSliceAdded;
+	rpl::event_stream<not_null<Participant*>> _participantSpeaking;
+	rpl::event_stream<> _participantsReloaded;
 
 	bool _joinMuted = false;
 	bool _canChangeJoinMuted = true;

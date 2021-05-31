@@ -5,11 +5,11 @@ the official desktop application for the Telegram messaging service.
 For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
-#include "calls/calls_group_menu.h"
+#include "calls/group/calls_group_menu.h"
 
-#include "calls/calls_group_call.h"
-#include "calls/calls_group_settings.h"
-#include "calls/calls_group_panel.h"
+#include "calls/group/calls_group_call.h"
+#include "calls/group/calls_group_settings.h"
+#include "calls/group/calls_group_panel.h"
 #include "data/data_peer.h"
 #include "data/data_group_call.h"
 #include "info/profile/info_profile_values.h" // Info::Profile::NameValue.
@@ -78,10 +78,6 @@ void StartGroupCallRecordingBox(
 	});
 	box->addButton(tr::lng_group_call_recording_start_button(), [=] {
 		const auto result = input->getLastText().trimmed();
-		if (result.isEmpty()) {
-			input->showError();
-			return;
-		}
 		box->closeBox();
 		done(result);
 	});
@@ -590,7 +586,9 @@ void FillMenu(
 		not_null<Ui::DropdownMenu*> menu,
 		not_null<PeerData*> peer,
 		not_null<GroupCall*> call,
+		bool wide,
 		Fn<void()> chooseJoinAs,
+		Fn<void()> chooseShareScreenSource,
 		Fn<void(object_ptr<Ui::BoxContent>)> showBox) {
 	const auto weak = base::make_weak(call.get());
 	const auto resolveReal = [=] {
@@ -606,8 +604,10 @@ void FillMenu(
 	}
 
 	const auto addEditJoinAs = call->showChooseJoinAs();
-	const auto addEditTitle = peer->canManageGroupCall();
-	const auto addEditRecording = peer->canManageGroupCall()
+	const auto addEditTitle = call->canManage();
+	const auto addEditRecording = call->canManage() && !real->scheduleDate();
+	const auto addScreenCast = !wide
+		&& (real->canStartVideo() || call->isSharingScreen())
 		&& !real->scheduleDate();
 	if (addEditJoinAs) {
 		menu->addAction(MakeJoinAsAction(
@@ -660,6 +660,23 @@ void FillMenu(
 			real->recordStartDateValue(),
 			handler));
 	}
+	if (addScreenCast) {
+		const auto sharing = call->isSharingScreen();
+		const auto toggle = [=] {
+			if (const auto strong = weak.get()) {
+				if (sharing) {
+					strong->toggleScreenSharing(std::nullopt);
+				} else {
+					chooseShareScreenSource();
+				}
+			}
+		};
+		menu->addAction(
+			(call->isSharingScreen()
+				? tr::lng_group_call_screen_share_stop(tr::now)
+				: tr::lng_group_call_screen_share_start(tr::now)),
+			toggle);
+	}
 	menu->addAction(tr::lng_group_call_settings(tr::now), [=] {
 		if (const auto strong = weak.get()) {
 			showBox(Box(SettingsBox, strong));
@@ -677,8 +694,12 @@ void FillMenu(
 	menu->addAction(MakeAttentionAction(
 		menu->menu(),
 		(real->scheduleDate()
-			? tr::lng_group_call_cancel(tr::now)
-			: tr::lng_group_call_end(tr::now)),
+			? (call->canManage()
+				? tr::lng_group_call_cancel(tr::now)
+				: tr::lng_group_call_leave(tr::now))
+			: (call->canManage()
+				? tr::lng_group_call_end(tr::now)
+				: tr::lng_group_call_leave(tr::now))),
 		finish));
 }
 

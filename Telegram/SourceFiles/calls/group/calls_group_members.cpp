@@ -132,11 +132,11 @@ private:
 	[[nodiscard]] bool allRowsAboveMoreImportantThanHand(
 		not_null<Row*> row,
 		uint64 raiseHandRating) const;
-	const Data::GroupCallParticipant *findParticipant(
+	[[nodiscard]] const Data::GroupCallParticipant *findParticipant(
 		const std::string &endpoint) const;
-	const std::string &computeScreenEndpoint(
+	[[nodiscard]] const std::string &computeScreenEndpoint(
 		not_null<const Data::GroupCallParticipant*> participant) const;
-	const std::string &computeCameraEndpoint(
+	[[nodiscard]] const std::string &computeCameraEndpoint(
 		not_null<const Data::GroupCallParticipant*> participant) const;
 	void showRowMenu(not_null<PeerListRow*> row, bool highlightRow);
 
@@ -147,7 +147,7 @@ private:
 	void appendInvitedUsers();
 	void scheduleRaisedHandStatusRemove();
 
-	void hideRowsWithVideoExcept(const VideoEndpoint &pinned);
+	void hideRowsWithVideoExcept(const VideoEndpoint &large);
 	void showAllHiddenRows();
 	void hideRowWithVideo(const VideoEndpoint &endpoint);
 	void showRowWithVideo(const VideoEndpoint &endpoint);
@@ -288,11 +288,11 @@ void Members::Controller::setupListChangeViewers() {
 	}, _lifetime);
 
 	_call->videoStreamShownUpdates(
-	) | rpl::filter([=](const VideoActiveToggle &update) {
+	) | rpl::filter([=](const VideoStateToggle &update) {
 		const auto &large = _call->videoEndpointLarge();
 		return large && (update.endpoint != large);
-	}) | rpl::start_with_next([=](const VideoActiveToggle &update) {
-		if (update.active) {
+	}) | rpl::start_with_next([=](const VideoStateToggle &update) {
+		if (update.value) {
 			hideRowWithVideo(update.endpoint);
 		} else {
 			showRowWithVideo(update.endpoint);
@@ -316,17 +316,25 @@ void Members::Controller::setupListChangeViewers() {
 }
 
 void Members::Controller::hideRowsWithVideoExcept(
-		const VideoEndpoint &pinned) {
-	auto hidden = false;
+		const VideoEndpoint &large) {
+	auto changed = false;
+	auto showLargeRow = true;
 	for (const auto &endpoint : _call->shownVideoTracks()) {
-		if (endpoint != pinned) {
+		if (endpoint != large) {
 			if (const auto row = findRow(endpoint.peer)) {
+				if (endpoint.peer == large.peer) {
+					showLargeRow = false;
+				}
 				delegate()->peerListSetRowHidden(row, true);
-				hidden = true;
+				changed = true;
 			}
 		}
 	}
-	if (hidden) {
+	if (const auto row = showLargeRow ? findRow(large.peer) : nullptr) {
+		delegate()->peerListSetRowHidden(row, false);
+		changed = true;
+	}
+	if (changed) {
 		delegate()->peerListRefreshRows();
 	}
 }
@@ -403,8 +411,8 @@ void Members::Controller::subscribeToChanges(not_null<Data::GroupCall*> real) {
 		toggleVideoEndpointActive(endpoint, true);
 	}
 	_call->videoStreamActiveUpdates(
-	) | rpl::start_with_next([=](const VideoActiveToggle &update) {
-		toggleVideoEndpointActive(update.endpoint, update.active);
+	) | rpl::start_with_next([=](const VideoStateToggle &update) {
+		toggleVideoEndpointActive(update.endpoint, update.value);
 	}, _lifetime);
 
 	if (_prepared) {
@@ -1206,12 +1214,12 @@ base::unique_qptr<Ui::PopupMenu> Members::Controller::createRowContextMenu(
 			const auto camera = VideoEndpoint{
 				VideoEndpointType::Camera,
 				participantPeer,
-				computeCameraEndpoint(participant)
+				computeCameraEndpoint(participant),
 			};
 			const auto screen = VideoEndpoint{
 				VideoEndpointType::Screen,
 				participantPeer,
-				computeScreenEndpoint(participant)
+				computeScreenEndpoint(participant),
 			};
 			if (shown.contains(camera)) {
 				if (pinned && large == camera) {
@@ -1278,7 +1286,8 @@ base::unique_qptr<Ui::PopupMenu> Members::Controller::createRowContextMenu(
 						&& chat->canBanMembers()
 						&& !chat->admins.contains(user));
 			} else if (const auto channel = _peer->asChannel()) {
-				return channel->canRestrictParticipant(participantPeer);
+				return !participantPeer->isMegagroup() // That's the creator.
+					&& channel->canRestrictParticipant(participantPeer);
 			}
 			return false;
 		}();
@@ -1452,7 +1461,8 @@ std::unique_ptr<Row> Members::Controller::createInvitedRow(
 Members::Members(
 	not_null<QWidget*> parent,
 	not_null<GroupCall*> call,
-	PanelMode mode)
+	PanelMode mode,
+	Ui::GL::Backend backend)
 : RpWidget(parent)
 , _call(call)
 , _mode(mode)
@@ -1464,7 +1474,8 @@ Members::Members(
 , _viewport(
 	std::make_unique<Viewport>(
 		_videoWrap.get(),
-		PanelMode::Default)) {
+		PanelMode::Default,
+		backend)) {
 	setupList();
 	setupAddMember(call);
 	setContent(_list);

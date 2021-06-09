@@ -927,7 +927,7 @@ groupCallLevelMeter: LevelMeter(defaultLevelMeter) {
 	lineSpacing: 5px;
 	lineCount: 44;
 	activeFg: groupCallActiveFg;
-	inactiveFg: groupCallMemberNotJoinedStatus;
+	inactiveFg: groupCallMembersBgRipple;
 }
 groupCallCheckboxIcon: icon {{ "default_checkbox_check", groupCallMembersFg, point(4px, 7px) }};
 groupCallCheck: Check(defaultCheck) {
@@ -1268,3 +1268,4 @@ groupCallNiceTooltipLabel: FlatLabel(defaultImportantTooltipLabel) {
 	}
 }
 groupCallNiceTooltipTop: 4px;
+groupCallPaused: icon {{ "calls/video_large_paused", groupCallVideoTextFg }};

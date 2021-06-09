@@ -39,9 +39,12 @@ struct GroupCallParticipant {
 	bool mutedByMe = false;
 	bool canSelfUnmute = false;
 	bool onlyMinLoaded = false;
+	bool videoJoined = false;
 
 	[[nodiscard]] const std::string &cameraEndpoint() const;
 	[[nodiscard]] const std::string &screenEndpoint() const;
+	[[nodiscard]] bool cameraPaused() const;
+	[[nodiscard]] bool screenPaused() const;
 };
 
 class GroupCall final {

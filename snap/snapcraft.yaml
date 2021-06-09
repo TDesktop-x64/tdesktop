@@ -146,6 +146,7 @@ parts:
       - kwayland
       - mozjpeg
       - openal
+      - rnnoise
       - webrtc
 
   patches:
@@ -230,6 +231,7 @@ parts:
       - -./usr/include
       - -./usr/lib/$SNAPCRAFT_ARCH_TRIPLET/libexec
       - -./usr/lib/$SNAPCRAFT_ARCH_TRIPLET/pkgconfig
+      - -./usr/lib/$SNAPCRAFT_ARCH_TRIPLET/*.so
       - -./usr/mkspecs
       - -./usr/share
     after:
@@ -252,6 +254,7 @@ parts:
       - -./usr/bin
       - -./usr/include
       - -./usr/lib/$SNAPCRAFT_ARCH_TRIPLET/pkgconfig
+      - -./usr/lib/$SNAPCRAFT_ARCH_TRIPLET/*.so
       - -./usr/share
 
   openal:
@@ -276,6 +279,7 @@ parts:
       - -./usr/include
       - -./usr/lib/$SNAPCRAFT_ARCH_TRIPLET/cmake
       - -./usr/lib/$SNAPCRAFT_ARCH_TRIPLET/pkgconfig
+      - -./usr/lib/$SNAPCRAFT_ARCH_TRIPLET/libopenal.so
 
   plasma-wayland-protocols:
     source: https://github.com/KDE/plasma-wayland-protocols.git
@@ -415,16 +419,38 @@ parts:
       - -./usr/lib/$SNAPCRAFT_ARCH_TRIPLET/qt5/bin
       - -./usr/lib/$SNAPCRAFT_ARCH_TRIPLET/qt5/mkspecs
       - -./usr/lib/$SNAPCRAFT_ARCH_TRIPLET/qt5/examples
+      - -./usr/lib/$SNAPCRAFT_ARCH_TRIPLET/*.a
+      - -./usr/lib/$SNAPCRAFT_ARCH_TRIPLET/*.la
+      - -./usr/lib/$SNAPCRAFT_ARCH_TRIPLET/*.prl
+      - -./usr/lib/$SNAPCRAFT_ARCH_TRIPLET/*.so
       - -./usr/lib/qt5
       - -./usr/share
     after:
       - mozjpeg
       - patches
 
+  rnnoise:
+    source: https://gitlab.xiph.org/xiph/rnnoise.git
+    source-depth: 1
+    source-commit: 7f449bf8bd3b933891d12c30112268c4090e4d59
+    plugin: autotools
+    autotools-configure-parameters:
+      - --prefix=/usr
+      - --libdir=\${exec_prefix}/lib/$SNAPCRAFT_ARCH_TRIPLET
+      - --disable-static
+      - --disable-examples
+      - --disable-doc
+    prime:
+      - -./usr/include
+      - -./usr/lib/$SNAPCRAFT_ARCH_TRIPLET/pkgconfig
+      - -./usr/lib/$SNAPCRAFT_ARCH_TRIPLET/librnnoise.la
+      - -./usr/lib/$SNAPCRAFT_ARCH_TRIPLET/librnnoise.so
+      - -./usr/share
+
   webrtc:
     source: https://github.com/desktop-app/tg_owt.git
     source-depth: 1
-    source-commit: 56f0e53eaccfaed54c513f8795cc03a25e2a72f8
+    source-commit: 2410d5f77938e026c63dad14411a9656def0c3a8
     plugin: cmake
     build-packages:
       - yasm
@@ -459,7 +485,11 @@ parts:
       - -DBUILD_SHARED_LIBS=OFF
       - -DJPEG_LIBRARY_RELEASE=$SNAPCRAFT_STAGE/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/libjpeg.so
       - -DJPEG_INCLUDE_DIR=$SNAPCRAFT_STAGE/usr/include
-    prime: [-./*]
+      - -DTG_OWT_BUILD_AUDIO_BACKENDS=OFF
+    prime:
+      - -./usr/include
+      - -./usr/lib/$SNAPCRAFT_ARCH_TRIPLET/cmake
+      - -./usr/lib/$SNAPCRAFT_ARCH_TRIPLET/*.a
     after:
       - ffmpeg
       - mozjpeg

@@ -40,13 +40,20 @@ constexpr auto kWaitForUpdatesTimeout = 3 * crl::time(1000);
 
 } // namespace
 
-
 const std::string &GroupCallParticipant::cameraEndpoint() const {
-	return videoParams ? videoParams->camera.endpoint : EmptyEndpoint();
+	return GetCameraEndpoint(videoParams);
 }
 
 const std::string &GroupCallParticipant::screenEndpoint() const {
-	return videoParams ? videoParams->screen.endpoint : EmptyEndpoint();
+	return GetScreenEndpoint(videoParams);
+}
+
+bool GroupCallParticipant::cameraPaused() const {
+	return IsCameraPaused(videoParams);
+}
+
+bool GroupCallParticipant::screenPaused() const {
+	return IsScreenPaused(videoParams);
 }
 
 GroupCall::GroupCall(
@@ -232,11 +239,9 @@ const GroupCallParticipant *GroupCall::participantByEndpoint(
 		return nullptr;
 	}
 	for (const auto &participant : _participants) {
-		if (const auto params = participant.videoParams.get()) {
-			if (params->camera.endpoint == endpoint
-				|| params->screen.endpoint == endpoint) {
-				return &participant;
-			}
+		if (GetCameraEndpoint(participant.videoParams) == endpoint
+			|| GetScreenEndpoint(participant.videoParams) == endpoint) {
+			return &participant;
 		}
 	}
 	return nullptr;
@@ -585,20 +590,23 @@ void GroupCall::applyParticipantsSlice(
 				: data.is_muted_by_you();
 			const auto onlyMinLoaded = data.is_min()
 				&& (!was || was->onlyMinLoaded);
+			const auto videoJoined = data.is_video_joined();
 			const auto raisedHandRating
 				= data.vraise_hand_rating().value_or_empty();
+			const auto localUpdate = (sliceSource
+				== ApplySliceSource::UpdateConstructed);
+			const auto existingVideoParams = (i != end(_participants))
+				? i->videoParams
+				: nullptr;
+			auto videoParams = localUpdate
+				? existingVideoParams
+				: Calls::ParseVideoParams(
+					data.vvideo(),
+					data.vpresentation(),
+					existingVideoParams);
 			const auto value = Participant{
 				.peer = participantPeer,
-				.videoParams = Calls::ParseVideoParams(
-					(data.vvideo()
-						? data.vvideo()->c_dataJSON().vdata().v
-						: QByteArray()),
-					(data.vpresentation()
-						? data.vpresentation()->c_dataJSON().vdata().v
-						: QByteArray()),
-					(i != end(_participants)
-						? i->videoParams
-						: nullptr)),
+				.videoParams = std::move(videoParams),
 				.date = data.vdate().v,
 				.lastActive = lastActive,
 				.raisedHandRating = raisedHandRating,
@@ -610,6 +618,7 @@ void GroupCall::applyParticipantsSlice(
 				.mutedByMe = mutedByMe,
 				.canSelfUnmute = canSelfUnmute,
 				.onlyMinLoaded = onlyMinLoaded,
+				.videoJoined = videoJoined,
 			};
 			if (i == end(_participants)) {
 				_participantPeerByAudioSsrc.emplace(

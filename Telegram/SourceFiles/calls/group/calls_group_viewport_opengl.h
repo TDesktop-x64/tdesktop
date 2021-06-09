@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/round_rect.h"
 #include "ui/effects/animations.h"
 #include "ui/effects/cross_line.h"
+#include "ui/gl/gl_primitives.h"
 #include "ui/gl/gl_surface.h"
 #include "ui/gl/gl_image.h"
 
@@ -52,15 +53,17 @@ private:
 		Ui::GL::Textures<5> textures;
 		Ui::GL::Framebuffers<2> framebuffers;
 		Ui::Animations::Simple outlined;
+		Ui::Animations::Simple paused;
+		QImage userpicFrame;
 		QRect nameRect;
 		int nameVersion = 0;
-		mutable int textureIndex = 0;
 		mutable int trackIndex = -1;
 		mutable QSize rgbaSize;
 		mutable QSize textureSize;
 		mutable QSize textureChromaSize;
 		mutable QSize textureBlurSize;
 		bool stale = false;
+		bool pause = false;
 		bool outline = false;
 	};
 	struct Program {
@@ -98,9 +101,27 @@ private:
 		TileData &tileData,
 		QSize blurSize);
 	void validateDatas();
+	void validateNoiseTexture(
+		QOpenGLFunctions &f,
+		GLuint defaultFramebufferObject);
 	void validateOutlineAnimation(
 		not_null<VideoTile*> tile,
 		TileData &data);
+	void validatePausedAnimation(
+		not_null<VideoTile*> tile,
+		TileData &data);
+	void validateUserpicFrame(
+		not_null<VideoTile*> tile,
+		TileData &tileData);
+
+	void uploadTexture(
+		QOpenGLFunctions &f,
+		GLint internalformat,
+		GLint format,
+		QSize size,
+		QSize hasSize,
+		int stride,
+		const void *data) const;
 
 	[[nodiscard]] bool isExpanded(
 		not_null<VideoTile*> tile,
@@ -116,13 +137,15 @@ private:
 	GLfloat _factor = 1.;
 	QSize _viewport;
 	bool _rgbaFrame = false;
+	bool _userpicFrame;
+	Ui::GL::BackgroundFiller _background;
 	std::optional<QOpenGLBuffer> _frameBuffer;
-	std::optional<QOpenGLBuffer> _bgBuffer;
 	Program _downscaleProgram;
 	std::optional<QOpenGLShaderProgram> _blurProgram;
 	Program _frameProgram;
 	std::optional<QOpenGLShaderProgram> _imageProgram;
-	std::optional<QOpenGLShaderProgram> _bgProgram;
+	Ui::GL::Textures<1> _noiseTexture;
+	Ui::GL::Framebuffers<1> _noiseFramebuffer;
 	QOpenGLShader *_downscaleVertexShader = nullptr;
 	QOpenGLShader *_frameVertexShader = nullptr;
 
@@ -132,14 +155,15 @@ private:
 	QRect _back;
 	QRect _muteOn;
 	QRect _muteOff;
+	QRect _paused;
 
 	Ui::GL::Image _names;
 	std::vector<TileData> _tileData;
 	std::vector<int> _tileDataIndices;
 
-	std::vector<GLfloat> _bgTriangles;
 	Ui::CrossLineAnimation _pinIcon;
 	Ui::CrossLineAnimation _muteIcon;
+
 	Ui::RoundRect _pinBackground;
 
 	rpl::lifetime _lifetime;

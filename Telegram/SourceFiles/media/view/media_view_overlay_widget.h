@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/timer.h"
 #include "ui/rp_widget.h"
+#include "ui/gl/gl_surface.h"
 #include "ui/widgets/dropdown_menu.h"
 #include "ui/effects/animations.h"
 #include "ui/effects/radial_animation.h"
@@ -46,12 +47,12 @@ struct TrackState;
 namespace Streaming {
 struct Information;
 struct Update;
+struct FrameWithInfo;
 enum class Error;
 } // namespace Streaming
 } // namespace Media
 
-namespace Media {
-namespace View {
+namespace Media::View {
 
 class GroupThumbs;
 class Pip;
@@ -111,7 +112,11 @@ public:
 private:
 	struct Streamed;
 	struct PipWrap;
+	class Renderer;
+	class RendererSW;
+	class RendererGL;
 
+	// If changing, see paintControls()!
 	enum OverState {
 		OverNone,
 		OverLeftNav,
@@ -138,6 +143,10 @@ private:
 		QuickSave,
 		SaveAs,
 	};
+	struct ContentGeometry {
+		QRectF rect;
+		qreal rotation = 0.;
+	};
 
 	[[nodiscard]] not_null<QWindow*> window() const;
 	[[nodiscard]] int width() const;
@@ -147,7 +156,7 @@ private:
 
 	[[nodiscard]] Ui::GL::ChosenRenderer chooseRenderer(
 		Ui::GL::Capabilities capabilities);
-	void paint(Painter &p, const QRegion &clip);
+	void paint(not_null<Renderer*> renderer);
 
 	void handleMousePress(QPoint position, Qt::MouseButton button);
 	void handleMouseRelease(QPoint position, Qt::MouseButton button);
@@ -234,7 +243,6 @@ private:
 
 	void refreshLang();
 	void showSaveMsgFile();
-	void updateMixerVideoVolume() const;
 
 	struct SharedMedia;
 	using SharedMediaType = SharedMediaWithLastSlice::Type;
@@ -318,8 +326,10 @@ private:
 	void documentUpdated(DocumentData *doc);
 	void changingMsgId(not_null<HistoryItem*> row, MsgId oldId);
 
-	[[nodiscard]] int contentRotation() const;
-	[[nodiscard]] QRect contentRect() const;
+	[[nodiscard]] int finalContentRotation() const;
+	[[nodiscard]] QRect finalContentRect() const;
+	[[nodiscard]] ContentGeometry contentGeometry() const;
+	void updateContentRect();
 	void contentSizeChanged();
 
 	// Radial animation interface.
@@ -343,13 +353,39 @@ private:
 	void zoomReset();
 	void zoomUpdate(int32 &newZoom);
 
-	void paintRadialLoading(Painter &p, bool radial, float64 radialOpacity);
+	void paintRadialLoading(not_null<Renderer*> renderer);
 	void paintRadialLoadingContent(
 		Painter &p,
 		QRect inner,
 		bool radial,
 		float64 radialOpacity) const;
-	void paintThemePreview(Painter &p, QRect clip);
+	void paintThemePreviewContent(Painter &p, QRect outer, QRect clip);
+	void paintDocumentBubbleContent(
+		Painter &p,
+		QRect outer,
+		QRect icon,
+		QRect clip) const;
+	void paintSaveMsgContent(Painter &p, QRect outer, QRect clip);
+	void paintControls(not_null<Renderer*> renderer, float64 opacity);
+	void paintFooterContent(
+		Painter &p,
+		QRect outer,
+		QRect clip,
+		float64 opacity);
+	[[nodiscard]] QRect footerGeometry() const;
+	void paintCaptionContent(
+		Painter &p,
+		QRect outer,
+		QRect clip,
+		float64 opacity);
+	[[nodiscard]] QRect captionGeometry() const;
+	void paintGroupThumbsContent(
+		Painter &p,
+		QRect outer,
+		QRect clip,
+		float64 opacity);
+
+	void updateSaveMsgState();
 
 	void updateOverRect(OverState state);
 	bool updateOverState(OverState newState);
@@ -367,14 +403,19 @@ private:
 	[[nodiscard]] bool videoShown() const;
 	[[nodiscard]] QSize videoSize() const;
 	[[nodiscard]] bool videoIsGifOrUserpic() const;
-	[[nodiscard]] QImage videoFrame() const;
-	[[nodiscard]] QImage videoFrameForDirectPaint() const;
-	[[nodiscard]] QImage transformVideoFrame(QImage frame) const;
-	[[nodiscard]] QImage transformStaticContent(QPixmap content) const;
+	[[nodiscard]] QImage videoFrame() const; // ARGB (changes prepare format)
+	[[nodiscard]] QImage currentVideoFrameImage() const; // RGB (may convert)
+	[[nodiscard]] Streaming::FrameWithInfo videoFrameWithInfo() const; // YUV
+	[[nodiscard]] int streamedIndex() const;
+	[[nodiscard]] QImage transformedShownContent() const;
+	[[nodiscard]] QImage transformShownContent(
+		QImage content,
+		int rotation) const;
 	[[nodiscard]] bool documentContentShown() const;
 	[[nodiscard]] bool documentBubbleShown() const;
-	void paintTransformedVideoFrame(Painter &p);
-	void paintTransformedStaticContent(Painter &p);
+	void setStaticContent(QImage image);
+	[[nodiscard]] bool contentShown() const;
+	[[nodiscard]] bool opaqueContentShown() const;
 	void clearStreaming(bool savePosition = true);
 	bool canInitStreaming() const;
 
@@ -383,7 +424,6 @@ private:
 	bool _opengl = false;
 	const std::unique_ptr<Ui::RpWidgetWrap> _surface;
 	const not_null<QWidget*> _widget;
-	QBrush _transparentBrush;
 
 	Main::Session *_session = nullptr;
 	rpl::lifetime _sessionLifetime;
@@ -437,14 +477,18 @@ private:
 	QPoint _mStart;
 	bool _pressed = false;
 	int32 _dragging = 0;
-	QPixmap _staticContent;
+	QImage _staticContent;
+	bool _staticContentTransparent = false;
 	bool _blurred = true;
 
+	ContentGeometry _oldGeometry;
+	Ui::Animations::Simple _geometryAnimation;
 	rpl::lifetime _screenGeometryLifetime;
 	std::unique_ptr<QObject> _applicationEventFilter;
 
 	std::unique_ptr<Streamed> _streamed;
 	std::unique_ptr<PipWrap> _pip;
+	int _streamedCreated = 0;
 	bool _showAsPip = false;
 
 	const style::icon *_docIcon = nullptr;
@@ -452,6 +496,7 @@ private:
 	QString _docName, _docSize, _docExt;
 	int _docNameWidth = 0, _docSizeWidth = 0, _docExtWidth = 0;
 	QRect _docRect, _docIconRect;
+	QImage _docRectImage;
 	int _docThumbx = 0, _docThumby = 0, _docThumbw = 0;
 	object_ptr<Ui::LinkButton> _docDownload;
 	object_ptr<Ui::LinkButton> _docSaveAs;
@@ -459,7 +504,6 @@ private:
 
 	QRect _photoRadialRect;
 	Ui::RadialAnimation _radial;
-	QImage _radialCache;
 
 	History *_migrated = nullptr;
 	History *_history = nullptr; // if conversation photos or files overview
@@ -520,6 +564,7 @@ private:
 	crl::time _saveMsgStarted = 0;
 	anim::value _saveMsgOpacity;
 	QRect _saveMsg;
+	QImage _saveMsgImage;
 	base::Timer _saveMsgUpdater;
 	Ui::Text::String _saveMsgText;
 	SavePhotoVideo _savePhotoVideoWhenLoaded = SavePhotoVideo::None;
@@ -542,10 +587,8 @@ private:
 	object_ptr<Ui::RoundButton> _themeShare = { nullptr };
 	Data::CloudTheme _themeCloudData;
 
-	bool _hideWorkaround = false;
-	bool _wasRepainted = false;
+	std::unique_ptr<Ui::RpWidget> _hideWorkaround;
 
 };
 
-} // namespace View
-} // namespace Media
+} // namespace Media::View

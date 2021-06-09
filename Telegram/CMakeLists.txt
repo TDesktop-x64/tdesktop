@@ -279,6 +279,8 @@ PRIVATE
     calls/group/calls_group_call.cpp
     calls/group/calls_group_call.h
     calls/group/calls_group_common.h
+    calls/group/calls_group_invite_controller.cpp
+    calls/group/calls_group_invite_controller.h
     calls/group/calls_group_members.cpp
     calls/group/calls_group_members.h
     calls/group/calls_group_members_row.cpp
@@ -779,6 +781,11 @@ PRIVATE
     media/streaming/media_streaming_video_track.h
     media/view/media_view_group_thumbs.cpp
     media/view/media_view_group_thumbs.h
+    media/view/media_view_overlay_opengl.cpp
+    media/view/media_view_overlay_opengl.h
+    media/view/media_view_overlay_raster.cpp
+    media/view/media_view_overlay_raster.h
+    media/view/media_view_overlay_renderer.h
     media/view/media_view_overlay_widget.cpp
     media/view/media_view_overlay_widget.h
     media/view/media_view_pip.cpp

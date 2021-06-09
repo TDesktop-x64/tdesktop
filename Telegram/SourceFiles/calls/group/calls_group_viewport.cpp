@@ -47,13 +47,12 @@ namespace {
 
 } // namespace
 
-Viewport::Viewport(not_null<QWidget*> parent, PanelMode mode)
+Viewport::Viewport(
+	not_null<QWidget*> parent,
+	PanelMode mode,
+	Ui::GL::Backend backend)
 : _mode(mode)
-, _content(Ui::GL::CreateSurface(
-	parent,
-	[=](Ui::GL::Capabilities capabilities) {
-		return chooseRenderer(capabilities);
-	})) {
+, _content(Ui::GL::CreateSurface(parent, chooseRenderer(backend))) {
 	setup();
 }
 
@@ -173,7 +172,7 @@ void Viewport::handleMouseRelease(QPoint position, Qt::MouseButton button) {
 				tile->row()->showContextMenu();
 			} else if (!wide()
 				|| (_hasTwoOrMore && !_large)
-				|| pressed.element == Selection::Element::BackButton) {
+				|| pressed.element != Selection::Element::PinButton) {
 				_clicks.fire_copy(tile->endpoint());
 			} else if (pressed.element == Selection::Element::PinButton) {
 				_pinToggles.fire(!tile->pinned());
@@ -237,6 +236,11 @@ void Viewport::add(
 	) | rpl::filter([](QSize size) {
 		return !size.isEmpty();
 	}) | rpl::start_with_next([=] {
+		updateTilesGeometry();
+	}, _tiles.back()->lifetime());
+
+	_tiles.back()->track()->stateValue(
+	) | rpl::start_with_next([=] {
 		updateTilesGeometry();
 	}, _tiles.back()->lifetime());
 }
@@ -434,7 +438,7 @@ Viewport::Layout Viewport::countWide(int outerWidth, int outerHeight) const {
 	sizes.reserve(_tiles.size());
 	for (const auto &tile : _tiles) {
 		const auto video = tile.get();
-		const auto size = video->trackSize();
+		const auto size = video->trackOrUserpicSize();
 		if (!size.isEmpty()) {
 			sizes.push_back(Geometry{ video, size });
 		}
@@ -520,16 +524,30 @@ Viewport::Layout Viewport::countWide(int outerWidth, int outerHeight) const {
 }
 
 void Viewport::showLarge(const VideoEndpoint &endpoint) {
-	const auto i = ranges::find(_tiles, endpoint, &VideoTile::endpoint);
-	const auto large = (i != end(_tiles)) ? i->get() : nullptr;
-	if (_large != large) {
-		prepareLargeChangeAnimation();
-		_large = large;
-		updateTopControlsVisibility();
-		startLargeChangeAnimation();
-	}
+	// If a video get's switched off, GroupCall first unpins it,
+	// then removes it from Large endpoint, then removes from active tracks.
+	//
+	// If we want to animate large video removal properly, we need to
+	// delay this update and start animation directly from removing of the
+	// track from the active list. Otherwise final state won't be correct.
+	_updateLargeScheduled = [=] {
+		const auto i = ranges::find(_tiles, endpoint, &VideoTile::endpoint);
+		const auto large = (i != end(_tiles)) ? i->get() : nullptr;
+		if (_large != large) {
+			prepareLargeChangeAnimation();
+			_large = large;
+			updateTopControlsVisibility();
+			startLargeChangeAnimation();
+		}
 
-	Ensures(!_large || !_large->trackSize().isEmpty());
+		Ensures(!_large || !_large->trackOrUserpicSize().isEmpty());
+	};
+	crl::on_main(widget(), [=] {
+		if (!_updateLargeScheduled) {
+			return;
+		}
+		base::take(_updateLargeScheduled)();
+	});
 }
 
 void Viewport::updateTilesGeometry() {
@@ -564,7 +582,7 @@ void Viewport::refreshHasTwoOrMore() {
 	auto hasTwoOrMore = false;
 	auto oneFound = false;
 	for (const auto &tile : _tiles) {
-		if (!tile->trackSize().isEmpty()) {
+		if (!tile->trackOrUserpicSize().isEmpty()) {
 			if (oneFound) {
 				hasTwoOrMore = true;
 				break;
@@ -598,7 +616,7 @@ void Viewport::updateTilesGeometryWide(int outerWidth, int outerHeight) {
 	}
 
 	_startTilesLayout = countWide(outerWidth, outerHeight);
-	if (_large && !_large->trackSize().isEmpty()) {
+	if (_large && !_large->trackOrUserpicSize().isEmpty()) {
 		for (const auto &geometry : _startTilesLayout.list) {
 			if (geometry.tile == _large) {
 				setTileGeometry(_large, { 0, 0, outerWidth, outerHeight });
@@ -629,7 +647,7 @@ void Viewport::updateTilesGeometryNarrow(int outerWidth) {
 	sizes.reserve(_tiles.size());
 	for (const auto &tile : _tiles) {
 		const auto video = tile.get();
-		const auto size = video->trackSize();
+		const auto size = video->trackOrUserpicSize();
 		if (size.isEmpty()) {
 			video->hide();
 		} else {
@@ -691,7 +709,7 @@ void Viewport::updateTilesGeometryColumn(int outerWidth) {
 	const auto y = -_scrollTop;
 	auto top = 0;
 	const auto layoutNext = [&](not_null<VideoTile*> tile) {
-		const auto size = tile->trackSize();
+		const auto size = tile->trackOrUserpicSize();
 		const auto shown = !size.isEmpty() && _large && tile != _large;
 		const auto height = shown
 			? st::groupCallNarrowVideoHeight
@@ -707,7 +725,7 @@ void Viewport::updateTilesGeometryColumn(int outerWidth) {
 		for (const auto &tile : _tiles) {
 			if (tile.get() != _large && tile->row()->peer() == topPeer) {
 				return (tile.get() != _tiles.front().get())
-					&& !tile->trackSize().isEmpty();
+					&& !tile->trackOrUserpicSize().isEmpty();
 			}
 		}
 		return false;
@@ -766,11 +784,7 @@ void Viewport::setSelected(Selection value) {
 }
 
 void Viewport::updateCursor() {
-	const auto pointer = _selected.tile
-		&& (!wide()
-			|| (_hasTwoOrMore && !_large)
-			|| _selected.element == Selection::Element::PinButton
-			|| _selected.element == Selection::Element::BackButton);
+	const auto pointer = _selected.tile && (!wide() || _hasTwoOrMore);
 	widget()->setCursor(pointer ? style::cur_pointer : style::cur_default);
 }
 
@@ -781,25 +795,14 @@ void Viewport::setPressed(Selection value) {
 	_pressed = value;
 }
 
-Ui::GL::ChosenRenderer Viewport::chooseRenderer(
-		Ui::GL::Capabilities capabilities) {
-	const auto use = Platform::IsMac()
-		? true
-		: Platform::IsWindows()
-		? capabilities.supported
-		: capabilities.transparency;
-	LOG(("OpenGL: %1 (Calls::Group::Viewport)").arg(Logs::b(use)));
-	if (use) {
-		auto renderer = std::make_unique<RendererGL>(this);
-		_opengl = true;
-		return {
-			.renderer = std::move(renderer),
-			.backend = Ui::GL::Backend::OpenGL,
-		};
-	}
+Ui::GL::ChosenRenderer Viewport::chooseRenderer(Ui::GL::Backend backend) {
+	_opengl = (backend == Ui::GL::Backend::OpenGL);
 	return {
-		.renderer = std::make_unique<Renderer>(this),
-		.backend = Ui::GL::Backend::Raster,
+		.renderer = (_opengl
+			? std::unique_ptr<Ui::GL::Renderer>(
+				std::make_unique<RendererGL>(this))
+			: std::make_unique<RendererSW>(this)),
+		.backend = backend,
 	};
 }
 

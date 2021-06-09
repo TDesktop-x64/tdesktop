@@ -15,9 +15,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace Calls::Group {
 
-class Viewport::Renderer final : public Ui::GL::Renderer {
+class Viewport::RendererSW final : public Ui::GL::Renderer {
 public:
-	explicit Renderer(not_null<Viewport*> owner);
+	explicit RendererSW(not_null<Viewport*> owner);
 
 	void paintFallback(
 		Painter &&p,
@@ -25,11 +25,15 @@ public:
 		Ui::GL::Backend backend) override;
 
 private:
+	struct TileData {
+		QImage userpicFrame;
+		QImage blurredFrame;
+		bool stale = false;
+	};
 	void paintTile(
 		Painter &p,
 		not_null<VideoTile*> tile,
 		const QRect &clip,
-		bool opengl,
 		QRegion &bg);
 	void paintTileOutline(
 		Painter &p,
@@ -45,10 +49,16 @@ private:
 		int width,
 		int height,
 		not_null<VideoTile*> tile);
+	void validateUserpicFrame(
+		not_null<VideoTile*> tile,
+		TileData &data);
 
 	const not_null<Viewport*> _owner;
 
 	QImage _shadow;
+	bool _userpicFrame = false;
+	bool _pausedFrame = false;
+	base::flat_map<not_null<VideoTile*>, TileData> _tileData;
 	Ui::CrossLineAnimation _pinIcon;
 	Ui::RoundRect _pinBackground;
 

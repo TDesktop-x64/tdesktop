@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "calls/group/calls_group_common.h"
 #include "calls/group/calls_group_viewport_tile.h"
 #include "calls/group/calls_group_members_row.h"
+#include "data/data_peer.h"
 #include "media/view/media_view_pip.h"
 #include "webrtc/webrtc_video_track.h"
 #include "lang/lang_keys.h"
@@ -17,8 +18,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/palette.h"
 
 namespace Calls::Group {
+namespace {
 
-Viewport::Renderer::Renderer(not_null<Viewport*> owner)
+constexpr auto kBlurRadius = 15;
+
+} // namespace
+
+Viewport::RendererSW::RendererSW(not_null<Viewport*> owner)
 : _owner(owner)
 , _pinIcon(st::groupCallVideoTile.pin)
 , _pinBackground(
@@ -28,35 +34,89 @@ Viewport::Renderer::Renderer(not_null<Viewport*> owner)
 	st::radialBg) {
 }
 
-void Viewport::Renderer::paintFallback(
+void Viewport::RendererSW::paintFallback(
 		Painter &&p,
 		const QRegion &clip,
 		Ui::GL::Backend backend) {
 	auto bg = clip;
 	auto hq = PainterHighQualityEnabler(p);
 	const auto bounding = clip.boundingRect();
-	const auto opengl = (backend == Ui::GL::Backend::OpenGL);
+	for (auto &[tile, tileData] : _tileData) {
+		tileData.stale = true;
+	}
 	for (const auto &tile : _owner->_tiles) {
-		paintTile(p, tile.get(), bounding, opengl, bg);
+		if (!tile->shown()) {
+			continue;
+		}
+		paintTile(p, tile.get(), bounding, bg);
 	}
 	for (const auto rect : bg) {
 		p.fillRect(rect, st::groupCallBg);
 	}
+	for (auto i = _tileData.begin(); i != _tileData.end();) {
+		if (i->second.stale) {
+			i = _tileData.erase(i);
+		} else {
+			++i;
+		}
+	}
 }
 
-void Viewport::Renderer::paintTile(
+void Viewport::RendererSW::validateUserpicFrame(
+		not_null<VideoTile*> tile,
+		TileData &data) {
+	if (!_userpicFrame) {
+		data.userpicFrame = QImage();
+		return;
+	} else if (!data.userpicFrame.isNull()) {
+		return;
+	}
+	auto userpic = QImage(
+		tile->trackOrUserpicSize(),
+		QImage::Format_ARGB32_Premultiplied);
+	userpic.fill(Qt::black);
+	{
+		auto p = Painter(&userpic);
+		tile->row()->peer()->paintUserpicSquare(
+			p,
+			tile->row()->ensureUserpicView(),
+			0,
+			0,
+			userpic.width());
+	}
+	data.userpicFrame = Images::BlurLargeImage(
+		std::move(userpic),
+		kBlurRadius);
+}
+
+void Viewport::RendererSW::paintTile(
 		Painter &p,
 		not_null<VideoTile*> tile,
 		const QRect &clip,
-		bool opengl,
 		QRegion &bg) {
 	const auto track = tile->track();
 	const auto data = track->frameWithInfo(true);
-	const auto &image = data.original;
-	const auto rotation = data.rotation;
-	if (image.isNull() || !tile->shown()) {
-		return;
+	auto &tileData = _tileData[tile];
+	tileData.stale = false;
+	_userpicFrame = (data.format == Webrtc::FrameFormat::None);
+	_pausedFrame = (track->state() == Webrtc::VideoState::Paused);
+	validateUserpicFrame(tile, tileData);
+	if (_userpicFrame || !_pausedFrame) {
+		tileData.blurredFrame = QImage();
+	} else if (tileData.blurredFrame.isNull()) {
+		tileData.blurredFrame = Images::BlurLargeImage(
+			data.original.scaled(
+				VideoTile::PausedVideoSize(),
+				Qt::KeepAspectRatio),
+			kBlurRadius);
 	}
+	const auto &image = _userpicFrame
+		? tileData.userpicFrame
+		: _pausedFrame
+		? tileData.blurredFrame
+		: data.original;
+	const auto frameRotation = _userpicFrame ? 0 : data.rotation;
+	Assert(!image.isNull());
 
 	const auto fill = [&](QRect rect) {
 		const auto intersected = rect.intersected(clip);
@@ -74,22 +134,22 @@ void Viewport::Renderer::paintTile(
 	const auto height = geometry.height();
 	const auto scaled = FlipSizeByRotation(
 		image.size(),
-		rotation
+		frameRotation
 	).scaled(QSize(width, height), Qt::KeepAspectRatio);
 	const auto left = (width - scaled.width()) / 2;
 	const auto top = (height - scaled.height()) / 2;
 	const auto target = QRect(QPoint(x + left, y + top), scaled);
-	if (UsePainterRotation(rotation, opengl)) {
-		if (rotation) {
+	if (UsePainterRotation(frameRotation, false)) {
+		if (frameRotation) {
 			p.save();
-			p.rotate(rotation);
+			p.rotate(frameRotation);
 		}
-		p.drawImage(RotatedRect(target, rotation), image);
-		if (rotation) {
+		p.drawImage(RotatedRect(target, frameRotation), image);
+		if (frameRotation) {
 			p.restore();
 		}
-	} else if (rotation) {
-		p.drawImage(target, RotateFrameImage(image, rotation));
+	} else if (frameRotation) {
+		p.drawImage(target, RotateFrameImage(image, frameRotation));
 	} else {
 		p.drawImage(target, image);
 	}
@@ -113,7 +173,7 @@ void Viewport::Renderer::paintTile(
 	paintTileOutline(p, x, y, width, height, tile);
 }
 
-void Viewport::Renderer::paintTileOutline(
+void Viewport::RendererSW::paintTileOutline(
 		Painter &p,
 		int x,
 		int y,
@@ -137,7 +197,7 @@ void Viewport::Renderer::paintTileOutline(
 	p.fillRect(x, y + height - outline, width - outline, outline, color);
 }
 
-void Viewport::Renderer::paintTileControls(
+void Viewport::RendererSW::paintTileControls(
 		Painter &p,
 		int x,
 		int y,
@@ -170,6 +230,11 @@ void Viewport::Renderer::paintTileControls(
 			&_pinBackground);
 	}
 
+	if (_pausedFrame) {
+		p.fillRect(x, y, width, height, QColor(0, 0, 0, kShadowMaxAlpha));
+		st::groupCallPaused.paintInCenter(p, { x, y, width, height });
+	}
+
 	const auto shown = _owner->_controlsShownRatio;
 	if (shown == 0.) {
 		return;
@@ -193,14 +258,16 @@ void Viewport::Renderer::paintTileControls(
 		return;
 	}
 	const auto factor = style::DevicePixelRatio();
-	p.drawImage(
-		shadowFill,
-		_shadow,
-		QRect(
-			0,
-			(shadowFill.y() - shadowRect.y()) * factor,
-			_shadow.width(),
-			shadowFill.height() * factor));
+	if (!_pausedFrame) {
+		p.drawImage(
+			shadowFill,
+			_shadow,
+			QRect(
+				0,
+				(shadowFill.y() - shadowRect.y()) * factor,
+				_shadow.width(),
+				shadowFill.height() * factor));
+	}
 	const auto row = tile->row();
 	row->lazyInitialize(st::groupCallMembersListItem);
 

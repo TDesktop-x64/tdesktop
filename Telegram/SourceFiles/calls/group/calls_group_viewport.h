@@ -14,6 +14,7 @@ namespace Ui {
 class AbstractButton;
 class RpWidgetWrap;
 namespace GL {
+enum class Backend;
 struct Capabilities;
 struct ChosenRenderer;
 } // namespace GL
@@ -58,7 +59,10 @@ struct VideoTileTrack {
 
 class Viewport final {
 public:
-	Viewport(not_null<QWidget*> parent, PanelMode mode);
+	Viewport(
+		not_null<QWidget*> parent,
+		PanelMode mode,
+		Ui::GL::Backend backend);
 	~Viewport();
 
 	[[nodiscard]] not_null<QWidget*> widget() const;
@@ -90,7 +94,7 @@ public:
 private:
 	struct Textures;
 	class VideoTile;
-	class Renderer;
+	class RendererSW;
 	class RendererGL;
 	using TileId = quintptr;
 
@@ -159,7 +163,7 @@ private:
 	void updateSelected();
 
 	[[nodiscard]] Ui::GL::ChosenRenderer chooseRenderer(
-		Ui::GL::Capabilities capabilities);
+		Ui::GL::Backend backend);
 
 	PanelMode _mode = PanelMode();
 	bool _opengl = false;
@@ -176,6 +180,7 @@ private:
 	rpl::event_stream<VideoQualityRequest> _qualityRequests;
 	float64 _controlsShownRatio = 1.;
 	VideoTile *_large = nullptr;
+	Fn<void()> _updateLargeScheduled;
 	Ui::Animations::Simple _largeChangeAnimation;
 	Layout _startTilesLayout;
 	Layout _finishTilesLayout;

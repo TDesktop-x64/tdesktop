@@ -85,6 +85,16 @@ enum class VideoEndpointType {
 };
 
 struct VideoEndpoint {
+	VideoEndpoint() = default;
+	VideoEndpoint(
+		VideoEndpointType type,
+		not_null<PeerData*> peer,
+		std::string id)
+	: type(type)
+	, peer(peer)
+	, id(std::move(id)) {
+	}
+
 	VideoEndpointType type = VideoEndpointType::Camera;
 	PeerData *peer = nullptr;
 	std::string id;
@@ -134,9 +144,9 @@ inline bool operator>=(
 	return !(a < b);
 }
 
-struct VideoActiveToggle {
+struct VideoStateToggle {
 	VideoEndpoint endpoint;
-	bool active = false;
+	bool value = false;
 };
 
 struct VideoQualityRequest {
@@ -144,28 +154,21 @@ struct VideoQualityRequest {
 	Group::VideoQuality quality = Group::VideoQuality();
 };
 
-struct VideoParams {
-	std::string endpoint;
-	QByteArray json;
-	uint32 hash = 0;
-
-	[[nodiscard]] bool empty() const {
-		return endpoint.empty() || json.isEmpty();
-	}
-	[[nodiscard]] explicit operator bool() const {
-		return !empty();
-	}
-};
-
-struct ParticipantVideoParams {
-	VideoParams camera;
-	VideoParams screen;
-};
+struct ParticipantVideoParams;
 
 [[nodiscard]] std::shared_ptr<ParticipantVideoParams> ParseVideoParams(
-	const QByteArray &camera,
-	const QByteArray &screen,
+	const tl::conditional<MTPGroupCallParticipantVideo> &camera,
+	const tl::conditional<MTPGroupCallParticipantVideo> &screen,
 	const std::shared_ptr<ParticipantVideoParams> &existing);
+
+[[nodiscard]] const std::string &GetCameraEndpoint(
+	const std::shared_ptr<ParticipantVideoParams> &params);
+[[nodiscard]] const std::string &GetScreenEndpoint(
+	const std::shared_ptr<ParticipantVideoParams> &params);
+[[nodiscard]] bool IsCameraPaused(
+	const std::shared_ptr<ParticipantVideoParams> &params);
+[[nodiscard]] bool IsScreenPaused(
+	const std::shared_ptr<ParticipantVideoParams> &params);
 
 class GroupCall final : public base::has_weak_ptr {
 public:
@@ -292,11 +295,11 @@ public:
 		return _levelUpdates.events();
 	}
 	[[nodiscard]] auto videoStreamActiveUpdates() const
-	-> rpl::producer<VideoActiveToggle> {
+	-> rpl::producer<VideoStateToggle> {
 		return _videoStreamActiveUpdates.events();
 	}
 	[[nodiscard]] auto videoStreamShownUpdates() const
-	-> rpl::producer<VideoActiveToggle> {
+	-> rpl::producer<VideoStateToggle> {
 		return _videoStreamShownUpdates.events();
 	}
 	void requestVideoQuality(
@@ -323,7 +326,7 @@ public:
 	struct VideoTrack {
 		std::unique_ptr<Webrtc::VideoTrack> track;
 		PeerData *peer = nullptr;
-		rpl::lifetime lifetime;
+		rpl::lifetime shownTrackingLifetime;
 		Group::VideoQuality quality = Group::VideoQuality();
 
 		[[nodiscard]] explicit operator bool() const {
@@ -358,6 +361,12 @@ public:
 	[[nodiscard]] bool mutedByAdmin() const;
 	[[nodiscard]] bool canManage() const;
 	[[nodiscard]] rpl::producer<bool> canManageValue() const;
+	[[nodiscard]] bool videoIsWorking() const {
+		return _videoIsWorking.current();
+	}
+	[[nodiscard]] rpl::producer<bool> videoIsWorkingValue() const {
+		return _videoIsWorking.value();
+	}
 
 	void setCurrentAudioDevice(bool input, const QString &deviceId);
 	void setCurrentVideoDevice(const QString &deviceId);
@@ -425,7 +434,7 @@ private:
 	enum class SendUpdateType {
 		Mute,
 		RaiseHand,
-		VideoMuted,
+		VideoStopped,
 	};
 	enum class JoinAction {
 		None,
@@ -518,7 +527,11 @@ private:
 	void addVideoOutput(const std::string &endpoint, SinkPointer sink);
 	void setVideoEndpointLarge(VideoEndpoint endpoint);
 
-	void markEndpointActive(VideoEndpoint endpoint, bool active);
+	void markEndpointActive(
+		VideoEndpoint endpoint,
+		bool active,
+		bool paused);
+	void markTrackPaused(const VideoEndpoint &endpoint, bool paused);
 	void markTrackShown(const VideoEndpoint &endpoint, bool shown);
 
 	[[nodiscard]] MTPInputGroupCall inputCall() const;
@@ -548,6 +561,7 @@ private:
 
 	rpl::variable<MuteState> _muted = MuteState::Muted;
 	rpl::variable<bool> _canManage = false;
+	rpl::variable<bool> _videoIsWorking = false;
 	bool _initialMuteStateSent = false;
 	bool _acceptFields = false;
 
@@ -589,8 +603,9 @@ private:
 	bool _requireARGB32 = true;
 
 	rpl::event_stream<LevelUpdate> _levelUpdates;
-	rpl::event_stream<VideoActiveToggle> _videoStreamActiveUpdates;
-	rpl::event_stream<VideoActiveToggle> _videoStreamShownUpdates;
+	rpl::event_stream<VideoStateToggle> _videoStreamActiveUpdates;
+	rpl::event_stream<VideoStateToggle> _videoStreamPausedUpdates;
+	rpl::event_stream<VideoStateToggle> _videoStreamShownUpdates;
 	base::flat_map<VideoEndpoint, VideoTrack> _activeVideoTracks;
 	base::flat_set<VideoEndpoint> _shownVideoTracks;
 	rpl::variable<VideoEndpoint> _videoEndpointLarge;

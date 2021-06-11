@@ -19,6 +19,10 @@ class Widget;
 enum class EnterPoint : uchar;
 } // namespace Intro
 
+namespace Media {
+class SystemMediaControlsManager;
+} // namespace Media
+
 namespace Window {
 class MediaPreviewWidget;
 class SectionMemento;
@@ -128,6 +132,8 @@ private:
 	void toggleDisplayNotifyFromTray();
 
 	QPixmap grabInner();
+
+	std::unique_ptr<Media::SystemMediaControlsManager> _mediaControlsManager;
 
 	QImage icon16, icon32, icon64, iconbig16, iconbig32, iconbig64;
 

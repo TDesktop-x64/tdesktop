@@ -119,14 +119,11 @@ void OverlayWidget::RendererGL::init(
 			FragmentSampleARGB32Texture(),
 			FragmentGlobalOpacity(),
 		}));
-
-	_background.init(f);
 }
 
 void OverlayWidget::RendererGL::deinit(
 		not_null<QOpenGLWidget*> widget,
 		QOpenGLFunctions &f) {
-	_background.deinit(f);
 	_textures.destroy(f);
 	_imageProgram = std::nullopt;
 	_texturedVertexShader = nullptr;
@@ -137,61 +134,44 @@ void OverlayWidget::RendererGL::deinit(
 	_contentBuffer = std::nullopt;
 }
 
-void OverlayWidget::RendererGL::resize(
-		not_null<QOpenGLWidget*> widget,
-		QOpenGLFunctions &f,
-		int w,
-		int h) {
-	const auto factor = widget->devicePixelRatio();
-	if (_factor != factor) {
-		_factor = factor;
-		_controlsImage.invalidate();
-	}
-	_viewport = QSize{ w, h };
-	_uniformViewport = QVector2D(
-		_viewport.width() * _factor,
-		_viewport.height() * _factor);
-	setDefaultViewport(f);
-}
-
-void OverlayWidget::RendererGL::setDefaultViewport(QOpenGLFunctions &f) {
-	f.glViewport(0, 0, _uniformViewport.x(), _uniformViewport.y());
-}
-
 void OverlayWidget::RendererGL::paint(
 		not_null<QOpenGLWidget*> widget,
 		QOpenGLFunctions &f) {
 	if (handleHideWorkaround(f)) {
 		return;
 	}
+	const auto factor = widget->devicePixelRatio();
+	if (_factor != factor) {
+		_factor = factor;
+		_controlsImage.invalidate();
+	}
+	_blendingEnabled = false;
+	_viewport = widget->size();
+	_uniformViewport = QVector2D(
+		_viewport.width() * _factor,
+		_viewport.height() * _factor);
 	_f = &f;
 	_owner->paint(this);
 	_f = nullptr;
 }
 
-bool OverlayWidget::RendererGL::handleHideWorkaround(QOpenGLFunctions &f) {
-	if (!Platform::IsWindows() || !_owner->_hideWorkaround) {
-		return false;
+std::optional<QColor> OverlayWidget::RendererGL::clearColor() {
+	if (Platform::IsWindows() && _owner->_hideWorkaround) {
+		return QColor(0, 0, 0, 0);
+	} else if (_owner->_fullScreenVideo) {
+		return st::mediaviewVideoBg->c;
+	} else {
+		return st::mediaviewBg->c;
 	}
+}
+
+bool OverlayWidget::RendererGL::handleHideWorkaround(QOpenGLFunctions &f) {
 	// This is needed on Windows,
 	// because on reopen it blinks with the last shown content.
-	f.glClearColor(0., 0., 0., 0.);
-	f.glClear(GL_COLOR_BUFFER_BIT);
-	return true;
+	return Platform::IsWindows() && _owner->_hideWorkaround;
 }
 
 void OverlayWidget::RendererGL::paintBackground() {
-	const auto &bg = _owner->_fullScreenVideo
-		? st::mediaviewVideoBg
-		: st::mediaviewBg;
-	auto fill = QRegion(QRect(QPoint(), _viewport));
-	toggleBlending(false);
-	_background.fill(
-		*_f,
-		fill,
-		_viewport,
-		_factor,
-		bg);
 	_contentBuffer->bind();
 }
 
@@ -318,6 +298,7 @@ void OverlayWidget::RendererGL::paintTransformedStaticContent(
 			_rgbaSize = image.size();
 		}
 	}
+	program->setUniformValue("s_texture", GLint(0));
 
 	paintTransformedContent(&*program, geometry);
 }
@@ -325,21 +306,15 @@ void OverlayWidget::RendererGL::paintTransformedStaticContent(
 void OverlayWidget::RendererGL::paintTransformedContent(
 		not_null<QOpenGLShaderProgram*> program,
 		ContentGeometry geometry) {
-	auto texCoords = std::array<std::array<GLfloat, 2>, 4> { {
-		{ { 0.f, 1.f } },
-		{ { 1.f, 1.f } },
-		{ { 1.f, 0.f } },
-		{ { 0.f, 0.f } },
-	} };
 	const auto rect = transformRect(geometry.rect);
 	const auto centerx = rect.x() + rect.width() / 2;
 	const auto centery = rect.y() + rect.height() / 2;
-	const auto rsin = std::sinf(geometry.rotation * M_PI / 180.);
-	const auto rcos = std::cosf(geometry.rotation * M_PI / 180.);
+	const auto rsin = float(std::sin(geometry.rotation * M_PI / 180.));
+	const auto rcos = float(std::cos(geometry.rotation * M_PI / 180.));
 	const auto rotated = [&](float x, float y) -> std::array<float, 2> {
 		x -= centerx;
 		y -= centery;
-		return {
+		return std::array<float, 2>{
 			centerx + (x * rcos + y * rsin),
 			centery + (y * rcos - x * rsin)
 		};
@@ -350,22 +325,21 @@ void OverlayWidget::RendererGL::paintTransformedContent(
 	const auto bottomleft = rotated(rect.left(), rect.bottom());
 	const GLfloat coords[] = {
 		topleft[0], topleft[1],
-		texCoords[0][0], texCoords[0][1],
+		0.f, 1.f,
 
 		topright[0], topright[1],
-		texCoords[1][0], texCoords[1][1],
+		1.f, 1.f,
 
 		bottomright[0], bottomright[1],
-		texCoords[2][0], texCoords[2][1],
+		1.f, 0.f,
 
 		bottomleft[0], bottomleft[1],
-		texCoords[3][0], texCoords[3][1],
+		0.f, 0.f,
 	};
 
 	_contentBuffer->write(0, coords, sizeof(coords));
 
 	program->setUniformValue("viewport", _uniformViewport);
-	program->setUniformValue("s_texture", GLint(0));
 
 	toggleBlending(false);
 	FillTexturedRectangle(*_f, &*program);
@@ -461,7 +435,7 @@ void OverlayWidget::RendererGL::paintControl(
 	const auto bgAlpha = int(std::round(bg.alpha() * outerOpacity));
 	const auto offset = kControlsOffset + (meta.index * kControlValues) / 4;
 	const auto fgOffset = offset + 2;
-	const auto bgRect = TransformRect(outer, _viewport, _factor);
+	const auto bgRect = transformRect(outer);
 	const auto iconRect = _controlsImage.texturedRect(
 		inner,
 		_controlsTextures[meta.index]);

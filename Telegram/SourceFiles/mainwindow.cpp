@@ -31,6 +31,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_account.h" // Account::sessionValue.
 #include "main/main_domain.h"
 #include "mainwidget.h"
+#include "media/system_media_controls_manager.h"
 #include "boxes/confirm_box.h"
 #include "boxes/connection_box.h"
 #include "storage/storage_account.h"
@@ -82,6 +83,7 @@ void FeedLangTestingKey(int key) {
 
 MainWindow::MainWindow(not_null<Window::Controller*> controller)
 : Platform::MainWindow(controller) {
+
 	auto logo = Core::App().logo();
 	icon16 = logo.scaledToWidth(16, Qt::SmoothTransformation);
 	icon32 = logo.scaledToWidth(32, Qt::SmoothTransformation);
@@ -130,6 +132,11 @@ void MainWindow::initHook() {
 		this,
 		[=] { checkHistoryActivation(); },
 		Qt::QueuedConnection);
+
+	if (Media::SystemMediaControlsManager::Supported()) {
+		using MediaManager = Media::SystemMediaControlsManager;
+		_mediaControlsManager = std::make_unique<MediaManager>(&controller());
+	}
 }
 
 void MainWindow::createTrayIconMenu() {

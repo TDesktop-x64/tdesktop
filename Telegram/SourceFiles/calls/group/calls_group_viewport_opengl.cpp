@@ -374,8 +374,6 @@ void Viewport::RendererGL::init(
 		}));
 
 	validateNoiseTexture(f, 0);
-
-	_background.init(f);
 }
 
 void Viewport::RendererGL::ensureARGB32Program() {
@@ -403,8 +401,6 @@ void Viewport::RendererGL::ensureARGB32Program() {
 void Viewport::RendererGL::deinit(
 		not_null<QOpenGLWidget*> widget,
 		QOpenGLFunctions &f) {
-	_background.deinit(f);
-
 	_frameBuffer = std::nullopt;
 	_frameVertexShader = nullptr;
 	_imageProgram = std::nullopt;
@@ -423,16 +419,6 @@ void Viewport::RendererGL::deinit(
 	_buttons.destroy(f);
 }
 
-void Viewport::RendererGL::resize(
-		not_null<QOpenGLWidget*> widget,
-		QOpenGLFunctions &f,
-		int w,
-		int h) {
-	_factor = widget->devicePixelRatio();
-	_viewport = QSize(w, h);
-	setDefaultViewport(f);
-}
-
 void Viewport::RendererGL::setDefaultViewport(QOpenGLFunctions &f) {
 	const auto size = _viewport * _factor;
 	f.glViewport(0, 0, size.width(), size.height());
@@ -442,10 +428,11 @@ void Viewport::RendererGL::paint(
 		not_null<QOpenGLWidget*> widget,
 		QOpenGLFunctions &f) {
 	_factor = widget->devicePixelRatio();
+	_viewport = widget->size();
+
 	const auto defaultFramebufferObject = widget->defaultFramebufferObject();
 
 	validateDatas();
-	fillBackground(f);
 	auto index = 0;
 	for (const auto &tile : _owner->_tiles) {
 		if (!tile->shown()) {
@@ -460,16 +447,8 @@ void Viewport::RendererGL::paint(
 	}
 }
 
-void Viewport::RendererGL::fillBackground(QOpenGLFunctions &f) {
-	const auto radius = st::roundRadiusLarge;
-	const auto radiuses = QMargins{ radius, radius, radius, radius };
-	auto region = QRegion(QRect(QPoint(), _viewport));
-	for (const auto &tile : _owner->_tiles) {
-		if (tile->shown()) {
-			region -= tile->geometry().marginsRemoved(radiuses);
-		}
-	}
-	_background.fill(f, region, _viewport, _factor, st::groupCallBg);
+std::optional<QColor> Viewport::RendererGL::clearColor() {
+	return st::groupCallBg->c;
 }
 
 void Viewport::RendererGL::validateUserpicFrame(
@@ -502,6 +481,9 @@ void Viewport::RendererGL::paintTile(
 		not_null<VideoTile*> tile,
 		TileData &tileData) {
 	const auto track = tile->track();
+	const auto markGuard = gsl::finally([&] {
+		tile->track()->markFrameShown();
+	});
 	const auto data = track->frameWithInfo(false);
 	_userpicFrame = (data.format == Webrtc::FrameFormat::None);
 	validateUserpicFrame(tile, tileData);
@@ -745,7 +727,6 @@ void Viewport::RendererGL::paintTile(
 	f.glViewport(0, 0, blurSize.width(), blurSize.height());
 
 	bindFrame(f, data, tileData, _downscaleProgram);
-	tile->track()->markFrameShown();
 
 	drawDownscalePass(f, tileData);
 	drawFirstBlurPass(f, tileData, blurSize);
@@ -1247,9 +1228,7 @@ void Viewport::RendererGL::validateDatas() {
 		_tileDataIndices[i] = index;
 	}
 	auto image = _names.takeImage();
-	const auto imageSize = QSize(
-		available * factor,
-		_tileData.size() * nameHeight);
+	const auto imageSize = QSize(available, _tileData.size() * nameHeight);
 	const auto allocate = (image.size() != imageSize);
 	auto paintToImage = allocate
 		? QImage(imageSize, QImage::Format_ARGB32_Premultiplied)

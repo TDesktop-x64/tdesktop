@@ -419,7 +419,7 @@ LastCrashedWindow::LastCrashedWindow(
 	connect(&_saveReport, &QPushButton::clicked, [=] { saveReport(); });
 	_getApp.setText(qsl("GET THE LATEST VERSION OF 64GRAM DESKTOP"));
 	connect(&_getApp, &QPushButton::clicked, [=] {
-		QDesktopServices::openUrl(qsl("l(qsl("https://github.com/TDesktop-x64/tdesktop"));
+		QDesktopServices::openUrl(qsl("https://github.com/TDesktop-x64/tdesktop"));
 	});
 
 	_send.setText(qsl("SEND CRASH REPORT"));

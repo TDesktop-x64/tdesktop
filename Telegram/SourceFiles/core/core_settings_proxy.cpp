@@ -235,4 +235,8 @@ void SettingsProxy::connectionTypeChangesNotify() {
 	_connectionTypeChanges.fire({});
 }
 
+void SettingsProxy::removeProxyList() {
+	_list = std::vector<MTP::ProxyData>{};
+}
+
 } // namespace Core

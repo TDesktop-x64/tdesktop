@@ -597,11 +597,11 @@ void ProxiesBox::setupContent() {
 
 	const auto top = addTopButton(st::infoTopBarMenu);
 	const auto share = [=] {
-		Global::SetProxiesList({});
-		Global::SetSelectedProxy(MTP::ProxyData());
-		Global::SetProxySettings(MTP::ProxyData::Settings::Disabled);
+		_settings.removeProxyList();
+		_settings.setSelected(MTP::ProxyData());
+		_settings.setSettings(MTP::ProxyData::Settings::Disabled);
 		Core::App().refreshGlobalProxy();
-		Global::RefConnectionTypeChanged().notify();
+		_settings.connectionTypeChangesNotify();
 		Local::writeSettings();
 
 		closeBox();

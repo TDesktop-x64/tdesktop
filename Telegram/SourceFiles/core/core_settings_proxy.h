@@ -37,6 +37,7 @@ public:
 
 	[[nodiscard]] const std::vector<MTP::ProxyData> &list() const;
 	[[nodiscard]] std::vector<MTP::ProxyData> &list();
+	void removeProxyList();
 
 	[[nodiscard]] QByteArray serialize() const;
 	bool setFromSerialized(const QByteArray &serialized);

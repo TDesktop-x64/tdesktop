@@ -12,16 +12,6 @@ https://github.com/TDesktop-x64/tdesktop/blob/dev/LEGAL
 class BoxContent;
 
 namespace Settings {
-	void SetupEnhancedNetwork(not_null<Ui::VerticalLayout *> container);
-
-	void SetupEnhancedMessages(not_null<Ui::VerticalLayout *> container);
-
-	void SetupEnhancedButton(not_null<Ui::VerticalLayout *> container);
-
-	void SetupEnhancedVoiceChat(not_null<Ui::VerticalLayout *> container);
-
-	void SetupEnhancedOthers(not_null<Window::SessionController*> controller, not_null<Ui::VerticalLayout *> container);
-
 	class Enhanced : public Section {
 	public:
 		Enhanced(
@@ -30,7 +20,14 @@ namespace Settings {
 
 	private:
 		void setupContent(not_null<Window::SessionController *> controller);
+		void SetupEnhancedNetwork(not_null<Ui::VerticalLayout *> container);
+		void SetupEnhancedMessages(not_null<Ui::VerticalLayout *> container);
+		void SetupEnhancedButton(not_null<Ui::VerticalLayout *> container);
+		void SetupEnhancedVoiceChat(not_null<Ui::VerticalLayout *> container);
+		void SetupEnhancedOthers(not_null<Window::SessionController*> controller, not_null<Ui::VerticalLayout *> container);
 
+		rpl::event_stream<QString> _AlwaysDeleteChanged;
+		rpl::event_stream<QString> _BitrateChanged;
 	};
 
 } // namespace Settings

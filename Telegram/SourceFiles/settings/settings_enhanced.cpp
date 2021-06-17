@@ -38,7 +38,7 @@ https://github.com/TDesktop-x64/tdesktop/blob/dev/LEGAL
 
 namespace Settings {
 
-	void SetupEnhancedNetwork(not_null<Ui::VerticalLayout *> container) {
+	void Enhanced::SetupEnhancedNetwork(not_null<Ui::VerticalLayout *> container) {
 		const auto wrap = container->add(
 				object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
 						container,
@@ -63,7 +63,7 @@ namespace Settings {
 		AddSkip(container);
 	}
 
-	void SetupEnhancedMessages(not_null<Ui::VerticalLayout *> container) {
+	void Enhanced::SetupEnhancedMessages(not_null<Ui::VerticalLayout *> container) {
 		AddDivider(container);
 		AddSkip(container);
 		AddSubsectionTitle(container, tr::lng_settings_messages());
@@ -122,19 +122,24 @@ namespace Settings {
 		}
 
 		auto value = rpl::single(
-				rpl::empty_value()
-		) | rpl::then(base::ObservableViewer(
-				Global::RefAlwaysDeleteChanged()
-		)) | rpl::map([] {
+				AlwaysDeleteBox::DeleteLabel(cAlwaysDeleteFor())
+		) | rpl::then(
+				_AlwaysDeleteChanged.events()
+		) | rpl::map([] {
 			return AlwaysDeleteBox::DeleteLabel(cAlwaysDeleteFor());
 		});
 
-		AddButtonWithLabel(
+		auto btn = AddButtonWithLabel(
 				container,
 				tr::lng_settings_always_delete_for(),
 				std::move(value),
 				st::settingsButton
-		)->addClickHandler([=] {
+		);
+		btn->events(
+		) | rpl::start_with_next([=]() {
+			_AlwaysDeleteChanged.fire({});
+		}, container->lifetime());
+		btn->addClickHandler([=] {
 			Ui::show(Box<AlwaysDeleteBox>());
 		});
 
@@ -169,7 +174,7 @@ namespace Settings {
 		}, container->lifetime());
 	}
 
-	void SetupEnhancedButton(not_null<Ui::VerticalLayout *> container) {
+	void Enhanced::SetupEnhancedButton(not_null<Ui::VerticalLayout *> container) {
 		AddDivider(container);
 		AddSkip(container);
 		AddSubsectionTitle(container, tr::lng_settings_button());
@@ -216,7 +221,7 @@ namespace Settings {
 		AddSkip(container);
 	}
 
-	void SetupEnhancedVoiceChat(not_null<Ui::VerticalLayout *> container) {
+	void Enhanced::SetupEnhancedVoiceChat(not_null<Ui::VerticalLayout *> container) {
 		AddDivider(container);
 		AddSkip(container);
 		AddSubsectionTitle(container, tr::lng_settings_voice_chat());
@@ -273,26 +278,31 @@ namespace Settings {
 		AddDividerText(inner, tr::lng_auto_unmute_desc());
 
 		auto value = rpl::single(
-				rpl::empty_value()
-		) | rpl::then(base::ObservableViewer(
-				Global::RefBitrateChanged()
-		)) | rpl::map([] {
+				BitrateController::BitrateLabel(cVoiceChatBitrate())
+		) | rpl::then(
+				_BitrateChanged.events()
+		) | rpl::map([=] {
 			return BitrateController::BitrateLabel(cVoiceChatBitrate());
 		});
 
-		AddButtonWithLabel(
+		auto btn = AddButtonWithLabel(
 				container,
 				tr::lng_bitrate_controller(),
 				std::move(value),
 				st::settingsButton
-		)->addClickHandler([=] {
+		);
+		btn->events(
+		) | rpl::start_with_next([=]() {
+			_BitrateChanged.fire({});
+		}, container->lifetime());
+		btn->addClickHandler([=] {
 			Ui::show(Box<BitrateController>());
 		});
 
 		AddSkip(container);
 	}
 
-	void SetupEnhancedOthers(not_null<Window::SessionController*> controller, not_null<Ui::VerticalLayout *> container) {
+	void Enhanced::SetupEnhancedOthers(not_null<Window::SessionController*> controller, not_null<Ui::VerticalLayout *> container) {
 		AddDivider(container);
 		AddSkip(container);
 		AddSubsectionTitle(container, tr::lng_settings_other());

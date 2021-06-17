@@ -325,11 +325,3 @@ bool switchInlineBotButtonReceived(
 
 } // namespace Notify
 
-
-	base::Observable<void> AlwaysDeleteChanged;
-
-	base::Observable<void> BitrateChanged;
-
-DefineRefVar(Global, base::Observable<void>, AlwaysDeleteChanged);
-
-DefineRefVar(Global, base::Observable<void>, BitrateChanged);

@@ -16,6 +16,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_boxes.h"
 #include "boxes/confirm_box.h"
 #include "core/enhanced_settings.h"
+#include "settings/settings_enhanced.h"
 #include "app.h"
 
 NetBoostBox::NetBoostBox(QWidget *parent) {
@@ -127,7 +128,6 @@ QString AlwaysDeleteBox::DeleteLabel(int boost) {
 void AlwaysDeleteBox::save() {
 	SetAlwaysDelete(_optionGroup->value());
 	EnhancedSettings::Write();
-	Global::RefAlwaysDeleteChanged().notify();
 	closeBox();
 }
 
@@ -228,7 +228,6 @@ QString BitrateController::BitrateLabel(int boost) {
 void BitrateController::save() {
 	SetBitrate(_bitrateGroup->value());
 	EnhancedSettings::Write();
-	Global::RefBitrateChanged().notify();
 	Ui::Toast::Show(tr::lng_bitrate_controller_hint(tr::now));
 	closeBox();
 }

@@ -81,8 +81,3 @@ bool switchInlineBotButtonReceived(
 	MsgId samePeerReplyTo = 0);
 
 } // namespace Notify
-
-
-DeclareRefVar(base::Observable<void>, AlwaysDeleteChanged);
-
-DeclareRefVar(base::Observable<void>, BitrateChanged);

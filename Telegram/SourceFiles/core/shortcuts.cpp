@@ -15,7 +15,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/platform/base_platform_info.h"
 #include "platform/platform_specific.h"
 #include "base/parse_helper.h"
-#include "facades.h"
 
 #include <QtWidgets/QShortcut>
 #include <QtCore/QJsonDocument>
@@ -560,8 +559,6 @@ rpl::producer<not_null<Request*>> Requests() {
 }
 
 void Start() {
-	Assert(Global::started());
-
 	Data.fill();
 }
 

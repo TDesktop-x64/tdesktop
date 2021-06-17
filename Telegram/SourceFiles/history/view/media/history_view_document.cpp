@@ -25,6 +25,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_session.h"
 #include "data/data_document.h"
 #include "data/data_document_media.h"
+#include "data/data_document_resolver.h"
 #include "data/data_media_types.h"
 #include "data/data_file_origin.h"
 #include "styles/style_chat.h"
@@ -219,9 +220,7 @@ void Document::createComponents(bool caption) {
 			_realParent->fullId());
 	}
 	if (const auto voice = Get<HistoryDocumentVoice>()) {
-		voice->_seekl = std::make_shared<VoiceSeekClickHandler>(
-			_data,
-			_realParent->fullId());
+		voice->_seekl = std::make_shared<VoiceSeekClickHandler>(_data, [] {});
 	}
 }
 

@@ -479,7 +479,8 @@ void InnerWidget::showFilter(Fn<void(FilterValue &&filter)> callback) {
 	if (_admins.empty()) {
 		_showFilterCallback = std::move(callback);
 	} else {
-		Ui::show(Box<FilterBox>(_channel, _admins, _filter, std::move(callback)));
+		_controller->show(
+			Box<FilterBox>(_channel, _admins, _filter, std::move(callback)));
 	}
 }
 
@@ -602,6 +603,19 @@ void InnerWidget::elementShowPollResults(
 	FullMsgId context) {
 }
 
+void InnerWidget::elementOpenPhoto(
+		not_null<PhotoData*> photo,
+		FullMsgId context) {
+	_controller->openPhoto(photo, context);
+}
+
+void InnerWidget::elementOpenDocument(
+		not_null<DocumentData*> document,
+		FullMsgId context,
+		bool showInMediaView) {
+	_controller->openDocument(document, context, showInMediaView);
+}
+
 void InnerWidget::elementShowTooltip(
 	const TextWithEntities &text,
 	Fn<void()> hiddenCallback) {
@@ -625,6 +639,10 @@ void InnerWidget::elementSendBotCommand(
 }
 
 void InnerWidget::elementHandleViaClick(not_null<UserData*> bot) {
+}
+
+bool InnerWidget::elementIsChatWide() {
+	return _controller->adaptive().isChatWide();
 }
 
 void InnerWidget::saveState(not_null<SectionMemento*> memento) {
@@ -942,14 +960,17 @@ void InnerWidget::paintEvent(QPaintEvent *e) {
 						p.setOpacity(opacity);
 						const auto dateY = /*noFloatingDate ? itemtop :*/ (dateTop - st::msgServiceMargin.top());
 						const auto width = view->width();
+						const auto chatWide =
+							_controller->adaptive().isChatWide();
 						if (const auto date = view->Get<HistoryView::DateBadge>()) {
-							date->paint(p, dateY, width);
+							date->paint(p, dateY, width, chatWide);
 						} else {
 							HistoryView::ServiceMessagePainter::paintDate(
 								p,
 								view->dateTime(),
 								dateY,
-								width);
+								width,
+								chatWide);
 						}
 					}
 				}
@@ -1273,7 +1294,7 @@ void InnerWidget::openContextGif(FullMsgId itemId) {
 	if (const auto item = session().data().message(itemId)) {
 		if (const auto media = item->media()) {
 			if (const auto document = media->document()) {
-				Core::App().showDocument(document, item);
+				_controller->openDocument(document, itemId, true);
 			}
 		}
 	}
@@ -1311,7 +1332,8 @@ void InnerWidget::suggestRestrictUser(not_null<UserData*> user) {
 					(*weakBox)->closeBox();
 				}
 			});
-			*weakBox = Ui::show(
+			*weakBox = QPointer<EditRestrictedBox>(box.data());
+			_controller->show(
 				std::move(box),
 				Ui::LayerOption::KeepOther);
 		};

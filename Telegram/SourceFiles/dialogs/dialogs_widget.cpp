@@ -20,6 +20,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "mainwindow.h"
 #include "mainwidget.h"
+#include "main/main_domain.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
 #include "apiwrap.h"
@@ -28,12 +29,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/update_checker.h"
 #include "boxes/peer_list_box.h"
 #include "boxes/peers/edit_participants_box.h"
+#include "window/window_adaptive.h"
 #include "window/window_session_controller.h"
 #include "window/window_slide_animation.h"
 #include "window/window_connecting_widget.h"
 #include "window/window_main_menu.h"
 #include "storage/storage_media_prepare.h"
 #include "storage/storage_account.h"
+#include "storage/storage_domain.h"
 #include "data/data_session.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
@@ -207,10 +210,11 @@ Widget::Widget(
 	connect(_inner, SIGNAL(completeHashtag(QString)), this, SLOT(onCompleteHashtag(QString)));
 	connect(_inner, SIGNAL(refreshHashtags()), this, SLOT(onFilterCursorMoved()));
 	connect(_inner, SIGNAL(cancelSearchInChat()), this, SLOT(onCancelSearchInChat()));
-	subscribe(_inner->searchFromUserChanged, [this](PeerData *from) {
-		setSearchInChat(_searchInChat, from);
+	_inner->cancelSearchFromUserRequests(
+	) | rpl::start_with_next([=] {
+		setSearchInChat(_searchInChat, nullptr);
 		applyFilterUpdate(true);
-	});
+	}, lifetime());
 	_inner->chosenRow(
 	) | rpl::start_with_next([=](const ChosenRow &row) {
 		const auto openSearchResult = !controller->selectingPeer()
@@ -262,13 +266,21 @@ Widget::Widget(
 		}, lifetime());
 	}
 
-	subscribe(Adaptive::Changed(), [this] { updateForwardBar(); });
+	controller->adaptive().changed(
+	) | rpl::start_with_next([=] {
+		updateForwardBar();
+	}, lifetime());
 
 	_cancelSearch->setClickedCallback([this] { onCancelSearch(); });
 	_jumpToDate->entity()->setClickedCallback([this] { showJumpToDate(); });
 	_chooseFromUser->entity()->setClickedCallback([this] { showSearchFrom(); });
-	_lockUnlock->setVisible(Global::LocalPasscode());
-	subscribe(Global::RefLocalPasscodeChanged(), [this] { updateLockUnlockVisibility(); });
+	rpl::single(
+		rpl::empty_value()
+	) | rpl::then(
+		session().domain().local().localPasscodeChanged()
+	) | rpl::start_with_next([=] {
+		updateLockUnlockVisibility();
+	}, lifetime());
 	_lockUnlock->setClickedCallback([this] {
 		_lockUnlock->setIconOverride(&st::dialogsUnlockIcon, &st::dialogsUnlockIconOver);
 		Core::App().lockByPasscode();
@@ -406,7 +418,7 @@ void Widget::setupConnectingWidget() {
 	_connecting = std::make_unique<Window::ConnectionState>(
 		this,
 		&session().account(),
-		Window::AdaptiveIsOneColumn());
+		controller()->adaptive().oneColumnValue());
 }
 
 void Widget::setupSupportMode() {
@@ -1276,7 +1288,7 @@ void Widget::dragEnterEvent(QDragEnterEvent *e) {
 
 	const auto data = e->mimeData();
 	_dragInScroll = false;
-	_dragForward = Adaptive::OneColumn()
+	_dragForward = controller()->adaptive().isOneColumn()
 		? false
 		: data->hasFormat(qsl("application/x-td-forward"));
 	if (_dragForward) {
@@ -1508,7 +1520,7 @@ void Widget::updateLockUnlockVisibility() {
 	if (_a_show.animating()) {
 		return;
 	}
-	const auto hidden = !Global::LocalPasscode();
+	const auto hidden = !session().domain().local().hasLocalPasscode();
 	if (_lockUnlock->isHidden() != hidden) {
 		_lockUnlock->setVisible(!hidden);
 		updateControlsGeometry();
@@ -1566,7 +1578,7 @@ void Widget::updateControlsGeometry() {
 	auto smallLayoutWidth = (st::dialogsPadding.x() + st::dialogsPhotoSize + st::dialogsPadding.x());
 	auto smallLayoutRatio = (width() < st::columnMinimalWidthLeft) ? (st::columnMinimalWidthLeft - width()) / float64(st::columnMinimalWidthLeft - smallLayoutWidth) : 0.;
 	auto filterLeft = (controller()->filtersWidth() ? st::dialogsFilterSkip : st::dialogsFilterPadding.x() + _mainMenuToggle->width()) + st::dialogsFilterPadding.x();
-	auto filterRight = (Global::LocalPasscode() ? (st::dialogsFilterPadding.x() + _lockUnlock->width()) : st::dialogsFilterSkip) + st::dialogsFilterPadding.x();
+	auto filterRight = (_lockUnlock->isVisible() ? (st::dialogsFilterPadding.x() + _lockUnlock->width()) : st::dialogsFilterSkip) + st::dialogsFilterPadding.x();
 	auto filterWidth = qMax(width(), st::columnMinimalWidthLeft) - filterLeft - filterRight;
 	auto filterAreaHeight = st::topBarHeight;
 	_searchControls->setGeometry(0, filterAreaTop, width(), filterAreaHeight);
@@ -1623,16 +1635,21 @@ void Widget::updateControlsGeometry() {
 	}
 }
 
+rpl::producer<> Widget::closeForwardBarRequests() const {
+	return _closeForwardBarRequests.events();
+}
+
 void Widget::updateForwardBar() {
 	auto selecting = controller()->selectingPeer();
-	auto oneColumnSelecting = (Adaptive::OneColumn() && selecting);
+	auto oneColumnSelecting = (controller()->adaptive().isOneColumn()
+		&& selecting);
 	if (!oneColumnSelecting == !_forwardCancel) {
 		return;
 	}
 	if (oneColumnSelecting) {
 		_forwardCancel.create(this, st::dialogsForwardCancel);
-		_forwardCancel->setClickedCallback([] {
-			Global::RefPeerChooseCancel().notify(true);
+		_forwardCancel->setClickedCallback([=] {
+			_closeForwardBarRequests.fire({});
 		});
 		if (!_a_show.animating()) _forwardCancel->show();
 	} else {
@@ -1745,7 +1762,7 @@ bool Widget::onCancelSearch() {
 	bool clearing = !_filter->getLastText().isEmpty();
 	cancelSearchRequest();
 	if (_searchInChat && !clearing) {
-		if (Adaptive::OneColumn()) {
+		if (controller()->adaptive().isOneColumn()) {
 			if (const auto peer = _searchInChat.peer()) {
 				Ui::showPeerHistory(peer, ShowAtUnreadMsgId);
 			} else {
@@ -1764,8 +1781,9 @@ bool Widget::onCancelSearch() {
 
 void Widget::onCancelSearchInChat() {
 	cancelSearchRequest();
+	const auto isOneColumn = controller()->adaptive().isOneColumn();
 	if (_searchInChat) {
-		if (Adaptive::OneColumn()
+		if (isOneColumn
 			&& !controller()->selectingPeer()
 			&& _filter->getLastText().trimmed().isEmpty()) {
 			if (const auto peer = _searchInChat.peer()) {
@@ -1777,7 +1795,7 @@ void Widget::onCancelSearchInChat() {
 		setSearchInChat(Key());
 	}
 	applyFilterUpdate(true);
-	if (!Adaptive::OneColumn() && !controller()->selectingPeer()) {
+	if (!isOneColumn && !controller()->selectingPeer()) {
 		cancelled();
 	}
 }

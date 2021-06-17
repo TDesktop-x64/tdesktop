@@ -73,9 +73,10 @@ std::unique_ptr<Manager> Create(System *system) {
 Manager::Manager(System *system)
 : Notifications::Manager(system)
 , _inputCheckTimer([=] { checkLastInput(); }) {
-	subscribe(system->settingsChanged(), [this](ChangeType change) {
+	system->settingsChanged(
+	) | rpl::start_with_next([=](ChangeType change) {
 		settingsChanged(change);
-	});
+	}, system->lifetime());
 }
 
 Manager::QueuedNotification::QueuedNotification(
@@ -130,9 +131,14 @@ void Manager::settingsChanged(ChangeType change) {
 				showNextFromQueue();
 			}
 		}
-	} else if (change == ChangeType::DemoIsShown) {
-		auto demoIsShown = Global::NotificationsDemoIsShown();
-		_demoMasterOpacity.start([this] { demoMasterOpacityCallback(); }, demoIsShown ? 1. : 0., demoIsShown ? 0. : 1., st::notifyFastAnim);
+	} else if ((change == ChangeType::DemoIsShown)
+			|| (change == ChangeType::DemoIsHidden)) {
+		_demoIsShown = (change == ChangeType::DemoIsShown);
+		_demoMasterOpacity.start(
+			[=] { demoMasterOpacityCallback(); },
+			_demoIsShown ? 1. : 0.,
+			_demoIsShown ? 0. : 1.,
+			st::notifyFastAnim);
 	}
 }
 
@@ -146,7 +152,7 @@ void Manager::demoMasterOpacityCallback() {
 }
 
 float64 Manager::demoMasterOpacity() const {
-	return _demoMasterOpacity.value(Global::NotificationsDemoIsShown() ? 0. : 1.);
+	return _demoMasterOpacity.value(_demoIsShown ? 0. : 1.);
 }
 
 void Manager::checkLastInput() {
@@ -896,7 +902,8 @@ bool Notification::canReply() const {
 	return !_hideReplyButton
 		&& (_item != nullptr)
 		&& !Core::App().passcodeLocked()
-		&& (Core::App().settings().notifyView() <= dbinvShowPreview);
+		&& (Core::App().settings().notifyView()
+			<= Core::Settings::NotifyView::ShowPreview);
 }
 
 void Notification::unlinkHistoryInManager() {

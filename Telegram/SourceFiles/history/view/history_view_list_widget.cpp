@@ -22,10 +22,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "chat_helpers/message_field.h"
 #include "mainwindow.h"
 #include "mainwidget.h"
-#include "core/application.h"
 #include "core/click_handler_types.h"
 #include "apiwrap.h"
 #include "layout.h"
+#include "window/window_adaptive.h"
 #include "window/window_session_controller.h"
 #include "window/window_peer_menu.h"
 #include "main/main_session.h"
@@ -312,6 +312,11 @@ ListWidget::ListWidget(
 			}
 		}
 	});
+
+	controller->adaptive().chatWideValue(
+	) | rpl::start_with_next([=](bool wide) {
+		_isChatWide = wide;
+	}, lifetime());
 }
 
 Main::Session &ListWidget::session() const {
@@ -1296,6 +1301,19 @@ void ListWidget::elementShowPollResults(
 	_controller->showPollResults(poll, context);
 }
 
+void ListWidget::elementOpenPhoto(
+		not_null<PhotoData*> photo,
+		FullMsgId context) {
+	_controller->openPhoto(photo, context);
+}
+
+void ListWidget::elementOpenDocument(
+		not_null<DocumentData*> document,
+		FullMsgId context,
+		bool showInMediaView) {
+	_controller->openDocument(document, context, showInMediaView);
+}
+
 void ListWidget::elementShowTooltip(
 	const TextWithEntities &text,
 	Fn<void()> hiddenCallback) {
@@ -1321,6 +1339,10 @@ void ListWidget::elementSendBotCommand(
 
 void ListWidget::elementHandleViaClick(not_null<UserData*> bot) {
 	_delegate->listHandleViaClick(bot);
+}
+
+bool ListWidget::elementIsChatWide() {
+	return _isChatWide;
 }
 
 void ListWidget::saveState(not_null<ListMemento*> memento) {
@@ -1558,13 +1580,14 @@ void ListWidget::paintEvent(QPaintEvent *e) {
 					int dateY = /*noFloatingDate ? itemtop :*/ (dateTop - st::msgServiceMargin.top());
 					int width = view->width();
 					if (const auto date = view->Get<HistoryView::DateBadge>()) {
-						date->paint(p, dateY, width);
+						date->paint(p, dateY, width, _isChatWide);
 					} else {
 						ServiceMessagePainter::paintDate(
 							p,
 							ItemDateText(view->data(), IsItemScheduledUntilOnline(view->data())),
 							dateY,
-							width);
+							width,
+							_isChatWide);
 					}
 				}
 			}
@@ -2348,7 +2371,7 @@ void ListWidget::mouseActionUpdate() {
 					dateWidth += st::msgServicePadding.left() + st::msgServicePadding.right();
 					auto dateLeft = st::msgServiceMargin.left();
 					auto maxwidth = view->width();
-					if (Core::App().settings().chatWide()) {
+					if (_isChatWide) {
 						maxwidth = qMin(maxwidth, int32(st::msgMaxWidth + 2 * st::msgPhotoSkip + 2 * st::msgMargin.left()));
 					}
 					auto widthForDate = maxwidth - st::msgServiceMargin.left() - st::msgServiceMargin.left();
@@ -2505,7 +2528,7 @@ std::unique_ptr<QMimeData> ListWidget::prepareDrag() {
 		if (!urls.isEmpty()) {
 			mimeData->setUrls(urls);
 		}
-		if (uponSelected && !Adaptive::OneColumn()) {
+		if (uponSelected && !_controller->adaptive().isOneColumn()) {
 			const auto canForwardAll = [&] {
 				for (const auto &[itemId, data] : _selected) {
 					if (!data.canForward) {
@@ -2568,7 +2591,9 @@ std::unique_ptr<QMimeData> ListWidget::prepareDrag() {
 void ListWidget::performDrag() {
 	if (auto mimeData = prepareDrag()) {
 		// This call enters event loop and can destroy any QObject.
-		_controller->widget()->launchDrag(std::move(mimeData));
+		_controller->widget()->launchDrag(
+			std::move(mimeData),
+			crl::guard(this, [=] { mouseActionUpdate(QCursor::pos()); }));;
 	}
 }
 
@@ -2815,14 +2840,15 @@ void ConfirmDeleteSelectedItems(not_null<ListWidget*> widget) {
 		}
 	}
 	const auto weak = Ui::MakeWeak(widget);
-	const auto box = Ui::show(Box<DeleteMessagesBox>(
+	auto box = Box<DeleteMessagesBox>(
 		&widget->controller()->session(),
-		widget->getSelectedIds()));
+		widget->getSelectedIds());
 	box->setDeleteConfirmedCallback([=] {
 		if (const auto strong = weak.data()) {
 			strong->cancelSelection();
 		}
 	});
+	widget->controller()->show(std::move(box));
 }
 
 void ConfirmForwardSelectedItems(not_null<ListWidget*> widget) {

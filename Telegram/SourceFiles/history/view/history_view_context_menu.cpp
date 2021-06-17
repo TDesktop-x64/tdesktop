@@ -158,11 +158,13 @@ void AddPhotoActions(
 	}
 }
 
-void OpenGif(not_null<Main::Session*> session, FullMsgId itemId) {
-	if (const auto item = session->data().message(itemId)) {
+void OpenGif(
+		not_null<Window::SessionController*> controller,
+		FullMsgId itemId) {
+	if (const auto item = controller->session().data().message(itemId)) {
 		if (const auto media = item->media()) {
 			if (const auto document = media->document()) {
-				Core::App().showDocument(document, item);
+				controller->openDocument(document, itemId, true);
 			}
 		}
 	}
@@ -224,7 +226,7 @@ void AddDocumentActions(
 		}();
 		if (notAutoplayedGif) {
 			menu->addAction(tr::lng_context_open_gif(tr::now), [=] {
-				OpenGif(session, contextId);
+				OpenGif(list->controller(), contextId);
 			});
 		}
 	}
@@ -551,7 +553,7 @@ bool AddRescheduleAction(
 			? HistoryView::DefaultScheduleTime()
 			: itemDate + 600;
 
-		const auto box = Ui::show(
+		const auto box = request.navigation->parentController()->show(
 			HistoryView::PrepareScheduleBox(
 				&request.navigation->session(),
 				sendMenuType,
@@ -719,14 +721,15 @@ bool AddDeleteSelectedAction(
 	menu->addAction(tr::lng_context_delete_selected(tr::now), [=] {
 		const auto weak = Ui::MakeWeak(list);
 		auto items = ExtractIdsList(request.selectedItems);
-		const auto box = Ui::show(Box<DeleteMessagesBox>(
+		auto box = Box<DeleteMessagesBox>(
 			&request.navigation->session(),
-			std::move(items)));
+			std::move(items));
 		box->setDeleteConfirmedCallback([=] {
 			if (const auto strong = weak.data()) {
 				strong->cancelSelection();
 			}
 		});
+		request.navigation->parentController()->show(std::move(box));
 	});
 	return true;
 }
@@ -759,7 +762,7 @@ bool AddDeleteMessageAction(
 		if (const auto item = owner->message(itemId)) {
 			if (asGroup) {
 				if (const auto group = owner->groups().find(item)) {
-					Ui::show(Box<DeleteMessagesBox>(
+					controller->show(Box<DeleteMessagesBox>(
 						&owner->session(),
 						owner->itemsToIds(group->items)));
 					return;
@@ -772,7 +775,8 @@ bool AddDeleteMessageAction(
 				}
 			}
 			const auto suggestModerateActions = true;
-			Ui::show(Box<DeleteMessagesBox>(item, suggestModerateActions));
+			controller->show(
+				Box<DeleteMessagesBox>(item, suggestModerateActions));
 		}
 	});
 	if (const auto message = item->toHistoryMessage()) {

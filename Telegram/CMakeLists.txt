@@ -375,6 +375,8 @@ PRIVATE
     core/core_cloud_password.h
     core/core_settings.cpp
     core/core_settings.h
+    core/core_settings_proxy.cpp
+    core/core_settings_proxy.h
     core/crash_report_window.cpp
     core/crash_report_window.h
     core/crash_reports.cpp
@@ -424,6 +426,8 @@ PRIVATE
     data/data_document.h
     data/data_document_media.cpp
     data/data_document_media.h
+    data/data_document_resolver.cpp
+    data/data_document_resolver.h
     data/data_drafts.cpp
     data/data_drafts.h
     data/data_folder.cpp
@@ -807,6 +811,7 @@ PRIVATE
     media/view/media_view_playback_controls.h
     media/view/media_view_playback_progress.cpp
     media/view/media_view_playback_progress.h
+    media/view/media_view_open_common.h
     mtproto/config_loader.cpp
     mtproto/config_loader.h
     mtproto/connection_abstract.cpp
@@ -1092,6 +1097,8 @@ PRIVATE
     window/section_memento.h
     window/section_widget.cpp
     window/section_widget.h
+    window/window_adaptive.cpp
+    window/window_adaptive.h
     window/window_connecting_widget.cpp
     window/window_connecting_widget.h
     window/window_controller.cpp

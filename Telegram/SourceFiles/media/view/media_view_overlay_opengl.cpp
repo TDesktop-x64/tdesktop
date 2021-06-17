@@ -183,7 +183,7 @@ void OverlayWidget::RendererGL::paintTransformedVideoFrame(
 	}
 	if (data.format == Streaming::FrameFormat::ARGB32) {
 		Assert(!data.original.isNull());
-		paintTransformedStaticContent(data.original, geometry, false);
+		paintTransformedStaticContent(data.original, geometry, false, false);
 		return;
 	}
 	Assert(data.format == Streaming::FrameFormat::YUV420);
@@ -237,12 +237,14 @@ void OverlayWidget::RendererGL::paintTransformedVideoFrame(
 	_yuv420Program->setUniformValue("u_texture", GLint(1));
 	_yuv420Program->setUniformValue("v_texture", GLint(2));
 
+	toggleBlending(false);
 	paintTransformedContent(&*_yuv420Program, geometry);
 }
 
 void OverlayWidget::RendererGL::paintTransformedStaticContent(
 		const QImage &image,
 		ContentGeometry geometry,
+		bool semiTransparent,
 		bool fillTransparentBackground) {
 	Expects(image.isNull()
 		|| image.format() == QImage::Format_RGB32
@@ -300,6 +302,7 @@ void OverlayWidget::RendererGL::paintTransformedStaticContent(
 	}
 	program->setUniformValue("s_texture", GLint(0));
 
+	toggleBlending(semiTransparent && !fillTransparentBackground);
 	paintTransformedContent(&*program, geometry);
 }
 
@@ -341,7 +344,6 @@ void OverlayWidget::RendererGL::paintTransformedContent(
 
 	program->setUniformValue("viewport", _uniformViewport);
 
-	toggleBlending(false);
 	FillTexturedRectangle(*_f, &*program);
 }
 
@@ -605,8 +607,10 @@ void OverlayWidget::RendererGL::paintUsingRaster(
 	}
 	method(Painter(&raster));
 
-	image.setImage(std::move(raster));
-	image.bind(*_f, size);
+	_f->glActiveTexture(GL_TEXTURE0);
+
+	image.setImage(std::move(raster), size);
+	image.bind(*_f);
 
 	const auto textured = image.texturedRect(rect, QRect(QPoint(), size));
 	const auto geometry = transformRect(textured.geometry);
@@ -631,9 +635,6 @@ void OverlayWidget::RendererGL::paintUsingRaster(
 	_imageProgram->bind();
 	_imageProgram->setUniformValue("viewport", _uniformViewport);
 	_imageProgram->setUniformValue("s_texture", GLint(0));
-
-	_f->glActiveTexture(GL_TEXTURE0);
-	image.bind(*_f, size);
 
 	toggleBlending(transparent);
 	FillTexturedRectangle(*_f, &*_imageProgram, bufferOffset);

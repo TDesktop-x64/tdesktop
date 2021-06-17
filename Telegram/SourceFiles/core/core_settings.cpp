@@ -77,6 +77,7 @@ Settings::Settings()
 QByteArray Settings::serialize() const {
 	const auto themesAccentColors = _themesAccentColors.serialize();
 	const auto windowPosition = Serialize(_windowPosition);
+	const auto proxy = _proxy.serialize();
 
 	auto recentEmojiPreloadGenerated = std::vector<RecentEmojiId>();
 	if (_recentEmojiPreload.empty()) {
@@ -97,7 +98,8 @@ QByteArray Settings::serialize() const {
 		+ Serialize::stringSize(_callOutputDeviceId)
 		+ Serialize::stringSize(_callInputDeviceId)
 		+ Serialize::stringSize(_callVideoInputDeviceId)
-		+ sizeof(qint32) * 5;
+		+ sizeof(qint32) * 5
+		+ Serialize::bytearraySize(proxy);
 	for (const auto &[key, value] : _soundOverrides) {
 		size += Serialize::stringSize(key) + Serialize::stringSize(value);
 	}
@@ -117,7 +119,7 @@ QByteArray Settings::serialize() const {
 		stream.setVersion(QDataStream::Qt_5_1);
 		stream
 			<< themesAccentColors
-			<< qint32(_adaptiveForWide ? 1 : 0)
+			<< qint32(_adaptiveForWide.current() ? 1 : 0)
 			<< qint32(_moderateModeEnabled ? 1 : 0)
 			<< qint32(qRound(_songVolume.current() * 1e6))
 			<< qint32(qRound(_videoVolume.current() * 1e6))
@@ -195,7 +197,11 @@ QByteArray Settings::serialize() const {
 		for (const auto &[id, variant] : _emojiVariants) {
 			stream << id << quint8(variant);
 		}
-		stream << qint32(_disableOpenGL ? 1 : 0);
+		stream
+			<< qint32(_disableOpenGL ? 1 : 0)
+			<< qint32(_groupCallNoiseSuppression ? 1 : 0)
+			<< _workMode.current()
+			<< proxy;
 	}
 	return result;
 }
@@ -209,7 +215,7 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 	stream.setVersion(QDataStream::Qt_5_1);
 
 	QByteArray themesAccentColors;
-	qint32 adaptiveForWide = _adaptiveForWide ? 1 : 0;
+	qint32 adaptiveForWide = _adaptiveForWide.current() ? 1 : 0;
 	qint32 moderateModeEnabled = _moderateModeEnabled ? 1 : 0;
 	qint32 songVolume = qint32(qRound(_songVolume.current() * 1e6));
 	qint32 videoVolume = qint32(qRound(_videoVolume.current() * 1e6));
@@ -272,6 +278,9 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 	std::vector<RecentEmojiId> recentEmojiPreload;
 	base::flat_map<QString, uint8> emojiVariants;
 	qint32 disableOpenGL = _disableOpenGL ? 1 : 0;
+	qint32 groupCallNoiseSuppression = _groupCallNoiseSuppression ? 1 : 0;
+	qint32 workMode = static_cast<qint32>(_workMode.current());
+	QByteArray proxy;
 
 	stream >> themesAccentColors;
 	if (!stream.atEnd()) {
@@ -403,11 +412,22 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 	if (!stream.atEnd()) {
 		stream >> disableOpenGL;
 	}
+	if (!stream.atEnd()) {
+		stream >> groupCallNoiseSuppression;
+	}
+	if (!stream.atEnd()) {
+		stream >> workMode;
+	}
+	if (!stream.atEnd()) {
+		stream >> proxy;
+	}
 	if (stream.status() != QDataStream::Ok) {
 		LOG(("App Error: "
 			"Bad data for Core::Settings::constructFromSerialized()"));
 		return;
 	} else if (!_themesAccentColors.setFromSerialized(themesAccentColors)) {
+		return;
+	} else if (!_proxy.setFromSerialized(proxy)) {
 		return;
 	}
 	_adaptiveForWide = (adaptiveForWide == 1);
@@ -421,11 +441,11 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 	_soundNotify = (soundNotify == 1);
 	_desktopNotify = (desktopNotify == 1);
 	_flashBounceNotify = (flashBounceNotify == 1);
-	const auto uncheckedNotifyView = static_cast<DBINotifyView>(notifyView);
+	const auto uncheckedNotifyView = static_cast<NotifyView>(notifyView);
 	switch (uncheckedNotifyView) {
-	case dbinvShowNothing:
-	case dbinvShowName:
-	case dbinvShowPreview: _notifyView = uncheckedNotifyView; break;
+	case NotifyView::ShowNothing:
+	case NotifyView::ShowName:
+	case NotifyView::ShowPreview: _notifyView = uncheckedNotifyView; break;
 	}
 	switch (nativeNotifications) {
 	case 0: _nativeNotifications = std::nullopt; break;
@@ -510,13 +530,16 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 	_emojiVariants = std::move(emojiVariants);
 	_disableOpenGL = (disableOpenGL == 1);
 	if (!Platform::IsMac()) {
-		Ui::GL::ForceDisable(_disableOpenGL);
+		Ui::GL::ForceDisable(_disableOpenGL
+			|| Ui::Integration::Instance().openglLastCheckFailed());
 	}
-}
-
-bool Settings::chatWide() const {
-	return _adaptiveForWide
-		&& (Global::AdaptiveChatLayout() == Adaptive::ChatLayout::Wide);
+	_groupCallNoiseSuppression = (groupCallNoiseSuppression == 1);
+	const auto uncheckedWorkMode = static_cast<WorkMode>(workMode);
+	switch (uncheckedWorkMode) {
+	case WorkMode::WindowAndTray:
+	case WorkMode::TrayOnly:
+	case WorkMode::WindowOnly: _workMode = uncheckedWorkMode; break;
+	}
 }
 
 QString Settings::getSoundPath(const QString &key) const {
@@ -718,7 +741,7 @@ void Settings::resetOnLastLogout() {
 	_soundNotify = true;
 	_desktopNotify = true;
 	_flashBounceNotify = true;
-	_notifyView = dbinvShowPreview;
+	_notifyView = NotifyView::ShowPreview;
 	//_nativeNotifications = std::nullopt;
 	//_notificationsCount = 3;
 	//_notificationsCorner = ScreenCorner::BottomRight;
@@ -739,6 +762,8 @@ void Settings::resetOnLastLogout() {
 	_groupCallPushToTalk = false;
 	_groupCallPushToTalkShortcut = QByteArray();
 	_groupCallPushToTalkDelay = 20;
+
+	_groupCallNoiseSuppression = true;
 
 	//_themesAccentColors = Window::Theme::AccentColors();
 
@@ -774,6 +799,8 @@ void Settings::resetOnLastLogout() {
 	_recentEmojiPreload.clear();
 	_recentEmoji.clear();
 	_emojiVariants.clear();
+
+	_workMode = WorkMode::WindowAndTray;
 }
 
 bool Settings::ThirdColumnByDefault() {

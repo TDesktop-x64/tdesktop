@@ -201,8 +201,10 @@ void SaveSlowmodeSeconds(
 void ShowEditPermissions(
 		not_null<Window::SessionNavigation*> navigation,
 		not_null<PeerData*> peer) {
-	const auto box = Ui::show(
-		Box<EditPeerPermissionsBox>(navigation, peer),
+	auto content = Box<EditPeerPermissionsBox>(navigation, peer);
+	const auto box = QPointer<EditPeerPermissionsBox>(content.data());
+	navigation->parentController()->show(
+		std::move(content),
 		Ui::LayerOption::KeepOther);
 	const auto saving = box->lifetime().make_state<int>(0);
 	const auto save = [=](
@@ -244,8 +246,10 @@ void ShowEditPermissions(
 void ShowEditInviteLinks(
 		not_null<Window::SessionNavigation*> navigation,
 		not_null<PeerData*> peer) {
-	const auto box = Ui::show(
-		Box<EditPeerPermissionsBox>(navigation, peer),
+	auto content = Box<EditPeerPermissionsBox>(navigation, peer);
+	const auto box = QPointer<EditPeerPermissionsBox>(content.data());
+	navigation->parentController()->show(
+		std::move(content),
 		Ui::LayerOption::KeepOther);
 	const auto saving = box->lifetime().make_state<int>(0);
 	const auto save = [=](
@@ -613,7 +617,7 @@ object_ptr<Ui::RpWidget> Controller::createStickersEdit() {
 		tr::lng_group_stickers_add(tr::now),
 		st::editPeerInviteLinkButton)
 	)->addClickHandler([=] {
-		Ui::show(
+		_navigation->parentController()->show(
 			Box<StickersBox>(_navigation->parentController(), channel),
 			Ui::LayerOption::KeepOther);
 	});
@@ -650,7 +654,7 @@ void Controller::showEditPeerTypeBox(
 		_usernameSavedValue = publicLink;
 		refreshHistoryVisibility();
 	});
-	Ui::show(
+	_navigation->parentController()->show(
 		Box<EditPeerTypeBox>(
 			_peer,
 			_channelHasLocationOriginalValue,
@@ -682,7 +686,7 @@ void Controller::showEditLinkedChatBox() {
 				|| channel->canEditPreHistoryHidden()));
 
 	if (const auto chat = *_linkedChatSavedValue) {
-		*box = Ui::show(
+		*box = _navigation->parentController()->show(
 			EditLinkedChatBox(
 				_navigation,
 				channel,
@@ -710,7 +714,7 @@ void Controller::showEditLinkedChatBox() {
 		for (const auto &item : list) {
 			chats.emplace_back(_peer->owner().processChat(item));
 		}
-		*box = Ui::show(
+		*box = _navigation->parentController()->show(
 			EditLinkedChatBox(
 				_navigation,
 				channel,
@@ -859,7 +863,7 @@ void Controller::fillHistoryVisibilityButton() {
 		_historyVisibilitySavedValue = checked;
 	});
 	const auto buttonCallback = [=] {
-		Ui::show(
+		_navigation->parentController()->show(
 			Box<EditPeerHistoryVisibilityBox>(
 				_peer,
 				boxCallback,
@@ -1027,9 +1031,15 @@ void Controller::fillManageSection() {
 			wrap->entity(),
 			tr::lng_manage_peer_invite_links(),
 			rpl::duplicate(count) | ToPositiveNumberString(),
-			[=] { Ui::show(
-				Box(ManageInviteLinksBox, _peer, _peer->session().user(), 0, 0),
-				Ui::LayerOption::KeepOther);
+			[=] {
+				_navigation->parentController()->show(
+					Box(
+						ManageInviteLinksBox,
+						_peer,
+						_peer->session().user(),
+						0,
+						0),
+					Ui::LayerOption::KeepOther);
 			},
 			st::infoIconInviteLinks);
 
@@ -1532,7 +1542,7 @@ void Controller::deleteWithConfirmation() {
 	const auto deleteCallback = crl::guard(this, [=] {
 		deleteChannel();
 	});
-	Ui::show(
+	_navigation->parentController()->show(
 		Box<ConfirmBox>(
 			text,
 			tr::lng_box_delete(tr::now),

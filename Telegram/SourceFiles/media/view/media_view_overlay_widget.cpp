@@ -49,6 +49,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_media_rotation.h"
 #include "data/data_photo_media.h"
 #include "data/data_document_media.h"
+#include "data/data_document_resolver.h"
 #include "window/themes/window_theme_preview.h"
 #include "window/window_peer_menu.h"
 #include "window/window_session_controller.h"
@@ -627,7 +628,8 @@ bool OverlayWidget::contentShown() const {
 
 bool OverlayWidget::opaqueContentShown() const {
 	return contentShown()
-		&& (!_document
+		&& (!_staticContentTransparent
+			|| !_document
 			|| (!_document->isVideoMessage() && !_document->sticker()));
 }
 
@@ -1424,12 +1426,12 @@ void OverlayWidget::subscribeToScreenGeometry() {
 }
 
 void OverlayWidget::toMessage() {
-	if (!_session) {
+	if (!_session || !_controller) {
 		return;
 	}
 	if (const auto item = _session->data().message(_msgid)) {
 		close();
-		Ui::showPeerHistoryAtItem(item);
+		_controller->showPeerHistoryAtItem(item);
 	}
 }
 
@@ -1553,8 +1555,11 @@ void OverlayWidget::handleDocumentClick() {
 	if (_document->loading()) {
 		saveCancel();
 	} else {
-		DocumentOpenClickHandler::Open(
-			fileOrigin(),
+		if (!_controller) {
+			return;
+		}
+		Data::ResolveDocument(
+			_controller,
 			_document,
 			_document->owner().message(_msgid));
 		if (_document->loading() && !_radial.animating()) {
@@ -2244,73 +2249,65 @@ void OverlayWidget::activate() {
 	setFocus();
 }
 
-void OverlayWidget::showPhoto(
-		not_null<PhotoData*> photo,
-		HistoryItem *context) {
-	setSession(&photo->session());
-
-	if (context) {
-		setContext(context);
-	} else {
-		setContext(v::null);
+void OverlayWidget::show(OpenRequest request) {
+	if (!request.controller()) {
+		return;
 	}
 
-	clearControlsState();
-	_firstOpenedPeerPhoto = false;
-	assignMediaPointer(photo);
+	const auto document = request.document();
+	const auto photo = request.photo();
+	const auto contextItem = request.item();
+	const auto contextPeer = request.peer();
+	if (photo) {
+		if (contextItem && contextPeer) {
+			return;
+		}
+		setSession(&photo->session());
+		_controller = request.controller();
+		Assert(_session == (&_controller->session()));
 
-	displayPhoto(photo, context);
-	preloadData(0);
-	activateControls();
-}
+		if (contextPeer) {
+			setContext(contextPeer);
+		} else if (contextItem) {
+			setContext(contextItem);
+		} else {
+			setContext(v::null);
+		}
 
-void OverlayWidget::showPhoto(
-		not_null<PhotoData*> photo,
-		not_null<PeerData*> context) {
-	setSession(&photo->session());
-	setContext(context);
+		clearControlsState();
+		if (contextPeer) {
+			_firstOpenedPeerPhoto = true;
+		}
+		assignMediaPointer(photo);
 
-	clearControlsState();
-	_firstOpenedPeerPhoto = true;
-	assignMediaPointer(photo);
-
-	displayPhoto(photo, nullptr);
-	preloadData(0);
-	activateControls();
-}
-
-void OverlayWidget::showDocument(
-		not_null<DocumentData*> document,
-		HistoryItem *context) {
-	showDocument(document, context, Data::CloudTheme(), false);
-}
-
-void OverlayWidget::showTheme(
-		not_null<DocumentData*> document,
-		const Data::CloudTheme &cloud) {
-	showDocument(document, nullptr, cloud, false);
-}
-
-void OverlayWidget::showDocument(
-		not_null<DocumentData*> document,
-		HistoryItem *context,
-		const Data::CloudTheme &cloud,
-		bool continueStreaming) {
-	setSession(&document->session());
-
-	if (context) {
-		setContext(context);
-	} else {
-		setContext(v::null);
-	}
-
-	clearControlsState();
-
-	_streamingStartPaused = false;
-	displayDocument(document, context, cloud, continueStreaming);
-	if (!isHidden()) {
+		displayPhoto(photo, contextPeer ? nullptr : contextItem);
 		preloadData(0);
 		activateControls();
+	} else if (document) {
+		setSession(&document->session());
+		_controller = request.controller();
+		Assert(_session == (&_controller->session()));
+
+		if (contextItem) {
+			setContext(contextItem);
+		} else {
+			setContext(v::null);
+		}
+
+		clearControlsState();
+
+		_streamingStartPaused = false;
+		displayDocument(
+			document,
+			contextItem,
+			request.cloudTheme()
+				? *request.cloudTheme()
+				: Data::CloudTheme(),
+			false);
+		if (!isHidden()) {
+			preloadData(0);
+			activateControls();
+		}
 	}
 }
 
@@ -2441,20 +2438,19 @@ void OverlayWidget::displayDocument(
 	refreshCaption(item);
 
 	_docIconRect = QRect((width() - st::mediaviewFileIconSize) / 2, (height() - st::mediaviewFileIconSize) / 2, st::mediaviewFileIconSize, st::mediaviewFileIconSize);
-	if (documentBubbleShown()) {
-		if (!_document || !_document->hasThumbnail()) {
-			int32 colorIndex = documentColorIndex(_document, _docExt);
-			_docIconColor = documentColor(colorIndex);
-			const style::icon *(thumbs[]) = { &st::mediaviewFileBlue, &st::mediaviewFileGreen, &st::mediaviewFileRed, &st::mediaviewFileYellow };
-			_docIcon = thumbs[colorIndex];
+	int32 colorIndex = documentColorIndex(_document, _docExt);
+	_docIconColor = documentColor(colorIndex);
+	const style::icon *(thumbs[]) = { &st::mediaviewFileBlue, &st::mediaviewFileGreen, &st::mediaviewFileRed, &st::mediaviewFileYellow };
+	_docIcon = thumbs[colorIndex];
 
-			int32 extmaxw = (st::mediaviewFileIconSize - st::mediaviewFileExtPadding * 2);
-			_docExtWidth = st::mediaviewFileExtFont->width(_docExt);
-			if (_docExtWidth > extmaxw) {
-				_docExt = st::mediaviewFileExtFont->elided(_docExt, extmaxw, Qt::ElideMiddle);
-				_docExtWidth = st::mediaviewFileExtFont->width(_docExt);
-			}
-		} else {
+	int32 extmaxw = (st::mediaviewFileIconSize - st::mediaviewFileExtPadding * 2);
+	_docExtWidth = st::mediaviewFileExtFont->width(_docExt);
+	if (_docExtWidth > extmaxw) {
+		_docExt = st::mediaviewFileExtFont->elided(_docExt, extmaxw, Qt::ElideMiddle);
+		_docExtWidth = st::mediaviewFileExtFont->width(_docExt);
+	}
+	if (documentBubbleShown()) {
+		if (_document && _document->hasThumbnail()) {
 			_document->loadThumbnail(fileOrigin());
 			const auto tw = _documentMedia->thumbnailSize().width();
 			const auto th = _documentMedia->thumbnailSize().height();
@@ -3102,12 +3098,17 @@ float64 OverlayWidget::playbackControlsCurrentSpeed() {
 void OverlayWidget::switchToPip() {
 	Expects(_streamed != nullptr);
 	Expects(_document != nullptr);
+	Expects(_controller != nullptr);
 
 	const auto document = _document;
 	const auto msgId = _msgid;
 	const auto closeAndContinue = [=] {
 		_showAsPip = false;
-		showDocument(document, document->owner().message(msgId), {}, true);
+		show(OpenRequest(
+			_controller,
+			document,
+			document->owner().message(msgId),
+			true));
 	};
 	_showAsPip = true;
 	_pip = std::make_unique<PipWrap>(
@@ -3268,11 +3269,11 @@ void OverlayWidget::paint(not_null<Renderer*> renderer) {
 			renderer->paintTransformedStaticContent(
 				_staticContent,
 				contentGeometry(),
+				_staticContentTransparent,
 				fillTransparentBackground);
 		}
 		paintRadialLoading(renderer);
 	} else {
-		int a = 0;
 		if (_themePreviewShown) {
 			renderer->paintThemePreview(_themePreviewRect);
 		} else if (documentBubbleShown() && !_docRect.isEmpty()) {

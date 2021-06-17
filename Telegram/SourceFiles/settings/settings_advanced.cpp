@@ -22,16 +22,18 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "platform/platform_specific.h"
 #include "platform/platform_window_title.h"
 #include "base/platform/base_platform_info.h"
+#include "window/window_controller.h"
 #include "window/window_session_controller.h"
 #include "lang/lang_keys.h"
 #include "core/update_checker.h"
 #include "core/application.h"
 #include "storage/localstorage.h"
+#include "storage/storage_domain.h"
 #include "data/data_session.h"
 #include "main/main_account.h"
+#include "main/main_domain.h"
 #include "main/main_session.h"
 #include "mtproto/facade.h"
-#include "facades.h"
 #include "app.h"
 #include "styles/style_settings.h"
 
@@ -44,11 +46,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Settings {
 
 void SetupConnectionType(
+		not_null<Window::Controller*> controller,
 		not_null<Main::Account*> account,
 		not_null<Ui::VerticalLayout*> container) {
 	const auto connectionType = [=] {
 		const auto transport = account->mtp().dctransport();
-		if (Global::ProxySettings() != MTP::ProxyData::Settings::Enabled) {
+		if (!Core::App().settings().proxy().isEnabled()) {
 			return transport.isEmpty()
 				? tr::lng_connection_auto_connecting(tr::now)
 				: tr::lng_connection_auto(tr::now, lt_transport, transport);
@@ -62,13 +65,13 @@ void SetupConnectionType(
 		container,
 		tr::lng_settings_connection_type(),
 		rpl::merge(
-			base::ObservableViewer(Global::RefConnectionTypeChanged()),
+			Core::App().settings().proxy().connectionTypeChanges(),
 			// Handle language switch.
 			tr::lng_connection_auto_connecting() | rpl::to_empty
 		) | rpl::map(connectionType),
 		st::settingsButton);
 	button->addClickHandler([=] {
-		Ui::show(ProxiesBoxController::CreateOwningBox(account));
+		controller->show(ProxiesBoxController::CreateOwningBox(account));
 	});
 }
 
@@ -303,7 +306,7 @@ void SetupSpellchecker(
 		Spellchecker::ButtonManageDictsState(session),
 		st::settingsButton
 	)->addClickHandler([=] {
-		Ui::show(Box<Ui::ManageDictionariesBox>(controller));
+		controller->show(Box<Ui::ManageDictionariesBox>(controller));
 	});
 
 	button->toggledValue(
@@ -313,7 +316,11 @@ void SetupSpellchecker(
 #endif // !TDESKTOP_DISABLE_SPELLCHECK
 }
 
-void SetupSystemIntegrationContent(not_null<Ui::VerticalLayout*> container) {
+void SetupSystemIntegrationContent(
+		Window::SessionController *controller,
+		not_null<Ui::VerticalLayout*> container) {
+	using WorkMode = Core::Settings::WorkMode;
+
 	const auto checkbox = [&](rpl::producer<QString> &&label, bool checked) {
 		return object_ptr<Ui::Checkbox>(
 			container,
@@ -339,18 +346,18 @@ void SetupSystemIntegrationContent(not_null<Ui::VerticalLayout*> container) {
 	};
 	if (Platform::TrayIconSupported()) {
 		const auto trayEnabled = [] {
-			const auto workMode = Global::WorkMode().value();
-			return (workMode == dbiwmTrayOnly)
-				|| (workMode == dbiwmWindowAndTray);
+			const auto workMode = Core::App().settings().workMode();
+			return (workMode == WorkMode::TrayOnly)
+				|| (workMode == WorkMode::WindowAndTray);
 		};
 		const auto tray = addCheckbox(
 			tr::lng_settings_workmode_tray(),
 			trayEnabled());
 
 		const auto taskbarEnabled = [] {
-			const auto workMode = Global::WorkMode().value();
-			return (workMode == dbiwmWindowOnly)
-				|| (workMode == dbiwmWindowAndTray);
+			const auto workMode = Core::App().settings().workMode();
+			return (workMode == WorkMode::WindowOnly)
+				|| (workMode == WorkMode::WindowAndTray);
 		};
 		const auto taskbar = Platform::SkipTaskbarSupported()
 			? addCheckbox(
@@ -361,14 +368,15 @@ void SetupSystemIntegrationContent(not_null<Ui::VerticalLayout*> container) {
 		const auto updateWorkmode = [=] {
 			const auto newMode = tray->checked()
 				? ((!taskbar || taskbar->checked())
-					? dbiwmWindowAndTray
-					: dbiwmTrayOnly)
-				: dbiwmWindowOnly;
-			if ((newMode == dbiwmWindowAndTray || newMode == dbiwmTrayOnly)
-				&& Global::WorkMode().value() != newMode) {
+					? WorkMode::WindowAndTray
+					: WorkMode::TrayOnly)
+				: WorkMode::WindowOnly;
+			if ((newMode == WorkMode::WindowAndTray
+				|| newMode == WorkMode::TrayOnly)
+				&& Core::App().settings().workMode() != newMode) {
 				cSetSeenTrayTooltip(false);
 			}
-			Global::RefWorkMode().set(newMode);
+			Core::App().settings().setWorkMode(newMode);
 			Local::writeSettings();
 		};
 
@@ -409,9 +417,10 @@ void SetupSystemIntegrationContent(not_null<Ui::VerticalLayout*> container) {
 			Core::App().saveSettingsDelayed();
 		}, nativeFrame->lifetime());
 	}
-	if (Platform::AutostartSupported()) {
-		const auto minimizedToggled = [] {
-			return cStartMinimized() && !Global::LocalPasscode();
+	if (Platform::AutostartSupported() && controller) {
+		const auto minimizedToggled = [=] {
+			return cStartMinimized()
+				&& !controller->session().domain().local().hasLocalPasscode();
 		};
 
 		const auto autostart = addCheckbox(
@@ -441,9 +450,9 @@ void SetupSystemIntegrationContent(not_null<Ui::VerticalLayout*> container) {
 		) | rpl::filter([=](bool checked) {
 			return (checked != minimizedToggled());
 		}) | rpl::start_with_next([=](bool checked) {
-			if (Global::LocalPasscode()) {
+			if (controller->session().domain().local().hasLocalPasscode()) {
 				minimized->entity()->setChecked(false);
-				Ui::show(Box<InformBox>(
+				controller->show(Box<InformBox>(
 					tr::lng_error_start_minimized_passcoded(tr::now)));
 			} else {
 				cSetStartMinimized(checked);
@@ -451,8 +460,7 @@ void SetupSystemIntegrationContent(not_null<Ui::VerticalLayout*> container) {
 			}
 		}, minimized->lifetime());
 
-		base::ObservableViewer(
-			Global::RefLocalPasscodeChanged()
+		controller->session().domain().local().localPasscodeChanged(
 		) | rpl::start_with_next([=] {
 			minimized->entity()->setChecked(minimizedToggled());
 		}, minimized->lifetime());
@@ -474,9 +482,11 @@ void SetupSystemIntegrationContent(not_null<Ui::VerticalLayout*> container) {
 	}
 }
 
-void SetupSystemIntegrationOptions(not_null<Ui::VerticalLayout*> container) {
+void SetupSystemIntegrationOptions(
+		not_null<Window::SessionController*> controller,
+		not_null<Ui::VerticalLayout*> container) {
 	auto wrap = object_ptr<Ui::VerticalLayout>(container);
-	SetupSystemIntegrationContent(wrap.data());
+	SetupSystemIntegrationContent(controller, wrap.data());
 	if (wrap->count() > 0) {
 		container->add(object_ptr<Ui::OverrideMargins>(
 			container,
@@ -502,7 +512,9 @@ void SetupAnimations(not_null<Ui::VerticalLayout*> container) {
 	}, container->lifetime());
 }
 
-void SetupOpenGL(not_null<Ui::VerticalLayout*> container) {
+void SetupOpenGL(
+		not_null<Window::SessionController*> controller,
+		not_null<Ui::VerticalLayout*> container) {
 	const auto toggles = container->lifetime().make_state<
 		rpl::event_stream<bool>
 	>();
@@ -526,7 +538,7 @@ void SetupOpenGL(not_null<Ui::VerticalLayout*> container) {
 		const auto cancelled = crl::guard(button, [=] {
 			toggles->fire(!enabled);
 		});
-		Ui::show(Box<ConfirmBox>(
+		controller->show(Box<ConfirmBox>(
 			tr::lng_settings_need_restart(tr::now),
 			tr::lng_settings_restart_now(tr::now),
 			confirmed,
@@ -539,11 +551,12 @@ void SetupPerformance(
 		not_null<Ui::VerticalLayout*> container) {
 	SetupAnimations(container);
 	if (!Platform::IsMac()) {
-		SetupOpenGL(container);
+		SetupOpenGL(controller, container);
 	}
 }
 
 void SetupSystemIntegration(
+		not_null<Window::SessionController*> controller,
 		not_null<Ui::VerticalLayout*> container,
 		Fn<void(Type)> showOther) {
 	AddDivider(container);
@@ -556,7 +569,7 @@ void SetupSystemIntegration(
 	)->addClickHandler([=] {
 		showOther(Type::Calls);
 	});
-	SetupSystemIntegrationOptions(container);
+	SetupSystemIntegrationOptions(controller, container);
 	AddSkip(container);
 }
 
@@ -597,11 +610,14 @@ void Advanced::setupContent(not_null<Window::SessionController*> controller) {
 	addDivider();
 	AddSkip(content);
 	AddSubsectionTitle(content, tr::lng_settings_network_proxy());
-	SetupConnectionType(&controller->session().account(), content);
+	SetupConnectionType(
+		&controller->window(),
+		&controller->session().account(),
+		content);
 	AddSkip(content);
 	SetupDataStorage(controller, content);
 	SetupAutoDownload(controller, content);
-	SetupSystemIntegration(content, [=](Type type) {
+	SetupSystemIntegration(controller, content, [=](Type type) {
 		_showOther.fire_copy(type);
 	});
 

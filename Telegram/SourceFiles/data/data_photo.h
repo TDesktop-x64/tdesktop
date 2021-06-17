@@ -198,10 +198,13 @@ private:
 
 class PhotoOpenClickHandler : public PhotoClickHandler {
 public:
-	using PhotoClickHandler::PhotoClickHandler;
+	PhotoOpenClickHandler(not_null<PhotoData*> photo, Fn<void()> &&callback);
 
 protected:
 	void onClickImpl() const override;
+
+private:
+	Fn<void()> _handler;
 
 };
 

@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
 #include "main/main_app_config.h"
+#include "media/view/media_view_open_common.h"
 #include "intro/intro_widget.h"
 #include "mtproto/mtproto_config.h"
 #include "ui/layers/box_content.h"
@@ -41,6 +42,7 @@ namespace Window {
 
 Controller::Controller()
 : _widget(this)
+, _adaptive(std::make_unique<Adaptive>())
 , _isActiveTimer([=] { updateIsActive(); }) {
 	_widget.init();
 }
@@ -125,7 +127,7 @@ void Controller::checkLockByTerms() {
 		return;
 	}
 	Ui::hideSettingsAndLayer(anim::type::instant);
-	const auto box = Ui::show(Box<TermsBox>(
+	const auto box = show(Box<TermsBox>(
 		*data,
 		tr::lng_terms_agree(),
 		tr::lng_terms_decline()));
@@ -160,7 +162,7 @@ void Controller::checkLockByTerms() {
 }
 
 void Controller::showTermsDecline() {
-	const auto box = Ui::show(
+	const auto box = show(
 		Box<Window::TermsBox>(
 			TextWithEntities{ tr::lng_terms_update_sorry(tr::now) },
 			tr::lng_terms_decline_and_delete(),
@@ -192,7 +194,7 @@ void Controller::showTermsDelete() {
 			Ui::hideLayer();
 		}
 	};
-	Ui::show(
+	show(
 		Box<ConfirmBox>(
 			tr::lng_terms_delete_warning(tr::now),
 			tr::lng_terms_delete_now(tr::now),
@@ -315,7 +317,8 @@ void Controller::updateIsActive() {
 }
 
 void Controller::minimize() {
-	if (Global::WorkMode().value() == dbiwmTrayOnly) {
+	if (Core::App().settings().workMode()
+			== Core::Settings::WorkMode::TrayOnly) {
 		_widget.minimizeToTray();
 	} else {
 		_widget.setWindowState(_widget.windowState() | Qt::WindowMinimized);
@@ -328,6 +331,15 @@ void Controller::close() {
 
 void Controller::preventOrInvoke(Fn<void()> &&callback) {
 	_widget.preventOrInvoke(std::move(callback));
+}
+
+void Controller::invokeForSessionController(
+		not_null<Main::Account*> account,
+		Fn<void(not_null<SessionController*>)> &&callback) {
+	_account->domain().activate(std::move(account));
+	if (_sessionController) {
+		callback(_sessionController.get());
+	}
 }
 
 QPoint Controller::getPointForCallPanelCenter() const {
@@ -365,6 +377,23 @@ void Controller::showLogoutConfirmation() {
 		tr::lng_settings_logout(tr::now),
 		st::attentionBoxButton,
 		callback));
+}
+
+Window::Adaptive &Controller::adaptive() const {
+	return *_adaptive;
+}
+
+void Controller::openInMediaView(Media::View::OpenRequest &&request) {
+	_openInMediaViewRequests.fire(std::move(request));
+}
+
+auto Controller::openInMediaViewRequests() const
+-> rpl::producer<Media::View::OpenRequest> {
+	return _openInMediaViewRequests.events();
+}
+
+rpl::lifetime &Controller::lifetime() {
+	return _lifetime;
 }
 
 } // namespace Window

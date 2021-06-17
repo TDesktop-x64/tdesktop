@@ -13,14 +13,21 @@ namespace Main {
 class Account;
 } // namespace Main
 
+namespace Window {
+class Controller;
+} // namespace Window
+
 namespace Settings {
 
 void SetupConnectionType(
+	not_null<Window::Controller*> controller,
 	not_null<Main::Account*> account,
 	not_null<Ui::VerticalLayout*> container);
 bool HasUpdate();
 void SetupUpdate(not_null<Ui::VerticalLayout*> container);
-void SetupSystemIntegrationContent(not_null<Ui::VerticalLayout*> container);
+void SetupSystemIntegrationContent(
+	Window::SessionController *controller,
+	not_null<Ui::VerticalLayout*> container);
 void SetupAnimations(not_null<Ui::VerticalLayout*> container);
 
 class Advanced : public Section {

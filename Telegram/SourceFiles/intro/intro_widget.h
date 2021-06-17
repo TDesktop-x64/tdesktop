@@ -29,6 +29,7 @@ class FadeWrap;
 
 namespace Window {
 class ConnectionState;
+class Controller;
 } // namespace Window
 
 namespace Intro {
@@ -42,6 +43,9 @@ enum class CallStatus {
 };
 
 struct Data {
+	// Required for the UserpicButton.
+	const not_null<Window::Controller*> controller;
+
 	QString country;
 	QString phone;
 	QByteArray phoneHash;
@@ -59,7 +63,7 @@ struct Data {
 
 	Window::TermsLock termsLock;
 
-	base::Observable<void> updated;
+	rpl::event_stream<> updated;
 
 };
 
@@ -87,11 +91,11 @@ enum class EnterPoint : uchar {
 class Widget
 	: public Ui::RpWidget
 	, private Media::Player::FloatDelegate
-	, private Media::Player::FloatSectionDelegate
-	, private base::Subscriber {
+	, private Media::Player::FloatSectionDelegate {
 public:
 	Widget(
 		QWidget *parent,
+		not_null<Window::Controller*> controller,
 		not_null<Main::Account*> account,
 		EnterPoint point);
 
@@ -162,6 +166,8 @@ private:
 		not_null<Media::Player::FloatSectionDelegate*> widget,
 		Window::Column widgetColumn)> callback) override;
 	bool floatPlayerIsVisible(not_null<HistoryItem*> item) override;
+	void floatPlayerDoubleClickEvent(
+		not_null<const HistoryItem*> item) override;
 
 	// FloatSectionDelegate
 	QRect floatPlayerAvailableRect() override;

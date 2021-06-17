@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "overview/overview_layout_delegate.h"
 #include "data/data_document.h"
+#include "data/data_document_resolver.h"
 #include "data/data_session.h"
 #include "data/data_web_page.h"
 #include "data/data_media_types.h"
@@ -184,7 +185,11 @@ void RadialProgressItem::setDocumentLinks(
 		not_null<DocumentData*> document) {
 	const auto context = parent()->fullId();
 	setLinks(
-		std::make_shared<DocumentOpenClickHandler>(document, context),
+		std::make_shared<DocumentOpenClickHandler>(
+			document,
+			crl::guard(this, [=] {
+				delegate()->openDocument(document, context);
+			})),
 		std::make_shared<DocumentSaveClickHandler>(document, context),
 		std::make_shared<DocumentCancelClickHandler>(document, context));
 }
@@ -271,7 +276,9 @@ Photo::Photo(
 	not_null<PhotoData*> photo)
 : ItemBase(delegate, parent)
 , _data(photo)
-, _link(std::make_shared<PhotoOpenClickHandler>(photo, parent->fullId())) {
+, _link(std::make_shared<PhotoOpenClickHandler>(photo, crl::guard(this, [=] {
+	delegate->openPhoto(photo, parent->fullId());
+}))) {
 	if (_data->inlineThumbnailBytes().isEmpty()
 		&& (_data->hasExact(Data::PhotoSize::Small)
 			|| _data->hasExact(Data::PhotoSize::Thumbnail))) {
@@ -592,7 +599,11 @@ Voice::Voice(
 	const style::OverviewFileLayout &st)
 : RadialProgressItem(delegate, parent)
 , _data(voice)
-, _namel(std::make_shared<DocumentOpenClickHandler>(_data, parent->fullId()))
+, _namel(std::make_shared<DocumentOpenClickHandler>(
+	_data,
+	crl::guard(this, [=] {
+		delegate->openDocument(_data, parent->fullId());
+	})))
 , _st(st) {
 	AddComponents(Info::Bit());
 
@@ -899,7 +910,11 @@ Document::Document(
 : RadialProgressItem(delegate, parent)
 , _data(document)
 , _msgl(goToMessageClickHandler(parent))
-, _namel(std::make_shared<DocumentOpenClickHandler>(_data, parent->fullId()))
+, _namel(std::make_shared<DocumentOpenClickHandler>(
+	_data,
+	crl::guard(this, [=] {
+		delegate->openDocument(_data, parent->fullId());
+	})))
 , _st(st)
 , _date(langDateTime(base::unixtime::parse(_data->date)))
 , _datew(st::normalFont->width(_date))
@@ -1453,7 +1468,9 @@ Link::Link(
 		if (_page->document) {
 			_photol = std::make_shared<DocumentOpenClickHandler>(
 				_page->document,
-				parent->fullId());
+				crl::guard(this, [=] {
+					delegate->openDocument(_page->document, parent->fullId());
+				}));
 		} else if (_page->photo) {
 			if (_page->type == WebPageType::Profile || _page->type == WebPageType::Video) {
 				_photol = createHandler(_page->url);
@@ -1462,7 +1479,9 @@ Link::Link(
 				|| _page->siteName == qstr("Facebook")) {
 				_photol = std::make_shared<PhotoOpenClickHandler>(
 					_page->photo,
-					parent->fullId());
+					crl::guard(this, [=] {
+						delegate->openPhoto(_page->photo, parent->fullId());
+					}));
 			} else {
 				_photol = createHandler(_page->url);
 			}

@@ -192,11 +192,11 @@ private:
 }
 
 - (void) screenIsLocked:(NSNotification *)aNotification {
-	Global::SetScreenIsLocked(true);
+	Core::App().setScreenIsLocked(true);
 }
 
 - (void) screenIsUnlocked:(NSNotification *)aNotification {
-	Global::SetScreenIsLocked(false);
+	Core::App().setScreenIsLocked(false);
 }
 
 - (void) windowWillEnterFullScreen:(NSNotification *)aNotification {
@@ -541,9 +541,9 @@ void MainWindow::psSetupTrayIcon() {
 	trayIcon->show();
 }
 
-void MainWindow::workmodeUpdated(DBIWorkMode mode) {
+void MainWindow::workmodeUpdated(Core::Settings::WorkMode mode) {
 	psSetupTrayIcon();
-	if (mode == dbiwmWindowOnly) {
+	if (mode == Core::Settings::WorkMode::WindowOnly) {
 		if (trayIcon) {
 			trayIcon->setContextMenu(0);
 			delete trayIcon;
@@ -723,7 +723,7 @@ void MainWindow::createGlobalMenu() {
 		if (!sessionController()) {
 			return;
 		}
-		Ui::show(PrepareContactsBox(sessionController()));
+		sessionController()->show(PrepareContactsBox(sessionController()));
 	}));
 	{
 		auto callback = [=] {

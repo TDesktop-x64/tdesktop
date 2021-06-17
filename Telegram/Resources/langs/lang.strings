@@ -497,6 +497,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_background_text1" = "Ah, you kids today with techno music! You should enjoy the classics, like Hasselhoff!";
 "lng_background_text2" = "I can't even take you seriously right now.";
 "lng_background_bad_link" = "This background link appears to be invalid.";
+"lng_background_gradient_unsupported" = "Telegram Desktop doesn't support gradient backgrounds yet.";
 "lng_background_apply" = "Apply";
 "lng_background_share" = "Share";
 "lng_background_link_copied" = "Link copied to clipboard";
@@ -2066,6 +2067,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_group_call_ptt_delay_s" = "{amount}s";
 "lng_group_call_ptt_delay" = "Push to Talk release delay: {delay}";
 "lng_group_call_share" = "Share Invite Link";
+"lng_group_call_noise_suppression" = "Enable Noise Suppression";
+"lng_group_call_limit#one" = "Video is only available\nfor the first {count} member";
+"lng_group_call_limit#other" = "Video is only available\nfor the first {count} members";
+"lng_group_call_video_paused" = "Video is paused";
 "lng_group_call_share_speaker" = "Users with this link can speak";
 "lng_group_call_copy_speaker_link" = "Copy Speaker Link";
 "lng_group_call_copy_listener_link" = "Copy Listener Link";

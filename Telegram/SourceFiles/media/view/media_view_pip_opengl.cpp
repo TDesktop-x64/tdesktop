@@ -116,7 +116,7 @@ uniform float roundRadius;
 )" + shadow.header + R"(
 
 float roundedCorner() {
-	vec2 rectHalf = roundRect.zw / 2;
+	vec2 rectHalf = roundRect.zw / 2.;
 	vec2 rectCenter = roundRect.xy + rectHalf;
 	vec2 fromRectCenter = abs(gl_FragCoord.xy - rectCenter);
 	vec2 vectorRadius = vec2(roundRadius + 0.5, roundRadius + 0.5);
@@ -406,21 +406,22 @@ void Pip::RendererGL::paintTransformedContent(
 	_f->glActiveTexture(rgbaFrame ? GL_TEXTURE1 : GL_TEXTURE3);
 	_shadowImage.bind(*_f);
 
+	const auto globalFactor = cIntRetinaFactor();
 	const auto fadeAlpha = st::radialBg->c.alphaF() * geometry.fade;
 	const auto roundRect = transformRect(RoundingRect(geometry));
 	program->setUniformValue("roundRect", Uniform(roundRect));
 	program->setUniformValue("h_texture", GLint(rgbaFrame ? 1 : 3));
 	program->setUniformValue("h_size", QSizeF(_shadowImage.image().size()));
 	program->setUniformValue("h_extend", QVector4D(
-		st::callShadow.extend.left(),
-		st::callShadow.extend.top(),
-		st::callShadow.extend.right(),
-		st::callShadow.extend.bottom()));
+		st::callShadow.extend.left() * globalFactor,
+		st::callShadow.extend.top() * globalFactor,
+		st::callShadow.extend.right() * globalFactor,
+		st::callShadow.extend.bottom() * globalFactor));
 	program->setUniformValue("h_components", QVector4D(
-		float(st::callShadow.topLeft.width()),
-		float(st::callShadow.topLeft.height()),
-		float(st::callShadow.left.width()),
-		float(st::callShadow.top.height())));
+		float(st::callShadow.topLeft.width() * globalFactor),
+		float(st::callShadow.topLeft.height() * globalFactor),
+		float(st::callShadow.left.width() * globalFactor),
+		float(st::callShadow.top.height() * globalFactor)));
 	program->setUniformValue(
 		"roundRadius",
 		GLfloat(st::roundRadiusLarge * _factor));
@@ -693,8 +694,10 @@ void Pip::RendererGL::paintUsingRaster(
 	}
 	method(Painter(&raster));
 
-	image.setImage(std::move(raster));
-	image.bind(*_f, size);
+	_f->glActiveTexture(GL_TEXTURE0);
+
+	image.setImage(std::move(raster), size);
+	image.bind(*_f);
 
 	const auto textured = image.texturedRect(rect, QRect(QPoint(), size));
 	const auto geometry = transformRect(textured.geometry);
@@ -720,9 +723,6 @@ void Pip::RendererGL::paintUsingRaster(
 	_imageProgram->setUniformValue("viewport", _uniformViewport);
 	_imageProgram->setUniformValue("s_texture", GLint(0));
 	_imageProgram->setUniformValue("g_opacity", GLfloat(1));
-
-	_f->glActiveTexture(GL_TEXTURE0);
-	image.bind(*_f, size);
 
 	toggleBlending(transparent);
 	FillTexturedRectangle(*_f, &*_imageProgram, bufferOffset);

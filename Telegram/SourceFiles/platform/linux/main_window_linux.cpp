@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "mainwindow.h"
 #include "core/application.h"
+#include "core/core_settings.h"
 #include "core/sandbox.h"
 #include "boxes/peer_list_controllers.h"
 #include "boxes/about_box.h"
@@ -28,7 +29,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/event_filter.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/input_fields.h"
-#include "facades.h"
 #include "app.h"
 
 #ifndef DESKTOP_APP_DISABLE_DBUS_INTEGRATION
@@ -61,6 +61,7 @@ namespace Platform {
 namespace {
 
 using internal::WaylandIntegration;
+using WorkMode = Core::Settings::WorkMode;
 
 constexpr auto kPanelTrayIconName = "telegram-panel"_cs;
 constexpr auto kMutePanelTrayIconName = "telegram-mute-panel"_cs;
@@ -809,7 +810,7 @@ void MainWindow::handleSNIHostRegistered() {
 
 	_sniAvailable = true;
 
-	if (Global::WorkMode().value() == dbiwmWindowOnly) {
+	if (Core::App().settings().workMode() == WorkMode::WindowOnly) {
 		return;
 	}
 
@@ -825,7 +826,7 @@ void MainWindow::handleSNIHostRegistered() {
 
 	SkipTaskbar(
 		windowHandle(),
-		Global::WorkMode().value() == dbiwmTrayOnly);
+		Core::App().settings().workMode() == WorkMode::TrayOnly);
 }
 
 void MainWindow::handleSNIOwnerChanged(
@@ -834,7 +835,7 @@ void MainWindow::handleSNIOwnerChanged(
 		const QString &newOwner) {
 	_sniAvailable = IsSNIAvailable();
 
-	if (Global::WorkMode().value() == dbiwmWindowOnly) {
+	if (Core::App().settings().workMode() == WorkMode::WindowOnly) {
 		return;
 	}
 
@@ -860,7 +861,8 @@ void MainWindow::handleSNIOwnerChanged(
 
 	SkipTaskbar(
 		windowHandle(),
-		(Global::WorkMode().value() == dbiwmTrayOnly) && trayAvailable());
+		(Core::App().settings().workMode() == WorkMode::TrayOnly)
+			&& trayAvailable());
 }
 
 void MainWindow::handleAppMenuOwnerChanged(
@@ -917,10 +919,10 @@ void MainWindow::psSetupTrayIcon() {
 	}
 }
 
-void MainWindow::workmodeUpdated(DBIWorkMode mode) {
+void MainWindow::workmodeUpdated(Core::Settings::WorkMode mode) {
 	if (!trayAvailable()) {
 		return;
-	} else if (mode == dbiwmWindowOnly) {
+	} else if (mode == WorkMode::WindowOnly) {
 #ifndef DESKTOP_APP_DISABLE_DBUS_INTEGRATION
 		if (_sniTrayIcon) {
 			_sniTrayIcon->setContextMenu(0);
@@ -938,7 +940,7 @@ void MainWindow::workmodeUpdated(DBIWorkMode mode) {
 		psSetupTrayIcon();
 	}
 
-	SkipTaskbar(windowHandle(), mode == dbiwmTrayOnly);
+	SkipTaskbar(windowHandle(), mode == WorkMode::TrayOnly);
 }
 
 void MainWindow::unreadCounterChangedHook() {
@@ -1152,7 +1154,8 @@ void MainWindow::createGlobalMenu() {
 				return;
 			}
 
-			Ui::show(PrepareContactsBox(sessionController()));
+			sessionController()->show(
+				PrepareContactsBox(sessionController()));
 		}));
 
 	psAddContact = tools->addAction(
@@ -1330,7 +1333,7 @@ void MainWindow::handleNativeSurfaceChanged(bool exist) {
 	if (exist) {
 		SkipTaskbar(
 			windowHandle(),
-			(Global::WorkMode().value() == dbiwmTrayOnly)
+			(Core::App().settings().workMode() == WorkMode::TrayOnly)
 				&& trayAvailable());
 	}
 

@@ -60,6 +60,13 @@ public:
 	virtual void elementShowPollResults(
 		not_null<PollData*> poll,
 		FullMsgId context) = 0;
+	virtual void elementOpenPhoto(
+		not_null<PhotoData*> photo,
+		FullMsgId context) = 0;
+	virtual void elementOpenDocument(
+		not_null<DocumentData*> document,
+		FullMsgId context,
+		bool showInMediaView = false) = 0;
 	virtual void elementShowTooltip(
 		const TextWithEntities &text,
 		Fn<void()> hiddenCallback) = 0;
@@ -70,6 +77,7 @@ public:
 		const QString &command,
 		const FullMsgId &context) = 0;
 	virtual void elementHandleViaClick(not_null<UserData*> bot) = 0;
+	virtual bool elementIsChatWide() = 0;
 
 };
 
@@ -96,6 +104,13 @@ public:
 	void elementShowPollResults(
 		not_null<PollData*> poll,
 		FullMsgId context) override;
+	void elementOpenPhoto(
+		not_null<PhotoData*> photo,
+		FullMsgId context) override;
+	void elementOpenDocument(
+		not_null<DocumentData*> document,
+		FullMsgId context,
+		bool showInMediaView = false) override;
 	void elementShowTooltip(
 		const TextWithEntities &text,
 		Fn<void()> hiddenCallback) override;
@@ -106,6 +121,7 @@ public:
 		const QString &command,
 		const FullMsgId &context) override;
 	void elementHandleViaClick(not_null<UserData*> bot) override;
+	bool elementIsChatWide() override;
 
 private:
 	const not_null<Window::SessionController*> _controller;
@@ -135,7 +151,7 @@ struct UnreadBar : public RuntimeComponent<UnreadBar, Element> {
 	static int height();
 	static int marginTop();
 
-	void paint(Painter &p, int y, int w) const;
+	void paint(Painter &p, int y, int w, bool chatWide) const;
 
 	QString text;
 	int width = 0;
@@ -149,7 +165,7 @@ struct DateBadge : public RuntimeComponent<DateBadge, Element> {
 	void init(const QString &date);
 
 	int height() const;
-	void paint(Painter &p, int y, int w) const;
+	void paint(Painter &p, int y, int w, bool chatWide) const;
 
 	QString text;
 	int width = 0;

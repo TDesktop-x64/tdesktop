@@ -14,7 +14,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "ui/inactive_press.h"
 #include "mainwindow.h"
-#include "facades.h"
 #include "app.h"
 
 #include <QtGui/QWindow>
@@ -236,9 +235,9 @@ bool EventFilter::mainWindowEvent(
 
 	case WM_WTSSESSION_CHANGE: {
 		if (wParam == WTS_SESSION_LOGOFF || wParam == WTS_SESSION_LOCK) {
-			Global::SetScreenIsLocked(true);
+			Core::App().setScreenIsLocked(true);
 		} else if (wParam == WTS_SESSION_LOGON || wParam == WTS_SESSION_UNLOCK) {
-			Global::SetScreenIsLocked(false);
+			Core::App().setScreenIsLocked(false);
 		}
 	} return false;
 
@@ -255,9 +254,7 @@ bool EventFilter::mainWindowEvent(
 		} else {
 			_window->shadowsDeactivate();
 		}
-		if (Global::started()) {
-			_window->update();
-		}
+		_window->update();
 	} return false;
 
 	case WM_WINDOWPOSCHANGING:

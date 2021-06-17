@@ -126,9 +126,6 @@ InnerWidget::InnerWidget(
 
 	_cancelSearchInChat->setClickedCallback([=] { cancelSearchInChat(); });
 	_cancelSearchInChat->hide();
-	_cancelSearchFromUser->setClickedCallback([=] {
-		searchFromUserChanged.notify(nullptr);
-	});
 	_cancelSearchFromUser->hide();
 
 	session().downloaderTaskFinished(
@@ -136,13 +133,13 @@ InnerWidget::InnerWidget(
 		update();
 	}, lifetime());
 
-	subscribe(Core::App().notifications().settingsChanged(), [=](
-			Window::Notifications::ChangeType change) {
+	Core::App().notifications().settingsChanged(
+	) | rpl::start_with_next([=](Window::Notifications::ChangeType change) {
 		if (change == Window::Notifications::ChangeType::CountMessages) {
 			// Folder rows change their unread badge with this setting.
 			update();
 		}
-	});
+	}, lifetime());
 
 	session().data().contactsLoaded().changes(
 	) | rpl::start_with_next([=] {
@@ -1957,6 +1954,10 @@ rpl::producer<> InnerWidget::listBottomReached() const {
 	return _listBottomReached.events();
 }
 
+rpl::producer<> InnerWidget::cancelSearchFromUserRequests() const {
+	return _cancelSearchFromUser->clicks() | rpl::to_empty;
+}
+
 void InnerWidget::visibleTopBottomUpdated(
 		int visibleTop,
 		int visibleBottom) {
@@ -3191,7 +3192,7 @@ void InnerWidget::setupShortcuts() {
 		});
 
 		request->check(Command::ShowContacts) && request->handle([=] {
-			Ui::show(PrepareContactsBox(_controller));
+			_controller->show(PrepareContactsBox(_controller));
 			return true;
 		});
 

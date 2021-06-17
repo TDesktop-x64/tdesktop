@@ -193,7 +193,7 @@ void NotificationsCount::setCount(int count) {
 	if (count != Core::App().settings().notificationsCount()) {
 		Core::App().settings().setNotificationsCount(count);
 		Core::App().saveSettingsDelayed();
-		Core::App().notifications().settingsChanged().notify(
+		Core::App().notifications().notifySettingsChanged(
 			ChangeType::MaxCount);
 	}
 }
@@ -356,8 +356,7 @@ void NotificationsCount::setOverCorner(ScreenCorner corner) {
 	} else {
 		_isOverCorner = true;
 		setCursor(style::cur_pointer);
-		Global::SetNotificationsDemoIsShown(true);
-		Core::App().notifications().settingsChanged().notify(
+		Core::App().notifications().notifySettingsChanged(
 			ChangeType::DemoIsShown);
 	}
 	_overCorner = corner;
@@ -392,8 +391,8 @@ void NotificationsCount::clearOverCorner() {
 	if (_isOverCorner) {
 		_isOverCorner = false;
 		setCursor(style::cur_default);
-		Global::SetNotificationsDemoIsShown(false);
-		Core::App().notifications().settingsChanged().notify(ChangeType::DemoIsShown);
+		Core::App().notifications().notifySettingsChanged(
+			ChangeType::DemoIsHidden);
 
 		for_const (const auto &samples, _cornerSamples) {
 			for_const (const auto widget, samples) {
@@ -420,7 +419,7 @@ void NotificationsCount::mouseReleaseEvent(QMouseEvent *e) {
 		if (_chosenCorner != Core::App().settings().notificationsCorner()) {
 			Core::App().settings().setNotificationsCorner(_chosenCorner);
 			Core::App().saveSettingsDelayed();
-			Core::App().notifications().settingsChanged().notify(
+			Core::App().notifications().notifySettingsChanged(
 				ChangeType::Corner);
 		}
 	}
@@ -583,6 +582,7 @@ void SetupMultiAccountNotifications(
 void SetupNotificationsContent(
 		not_null<Window::SessionController*> controller,
 		not_null<Ui::VerticalLayout*> container) {
+	using NotifyView = Core::Settings::NotifyView;
 	SetupMultiAccountNotifications(controller, container);
 
 	AddSubsectionTitle(container, tr::lng_settings_notify_title());
@@ -613,10 +613,10 @@ void SetupNotificationsContent(
 		settings.desktopNotify());
 	const auto name = addSlidingCheckbox(
 		tr::lng_settings_show_name(tr::now),
-		(settings.notifyView() <= dbinvShowName));
+		(settings.notifyView() <= NotifyView::ShowName));
 	const auto preview = addSlidingCheckbox(
 		tr::lng_settings_show_preview(tr::now),
-		(settings.notifyView() <= dbinvShowPreview));
+		(settings.notifyView() <= NotifyView::ShowPreview));
 	const auto sound = addCheckbox(
 		tr::lng_settings_sound_notify(tr::now),
 		settings.soundNotify());
@@ -740,7 +740,7 @@ void SetupNotificationsContent(
 	using Change = Window::Notifications::ChangeType;
 	const auto changed = [=](Change change) {
 		Core::App().saveSettingsDelayed();
-		Core::App().notifications().settingsChanged().notify(change);
+		Core::App().notifications().notifySettingsChanged(change);
 	};
 	desktop->checkedChanges(
 	) | rpl::filter([](bool checked) {
@@ -753,14 +753,14 @@ void SetupNotificationsContent(
 	name->entity()->checkedChanges(
 	) | rpl::map([=](bool checked) {
 		if (!checked) {
-			return dbinvShowNothing;
+			return NotifyView::ShowNothing;
 		} else if (!preview->entity()->checked()) {
-			return dbinvShowName;
+			return NotifyView::ShowName;
 		}
-		return dbinvShowPreview;
-	}) | rpl::filter([=](DBINotifyView value) {
+		return NotifyView::ShowPreview;
+	}) | rpl::filter([=](NotifyView value) {
 		return (value != Core::App().settings().notifyView());
-	}) | rpl::start_with_next([=](DBINotifyView value) {
+	}) | rpl::start_with_next([=](NotifyView value) {
 		Core::App().settings().setNotifyView(value);
 		changed(Change::ViewParams);
 	}, name->lifetime());
@@ -768,14 +768,14 @@ void SetupNotificationsContent(
 	preview->entity()->checkedChanges(
 	) | rpl::map([=](bool checked) {
 		if (checked) {
-			return dbinvShowPreview;
+			return NotifyView::ShowPreview;
 		} else if (name->entity()->checked()) {
-			return dbinvShowName;
+			return NotifyView::ShowName;
 		}
-		return dbinvShowNothing;
-	}) | rpl::filter([=](DBINotifyView value) {
+		return NotifyView::ShowNothing;
+	}) | rpl::filter([=](NotifyView value) {
 		return (value != Core::App().settings().notifyView());
-	}) | rpl::start_with_next([=](DBINotifyView value) {
+	}) | rpl::start_with_next([=](NotifyView value) {
 		Core::App().settings().setNotifyView(value);
 		changed(Change::ViewParams);
 	}, preview->lifetime());
@@ -812,8 +812,7 @@ void SetupNotificationsContent(
 		changed(Change::CountMessages);
 	}, count->lifetime());
 
-	base::ObservableViewer(
-		Core::App().notifications().settingsChanged()
+	Core::App().notifications().settingsChanged(
 	) | rpl::start_with_next([=](Change change) {
 		if (change == Change::DesktopEnabled) {
 			desktop->setChecked(Core::App().settings().desktopNotify());

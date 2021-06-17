@@ -174,7 +174,8 @@ void MainWindow::createTrayIconMenu() {
 }
 
 void MainWindow::applyInitialWorkMode() {
-	Global::RefWorkMode().setForced(Global::WorkMode().value(), true);
+	const auto workMode = Core::App().settings().workMode();
+	workmodeUpdated(workMode);
 
 	if (Core::App().settings().windowPosition().maximized) {
 		DEBUG_LOG(("Window Pos: First show, setting maximized."));
@@ -187,8 +188,8 @@ void MainWindow::applyInitialWorkMode() {
 		const auto minimizeAndHide = [=] {
 			DEBUG_LOG(("Window Pos: First show, setting minimized after."));
 			setWindowState(windowState() | Qt::WindowMinimized);
-			if (Global::WorkMode().value() == dbiwmTrayOnly
-				|| Global::WorkMode().value() == dbiwmWindowAndTray) {
+			if (workMode == Core::Settings::WorkMode::TrayOnly
+				|| workMode == Core::Settings::WorkMode::WindowAndTray) {
 				hide();
 			}
 		};
@@ -293,7 +294,11 @@ void MainWindow::setupIntro(Intro::EnterPoint point) {
 	auto bg = animated ? grabInner() : QPixmap();
 
 	destroyLayer();
-	auto created = object_ptr<Intro::Widget>(bodyWidget(), &account(), point);
+	auto created = object_ptr<Intro::Widget>(
+		bodyWidget(),
+		&controller(),
+		&account(),
+		point);
 	created->showSettingsRequested(
 	) | rpl::start_with_next([=] {
 		showSettings();
@@ -756,13 +761,13 @@ void MainWindow::toggleDisplayNotifyFromTray() {
 	}
 	account().session().saveSettings();
 	using Change = Window::Notifications::ChangeType;
-	auto &changes = Core::App().notifications().settingsChanged();
-	changes.notify(Change::DesktopEnabled);
+	auto &notifications = Core::App().notifications();
+	notifications.notifySettingsChanged(Change::DesktopEnabled);
 	if (soundNotifyChanged) {
-		changes.notify(Change::SoundEnabled);
+		notifications.notifySettingsChanged(Change::SoundEnabled);
 	}
 	if (flashBounceNotifyChanged) {
-		changes.notify(Change::FlashBounceEnabled);
+		notifications.notifySettingsChanged(Change::FlashBounceEnabled);
 	}
 }
 

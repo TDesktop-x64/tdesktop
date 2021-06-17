@@ -63,12 +63,14 @@ public:
 	bool loaded() const;
 	bool notInstalled() const;
 	bool official() const;
-	rpl::producer<TextWithEntities> title() const;
-	QString shortName() const;
+	[[nodiscard]] rpl::producer<TextWithEntities> title() const;
+	[[nodiscard]] QString shortName() const;
 
 	void install();
-	rpl::producer<uint64> setInstalled() const;
-	rpl::producer<> updateControls() const;
+	[[nodiscard]] rpl::producer<uint64> setInstalled() const;
+	[[nodiscard]] rpl::producer<> updateControls() const;
+
+	[[nodiscard]] rpl::producer<Error> errors() const;
 
 	~Inner();
 
@@ -137,6 +139,7 @@ private:
 
 	rpl::event_stream<uint64> _setInstalled;
 	rpl::event_stream<> _updateControls;
+	rpl::event_stream<Error> _errors;
 
 };
 
@@ -153,7 +156,7 @@ QPointer<Ui::BoxContent> StickerSetBox::Show(
 		not_null<DocumentData*> document) {
 	if (const auto sticker = document->sticker()) {
 		if (sticker->set.type() != mtpc_inputStickerSetEmpty) {
-			return Ui::show(
+			return controller->show(
 				Box<StickerSetBox>(controller, sticker->set),
 				Ui::LayerOption::KeepOther).data();
 		}
@@ -186,6 +189,11 @@ void StickerSetBox::prepare() {
 		_controller->session().api().stickerSetInstalled(setId);
 		closeBox();
 	}, lifetime());
+
+	_inner->errors(
+	) | rpl::start_with_next([=](Error error) {
+		handleError(error);
+	}, lifetime());
 }
 
 void StickerSetBox::addStickers() {
@@ -196,6 +204,20 @@ void StickerSetBox::copyStickersLink() {
 	const auto url = _controller->session().createInternalLinkFull(
 		qsl("addstickers/") + _inner->shortName());
 	QGuiApplication::clipboard()->setText(url);
+}
+
+void StickerSetBox::handleError(Error error) {
+	const auto guard = gsl::finally(crl::guard(this, [=] {
+		closeBox();
+	}));
+
+	switch (error) {
+	case Error::NotFound:
+		_controller->show(
+			Box<InformBox>(tr::lng_stickers_not_found(tr::now)));
+		break;
+	default: Unexpected("Error in StickerSetBox::handleError.");
+	}
 }
 
 void StickerSetBox::archiveStickers() {
@@ -211,7 +233,7 @@ void StickerSetBox::archiveStickers() {
 		}
 		if (result.type() == mtpc_messages_stickerSetInstallResultSuccess) {
 			Ui::Toast::Show(tr::lng_stickers_has_been_archived(tr::now));
-            
+
 			const auto &session = controller->session();
 			auto &order = session.data().stickers().setsOrderRef();
 			const auto index = order.indexOf(setId);
@@ -219,10 +241,10 @@ void StickerSetBox::archiveStickers() {
 				return;
 			}
 			order.removeAt(index);
-            
+
 			session.local().writeInstalledStickers();
 			session.local().writeArchivedStickers();
-            
+
 			session.data().stickers().notifyUpdated();
 		}
 	}).fail([](const MTP::Error &error) {
@@ -331,7 +353,7 @@ StickerSetBox::Inner::Inner(
 		gotSet(result);
 	}).fail([=](const MTP::Error &error) {
 		_loaded = true;
-		Ui::show(Box<InformBox>(tr::lng_stickers_not_found(tr::now)));
+		_errors.fire(Error::NotFound);
 	}).send();
 
 	_controller->session().api().updateStickers();
@@ -426,7 +448,7 @@ void StickerSetBox::Inner::gotSet(const MTPmessages_StickerSet &set) {
 	});
 
 	if (_pack.isEmpty()) {
-		Ui::show(Box<InformBox>(tr::lng_stickers_not_found(tr::now)));
+		_errors.fire(Error::NotFound);
 		return;
 	} else {
 		int32 rows = _pack.size() / kStickersPanelPerRow + ((_pack.size() % kStickersPanelPerRow) ? 1 : 0);
@@ -444,6 +466,10 @@ rpl::producer<uint64> StickerSetBox::Inner::setInstalled() const {
 
 rpl::producer<> StickerSetBox::Inner::updateControls() const {
 	return _updateControls.events();
+}
+
+rpl::producer<StickerSetBox::Error> StickerSetBox::Inner::errors() const {
+	return _errors.events();
 }
 
 void StickerSetBox::Inner::installDone(
@@ -802,7 +828,7 @@ QString StickerSetBox::Inner::shortName() const {
 
 void StickerSetBox::Inner::install() {
 	if (isMasksSet()) {
-		Ui::show(
+		_controller->show(
 			Box<InformBox>(tr::lng_stickers_masks_pack(tr::now)),
 			Ui::LayerOption::KeepOther);
 		return;
@@ -815,7 +841,7 @@ void StickerSetBox::Inner::install() {
 	)).done([=](const MTPmessages_StickerSetInstallResult &result) {
 		installDone(result);
 	}).fail([=](const MTP::Error &error) {
-		Ui::show(Box<InformBox>(tr::lng_stickers_not_found(tr::now)));
+		_errors.fire(Error::NotFound);
 	}).send();
 }
 

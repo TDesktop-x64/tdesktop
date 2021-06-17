@@ -86,13 +86,13 @@ enum {
 	dbiAutoStart = 0x06,
 	dbiStartMinimized = 0x07,
 	dbiSoundFlashBounceNotifyOld = 0x08,
-	dbiWorkMode = 0x09,
+	dbiWorkModeOld = 0x09,
 	dbiSeenTrayTooltip = 0x0a,
 	dbiDesktopNotifyOld = 0x0b,
 	dbiAutoUpdate = 0x0c,
 	dbiLastUpdateCheck = 0x0d,
 	dbiWindowPositionOld = 0x0e,
-	dbiConnectionTypeOld = 0x0f,
+	dbiConnectionTypeOldOld = 0x0f,
 	// 0x10 reserved
 	dbiDefaultAttach = 0x11,
 	dbiCatsAndDogsOld = 0x12,
@@ -117,7 +117,7 @@ enum {
 	dbiEmojiVariantsOldOld = 0x25,
 	dbiRecentStickers = 0x26,
 	dbiDcOptionOld = 0x27,
-	dbiTryIPv6 = 0x28,
+	dbiTryIPv6Old = 0x28,
 	dbiSongVolumeOld = 0x29,
 	dbiWindowsNotificationsOld = 0x30,
 	dbiIncludeMutedOld = 0x31,
@@ -146,7 +146,7 @@ enum {
 	dbiLastSeenWarningSeenOld = 0x4c,
 	dbiSessionSettings = 0x4d,
 	dbiLangPackKey = 0x4e,
-	dbiConnectionType = 0x4f,
+	dbiConnectionTypeOld = 0x4f,
 	dbiStickersFavedLimitOld = 0x50,
 	dbiSuggestStickersByEmojiOld = 0x51,
 	dbiSuggestEmojiOld = 0x52,
@@ -173,17 +173,6 @@ enum {
 
 	dbiVersion = 666,
 };
-
-enum {
-	dbictAuto = 0,
-	dbictHttpAuto = 1, // not used
-	dbictHttpProxy = 2,
-	dbictTcpProxy = 3,
-	dbictProxiesListOld = 4,
-	dbictProxiesList = 5,
-};
-
-inline constexpr auto kProxyTypeShift = 1024;
 
 } // namespace details
 } // namespace Storage

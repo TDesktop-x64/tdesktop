@@ -225,10 +225,12 @@ void Viewport::setControlsShown(float64 shown) {
 void Viewport::add(
 		const VideoEndpoint &endpoint,
 		VideoTileTrack track,
+		rpl::producer<QSize> trackSize,
 		rpl::producer<bool> pinned) {
 	_tiles.push_back(std::make_unique<VideoTile>(
 		endpoint,
 		track,
+		std::move(trackSize),
 		std::move(pinned),
 		[=] { widget()->update(); }));
 
@@ -711,11 +713,13 @@ void Viewport::updateTilesGeometryColumn(int outerWidth) {
 	const auto layoutNext = [&](not_null<VideoTile*> tile) {
 		const auto size = tile->trackOrUserpicSize();
 		const auto shown = !size.isEmpty() && _large && tile != _large;
-		const auto height = shown
-			? st::groupCallNarrowVideoHeight
-			: 0;
-		setTileGeometry(tile, { 0, y + top, outerWidth, height });
-		top += height ? (height + st::groupCallVideoSmallSkip) : 0;
+		const auto height = st::groupCallNarrowVideoHeight;
+		if (!shown) {
+			tile->hide();
+		} else {
+			setTileGeometry(tile, { 0, y + top, outerWidth, height });
+			top += height + st::groupCallVideoSmallSkip;
+		}
 	};
 	const auto topPeer = _large ? _large->row()->peer().get() : nullptr;
 	const auto reorderNeeded = [&] {
@@ -756,8 +760,9 @@ void Viewport::setTileGeometry(not_null<VideoTile*> tile, QRect geometry) {
 	tile->setGeometry(geometry);
 
 	const auto min = std::min(geometry.width(), geometry.height());
-	const auto kMedium = style::ConvertScale(480);
+	const auto kMedium = style::ConvertScale(540);
 	const auto kSmall = style::ConvertScale(240);
+	const auto &endpoint = tile->endpoint();
 	const auto quality = (min >= kMedium)
 		? VideoQuality::Full
 		: (min >= kSmall)
@@ -765,7 +770,7 @@ void Viewport::setTileGeometry(not_null<VideoTile*> tile, QRect geometry) {
 		: VideoQuality::Thumbnail;
 	if (tile->updateRequestedQuality(quality)) {
 		_qualityRequests.fire(VideoQualityRequest{
-			.endpoint = tile->endpoint(),
+			.endpoint = endpoint,
 			.quality = quality,
 		});
 	}

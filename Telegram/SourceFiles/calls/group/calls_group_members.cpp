@@ -29,6 +29,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h" // Core::App().domain, .activeWindow.
 #include "main/main_domain.h" // Core::App().domain().activate.
 #include "main/main_session.h"
+#include "main/main_account.h" // account().appConfig().
+#include "main/main_app_config.h" // appConfig().get<double>().
 #include "boxes/peers/edit_participants_box.h" // SubscribeToMigration.
 #include "window/window_controller.h" // Controller::sessionController.
 #include "window/window_session_controller.h"
@@ -41,8 +43,109 @@ namespace {
 
 constexpr auto kKeepRaisedHandStatusDuration = 3 * crl::time(1000);
 constexpr auto kShadowMaxAlpha = 74;
+constexpr auto kUserpicSizeForBlur = 40;
+constexpr auto kUserpicBlurRadius = 8;
 
 using Row = MembersRow;
+
+void SetupVideoPlaceholder(
+		not_null<Ui::RpWidget*> widget,
+		not_null<PeerData*> chat) {
+	struct State {
+		QImage blurred;
+		QImage rounded;
+		InMemoryKey key = {};
+		std::shared_ptr<Data::CloudImageView> view;
+		qint64 blurredCacheKey = 0;
+	};
+	const auto state = widget->lifetime().make_state<State>();
+	const auto refreshBlurred = [=] {
+		const auto key = chat->userpicUniqueKey(state->view);
+		if (state->key == key && !state->blurred.isNull()) {
+			return;
+		}
+		constexpr auto size = kUserpicSizeForBlur;
+		state->key = key;
+		state->blurred = QImage(
+			QSize(size, size),
+			QImage::Format_ARGB32_Premultiplied);
+		{
+			auto p = Painter(&state->blurred);
+			auto hq = PainterHighQualityEnabler(p);
+			chat->paintUserpicSquare(p, state->view, 0, 0, size);
+		}
+		state->blurred = Images::BlurLargeImage(
+			std::move(state->blurred),
+			kUserpicBlurRadius);
+		widget->update();
+	};
+	const auto refreshRounded = [=](QSize size) {
+		refreshBlurred();
+		const auto key = state->blurred.cacheKey();
+		if (state->rounded.size() == size && state->blurredCacheKey == key) {
+			return;
+		}
+		state->blurredCacheKey = key;
+		state->rounded = Images::prepare(
+			state->blurred,
+			size.width(),
+			size.width(), // Square
+			Images::Option::Smooth,
+			size.width(),
+			size.height());
+		{
+			auto p = QPainter(&state->rounded);
+			p.fillRect(
+				0,
+				0,
+				size.width(),
+				size.height(),
+				QColor(0, 0, 0, Viewport::kShadowMaxAlpha));
+		}
+		state->rounded = Images::prepare(
+			std::move(state->rounded),
+			size.width(),
+			size.height(),
+			(Images::Option::RoundedLarge | Images::Option::RoundedAll),
+			size.width(),
+			size.height());
+	};
+	chat->loadUserpic();
+	refreshBlurred();
+
+	widget->paintRequest(
+	) | rpl::start_with_next([=] {
+		const auto size = QSize(
+			widget->width(),
+			widget->height() - st::groupCallVideoSmallSkip);
+		refreshRounded(size * cIntRetinaFactor());
+
+		auto p = QPainter(widget);
+		const auto inner = QRect(QPoint(), size);
+		p.drawImage(inner, state->rounded);
+		st::groupCallPaused.paint(
+			p,
+			(size.width() - st::groupCallPaused.width()) / 2,
+			st::groupCallVideoPlaceholderIconTop,
+			size.width());
+
+		const auto skip = st::groupCallVideoLargeSkip;
+		const auto limit = chat->session().account().appConfig().get<double>(
+			"groupcall_video_participants_max",
+			30.);
+		p.setPen(st::groupCallVideoTextFg);
+		const auto text = QRect(
+			skip,
+			st::groupCallVideoPlaceholderTextTop,
+			(size.width() - 2 * skip),
+			size.height() - st::groupCallVideoPlaceholderTextTop);
+		p.setFont(st::semiboldFont);
+		p.drawText(
+			text,
+			tr::lng_group_call_limit(tr::now, lt_count, int(limit)),
+			style::al_top);
+	}, widget->lifetime());
+}
 
 } // namespace
 
@@ -953,9 +1056,7 @@ void Members::Controller::rowPaintIcon(
 					: _coloredCrossLine;
 				const auto color = video
 					? std::nullopt
-					: std::make_optional(narrow
-						? st::groupCallMemberNotJoinedStatus->c
-						: st::groupCallMemberMutedIcon->c);
+					: std::make_optional(st::groupCallMemberMutedIcon->c);
 				line.paint(
 					p,
 					left,
@@ -987,9 +1088,7 @@ void Members::Controller::rowPaintIcon(
 		state.speaking);
 	const auto iconColor = anim::color(
 		activeInactiveColor,
-		(narrow
-			? st::groupCallMemberNotJoinedStatus
-			: st::groupCallMemberMutedIcon),
+		st::groupCallMemberMutedIcon,
 		state.muted);
 	const auto color = video
 		? std::nullopt
@@ -1137,12 +1236,10 @@ base::unique_qptr<Ui::PopupMenu> Members::Controller::createRowContextMenu(
 		not_null<PeerListRow*> row) {
 	const auto participantPeer = row->peer();
 	const auto real = static_cast<Row*>(row.get());
-
-	auto result = base::make_unique_q<Ui::PopupMenu>(
-		parent,
-		st::groupCallPopupMenu);
-
 	const auto muteState = real->state();
+	const auto muted = (muteState == Row::State::Muted)
+		|| (muteState == Row::State::RaisedHand);
+	const auto addVolumeItem = !muted || isMe(participantPeer);
 	const auto admin = IsGroupCallAdmin(_peer, participantPeer);
 	const auto session = &_peer->session();
 	const auto getCurrentWindow = [=]() -> Window::SessionController* {
@@ -1163,6 +1260,12 @@ base::unique_qptr<Ui::PopupMenu> Members::Controller::createRowContextMenu(
 		}
 		return getCurrentWindow();
 	};
+
+	auto result = base::make_unique_q<Ui::PopupMenu>(
+		parent,
+		(addVolumeItem
+			? st::groupCallPopupMenuWithVolume
+			: st::groupCallPopupMenu));
 	const auto weakMenu = Ui::MakeWeak(result.get());
 	const auto performOnMainWindow = [=](auto callback) {
 		if (const auto window = getWindow()) {
@@ -1343,7 +1446,8 @@ void Members::Controller::addMuteActionsToContextMenu(
 
 	auto mutesFromVolume = rpl::never<bool>() | rpl::type_erased();
 
-	if (!muted || _call->joinAs() == participantPeer) {
+	const auto addVolumeItem = !muted || isMe(participantPeer);
+	if (addVolumeItem) {
 		auto otherParticipantStateValue
 			= _call->otherParticipantStateValue(
 		) | rpl::filter([=](const Group::ParticipantState &data) {
@@ -1352,7 +1456,7 @@ void Members::Controller::addMuteActionsToContextMenu(
 
 		auto volumeItem = base::make_unique_q<MenuVolumeItem>(
 			menu->menu(),
-			st::groupCallPopupMenu.menu,
+			st::groupCallPopupMenuWithVolume.menu,
 			otherParticipantStateValue,
 			row->volume(),
 			Group::kMaxVolume,
@@ -1392,6 +1496,10 @@ void Members::Controller::addMuteActionsToContextMenu(
 		}, volumeItem->lifetime());
 
 		menu->addAction(std::move(volumeItem));
+
+		if (!isMe(participantPeer)) {
+			menu->addSeparator();
+		}
 	};
 
 	const auto muteAction = [&]() -> QAction* {
@@ -1471,6 +1579,7 @@ Members::Members(
 , _layout(_scroll->setOwnedWidget(
 	object_ptr<Ui::VerticalLayout>(_scroll.data())))
 , _videoWrap(_layout->add(object_ptr<Ui::RpWidget>(_layout.get())))
+, _videoPlaceholder(std::make_unique<Ui::RpWidget>(_videoWrap.get()))
 , _viewport(
 	std::make_unique<Viewport>(
 		_videoWrap.get(),
@@ -1708,11 +1817,27 @@ void Members::trackViewportGeometry() {
 	_scroll->scrollTopValue(
 	) | rpl::skip(1) | rpl::start_with_next(move, _viewport->lifetime());
 
-	_viewport->fullHeightValue(
-	) | rpl::start_with_next([=](int height) {
-		_videoWrap->resize(_videoWrap->width(), height);
-		move();
-		resize();
+	rpl::combine(
+		_layout->widthValue(),
+		_call->hasNotShownVideoValue()
+	) | rpl::start_with_next([=](int width, bool has) {
+		const auto height = has ? st::groupCallVideoPlaceholderHeight : 0;
+		_videoPlaceholder->setGeometry(0, 0, width, height);
+	}, _videoPlaceholder->lifetime());
+
+	SetupVideoPlaceholder(_videoPlaceholder.get(), _call->peer());
+
+	rpl::combine(
+		_videoPlaceholder->heightValue(),
+		_viewport->fullHeightValue()
+	) | rpl::start_with_next([=](int placeholder, int viewport) {
+		_videoWrap->resize(
+			_videoWrap->width(),
+			std::max(placeholder, viewport));
+		if (viewport > 0) {
+			move();
+			resize();
+		}
 	}, _viewport->lifetime());
 }
 

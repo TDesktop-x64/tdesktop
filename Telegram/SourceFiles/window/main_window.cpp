@@ -178,9 +178,10 @@ MainWindow::MainWindow(not_null<Controller*> controller)
 		updateUnreadCounter();
 	}, lifetime());
 
-	subscribe(Global::RefWorkMode(), [=](DBIWorkMode mode) {
+	Core::App().settings().workModeChanges(
+	) | rpl::start_with_next([=](Core::Settings::WorkMode mode) {
 		workmodeUpdated(mode);
-	});
+	}, lifetime());
 
 	Ui::Toast::SetDefaultParent(_body.data());
 
@@ -209,7 +210,9 @@ bool MainWindow::hideNoQuit() {
 	if (App::quitting()) {
 		return false;
 	}
-	if (Global::WorkMode().value() == dbiwmTrayOnly || Global::WorkMode().value() == dbiwmWindowAndTray) {
+	const auto workMode = Core::App().settings().workMode();
+	if (workMode == Core::Settings::WorkMode::TrayOnly
+		|| workMode == Core::Settings::WorkMode::WindowAndTray) {
 		if (minimizeToTray()) {
 			if (const auto controller = sessionController()) {
 				Ui::showChatsList(&controller->session());
@@ -314,7 +317,9 @@ void MainWindow::handleStateChanged(Qt::WindowState state) {
 		controller().updateIsActiveFocus();
 	}
 	Core::App().updateNonIdle();
-	if (state == Qt::WindowMinimized && Global::WorkMode().value() == dbiwmTrayOnly) {
+	using WorkMode = Core::Settings::WorkMode;
+	if (state == Qt::WindowMinimized
+		&& (Core::App().settings().workMode() == WorkMode::TrayOnly)) {
 		minimizeToTray();
 	}
 	savePosition(state);
@@ -827,17 +832,16 @@ int MainWindow::tryToExtendWidthBy(int addToWidth) {
 	return addToWidth;
 }
 
-void MainWindow::launchDrag(std::unique_ptr<QMimeData> data) {
-	auto weak = QPointer<MainWindow>(this);
+void MainWindow::launchDrag(
+		std::unique_ptr<QMimeData> data,
+		Fn<void()> &&callback) {
 	auto drag = std::make_unique<QDrag>(this);
 	drag->setMimeData(data.release());
 	drag->exec(Qt::CopyAction);
 
 	// We don't receive mouseReleaseEvent when drag is finished.
 	ClickHandler::unpressed();
-	if (weak) {
-		weak->dragFinished().notify();
-	}
+	callback();
 }
 
 MainWindow::~MainWindow() {

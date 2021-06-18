@@ -71,6 +71,7 @@ UniversalMsgId GetUniversalId(not_null<const BaseLayout*> layout) {
 bool HasFloatingHeader(Type type) {
 	switch (type) {
 	case Type::Photo:
+	case Type::GIF:
 	case Type::Video:
 	case Type::RoundFile:
 	case Type::RoundVoiceFile:

@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_file_origin.h"
 #include "data/data_photo_media.h"
 #include "data/data_document_media.h"
+#include "data/data_file_click_handler.h"
 #include "styles/style_overview.h"
 #include "styles/style_chat.h"
 #include "core/file_utilities.h"
@@ -187,11 +188,15 @@ void RadialProgressItem::setDocumentLinks(
 	setLinks(
 		std::make_shared<DocumentOpenClickHandler>(
 			document,
-			crl::guard(this, [=] {
-				delegate()->openDocument(document, context);
-			})),
+			crl::guard(this, [=](FullMsgId id) {
+				delegate()->openDocument(document, id);
+			}),
+			context),
 		std::make_shared<DocumentSaveClickHandler>(document, context),
-		std::make_shared<DocumentCancelClickHandler>(document, context));
+		std::make_shared<DocumentCancelClickHandler>(
+			document,
+			nullptr,
+			context));
 }
 
 void RadialProgressItem::clickHandlerActiveChanged(
@@ -276,9 +281,10 @@ Photo::Photo(
 	not_null<PhotoData*> photo)
 : ItemBase(delegate, parent)
 , _data(photo)
-, _link(std::make_shared<PhotoOpenClickHandler>(photo, crl::guard(this, [=] {
-	delegate->openPhoto(photo, parent->fullId());
-}))) {
+, _link(std::make_shared<PhotoOpenClickHandler>(
+	photo,
+	crl::guard(this, [=](FullMsgId id) { delegate->openPhoto(photo, id); }),
+	parent->fullId())) {
 	if (_data->inlineThumbnailBytes().isEmpty()
 		&& (_data->hasExact(Data::PhotoSize::Small)
 			|| _data->hasExact(Data::PhotoSize::Thumbnail))) {
@@ -601,9 +607,10 @@ Voice::Voice(
 , _data(voice)
 , _namel(std::make_shared<DocumentOpenClickHandler>(
 	_data,
-	crl::guard(this, [=] {
-		delegate->openDocument(_data, parent->fullId());
-	})))
+	crl::guard(this, [=](FullMsgId id) {
+		delegate->openDocument(_data, id);
+	}),
+	parent->fullId()))
 , _st(st) {
 	AddComponents(Info::Bit());
 
@@ -912,9 +919,10 @@ Document::Document(
 , _msgl(goToMessageClickHandler(parent))
 , _namel(std::make_shared<DocumentOpenClickHandler>(
 	_data,
-	crl::guard(this, [=] {
-		delegate->openDocument(_data, parent->fullId());
-	})))
+	crl::guard(this, [=](FullMsgId id) {
+		delegate->openDocument(_data, id);
+	}),
+	parent->fullId()))
 , _st(st)
 , _date(langDateTime(base::unixtime::parse(_data->date)))
 , _datew(st::normalFont->width(_date))
@@ -1468,9 +1476,10 @@ Link::Link(
 		if (_page->document) {
 			_photol = std::make_shared<DocumentOpenClickHandler>(
 				_page->document,
-				crl::guard(this, [=] {
-					delegate->openDocument(_page->document, parent->fullId());
-				}));
+				crl::guard(this, [=](FullMsgId id) {
+					delegate->openDocument(_page->document, id);
+				}),
+				parent->fullId());
 		} else if (_page->photo) {
 			if (_page->type == WebPageType::Profile || _page->type == WebPageType::Video) {
 				_photol = createHandler(_page->url);
@@ -1479,9 +1488,10 @@ Link::Link(
 				|| _page->siteName == qstr("Facebook")) {
 				_photol = std::make_shared<PhotoOpenClickHandler>(
 					_page->photo,
-					crl::guard(this, [=] {
-						delegate->openPhoto(_page->photo, parent->fullId());
-					}));
+					crl::guard(this, [=](FullMsgId id) {
+						delegate->openPhoto(_page->photo, id);
+					}),
+					parent->fullId());
 			} else {
 				_photol = createHandler(_page->url);
 			}

@@ -27,6 +27,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_document_media.h"
 #include "data/data_document_resolver.h"
 #include "data/data_media_types.h"
+#include "data/data_file_click_handler.h"
 #include "data/data_file_origin.h"
 #include "styles/style_chat.h"
 
@@ -217,10 +218,15 @@ void Document::createComponents(bool caption) {
 			_realParent->fullId());
 		thumbed->_linkcancell = std::make_shared<DocumentCancelClickHandler>(
 			_data,
+			crl::guard(this, [=](FullMsgId id) {
+				_parent->delegate()->elementCancelUpload(id);
+			}),
 			_realParent->fullId());
 	}
 	if (const auto voice = Get<HistoryDocumentVoice>()) {
-		voice->_seekl = std::make_shared<VoiceSeekClickHandler>(_data, [] {});
+		voice->_seekl = std::make_shared<VoiceSeekClickHandler>(
+			_data,
+			[](FullMsgId) {});
 	}
 }
 

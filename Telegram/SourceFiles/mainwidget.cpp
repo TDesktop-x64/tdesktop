@@ -35,7 +35,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/special_buttons.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/shadow.h"
-#include "ui/toast/toast.h"
+#include "ui/toasts/common_toasts.h"
 #include "ui/widgets/dropdown_menu.h"
 #include "ui/image/image.h"
 #include "ui/focus_persister.h"
@@ -68,7 +68,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "lang/lang_cloud_manager.h"
 #include "boxes/add_contact_box.h"
-#include "storage/file_upload.h"
 #include "mainwindow.h"
 #include "inline_bots/inline_bot_layout_item.h"
 #include "boxes/confirm_box.h"
@@ -381,7 +380,7 @@ MainWidget::MainWidget(
 		}
 	});
 
-	_controller->adaptive().changed(
+	_controller->adaptive().changes(
 	) | rpl::start_with_next([=] {
 		handleAdaptiveLayoutUpdate();
 	}, lifetime());
@@ -748,36 +747,6 @@ void MainWidget::showSendPathsLayer() {
 			cSetSendPaths(QStringList());
 		});
 	}
-}
-
-void MainWidget::cancelUploadLayer(not_null<HistoryItem*> item) {
-	const auto itemId = item->fullId();
-	session().uploader().pause(itemId);
-	const auto stopUpload = [=] {
-		Ui::hideLayer();
-		auto &data = session().data();
-		if (const auto item = data.message(itemId)) {
-			if (!item->isEditingMedia()) {
-				const auto history = item->history();
-				item->destroy();
-				history->requestChatListMessage();
-			} else {
-				item->returnSavedMedia();
-				session().uploader().cancel(item->fullId());
-			}
-			data.sendHistoryChangeNotifications();
-		}
-		session().uploader().unpause();
-	};
-	const auto continueUpload = [=] {
-		session().uploader().unpause();
-	};
-	Ui::show(Box<ConfirmBox>(
-		tr::lng_selected_cancel_sure_this(tr::now),
-		tr::lng_selected_upload_stop(tr::now),
-		tr::lng_continue(tr::now),
-		stopUpload,
-		continueUpload));
 }
 
 void MainWidget::deletePhotoLayer(PhotoData *photo) {
@@ -1454,6 +1423,9 @@ void MainWidget::showChooseReportMessages(
 		peer->id,
 		SectionShow::Way::Forward,
 		ShowForChooseMessagesMsgId);
+	Ui::ShowMultilineToast({
+		.text = { tr::lng_report_please_select_messages(tr::now) },
+	});
 }
 
 void MainWidget::clearChooseReportMessages() {

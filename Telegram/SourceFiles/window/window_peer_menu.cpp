@@ -535,12 +535,12 @@ void Filler::addUserActions(not_null<UserData*> user) {
 }
 
 void Filler::addChatActions(not_null<ChatData*> chat) {
+	const auto navigation = _controller;
 	if (_request.section != Section::ChatsList) {
-		const auto controller = _controller;
 		if (EditPeerInfoBox::Available(chat)) {
 			const auto text = tr::lng_manage_group_title(tr::now);
 			_addAction(text, [=] {
-				controller->showEditPeerBox(chat);
+				navigation->showEditPeerBox(chat);
 			});
 		}
 		if (chat->hasPinnedMessages()) {
@@ -564,7 +564,7 @@ void Filler::addChatActions(not_null<ChatData*> chat) {
 		if (chat->canAddMembers()) {
 			_addAction(
 				tr::lng_channel_add_members(tr::now),
-				[=] { AddChatMembers(controller, chat); });
+				[=] { AddChatMembers(navigation, chat); });
 		}
 		addPollAction(chat);
 		if (chat->canExportChatHistory()) {
@@ -579,6 +579,13 @@ void Filler::addChatActions(not_null<ChatData*> chat) {
 	_addAction(
 		tr::lng_profile_clear_history(tr::now),
 		ClearHistoryHandler(_peer));
+	if (_request.section != Section::ChatsList) {
+		if (!chat->amCreator()) {
+			_addAction(tr::lng_profile_report(tr::now), [=] {
+				HistoryView::ShowReportPeerBox(navigation, chat);
+			});
+		}
+	}
 }
 
 void Filler::addChannelActions(not_null<ChannelData*> channel) {
@@ -661,9 +668,7 @@ void Filler::addChannelActions(not_null<ChannelData*> channel) {
 			[=] { channel->session().api().joinChannel(channel); });
 	}
 	if (_request.section != Section::ChatsList) {
-		const auto needReport = !channel->amCreator()
-			&& (!isGroup || channel->isPublic());
-		if (needReport) {
+		if (!channel->amCreator()) {
 			_addAction(tr::lng_profile_report(tr::now), [=] {
 				HistoryView::ShowReportPeerBox(navigation, channel);
 			});

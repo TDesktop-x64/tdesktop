@@ -27,6 +27,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_session.h"
 #include "data/data_document.h"
 #include "data/data_document_media.h"
+#include "data/data_file_click_handler.h"
 #include "data/data_file_origin.h"
 #include "lottie/lottie_single_player.h"
 #include "chat_helpers/stickers_lottie.h"
@@ -286,11 +287,10 @@ void Sticker::refreshLink() {
 		// .webp image and we allow to open it in media viewer.
 		_link = std::make_shared<DocumentOpenClickHandler>(
 			_data,
-			crl::guard(this, [=] {
-				_parent->delegate()->elementOpenDocument(
-					_data,
-					_parent->data()->fullId());
-			}));
+			crl::guard(this, [=](FullMsgId id) {
+				_parent->delegate()->elementOpenDocument(_data, id);
+			}),
+			_parent->data()->fullId());
 	}
 }
 

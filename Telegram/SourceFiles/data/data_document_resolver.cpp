@@ -16,6 +16,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/mime_type.h"
 #include "data/data_document.h"
 #include "data/data_document_media.h"
+#include "data/data_file_click_handler.h"
 #include "data/data_file_origin.h"
 #include "data/data_session.h"
 #include "history/view/media/history_view_gif.h"
@@ -208,7 +209,7 @@ base::binary_guard ReadImageAsync(
 }
 
 void ResolveDocument(
-		not_null<Window::SessionController*> controller,
+		Window::SessionController *controller,
 		not_null<DocumentData*> document,
 		HistoryItem *item) {
 	if (!document->date) {
@@ -221,7 +222,7 @@ void ResolveDocument(
 			&& document->isVideoFile()
 			&& !document->filepath().isEmpty()) {
 			File::Launch(document->location(false).fname);
-		} else {
+		} else if (controller) {
 			controller->openDocument(document, msgId, true);
 		}
 	};

@@ -37,6 +37,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_groups.h"
 #include "data/data_channel.h"
 #include "data/data_user.h"
+#include "data/data_file_click_handler.h"
 #include "data/data_file_origin.h"
 #include "data/data_scheduled_messages.h"
 #include "core/file_utilities.h"
@@ -770,7 +771,7 @@ bool AddDeleteMessageAction(
 			}
 			if (const auto message = item->toHistoryMessage()) {
 				if (message->uploading()) {
-					controller->content()->cancelUploadLayer(item);
+					controller->cancelUploadLayer(item);
 					return;
 				}
 			}

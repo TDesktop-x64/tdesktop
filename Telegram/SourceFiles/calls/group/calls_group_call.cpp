@@ -51,6 +51,8 @@ constexpr auto kUpdateSendActionEach = crl::time(500);
 constexpr auto kPlayConnectingEach = crl::time(1056) + 2 * crl::time(1000);
 constexpr auto kFixManualLargeVideoDuration = 5 * crl::time(1000);
 constexpr auto kFixSpeakingLargeVideoDuration = 3 * crl::time(1000);
+constexpr auto kFullAsMediumsCount = 4; // 1 Full is like 4 Mediums.
+constexpr auto kMaxMediumQualities = 16; // 4 Fulls or 16 Mediums.
 
 [[nodiscard]] std::unique_ptr<Webrtc::MediaDevices> CreateMediaDevices() {
 	const auto &settings = Core::App().settings();
@@ -188,6 +190,28 @@ private:
 struct GroupCall::SinkPointer {
 	std::weak_ptr<Webrtc::SinkInterface> data;
 };
+
+struct GroupCall::VideoTrack {
+	VideoTrack(bool paused, bool requireARGB32, not_null<PeerData*> peer);
+
+	Webrtc::VideoTrack track;
+	rpl::variable<QSize> trackSize;
+	not_null<PeerData*> peer;
+	rpl::lifetime lifetime;
+	Group::VideoQuality quality = Group::VideoQuality();
+	bool shown = false;
+};
+
+GroupCall::VideoTrack::VideoTrack(
+	bool paused,
+	bool requireARGB32,
+	not_null<PeerData*> peer)
+: track((paused
+	? Webrtc::VideoState::Paused
+	: Webrtc::VideoState::Active),
+	requireARGB32)
+, peer(peer) {
+}
 
 [[nodiscard]] bool IsGroupCallAdmin(
 		not_null<PeerData*> peer,
@@ -451,6 +475,21 @@ void GroupCall::MediaChannelDescriptionsTask::cancel() {
 			}
 		});
 	}
+}
+
+not_null<PeerData*> GroupCall::TrackPeer(
+		const std::unique_ptr<VideoTrack> &track) {
+	return track->peer;
+}
+
+not_null<Webrtc::VideoTrack*> GroupCall::TrackPointer(
+		const std::unique_ptr<VideoTrack> &track) {
+	return &track->track;
+}
+
+rpl::producer<QSize> GroupCall::TrackSizeValue(
+		const std::unique_ptr<VideoTrack> &track) {
+	return track->trackSize.value();
 }
 
 GroupCall::GroupCall(
@@ -1066,43 +1105,39 @@ void GroupCall::markEndpointActive(
 	if (active) {
 		const auto i = _activeVideoTracks.emplace(
 			endpoint,
-			VideoTrack{
-				.track = std::make_unique<Webrtc::VideoTrack>(
-					(paused
-						? Webrtc::VideoState::Paused
-						: Webrtc::VideoState::Active),
-					_requireARGB32),
-				.peer = endpoint.peer,
-			}).first;
-		const auto track = i->second.track.get();
+			std::make_unique<VideoTrack>(
+				paused,
+				_requireARGB32,
+				endpoint.peer)).first;
+		const auto track = &i->second->track;
 
 		track->renderNextFrame(
 		) | rpl::start_with_next([=] {
-			auto &activeTrack = _activeVideoTracks[endpoint];
+			const auto activeTrack = _activeVideoTracks[endpoint].get();
 			const auto size = track->frameSize();
 			if (size.isEmpty()) {
 				track->markFrameShown();
-			} else if (!activeTrack.shown) {
-				activeTrack.shown = true;
+			} else if (!activeTrack->shown) {
+				activeTrack->shown = true;
 				markTrackShown(endpoint, true);
 			}
-			activeTrack.trackSize = size;
-		}, i->second.lifetime);
+			activeTrack->trackSize = size;
+		}, i->second->lifetime);
 
 		const auto size = track->frameSize();
-		i->second.trackSize = size;
+		i->second->trackSize = size;
 		if (!size.isEmpty() || paused) {
-			i->second.shown = true;
+			i->second->shown = true;
 			shown = true;
 		} else {
 			track->stateValue(
 			) | rpl::filter([=](Webrtc::VideoState state) {
 				return (state == Webrtc::VideoState::Paused)
-					&& !_activeVideoTracks[endpoint].shown;
+					&& !_activeVideoTracks[endpoint]->shown;
 			}) | rpl::start_with_next([=] {
-				_activeVideoTracks[endpoint].shown = true;
+				_activeVideoTracks[endpoint]->shown = true;
 				markTrackShown(endpoint, true);
-			}, i->second.lifetime);
+			}, i->second->lifetime);
 		}
 		addVideoOutput(i->first.id, { track->sink() });
 	} else {
@@ -1146,7 +1181,7 @@ void GroupCall::markTrackPaused(const VideoEndpoint &endpoint, bool paused) {
 	const auto i = _activeVideoTracks.find(endpoint);
 	Assert(i != end(_activeVideoTracks));
 
-	i->second.track->setState(paused
+	i->second->track.setState(paused
 		? Webrtc::VideoState::Paused
 		: Webrtc::VideoState::Active);
 }
@@ -1971,6 +2006,10 @@ bool GroupCall::emitShareCameraError() {
 
 void GroupCall::emitShareCameraError(Error error) {
 	_cameraState = Webrtc::VideoState::Inactive;
+	if (error == Error::CameraFailed
+		&& Webrtc::GetVideoInputList().empty()) {
+		error = Error::NoCamera;
+	}
 	_errors.fire_copy(error);
 }
 
@@ -2024,8 +2063,14 @@ void GroupCall::setupOutgoingVideo() {
 				_cameraCapture = _delegate->groupCallGetVideoCapture(
 					_cameraInputId);
 				if (!_cameraCapture) {
-					return emitShareCameraError(Error::NoCamera);
+					return emitShareCameraError(Error::CameraFailed);
 				}
+				const auto weak = base::make_weak(this);
+				_cameraCapture->setOnFatalError([=] {
+					crl::on_main(weak, [=] {
+						emitShareCameraError(Error::CameraFailed);
+					});
+				});
 			} else {
 				_cameraCapture->switchToDevice(_cameraInputId.toStdString());
 			}
@@ -2443,6 +2488,9 @@ void GroupCall::updateRequestedVideoChannels() {
 	channels.reserve(_activeVideoTracks.size());
 	const auto &camera = cameraSharingEndpoint();
 	const auto &screen = screenSharingEndpoint();
+	auto mediums = 0;
+	auto fullcameras = 0;
+	auto fullscreencasts = 0;
 	for (const auto &[endpoint, video] : _activeVideoTracks) {
 		const auto &endpointId = endpoint.id;
 		if (endpointId == camera || endpointId == screen) {
@@ -2455,23 +2503,73 @@ void GroupCall::updateRequestedVideoChannels() {
 		if (!params) {
 			continue;
 		}
+		const auto min = (video->quality == Group::VideoQuality::Full
+			&& endpoint.type == VideoEndpointType::Screen)
+			? Quality::Full
+			: Quality::Thumbnail;
+		const auto max = (video->quality == Group::VideoQuality::Full)
+			? Quality::Full
+			: (video->quality == Group::VideoQuality::Medium
+				&& endpoint.type != VideoEndpointType::Screen)
+			? Quality::Medium
+			: Quality::Thumbnail;
+		if (max == Quality::Full) {
+			if (endpoint.type == VideoEndpointType::Screen) {
+				++fullscreencasts;
+			} else {
+				++fullcameras;
+			}
+		} else if (max == Quality::Medium) {
+			++mediums;
+		}
 		channels.push_back({
 			.audioSsrc = participant->ssrc,
 			.endpointId = endpointId,
 			.ssrcGroups = (params->camera.endpointId == endpointId
 				? params->camera.ssrcGroups
 				: params->screen.ssrcGroups),
-			.minQuality = ((video.quality == Group::VideoQuality::Full
-				&& endpoint.type == VideoEndpointType::Screen)
-				? Quality::Full
-				: Quality::Thumbnail),
-			.maxQuality = ((video.quality == Group::VideoQuality::Full)
-				? Quality::Full
-				: (video.quality == Group::VideoQuality::Medium
-					&& endpoint.type != VideoEndpointType::Screen)
-				? Quality::Medium
-				: Quality::Thumbnail),
+			.minQuality = min,
+			.maxQuality = max,
 		});
+	}
+
+	// We limit `count(Full) * kFullAsMediumsCount + count(medium)`.
+	//
+	// Try to preserve all qualities; If not
+	// Try to preserve all screencasts as Full and cameras as Medium; If not
+	// Try to preserve all screencasts as Full; If not
+	// Try to preserve all cameras as Medium;
+	const auto mediumsCount = mediums
+		+ (fullcameras + fullscreencasts) * kFullAsMediumsCount;
+	const auto downgradeSome = (mediumsCount > kMaxMediumQualities);
+	const auto downgradeAll = (fullscreencasts * kFullAsMediumsCount)
+		> kMaxMediumQualities;
+	if (downgradeSome) {
+		for (auto &channel : channels) {
+			if (channel.maxQuality == Quality::Full) {
+				const auto camera = (channel.minQuality != Quality::Full);
+				if (camera) {
+					channel.maxQuality = Quality::Medium;
+				} else if (downgradeAll) {
+					channel.maxQuality
+						= channel.minQuality
+						= Quality::Thumbnail;
+					--fullscreencasts;
+				}
+			}
+		}
+		mediums += fullcameras;
+		fullcameras = 0;
+		if (downgradeAll) {
+			fullscreencasts = 0;
+		}
+	}
+	if (mediums > kMaxMediumQualities) {
+		for (auto &channel : channels) {
+			if (channel.maxQuality == Quality::Medium) {
+				channel.maxQuality = Quality::Thumbnail;
+			}
+		}
 	}
 	_instance->setRequestedVideoChannels(std::move(channels));
 }
@@ -2955,10 +3053,10 @@ void GroupCall::requestVideoQuality(
 		return;
 	}
 	const auto i = _activeVideoTracks.find(endpoint);
-	if (i == end(_activeVideoTracks) || i->second.quality == quality) {
+	if (i == end(_activeVideoTracks) || i->second->quality == quality) {
 		return;
 	}
-	i->second.quality = quality;
+	i->second->quality = quality;
 	updateRequestedVideoChannelsDelayed();
 }
 

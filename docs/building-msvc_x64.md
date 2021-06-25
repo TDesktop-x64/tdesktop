@@ -148,8 +148,19 @@ Open **x64 Native Tools Command Prompt for VS 2019.bat**, go to ***BuildPath*** 
     cd win32\VS2015
     msbuild opus.sln /property:Configuration=Debug /property:Platform="x64"
     msbuild opus.sln /property:Configuration=Release /property:Platform="x64"
+    
+    cd ..\..\..
 
-    cd ..\..\..\..\..
+    git clone https://github.com/desktop-app/rnnoise.git
+    cd rnnoise
+    mkdir out
+    cd out
+    cmake -A x64 ..
+    cmake --build . --config Debug
+    cmake --build . --config Release
+    cd ..\..
+
+    cd ..\..
     SET PATH_BACKUP_=%PATH%
     SET PATH=%cd%\ThirdParty\msys64\usr\bin;%PATH%
     cd Libraries\win64
@@ -183,7 +194,7 @@ Open **x64 Native Tools Command Prompt for VS 2019.bat**, go to ***BuildPath*** 
         -confirm-license ^
         -static ^
         -static-runtime ^
-        -no-opengl ^
+        -opengl dynamic ^
         -openssl-linked ^
         -I "%LibrariesPath%\openssl_1_1_1\include" ^
         OPENSSL_LIBS_DEBUG="%LibrariesPath%\openssl_1_1_1\out64.dbg\libssl.lib %LibrariesPath%\openssl_1_1_1\out64.dbg\libcrypto.lib Ws2_32.lib Gdi32.lib Advapi32.lib Crypt32.lib User32.lib" ^
@@ -208,6 +219,7 @@ Open **x64 Native Tools Command Prompt for VS 2019.bat**, go to ***BuildPath*** 
     cd Debug
     cmake -G Ninja ^
         -DCMAKE_BUILD_TYPE=Debug ^
+        -DTG_OWT_BUILD_AUDIO_BACKENDS=OFF ^
         -DTG_OWT_SPECIAL_TARGET=win64 ^
         -DTG_OWT_LIBJPEG_INCLUDE_PATH=%cd%/../../../mozjpeg ^
         -DTG_OWT_OPENSSL_INCLUDE_PATH=%cd%/../../../openssl_1_1_1/include ^
@@ -219,6 +231,7 @@ Open **x64 Native Tools Command Prompt for VS 2019.bat**, go to ***BuildPath*** 
     cd Release
     cmake -G Ninja ^
         -DCMAKE_BUILD_TYPE=Release ^
+        -DTG_OWT_BUILD_AUDIO_BACKENDS=OFF ^
         -DTG_OWT_SPECIAL_TARGET=win64 ^
         -DTG_OWT_LIBJPEG_INCLUDE_PATH=%cd%/../../../mozjpeg ^
         -DTG_OWT_OPENSSL_INCLUDE_PATH=%cd%/../../../openssl_1_1_1/include ^

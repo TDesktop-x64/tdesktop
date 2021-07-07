@@ -285,10 +285,6 @@ void StickerSetBox::updateButtons() {
 					Ui::Toast::Show(tr::lng_stickers_copied(tr::now));
 					closeBox();
 				};
-				const auto archive = [=] {
-					archiveStickers();
-					closeBox();
-				};
 				const auto menu =
 					std::make_shared<base::unique_qptr<Ui::PopupMenu>>();
 				top->setClickedCallback([=] {
@@ -298,9 +294,6 @@ void StickerSetBox::updateButtons() {
 							? tr::lng_stickers_share_masks
 							: tr::lng_stickers_share_pack)(tr::now),
 						share);
-					(*menu)->addAction(
-							tr::lng_stickers_archive_pack(tr::now),
-							archive);
 					(*menu)->popup(QCursor::pos());
 					return true;
 				});

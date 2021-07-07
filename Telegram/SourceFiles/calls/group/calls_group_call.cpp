@@ -2868,11 +2868,14 @@ void GroupCall::setInstanceConnected(
 	if (nowCanSpeak) {
 		notifyAboutAllowedToSpeak();
 	}
-	if (cAutoUnmute() && state() == State::Joined && muted() == MuteState::Muted) {
-		setMutedAndUpdate(MuteState::Active);
-	}
 	if (!_hadJoinedState && state() == State::Joined) {
 		checkFirstTimeJoined();
+	}
+	if (cAutoUnmute() && state() == State::Joined) {
+		if (muted() == MuteState::Muted) {
+			setMuted(MuteState::Muted);
+			setMutedAndUpdate(MuteState::Active);
+		}
 	}
 }
 

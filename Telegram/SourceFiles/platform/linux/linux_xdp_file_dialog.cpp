@@ -569,6 +569,27 @@ int XDPFileDialog::exec() {
 	setAttribute(Qt::WA_ShowModal, true);
 	setResult(0);
 
+	// HACK we have to avoid returning until we emit
+	// that the dialog was accepted or rejected
+	const auto context = Glib::MainContext::create();
+	const auto loop = Glib::MainLoop::create(context);
+	g_main_context_push_thread_default(context->gobj());
+	const auto contextGuard = gsl::finally([&] {
+		g_main_context_pop_thread_default(context->gobj());
+	});
+
+	rpl::lifetime lifetime;
+
+	accepted(
+	) | rpl::start_with_next([&] {
+		loop->quit();
+	}, lifetime);
+
+	rejected(
+	) | rpl::start_with_next([&] {
+		loop->quit();
+	}, lifetime);
+
 	show();
 	if (failedToOpen()) {
 		return result();
@@ -576,22 +597,7 @@ int XDPFileDialog::exec() {
 
 	QPointer<QDialog> guard = this;
 
-	// HACK we have to avoid returning until we emit
-	// that the dialog was accepted or rejected
-	QEventLoop loop;
-	rpl::lifetime lifetime;
-
-	accepted(
-	) | rpl::start_with_next([&] {
-		loop.quit();
-	}, lifetime);
-
-	rejected(
-	) | rpl::start_with_next([&] {
-		loop.quit();
-	}, lifetime);
-
-	loop.exec();
+	loop->run();
 
 	if (guard.isNull()) {
 		return QDialog::Rejected;

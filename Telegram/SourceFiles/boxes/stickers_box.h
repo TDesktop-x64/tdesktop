@@ -56,12 +56,14 @@ public:
 		Featured,
 		Archived,
 		Attached,
+		Masks,
 	};
 
 	StickersBox(
 		QWidget*,
 		not_null<Window::SessionController*> controller,
-		Section section);
+		Section section,
+		bool masks = false);
 	StickersBox(
 		QWidget*,
 		not_null<Window::SessionController*> controller,
@@ -94,7 +96,7 @@ private:
 		object_ptr<Inner> takeWidget();
 		void returnWidget(object_ptr<Inner> widget);
 
-		[[nodiscard]] Inner *widget();
+		[[nodiscard]] Inner *widget() const;
 		[[nodiscard]] int index() const;
 
 		void saveScrollTop();
@@ -103,7 +105,7 @@ private:
 		}
 
 	private:
-		int _index = 0;
+		const int _index = 0;
 		object_ptr<Inner> _widget = { nullptr };
 		QPointer<Inner> _weak;
 		int _scrollTop = 0;
@@ -132,6 +134,11 @@ private:
 		uint64 offsetId);
 	void showAttachedStickers();
 
+	const Data::StickersSetsOrder &archivedSetsOrder() const;
+	Data::StickersSetsOrder &archivedSetsOrderRef();
+
+	std::array<Inner*, 5> widgets() const;
+
 	const not_null<Window::SessionController*> _controller;
 	MTP::Sender _api;
 
@@ -142,8 +149,10 @@ private:
 	object_ptr<CounterWidget> _unreadBadge = { nullptr };
 
 	Section _section;
+	const bool _isMasks;
 
 	Tab _installed;
+	Tab _masks;
 	Tab _featured;
 	Tab _archived;
 	Tab _attached;

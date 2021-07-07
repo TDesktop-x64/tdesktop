@@ -184,6 +184,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 "lng_edit_media_album_error" = "This file cannot be saved as a part of an album.";
 "lng_edit_media_invalid_file" = "Sorry, no way to use this file.";
+"lng_edit_photo_editor_hint" = "Left-click on the photo to edit.";
 "lng_edit_caption_attach" = "Sorry, you can't attach a new media while you're editing your message.";
 "lng_edit_caption_voice" = "Sorry, you can't edit your message while you're having an unsent voice message.";
 
@@ -452,6 +453,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_performance" = "Performance";
 "lng_settings_enable_animations" = "Enable animations";
 "lng_settings_enable_opengl" = "Enable OpenGL rendering for media";
+"lng_settings_angle_backend" = "ANGLE graphics backend";
+"lng_settings_angle_backend_auto" = "Auto";
+"lng_settings_angle_backend_d3d9" = "Direct3D 9";
+"lng_settings_angle_backend_d3d11" = "Direct3D 11";
+"lng_settings_angle_backend_d3d11on12" = "D3D11on12";
+"lng_settings_angle_backend_opengl" = "OpenGL";
+"lng_settings_angle_backend_disabled" = "Disabled";
 "lng_settings_sensitive_title" = "Sensitive content";
 "lng_settings_sensitive_disable_filtering" = "Disable filtering";
 "lng_settings_sensitive_about" = "Display sensitive media in public channels on all your Telegram devices.";
@@ -1379,6 +1387,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_switch_stickers" = "Stickers";
 "lng_switch_emoji" = "Emoji";
 "lng_switch_gifs" = "GIFs";
+"lng_switch_masks" = "Masks";
 "lng_stickers_featured_add" = "Add";
 "lng_gifs_search" = "Search GIFs";
 "lng_gifs_no_saved" = "You have no saved GIFs yet.";
@@ -1389,11 +1398,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_box_remove" = "Remove";
 
 "lng_stickers_installed_tab" = "Stickers";
+"lng_stickers_masks_tab" = "Masks";
 "lng_stickers_featured_tab" = "Trending";
 "lng_stickers_archived_tab" = "Archived";
 "lng_stickers_remove_pack" = "Remove «{sticker_pack}»?";
 "lng_stickers_add_pack" = "Add stickers";
+"lng_stickers_add_masks" = "Add masks";
 "lng_stickers_share_pack" = "Share Stickers";
+"lng_stickers_share_masks" = "Share Masks";
 "lng_stickers_not_found" = "Sticker pack not found.";
 "lng_stickers_packs_archived" = "Some of your unused stickers have been archived to make room for the sets you've activated.";
 "lng_stickers_copied" = "Sticker pack link copied to clipboard.";
@@ -1402,7 +1414,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_stickers_return" = "Undo";
 "lng_stickers_count#one" = "{count} sticker";
 "lng_stickers_count#other" = "{count} stickers";
-"lng_stickers_masks_pack" = "This is a pack of mask stickers. You can use them in the photo editor on our mobile apps.";
+"lng_masks_count#one" = "{count} mask";
+"lng_masks_count#other" = "{count} masks";
 "lng_stickers_attached_sets" = "Sets of attached stickers";
 "lng_stickers_group_set" = "Group sticker set";
 "lng_stickers_remove_group_set" = "Remove group sticker set?";
@@ -1413,6 +1426,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_stickers_remove_pack_confirm" = "Remove";
 "lng_stickers_archive_pack" = "Archive Stickers";
 "lng_stickers_has_been_archived" = "Sticker pack has been archived.";
+"lng_masks_archive_pack" = "Archive Masks";
+"lng_masks_has_been_archived" = "Mask pack has been archived.";
+"lng_masks_installed" = "Mask pack has been installed.";
 
 "lng_in_dlg_photo" = "Photo";
 "lng_in_dlg_album" = "Album";
@@ -2768,6 +2784,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_filters_context_remove" = "Remove";
 "lng_filters_remove_sure" = "This will remove the folder, your chats will not be deleted.";
 "lng_filters_remove_yes" = "Remove";
+
+"lng_photo_editor_menu_delete" = "Delete";
+"lng_photo_editor_menu_flip" = "Flip";
+"lng_photo_editor_menu_duplicate" = "Duplicate";
 
 // Wnd specific
 

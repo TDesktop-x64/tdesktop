@@ -87,7 +87,6 @@ if (LINUX)
     PRIVATE
         desktop-app::external_glibmm
         desktop-app::external_glib
-        desktop-app::external_mallocng
     )
 
     if (NOT DESKTOP_APP_DISABLE_DBUS_INTEGRATION)
@@ -114,6 +113,7 @@ if (LINUX)
     endif()
 
     if (NOT DESKTOP_APP_DISABLE_GTK_INTEGRATION)
+        target_link_libraries(Telegram PRIVATE rt)
         find_package(PkgConfig REQUIRED)
 
         if (DESKTOP_APP_USE_PACKAGED AND NOT DESKTOP_APP_USE_PACKAGED_LAZY)
@@ -253,8 +253,6 @@ PRIVATE
     boxes/peer_lists_box.h
     boxes/passcode_box.cpp
     boxes/passcode_box.h
-    boxes/photo_crop_box.cpp
-    boxes/photo_crop_box.h
     boxes/rate_call_box.cpp
     boxes/rate_call_box.h
     boxes/self_destruction_box.cpp
@@ -399,6 +397,7 @@ PRIVATE
     data/stickers/data_stickers_set.h
     data/stickers/data_stickers.cpp
     data/stickers/data_stickers.h
+    data/data_abstract_sparse_ids.h
     data/data_abstract_structure.cpp
     data/data_abstract_structure.h
     data/data_auto_download.cpp
@@ -511,6 +510,39 @@ PRIVATE
     dialogs/dialogs_search_from_controllers.h
     dialogs/dialogs_widget.cpp
     dialogs/dialogs_widget.h
+    editor/color_picker.cpp
+    editor/color_picker.h
+    editor/controllers/controllers.h
+    editor/controllers/stickers_panel_controller.cpp
+    editor/controllers/stickers_panel_controller.h
+    editor/controllers/undo_controller.cpp
+    editor/controllers/undo_controller.h
+    editor/editor_crop.cpp
+    editor/editor_crop.h
+    editor/editor_paint.cpp
+    editor/editor_paint.h
+    editor/photo_editor.cpp
+    editor/photo_editor.h
+    editor/photo_editor_common.cpp
+    editor/photo_editor_common.h
+    editor/photo_editor_content.cpp
+    editor/photo_editor_content.h
+    editor/photo_editor_controls.cpp
+    editor/photo_editor_controls.h
+    editor/photo_editor_layer_widget.cpp
+    editor/photo_editor_layer_widget.h
+    editor/scene/scene.cpp
+    editor/scene/scene.h
+    editor/scene/scene_item_base.cpp
+    editor/scene/scene_item_base.h
+    editor/scene/scene_item_canvas.cpp
+    editor/scene/scene_item_canvas.h
+    editor/scene/scene_item_image.cpp
+    editor/scene/scene_item_image.h
+    editor/scene/scene_item_line.cpp
+    editor/scene/scene_item_line.h
+    editor/scene/scene_item_sticker.cpp
+    editor/scene/scene_item_sticker.h
     export/export_manager.cpp
     export/export_manager.h
     export/view/export_view_content.cpp
@@ -867,8 +899,6 @@ PRIVATE
     platform/linux/linux_gdk_helper.h
     platform/linux/linux_gsd_media_keys.cpp
     platform/linux/linux_gsd_media_keys.h
-    platform/linux/linux_gtk_file_dialog.cpp
-    platform/linux/linux_gtk_file_dialog.h
     platform/linux/linux_gtk_integration_dummy.cpp
     platform/linux/linux_gtk_integration_p.h
     platform/linux/linux_gtk_integration.cpp
@@ -1202,8 +1232,6 @@ if (DESKTOP_APP_DISABLE_GTK_INTEGRATION)
     remove_target_sources(Telegram ${src_loc}
         platform/linux/linux_gdk_helper.cpp
         platform/linux/linux_gdk_helper.h
-        platform/linux/linux_gtk_file_dialog.cpp
-        platform/linux/linux_gtk_file_dialog.h
         platform/linux/linux_gtk_integration_p.h
         platform/linux/linux_gtk_integration.cpp
         platform/linux/linux_gtk_open_with_dialog.cpp
@@ -1369,6 +1397,32 @@ endif()
 
 set_target_properties(Telegram PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${output_folder})
 
+if (WIN32)
+    target_link_options(Telegram
+    PRIVATE
+        /DELAYLOAD:secur32.dll
+        /DELAYLOAD:winmm.dll
+        /DELAYLOAD:ws2_32.dll
+        /DELAYLOAD:user32.dll
+        /DELAYLOAD:gdi32.dll
+        /DELAYLOAD:advapi32.dll
+        /DELAYLOAD:shell32.dll
+        /DELAYLOAD:ole32.dll
+        /DELAYLOAD:oleaut32.dll
+        /DELAYLOAD:shlwapi.dll
+        /DELAYLOAD:iphlpapi.dll
+        /DELAYLOAD:gdiplus.dll
+        /DELAYLOAD:version.dll
+        /DELAYLOAD:dwmapi.dll
+        /DELAYLOAD:crypt32.dll
+        /DELAYLOAD:bcrypt.dll
+        /DELAYLOAD:imm32.dll
+        /DELAYLOAD:netapi32.dll
+        /DELAYLOAD:userenv.dll
+        /DELAYLOAD:wtsapi32.dll
+    )
+endif()
+
 if ((NOT DESKTOP_APP_DISABLE_AUTOUPDATE OR APPLE) AND NOT build_macstore AND NOT build_winstore)
     add_executable(Updater WIN32)
     init_target(Updater)
@@ -1385,8 +1439,26 @@ if ((NOT DESKTOP_APP_DISABLE_AUTOUPDATE OR APPLE) AND NOT build_macstore AND NOT
 
     set_target_properties(Updater PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${output_folder})
 
-    if (WIN32 AND NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-        target_link_options(Updater PRIVATE -municode)
+    if (WIN32)
+        get_filename_component(lib_base_loc lib_base REALPATH)
+        nice_target_sources(Updater ${lib_base_loc}
+        PRIVATE
+            base/platform/win/base_windows_safe_library.cpp
+            base/platform/win/base_windows_safe_library.h
+        )
+        target_include_directories(Updater PRIVATE ${lib_base_loc})
+        if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+            target_link_options(Updater
+            PRIVATE
+                /DELAYLOAD:user32.dll
+                /DELAYLOAD:advapi32.dll
+                /DELAYLOAD:shell32.dll
+                /DELAYLOAD:ole32.dll
+                /DELAYLOAD:shlwapi.dll
+            )
+        else()
+            target_link_options(Updater PRIVATE -municode)
+        endif()
     endif()
 
     if (LINUX)

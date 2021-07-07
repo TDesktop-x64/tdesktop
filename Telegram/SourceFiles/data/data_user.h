@@ -10,28 +10,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_peer.h"
 #include "dialogs/dialogs_key.h"
 
-class BotCommand {
-public:
-	BotCommand(const QString &command, const QString &description);
-
-	bool setDescription(const QString &description);
-	const Ui::Text::String &descriptionText() const;
-
-	QString command;
-
-private:
-	QString _description;
-	mutable Ui::Text::String _descriptionText;
-
-};
-
 struct BotInfo {
 	bool inited = false;
 	bool readsAllHistory = false;
 	bool cantJoinGroups = false;
 	int version = 0;
 	QString description, inlinePlaceholder;
-	QList<BotCommand> commands;
+	std::vector<BotCommand> commands;
 	Ui::Text::String text = { int(st::msgMinWidth) }; // description
 
 	QString startToken, startGroupToken, shareGameShortName;

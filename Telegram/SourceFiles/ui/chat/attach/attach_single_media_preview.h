@@ -8,9 +8,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "ui/rp_widget.h"
-#include "ui/round_rect.h"
+#include "ui/abstract_button.h"
 #include "media/clip/media_clip_reader.h"
-#include "base/object_ptr.h"
 
 namespace Lottie {
 class SinglePlayer;
@@ -18,6 +17,7 @@ class SinglePlayer;
 
 namespace Ui {
 
+class AttachControlsWidget;
 struct PreparedFile;
 class IconButton;
 
@@ -39,6 +39,7 @@ public:
 
 	[[nodiscard]] rpl::producer<> deleteRequests() const;
 	[[nodiscard]] rpl::producer<> editRequests() const;
+	[[nodiscard]] rpl::producer<> modifyRequests() const;
 
 private:
 	void paintEvent(QPaintEvent *e) override;
@@ -48,7 +49,6 @@ private:
 		QImage preview,
 		const QString &animatedPreviewPath);
 	void prepareAnimatedPreview(const QString &animatedPreviewPath);
-	void paintButtonsBackground(QPainter &p);
 	void clipCallback(Media::Clip::Notification notification);
 
 	Fn<bool()> _gifPaused;
@@ -56,14 +56,17 @@ private:
 	bool _sticker = false;
 	QPixmap _preview;
 	int _previewLeft = 0;
+	int _previewTop = 0;
 	int _previewWidth = 0;
 	int _previewHeight = 0;
 	Media::Clip::ReaderPointer _gifPreview;
 	std::unique_ptr<Lottie::SinglePlayer> _lottiePreview;
 
-	object_ptr<IconButton> _editMedia = { nullptr };
-	object_ptr<IconButton> _deleteMedia = { nullptr };
-	RoundRect _buttonsRect;
+	const int _minThumbH;
+	const base::unique_qptr<AbstractButton> _photoEditorButton;
+	const base::unique_qptr<AttachControlsWidget> _controls;
+
+	rpl::event_stream<> _modifyRequests;
 
 };
 

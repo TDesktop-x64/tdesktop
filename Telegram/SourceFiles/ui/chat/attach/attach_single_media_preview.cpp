@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "ui/chat/attach/attach_single_media_preview.h"
 
+#include "editor/photo_editor_common.h"
+#include "ui/chat/attach/attach_controls.h"
 #include "ui/chat/attach/attach_prepare.h"
 #include "ui/widgets/buttons.h"
 #include "core/mime_type.h"
@@ -32,7 +34,7 @@ SingleMediaPreview *SingleMediaPreview::Create(
 	bool animationPreview = false;
 	if (const auto image = std::get_if<PreparedFileInformation::Image>(
 			&file.information->media)) {
-		preview = image->data;
+		preview = Editor::ImageModified(image->data, image->modifications);
 		animated = animationPreview = image->animated;
 	} else if (const auto video = std::get_if<PreparedFileInformation::Video>(
 			&file.information->media)) {
@@ -67,12 +69,11 @@ SingleMediaPreview::SingleMediaPreview(
 , _gifPaused(std::move(gifPaused))
 , _animated(animated)
 , _sticker(sticker)
-, _editMedia(this, st::sendBoxAlbumGroupButtonMedia)
-, _deleteMedia(this, st::sendBoxAlbumGroupButtonMedia)
-, _buttonsRect(st::sendBoxAlbumGroupRadius, st::roundedBg) {
+, _minThumbH(st::sendBoxAlbumGroupSize.height()
+	+ st::sendBoxAlbumGroupSkipTop * 2)
+, _photoEditorButton(base::make_unique_q<AbstractButton>(this))
+, _controls(base::make_unique_q<AttachControlsWidget>(this)) {
 	Expects(!preview.isNull());
-
-	_deleteMedia->setIconOverride(&st::sendBoxAlbumGroupButtonMediaDelete);
 
 	preparePreview(preview, animatedPreviewPath);
 }
@@ -80,11 +81,15 @@ SingleMediaPreview::SingleMediaPreview(
 SingleMediaPreview::~SingleMediaPreview() = default;
 
 rpl::producer<> SingleMediaPreview::deleteRequests() const {
-	return _deleteMedia->clicks() | rpl::to_empty;
+	return _controls->deleteRequests();
 }
 
 rpl::producer<> SingleMediaPreview::editRequests() const {
-	return _editMedia->clicks() | rpl::to_empty;
+	return _controls->editRequests();
+}
+
+rpl::producer<> SingleMediaPreview::modifyRequests() const {
+	return _photoEditorButton->clicks() | rpl::to_empty;
 }
 
 void SingleMediaPreview::preparePreview(
@@ -126,20 +131,20 @@ void SingleMediaPreview::preparePreview(
 		_previewWidth = qMax(preview.width(), kMinPreviewWidth);
 	}
 	auto maxthumbh = qMin(qRound(1.5 * _previewWidth), st::confirmMaxHeight);
-	const auto minthumbh = st::sendBoxAlbumGroupHeight
-		 + st::sendBoxAlbumGroupSkipTop * 2;
-	_previewHeight = qRound(originalHeight * float64(_previewWidth) / originalWidth);
+	_previewHeight = qRound(originalHeight
+		* float64(_previewWidth)
+		/ originalWidth);
 	if (_previewHeight > maxthumbh) {
-		_previewWidth = qRound(_previewWidth * float64(maxthumbh) / _previewHeight);
-		accumulate_max(_previewWidth, kMinPreviewWidth);
-		_previewHeight = maxthumbh;
-	} else if (_previewHeight < minthumbh) {
-		_previewWidth = qRound(_previewWidth * float64(minthumbh)
+		_previewWidth = qRound(_previewWidth
+			* float64(maxthumbh)
 			/ _previewHeight);
 		accumulate_max(_previewWidth, kMinPreviewWidth);
-		_previewHeight = minthumbh;
+		_previewHeight = maxthumbh;
 	}
 	_previewLeft = (st::boxWideWidth - _previewWidth) / 2;
+	if (_previewHeight < _minThumbH) {
+		_previewTop = (_minThumbH - _previewHeight) / 2;
+	}
 
 	preview = std::move(preview).scaled(
 		_previewWidth * style::DevicePixelRatio(),
@@ -152,22 +157,21 @@ void SingleMediaPreview::preparePreview(
 
 	prepareAnimatedPreview(animatedPreviewPath);
 
-	resize(width(), _previewHeight);
+	_photoEditorButton->resize(_previewWidth, _previewHeight);
+	_photoEditorButton->moveToLeft(_previewLeft, _previewTop);
+	_photoEditorButton->setVisible(!_sticker
+		&& !_gifPreview
+		&& !_lottiePreview
+		&& !_animated);
+
+	resize(width(), std::max(_previewHeight, _minThumbH));
 }
 
 void SingleMediaPreview::resizeEvent(QResizeEvent *e) {
-	const auto skipInternal = st::sendBoxAlbumGroupEditInternalSkip;
-	const auto size = st::sendBoxAlbumGroupHeight;
-	const auto skipRight = st::sendBoxAlbumGroupSkipRight;
-	const auto skipTop = st::sendBoxAlbumGroupSkipTop;
-	const auto groupWidth = size * 2 + skipInternal;
-
-	const auto right = (st::boxWideWidth - st::sendMediaPreviewSize) / 2
-		+ st::sendMediaPreviewSize;
-	const auto left = right - groupWidth - skipRight;
-	const auto top = skipTop;
-	_editMedia->move(left, top);
-	_deleteMedia->move(left + size + skipInternal, top);
+	_controls->moveToRight(
+		st::boxPhotoPadding.right() + st::sendBoxAlbumGroupSkipRight,
+		st::sendBoxAlbumGroupSkipTop,
+		width());
 }
 
 void SingleMediaPreview::prepareAnimatedPreview(
@@ -192,7 +196,8 @@ void SingleMediaPreview::prepareAnimatedPreview(
 	}
 }
 
-void SingleMediaPreview::clipCallback(Media::Clip::Notification notification) {
+void SingleMediaPreview::clipCallback(
+		Media::Clip::Notification notification) {
 	using namespace Media::Clip;
 	switch (notification) {
 	case NotificationReinit: {
@@ -202,7 +207,13 @@ void SingleMediaPreview::clipCallback(Media::Clip::Notification notification) {
 
 		if (_gifPreview && _gifPreview->ready() && !_gifPreview->started()) {
 			auto s = QSize(_previewWidth, _previewHeight);
-			_gifPreview->start(s.width(), s.height(), s.width(), s.height(), ImageRoundRadius::None, RectPart::None);
+			_gifPreview->start(
+				s.width(),
+				s.height(),
+				s.width(),
+				s.height(),
+				ImageRoundRadius::None,
+				RectPart::None);
 		}
 
 		update();
@@ -220,18 +231,44 @@ void SingleMediaPreview::paintEvent(QPaintEvent *e) {
 	Painter p(this);
 
 	if (!_sticker) {
-		if (_previewLeft > st::boxPhotoPadding.left()) {
-			p.fillRect(st::boxPhotoPadding.left(), 0, _previewLeft - st::boxPhotoPadding.left(), _previewHeight, st::confirmBg);
+		const auto &padding = st::boxPhotoPadding;
+		if (_previewLeft > padding.left()) {
+			p.fillRect(
+				padding.left(),
+				_previewTop,
+				_previewLeft - padding.left(),
+				_previewHeight,
+				st::confirmBg);
 		}
-		if (_previewLeft + _previewWidth < width() - st::boxPhotoPadding.right()) {
-			p.fillRect(_previewLeft + _previewWidth, 0, width() - st::boxPhotoPadding.right() - _previewLeft - _previewWidth, _previewHeight, st::confirmBg);
+		if ((_previewLeft + _previewWidth) < (width() - padding.right())) {
+			p.fillRect(
+				_previewLeft + _previewWidth,
+				_previewTop,
+				width() - padding.right() - _previewLeft - _previewWidth,
+				_previewHeight,
+				st::confirmBg);
+		}
+		if (_previewTop > 0) {
+			p.fillRect(
+				padding.left(),
+				0,
+				width() - padding.right() - padding.left(),
+				height(),
+				st::confirmBg);
 		}
 	}
 	if (_gifPreview && _gifPreview->started()) {
 		auto s = QSize(_previewWidth, _previewHeight);
 		auto paused = _gifPaused();
-		auto frame = _gifPreview->current(s.width(), s.height(), s.width(), s.height(), ImageRoundRadius::None, RectPart::None, paused ? 0 : crl::now());
-		p.drawPixmap(_previewLeft, 0, frame);
+		auto frame = _gifPreview->current(
+			s.width(),
+			s.height(),
+			s.width(),
+			s.height(),
+			ImageRoundRadius::None,
+			RectPart::None,
+			paused ? 0 : crl::now());
+		p.drawPixmap(_previewLeft, _previewTop, frame);
 	} else if (_lottiePreview && _lottiePreview->ready()) {
 		const auto frame = _lottiePreview->frame();
 		const auto size = frame.size() / style::DevicePixelRatio();
@@ -244,11 +281,15 @@ void SingleMediaPreview::paintEvent(QPaintEvent *e) {
 			frame);
 		_lottiePreview->markFrameShown();
 	} else {
-		p.drawPixmap(_previewLeft, 0, _preview);
+		p.drawPixmap(_previewLeft, _previewTop, _preview);
 	}
 	if (_animated && !_gifPreview && !_lottiePreview) {
 		const auto innerSize = st::msgFileLayout.thumbSize;
-		auto inner = QRect(_previewLeft + (_previewWidth - innerSize) / 2, (_previewHeight - innerSize) / 2, innerSize, innerSize);
+		auto inner = QRect(
+			_previewLeft + (_previewWidth - innerSize) / 2,
+			_previewTop + (_previewHeight - innerSize) / 2,
+			innerSize,
+			innerSize);
 		p.setPen(Qt::NoPen);
 		p.setBrush(st::msgDateImgBg);
 
@@ -260,22 +301,6 @@ void SingleMediaPreview::paintEvent(QPaintEvent *e) {
 		auto icon = &st::historyFileInPlay;
 		icon->paintInCenter(p, inner);
 	}
-	paintButtonsBackground(p);
-}
-
-void SingleMediaPreview::paintButtonsBackground(QPainter &p) {
-	const auto skipInternal = st::sendBoxAlbumGroupEditInternalSkip;
-	const auto size = st::sendBoxAlbumGroupHeight;
-	const auto skipRight = st::sendBoxAlbumGroupSkipRight;
-	const auto skipTop = st::sendBoxAlbumGroupSkipTop;
-	const auto groupWidth = size * 2 + skipInternal;
-	const auto right = (st::boxWideWidth - st::sendMediaPreviewSize) / 2
-		+ st::sendMediaPreviewSize;
-	const auto left = right - groupWidth - skipRight;
-	const auto top = skipTop;
-
-	QRect groupRect(left, top, groupWidth, size);
-	_buttonsRect.paint(p, groupRect);
 }
 
 } // namespace Ui

@@ -508,8 +508,16 @@ void OverlayWidget::updateGeometry() {
 		? window()->screen()
 		: QApplication::primaryScreen();
 	const auto available = screen->geometry();
-	const auto useSizeHack = _opengl && Platform::IsWindows();
-	const auto use = available.marginsAdded({ 0, 0, 0, 1 });
+	const auto openglWidget = _opengl
+		? static_cast<QOpenGLWidget*>(_widget.get())
+		: nullptr;
+	const auto useSizeHack = Platform::IsWindows()
+		&& openglWidget
+		&& (openglWidget->format().renderableType()
+			!= QSurfaceFormat::OpenGLES);
+	const auto use = useSizeHack
+		? available.marginsAdded({ 0, 0, 0, 1 })
+		: available;
 	const auto mask = useSizeHack
 		? QRegion(QRect(QPoint(), available.size()))
 		: QRegion();
@@ -1814,19 +1822,31 @@ auto OverlayWidget::sharedMediaKey() const -> std::optional<SharedMediaKey> {
 			_photo
 		};
 	}
-	if (!IsServerMsgId(_msgid.msg)) {
-		return std::nullopt;
-	}
-	auto keyForType = [this](SharedMediaType type) -> SharedMediaKey {
+	const auto isServerMsgId = IsServerMsgId(_msgid.msg);
+	const auto isScheduled = [&] {
+		if (isServerMsgId) {
+			return false;
+		}
+		if (const auto item = _session->data().message(_msgid)) {
+			return item->isScheduled();
+		}
+		return false;
+	}();
+	const auto keyForType = [&](SharedMediaType type) -> SharedMediaKey {
 		return {
 			_history->peer->id,
 			_migrated ? _migrated->peer->id : 0,
 			type,
-			(_msgid.channel == _history->channelId()) ? _msgid.msg : (_msgid.msg - ServerMaxMsgId) };
+			(_msgid.channel == _history->channelId())
+				? _msgid.msg
+				: (_msgid.msg - ServerMaxMsgId),
+			isScheduled
+		};
 	};
-	return
-		sharedMediaType()
-		| keyForType;
+	if (!isServerMsgId && !isScheduled) {
+		return std::nullopt;
+	}
+	return sharedMediaType() | keyForType;
 }
 
 Data::FileOrigin OverlayWidget::fileOrigin() const {
@@ -1864,7 +1884,8 @@ bool OverlayWidget::validSharedMedia() const {
 		auto inSameDomain = [](const Key &a, const Key &b) {
 			return (a.type == b.type)
 				&& (a.peerId == b.peerId)
-				&& (a.migratedPeerId == b.migratedPeerId);
+				&& (a.migratedPeerId == b.migratedPeerId)
+				&& (a.scheduled == b.scheduled);
 		};
 		auto countDistanceInData = [&](const Key &a, const Key &b) {
 			return [&](const SharedMediaWithLastSlice &data) {

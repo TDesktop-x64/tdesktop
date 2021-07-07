@@ -313,6 +313,9 @@ HistoryWidget::HistoryWidget(
 	Ui::InputField::Mode::MultiLine,
 	tr::lng_message_ph())
 , _kbScroll(this, st::botKbScroll)
+, _keyboard(_kbScroll->setOwnedWidget(object_ptr<BotKeyboard>(
+	&session(),
+	this)))
 , _membersDropdownShowTimer([=] { showMembersDropdown(); })
 , _scrollTimer([=] { scrollByTimer(); })
 , _saveDraftTimer([=] { saveDraft(); })
@@ -397,10 +400,6 @@ HistoryWidget::HistoryWidget(
 
 	_topBar->hide();
 	_scroll->hide();
-
-	_keyboard = _kbScroll->setOwnedWidget(object_ptr<BotKeyboard>(
-		&session(),
-		this));
 	_kbScroll->hide();
 
 	updateScrollColors();
@@ -587,9 +586,9 @@ HistoryWidget::HistoryWidget(
 	}, lifetime());
 
 	session().data().botCommandsChanges(
-	) | rpl::filter([=](not_null<UserData*> user) {
-		return _peer && (_peer == user || !_peer->isUser());
-	}) | rpl::start_with_next([=](not_null<UserData*> user) {
+	) | rpl::filter([=](not_null<PeerData*> peer) {
+		return _peer && (_peer == peer);
+	}) | rpl::start_with_next([=] {
 		if (_fieldAutocomplete->clearFilteredBotCommands()) {
 			checkFieldAutocomplete();
 		}
@@ -4136,6 +4135,7 @@ void HistoryWidget::toggleKeyboard(bool manual) {
 		}
 	}
 	updateControlsGeometry();
+	updateFieldPlaceholder();
 	if (_botKeyboardHide->isHidden() && canWriteMessage() && !_a_show.animating()) {
 		_tabbedSelectorToggle->show();
 	} else {
@@ -4430,11 +4430,14 @@ void HistoryWidget::updateFieldPlaceholder() {
 		return;
 	}
 
-	_field->setPlaceholder([&] {
+	_field->setPlaceholder([&]() -> rpl::producer<QString> {
 		if (_editMsgId) {
 			return tr::lng_edit_message_text();
 		} else if (!_history) {
 			return tr::lng_message_ph();
+		} else if ((_kbShown || _keyboard->forceReply())
+			&& !_keyboard->placeholder().isEmpty()) {
+			return rpl::single(_keyboard->placeholder());
 		} else if (const auto channel = _history->peer->asChannel()) {
 			if (channel->isBroadcast()) {
 				return session().data().notifySilentPosts(channel)
@@ -5136,7 +5139,9 @@ void HistoryWidget::updateBotKeyboard(History *h, bool force) {
 		changed = _keyboard->updateMarkup(keyboardItem, force);
 	}
 	updateCmdStartShown();
-	if (!changed) return;
+	if (!changed) {
+		return;
+	}
 
 	bool hasMarkup = _keyboard->hasMarkup(), forceReply = _keyboard->forceReply() && (!_replyToId || !_replyEditMsg);
 	if (hasMarkup || forceReply) {
@@ -5201,6 +5206,7 @@ void HistoryWidget::updateBotKeyboard(History *h, bool force) {
 		}
 	}
 	refreshTopBarActiveChat();
+	updateFieldPlaceholder();
 	updateControlsGeometry();
 	update();
 }

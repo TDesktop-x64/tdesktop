@@ -86,6 +86,10 @@ public:
 	void updateTrayMenu() override;
 	void fixOrder() override;
 
+	void showLayer(
+		std::unique_ptr<Ui::LayerWidget> &&layer,
+		Ui::LayerOptions options,
+		anim::type animated);
 	void showSpecialLayer(
 		object_ptr<Ui::LayerWidget> layer,
 		anim::type animated);
@@ -127,6 +131,14 @@ private:
 	void ensureLayerCreated();
 	void destroyLayer();
 
+	void showBoxOrLayer(
+		std::variant<
+			v::null_t,
+			object_ptr<Ui::BoxContent>,
+			std::unique_ptr<Ui::LayerWidget>> &&layer,
+		Ui::LayerOptions options,
+		anim::type animated);
+
 	void themeUpdated(const Window::Theme::BackgroundUpdate &data);
 
 	void toggleDisplayNotifyFromTray();
@@ -148,6 +160,8 @@ private:
 	object_ptr<Window::MediaPreviewWidget> _mediaPreview = { nullptr };
 
 	object_ptr<Window::Theme::WarningWidget> _testingThemeWarning = { nullptr };
+
+	rpl::event_stream<> _updateTrayMenuTextActions;
 
 };
 

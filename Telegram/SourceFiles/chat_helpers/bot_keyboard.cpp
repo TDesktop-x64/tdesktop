@@ -171,11 +171,11 @@ bool BotKeyboard::moderateKeyActivate(int key) {
 						App::sendBotCommand(user, user, qsl("/pattern"));
 					} else if (key == Qt::Key_4) {
 						App::sendBotCommand(user, user, qsl("/abuse"));
-					} else if (key == Qt::Key_0 || key == Qt::Key_E) {
+					} else if (key == Qt::Key_0) {
 						App::sendBotCommand(user, user, qsl("/undo"));
-					} else if (key == Qt::Key_Plus || key == Qt::Key_QuoteLeft) {
+					} else if (key == Qt::Key_7) {
 						App::sendBotCommand(user, user, qsl("/next"));
-					} else if (key == Qt::Key_Period || key == Qt::Key_S) {
+					} else if (key == Qt::Key_8) {
 						App::sendBotCommand(user, user, qsl("/stats"));
 					}
 					return true;
@@ -201,6 +201,7 @@ bool BotKeyboard::updateMarkup(HistoryItem *to, bool force) {
 		if (_wasForMsgId.msg) {
 			_maximizeSize = _singleUse = _forceReply = false;
 			_wasForMsgId = FullMsgId();
+			_placeholder = QString();
 			_impl = nullptr;
 			return true;
 		}
@@ -217,6 +218,12 @@ bool BotKeyboard::updateMarkup(HistoryItem *to, bool force) {
 	_forceReply = markupFlags & MTPDreplyKeyboardMarkup_ClientFlag::f_force_reply;
 	_maximizeSize = !(markupFlags & MTPDreplyKeyboardMarkup::Flag::f_resize);
 	_singleUse = _forceReply || (markupFlags & MTPDreplyKeyboardMarkup::Flag::f_single_use);
+
+	if (const auto markup = to->Get<HistoryMessageReplyMarkup>()) {
+		_placeholder = markup->placeholder;
+	} else {
+		_placeholder = QString();
+	}
 
 	_impl = nullptr;
 	if (auto markup = to->Get<HistoryMessageReplyMarkup>()) {

@@ -496,6 +496,7 @@ object_ptr<Ui::RpWidget> Controller::createPhotoEdit() {
 		_wrap,
 		object_ptr<Ui::UserpicButton>(
 			_wrap,
+			&_navigation->parentController()->window(),
 			_peer,
 			Ui::UserpicButton::Role::ChangePhoto,
 			st::defaultUserpicButton),

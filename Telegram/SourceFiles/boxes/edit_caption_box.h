@@ -29,11 +29,13 @@ class DocumentMedia;
 } // namespace Data
 
 namespace Ui {
+class AbstractButton;
 class InputField;
 class EmojiButton;
 class IconButton;
 class Checkbox;
 enum class AlbumType;
+class AttachControlsWidget;
 } // namespace Ui
 
 namespace Window {
@@ -90,6 +92,7 @@ private:
 	bool fileFromClipboard(not_null<const QMimeData*> data);
 	void updateEditPreview();
 	void updateEditMediaButton();
+	void updateCaptionMaxHeight();
 
 	int errorTopSkip() const;
 
@@ -122,6 +125,7 @@ private:
 	object_ptr<Ui::EmojiButton> _emojiToggle = { nullptr };
 	base::unique_qptr<ChatHelpers::TabbedPanel> _emojiPanel;
 	base::unique_qptr<QObject> _emojiFilter;
+	base::unique_qptr<Ui::AbstractButton> _photoEditorButton;
 
 	int _thumbx = 0;
 	int _thumbw = 0;
@@ -139,13 +143,16 @@ private:
 
 	mtpRequestId _saveRequestId = 0;
 
-	object_ptr<Ui::IconButton> _editMedia = nullptr;
+	object_ptr<Ui::AttachControlsWidget> _editMedia = nullptr;
+	object_ptr<Ui::IconButton> _editFile = nullptr;
 	Ui::SlideWrap<Ui::RpWidget> *_wayWrap = nullptr;
+	Ui::SlideWrap<Ui::RpWidget> *_hintLabel = nullptr;
 	QString _newMediaPath;
 	Ui::AlbumType _albumType = Ui::AlbumType();
 	bool _isAllowedEditMedia = false;
 	bool _asFile = false;
 	rpl::event_stream<> _editMediaClicks;
+	rpl::event_stream<> _photoEditorOpens;
 
 	QString _error;
 

@@ -24,32 +24,6 @@ using UpdateFlag = Data::PeerUpdate::Flag;
 
 } // namespace
 
-BotCommand::BotCommand(
-	const QString &command,
-	const QString &description)
-: command(command)
-, _description(description) {
-}
-
-bool BotCommand::setDescription(const QString &description) {
-	if (_description != description) {
-		_description = description;
-		_descriptionText = Ui::Text::String();
-		return true;
-	}
-	return false;
-}
-
-const Ui::Text::String &BotCommand::descriptionText() const {
-	if (_descriptionText.isEmpty() && !_description.isEmpty()) {
-		_descriptionText.setText(
-			st::defaultTextStyle,
-			_description,
-			Ui::NameTextOptions());
-	}
-	return _descriptionText;
-}
-
 UserData::UserData(not_null<Data::Session*> owner, PeerId id)
 : PeerData(owner, id) {
 }
@@ -132,7 +106,7 @@ void UserData::setBotInfoVersion(int version) {
 		botInfo->version = version;
 		owner().userIsBotChanged(this);
 	} else if (botInfo->version < version) {
-		if (!botInfo->commands.isEmpty()) {
+		if (!botInfo->commands.empty()) {
 			botInfo->commands.clear();
 			owner().botCommandsChanged(this);
 		}
@@ -155,34 +129,9 @@ void UserData::setBotInfo(const MTPBotInfo &info) {
 			botInfo->description = desc;
 			botInfo->text = Ui::Text::String(st::msgMinWidth);
 		}
-
-		auto &v = d.vcommands().v;
-		botInfo->commands.reserve(v.size());
-		auto changedCommands = false;
-		int32 j = 0;
-		for (const auto &command : v) {
-			command.match([&](const MTPDbotCommand &data) {
-				const auto cmd = qs(data.vcommand());
-				const auto desc = qs(data.vdescription());
-				if (botInfo->commands.size() <= j) {
-					botInfo->commands.push_back(BotCommand(cmd, desc));
-					changedCommands = true;
-				} else {
-					if (botInfo->commands[j].command != cmd) {
-						botInfo->commands[j].command = cmd;
-						changedCommands = true;
-					}
-					if (botInfo->commands[j].setDescription(desc)) {
-						changedCommands = true;
-					}
-				}
-				++j;
-			});
-		}
-		while (j < botInfo->commands.size()) {
-			botInfo->commands.pop_back();
-			changedCommands = true;
-		}
+		const auto changedCommands = Data::UpdateBotCommands(
+			botInfo->commands,
+			d.vcommands());
 
 		botInfo->inited = true;
 

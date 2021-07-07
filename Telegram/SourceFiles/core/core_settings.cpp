@@ -113,7 +113,8 @@ QByteArray Settings::serialize() const {
 		+ sizeof(qint64)
 		+ sizeof(qint32) * 2
 		+ Serialize::bytearraySize(windowPosition)
-		+ sizeof(qint32);
+		+ sizeof(qint32)
+		+ Serialize::bytearraySize(_photoEditorBrush);
 	for (const auto &[id, rating] : recentEmojiPreloadData) {
 		size += Serialize::stringSize(id) + sizeof(quint16);
 	}
@@ -123,7 +124,7 @@ QByteArray Settings::serialize() const {
 	}
 	size += sizeof(qint32) * 3
 		+ Serialize::bytearraySize(proxy)
-		+ sizeof(qint32);
+		+ sizeof(qint32) * 2;
 
 	auto result = QByteArray();
 	result.reserve(size);
@@ -211,11 +212,13 @@ QByteArray Settings::serialize() const {
 			stream << id << quint8(variant);
 		}
 		stream
-			<< qint32(_disableOpenGL ? 1 : 0)
+			<< qint32(0) // Old Disable OpenGL
 			<< qint32(_groupCallNoiseSuppression ? 1 : 0)
 			<< qint32(_workMode.current())
 			<< proxy
-			<< qint32(_hiddenGroupCallTooltips.value());
+			<< qint32(_hiddenGroupCallTooltips.value())
+			<< qint32(_disableOpenGL ? 1 : 0)
+			<< _photoEditorBrush;
 	}
 	return result;
 }
@@ -296,6 +299,7 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 	qint32 workMode = static_cast<qint32>(_workMode.current());
 	QByteArray proxy;
 	qint32 hiddenGroupCallTooltips = qint32(_hiddenGroupCallTooltips.value());
+	QByteArray photoEditorBrush = _photoEditorBrush;
 
 	stream >> themesAccentColors;
 	if (!stream.atEnd()) {
@@ -425,7 +429,8 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 		}
 	}
 	if (!stream.atEnd()) {
-		stream >> disableOpenGL;
+		qint32 disableOpenGLOld;
+		stream >> disableOpenGLOld;
 	}
 	if (!stream.atEnd()) {
 		stream >> groupCallNoiseSuppression;
@@ -438,6 +443,12 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 	}
 	if (!stream.atEnd()) {
 		stream >> hiddenGroupCallTooltips;
+	}
+	if (!stream.atEnd()) {
+		stream >> disableOpenGL;
+	}
+	if (!stream.atEnd()) {
+		stream >> photoEditorBrush;
 	}
 	if (stream.status() != QDataStream::Ok) {
 		LOG(("App Error: "
@@ -549,7 +560,7 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 	_disableOpenGL = (disableOpenGL == 1);
 	if (!Platform::IsMac()) {
 		Ui::GL::ForceDisable(_disableOpenGL
-			|| Ui::Integration::Instance().openglLastCheckFailed());
+			|| Ui::GL::LastCrashCheckFailed());
 	}
 	_groupCallNoiseSuppression = (groupCallNoiseSuppression == 1);
 	const auto uncheckedWorkMode = static_cast<WorkMode>(workMode);
@@ -568,6 +579,7 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 				? Tooltip::Microphone
 				: Tooltip(0));
 	}();
+	_photoEditorBrush = photoEditorBrush;
 }
 
 QString Settings::getSoundPath(const QString &key) const {

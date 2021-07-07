@@ -111,13 +111,19 @@ public:
 	void writeRecentStickers();
 	void writeFavedStickers();
 	void writeArchivedStickers();
+	void writeArchivedMasks();
 	void readInstalledStickers();
 	void readFeaturedStickers();
 	void readRecentStickers();
 	void readFavedStickers();
 	void readArchivedStickers();
+	void readArchivedMasks();
 	void writeSavedGifs();
 	void readSavedGifs();
+	void writeInstalledMasks();
+	void writeRecentMasks();
+	void readInstalledMasks();
+	void readRecentMasks();
 
 	void writeRecentHashtagsAndBots();
 	void readRecentHashtagsAndBots();
@@ -248,6 +254,7 @@ private:
 	FileKey _recentStickersKey = 0;
 	FileKey _favedStickersKey = 0;
 	FileKey _archivedStickersKey = 0;
+	FileKey _archivedMasksKey = 0;
 	FileKey _savedGifsKey = 0;
 	FileKey _recentStickersKeyOld = 0;
 	FileKey _legacyBackgroundKeyDay = 0;
@@ -255,6 +262,8 @@ private:
 	FileKey _settingsKey = 0;
 	FileKey _recentHashtagsAndBotsKey = 0;
 	FileKey _exportSettingsKey = 0;
+	FileKey _installedMasksKey = 0;
+	FileKey _recentMasksKey = 0;
 
 	qint64 _cacheTotalSizeLimit = 0;
 	qint64 _cacheBigFileTotalSizeLimit = 0;

@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include <base/unique_qptr.h>
+#include <editor/photo_editor_inner_common.h>
 
 #include <QGraphicsScene>
 
@@ -24,7 +25,7 @@ class NumberedItem;
 
 class Scene final : public QGraphicsScene {
 public:
-	using ItemPtr = std::shared_ptr<QGraphicsItem>;
+	using ItemPtr = std::shared_ptr<NumberedItem>;
 
 	Scene(const QRectF &rect);
 	~Scene();
@@ -32,7 +33,7 @@ public:
 
 	[[nodiscard]] std::vector<ItemPtr> items(
 		Qt::SortOrder order = Qt::DescendingOrder) const;
-	void addItem(std::shared_ptr<NumberedItem> item);
+	void addItem(ItemPtr item);
 	void removeItem(not_null<QGraphicsItem*> item);
 	void removeItem(const ItemPtr &item);
 	[[nodiscard]] rpl::producer<> addsItem() const;
@@ -40,13 +41,30 @@ public:
 
 	[[nodiscard]] std::vector<MTPInputDocument> attachedStickers() const;
 
+	[[nodiscard]] std::shared_ptr<float64> lastZ() const;
+
+	void updateZoom(float64 zoom);
+
 	void cancelDrawing();
+
+	[[nodiscard]] bool hasUndo() const;
+	[[nodiscard]] bool hasRedo() const;
+
+	void performUndo();
+	void performRedo();
+
+	void save(SaveState state);
+	void restore(SaveState state);
+
+	void clearRedoList();
 protected:
 	void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
 	void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override;
 	void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override;
 private:
+	void removeIf(Fn<bool(const ItemPtr &)> proj);
 	const std::shared_ptr<ItemCanvas> _canvas;
+	const std::shared_ptr<float64> _lastZ;
 
 	std::vector<ItemPtr> _items;
 

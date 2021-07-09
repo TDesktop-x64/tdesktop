@@ -999,8 +999,8 @@ void Updates::handleSendActionUpdate(
 			const auto chat = peer->asChat();
 			const auto channel = peer->asChannel();
 			const auto active = chat
-				? (chat->flags() & MTPDchat::Flag::f_call_active)
-				: (channel->flags() & MTPDchannel::Flag::f_call_active);
+				? (chat->flags() & ChatDataFlag::CallActive)
+				: (channel->flags() & ChannelDataFlag::CallActive);
 			if (active) {
 				_pendingSpeakingCallParticipants.emplace(
 					peer).first->second[fromId] = now;
@@ -1817,11 +1817,7 @@ void Updates::feedUpdate(const MTPUpdate &update) {
 		const auto &d = update.c_updatePeerSettings();
 		const auto peerId = peerFromMTP(d.vpeer());
 		if (const auto peer = session().data().peerLoaded(peerId)) {
-			const auto settings = d.vsettings().match([](
-					const MTPDpeerSettings &data) {
-				return data.vflags().v;
-			});
-			peer->setSettings(settings);
+			peer->setSettings(d.vsettings());
 		}
 	} break;
 

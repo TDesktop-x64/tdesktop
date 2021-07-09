@@ -167,8 +167,7 @@ void UserData::madeAction(TimeId when) {
 void UserData::setAccessHash(uint64 accessHash) {
 	if (accessHash == kInaccessibleAccessHashOld) {
 		_accessHash = 0;
-//		_flags.add(MTPDuser_ClientFlag::f_inaccessible | 0);
-		_flags.add(MTPDuser::Flag::f_deleted);
+		_flags.add(Flag::Deleted);
 	} else {
 		_accessHash = accessHash;
 	}
@@ -193,11 +192,7 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 	if (const auto photo = update.vprofile_photo()) {
 		user->owner().processPhoto(*photo);
 	}
-	const auto settings = update.vsettings().match([&](
-			const MTPDpeerSettings &data) {
-		return data.vflags().v;
-	});
-	user->setSettings(settings);
+	user->setSettings(update.vsettings());
 	user->session().api().applyNotifySettings(
 		MTP_inputNotifyPeer(user->input),
 		update.vnotify_settings());
@@ -211,7 +206,16 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 	if (const auto pinned = update.vpinned_msg_id()) {
 		SetTopPinnedMessageId(user, pinned->v);
 	}
-	user->setFullFlags(update.vflags().v);
+	using Flag = UserDataFlag;
+	const auto mask = Flag::Blocked
+		| Flag::HasPhoneCalls
+		| Flag::PhoneCallsPrivate
+		| Flag::CanPinMessages;
+	user->setFlags((user->flags() & ~mask)
+		| (update.is_phone_calls_private() ? Flag::PhoneCallsPrivate : Flag())
+		| (update.is_phone_calls_available() ? Flag::HasPhoneCalls : Flag())
+		| (update.is_can_pin_message() ? Flag::CanPinMessages : Flag())
+		| (update.is_blocked() ? Flag::Blocked : Flag()));
 	user->setIsBlocked(update.is_blocked());
 	user->setCallsStatus(update.is_phone_calls_private()
 		? UserData::CallsStatus::Private

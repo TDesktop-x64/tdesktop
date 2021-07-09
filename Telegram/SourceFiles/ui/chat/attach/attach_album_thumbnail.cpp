@@ -76,7 +76,8 @@ AlbumThumbnail::AlbumThumbnail(
 	const auto filepath = file.path;
 	if (filepath.isEmpty()) {
 		_name = "image.png";
-		_status = u"%1x%2"_q.arg(_fullPreview.width(), _fullPreview.height());
+		_status = FormatImageSizeText(_fullPreview.size()
+			/ _fullPreview.devicePixelRatio());
 	} else {
 		auto fileinfo = QFileInfo(filepath);
 		_name = fileinfo.fileName();

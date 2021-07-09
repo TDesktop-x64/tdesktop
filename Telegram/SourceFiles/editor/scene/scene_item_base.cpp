@@ -26,6 +26,9 @@ const auto kDuplicateSequence = QKeySequence("ctrl+d");
 const auto kFlipSequence = QKeySequence("ctrl+s");
 const auto kDeleteSequence = QKeySequence("delete");
 
+constexpr auto kMinSizeRatio = 0.05;
+constexpr auto kMaxSizeRatio = 1.00;
+
 auto Normalized(float64 angle) {
 	return angle
 		+ ((std::abs(angle) < 360) ? 0 : (-360 * (angle < 0 ? -1 : 1)));
@@ -45,47 +48,48 @@ void NumberedItem::setNumber(int number) {
 	_number = number;
 }
 
-ItemBase::ItemBase(
-	rpl::producer<float64> zoomValue,
-	std::shared_ptr<float64> zPtr,
-	int size,
-	int x,
-	int y)
-: _lastZ(zPtr)
-, _horizontalSize(size)
-, _zoom(std::move(zoomValue)) {
+NumberedItem::Status NumberedItem::status() const {
+	return _status;
+}
+
+bool NumberedItem::isNormalStatus() const {
+	return _status == Status::Normal;
+}
+
+bool NumberedItem::isUndidStatus() const {
+	return _status == Status::Undid;
+}
+
+bool NumberedItem::isRemovedStatus() const {
+	return _status == Status::Removed;
+}
+
+void NumberedItem::save(SaveState state) {
+}
+
+void NumberedItem::restore(SaveState state) {
+}
+
+bool NumberedItem::hasState(SaveState state) const {
+	return false;
+}
+
+void NumberedItem::setStatus(Status status) {
+	if (status != _status) {
+		_status = status;
+		setVisible(status == Status::Normal);
+	}
+}
+
+ItemBase::ItemBase(Data data)
+: _lastZ(data.zPtr)
+, _imageSize(data.imageSize)
+, _horizontalSize(data.size) {
 	setFlags(QGraphicsItem::ItemIsMovable
 		| QGraphicsItem::ItemIsSelectable
 		| QGraphicsItem::ItemIsFocusable);
 	setAcceptHoverEvents(true);
-	setPos(x, y);
-	setZValue((*_lastZ)++);
-
-	const auto &handleSize = st::photoEditorItemHandleSize;
-	_zoom.value(
-	) | rpl::start_with_next([=](float64 zoom) {
-		_scaledHandleSize = handleSize / zoom;
-		_scaledInnerMargins = QMarginsF(
-			_scaledHandleSize,
-			_scaledHandleSize,
-			_scaledHandleSize,
-			_scaledHandleSize) * 0.5;
-		_sizeLimits = {
-			.min = int(st::photoEditorItemMinSize / zoom),
-			.max = int(st::photoEditorItemMaxSize / zoom),
-		};
-		_horizontalSize = std::clamp(
-			_horizontalSize,
-			float64(_sizeLimits.min),
-			float64(_sizeLimits.max));
-
-		updatePens(QPen(
-			QBrush(),
-			1 / zoom,
-			Qt::DashLine,
-			Qt::SquareCap,
-			Qt::RoundJoin));
-	}, _lifetime);
+	applyData(data);
 }
 
 QRectF ItemBase::boundingRect() const {
@@ -237,14 +241,10 @@ void ItemBase::actionDelete() {
 
 void ItemBase::actionDuplicate() {
 	if (const auto s = static_cast<Scene*>(scene())) {
-		const auto newItem = duplicate(
-			_zoom.value(),
-			_lastZ,
-			_horizontalSize,
-			scenePos().x() + _horizontalSize / 3,
-			scenePos().y() + _verticalSize / 3);
-		newItem->setFlip(flipped());
-		newItem->setRotation(rotation());
+		auto data = generateData();
+		data.x += int(_horizontalSize / 3);
+		data.y += int(_verticalSize / 3);
+		const auto newItem = duplicate(std::move(data));
 		if (hasFocus()) {
 			newItem->setFocus();
 		}
@@ -310,8 +310,8 @@ void ItemBase::updateVerticalSize() {
 	const auto verticalSize = _horizontalSize * _aspectRatio;
 	_verticalSize = std::max(
 		verticalSize,
-		float64(st::photoEditorItemMinSize));
-	if (verticalSize < st::photoEditorItemMinSize) {
+		float64(_sizeLimits.min));
+	if (verticalSize < _sizeLimits.min) {
 		_horizontalSize = _verticalSize / _aspectRatio;
 	}
 }
@@ -340,6 +340,39 @@ void ItemBase::setFlip(bool value) {
 	}
 }
 
+int ItemBase::type() const {
+	return ItemBase::Type;
+}
+
+void ItemBase::updateZoom(float64 zoom) {
+	_scaledHandleSize = st::photoEditorItemHandleSize / zoom;
+	_scaledInnerMargins = QMarginsF(
+		_scaledHandleSize,
+		_scaledHandleSize,
+		_scaledHandleSize,
+		_scaledHandleSize) * 0.5;
+
+	const auto maxSide = std::max(
+		_imageSize.width(),
+		_imageSize.height());
+	_sizeLimits = {
+		.min = int(maxSide * kMinSizeRatio),
+		.max = int(maxSide * kMaxSizeRatio),
+	};
+	_horizontalSize = std::clamp(
+		_horizontalSize,
+		float64(_sizeLimits.min),
+		float64(_sizeLimits.max));
+	updateVerticalSize();
+
+	updatePens(QPen(
+		QBrush(),
+		1 / zoom,
+		Qt::DashLine,
+		Qt::SquareCap,
+		Qt::RoundJoin));
+}
+
 void ItemBase::performFlip() {
 }
 
@@ -356,6 +389,56 @@ void ItemBase::updatePens(QPen pen) {
 	_pens.handleInactive.setColor(Qt::gray);
 	_pens.handle.setStyle(Qt::SolidLine);
 	_pens.handleInactive.setStyle(Qt::SolidLine);
+}
+
+ItemBase::Data ItemBase::generateData() const {
+	return {
+		.initialZoom = (st::photoEditorItemHandleSize / _scaledHandleSize),
+		.zPtr = _lastZ,
+		.size = int(_horizontalSize),
+		.x = int(scenePos().x()),
+		.y = int(scenePos().y()),
+		.flipped = flipped(),
+		.rotation = int(rotation()),
+		.imageSize = _imageSize,
+	};
+}
+
+void ItemBase::applyData(const Data &data) {
+	// _lastZ is const.
+	// _imageSize is const.
+	_horizontalSize = data.size;
+	setPos(data.x, data.y);
+	setZValue((*_lastZ)++);
+	setFlip(data.flipped);
+	setRotation(data.rotation);
+	updateZoom(data.initialZoom);
+	update();
+}
+
+void ItemBase::save(SaveState state) {
+	const auto z = zValue();
+	auto &saved = (state == SaveState::Keep) ? _keeped : _saved;
+	saved = {
+		.data = generateData(),
+		.zValue = z,
+		.status = status(),
+	};
+}
+
+void ItemBase::restore(SaveState state) {
+	if (!hasState(state)) {
+		return;
+	}
+	const auto &saved = (state == SaveState::Keep) ? _keeped : _saved;
+	applyData(saved.data);
+	setZValue(saved.zValue);
+	setStatus(saved.status);
+}
+
+bool ItemBase::hasState(SaveState state) const {
+	const auto &saved = (state == SaveState::Keep) ? _keeped : _saved;
+	return saved.zValue;
 }
 
 } // namespace Editor

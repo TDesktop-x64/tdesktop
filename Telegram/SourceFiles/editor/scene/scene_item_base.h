@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "base/unique_qptr.h"
+#include "editor/photo_editor_inner_common.h"
 
 #include <QGraphicsItem>
 
@@ -23,33 +24,64 @@ namespace Editor {
 
 class NumberedItem : public QGraphicsItem {
 public:
+	enum class Status {
+		Normal,
+		Undid,
+		Removed,
+	};
+
 	enum { Type = UserType + 1 };
 	using QGraphicsItem::QGraphicsItem;
 
 	int type() const override;
 	void setNumber(int number);
 	[[nodiscard]] int number() const;
+
+	[[nodiscard]] Status status() const;
+	void setStatus(Status status);
+	[[nodiscard]] bool isNormalStatus() const;
+	[[nodiscard]] bool isUndidStatus() const;
+	[[nodiscard]] bool isRemovedStatus() const;
+
+	virtual void save(SaveState state);
+	virtual void restore(SaveState state);
+	virtual bool hasState(SaveState state) const;
 private:
 	int _number = 0;
+	Status _status = Status::Normal;
 };
 
 class ItemBase : public NumberedItem {
 public:
+	enum { Type = UserType + 2 };
 
-	ItemBase(
-		rpl::producer<float64> zoomValue,
-		std::shared_ptr<float64> zPtr,
-		int size,
-		int x,
-		int y);
+	struct Data {
+		float64 initialZoom = 0.;
+		std::shared_ptr<float64> zPtr;
+		int size = 0;
+		int x = 0;
+		int y = 0;
+		bool flipped = false;
+		int rotation = 0;
+		QSize imageSize;
+	};
+
+	ItemBase(Data data);
 	QRectF boundingRect() const override;
 	void paint(
 		QPainter *p,
 		const QStyleOptionGraphicsItem *option,
 		QWidget *widget) override;
+	int type() const override;
 
 	bool flipped() const;
 	void setFlip(bool value);
+
+	void updateZoom(float64 zoom);
+
+	bool hasState(SaveState state) const override;
+	void save(SaveState state) override;
+	void restore(SaveState state) override;
 protected:
 	enum HandleType {
 		None,
@@ -77,12 +109,7 @@ protected:
 	void setAspectRatio(float64 aspectRatio);
 
 	virtual void performFlip();
-	virtual std::shared_ptr<ItemBase> duplicate(
-		rpl::producer<float64> zoomValue,
-		std::shared_ptr<float64> zPtr,
-		int size,
-		int x,
-		int y) const = 0;
+	virtual std::shared_ptr<ItemBase> duplicate(Data data) const = 0;
 private:
 	HandleType handleType(const QPointF &pos) const;
 	QRectF rightHandleRect() const;
@@ -92,7 +119,11 @@ private:
 	void updatePens(QPen pen);
 	void handleActionKey(not_null<QKeyEvent*> e);
 
+	Data generateData() const;
+	void applyData(const Data &data);
+
 	const std::shared_ptr<float64> _lastZ;
+	const QSize _imageSize;
 
 	struct {
 		QPen select;
@@ -104,8 +135,14 @@ private:
 	base::unique_qptr<Ui::PopupMenu> _menu;
 
 	struct {
-		int min = 0.;
-		int max = 0.;
+		Data data;
+		float64 zValue = 0.;
+		NumberedItem::Status status;
+	} _saved, _keeped;
+
+	struct {
+		int min = 0;
+		int max = 0;
 	} _sizeLimits;
 	float64 _scaledHandleSize = 1.0;
 	QMarginsF _scaledInnerMargins;
@@ -116,9 +153,6 @@ private:
 	HandleType _handle = HandleType::None;
 
 	bool _flipped = false;
-
-	rpl::variable<float64> _zoom;
-	rpl::lifetime _lifetime;
 
 };
 

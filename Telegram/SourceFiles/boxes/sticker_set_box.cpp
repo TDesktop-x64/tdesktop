@@ -51,6 +51,7 @@ constexpr auto kStickersPanelPerRow = 5;
 using Data::StickersSet;
 using Data::StickersPack;
 using Data::StickersByEmojiMap;
+using SetFlag = Data::StickersSetFlag;
 
 } // namespace
 
@@ -59,7 +60,7 @@ public:
 	Inner(
 		QWidget *parent,
 		not_null<Window::SessionController*> controller,
-		const MTPInputStickerSet &set);
+		const StickerSetIdentifier &set);
 
 	bool loaded() const;
 	bool notInstalled() const;
@@ -77,7 +78,7 @@ public:
 	void archiveStickers();
 
 	bool isMasksSet() const {
-		return (_setFlags & MTPDstickerSet::Flag::f_masks);
+		return (_setFlags & SetFlag::Masks);
 	}
 
 	~Inner();
@@ -128,13 +129,13 @@ private:
 	QString _setTitle, _setShortName;
 	int _setCount = 0;
 	int32 _setHash = 0;
-	MTPDstickerSet::Flags _setFlags = 0;
+	Data::StickersSetFlags _setFlags;
 	TimeId _setInstallDate = TimeId(0);
 	ImageWithLocation _setThumbnail;
 
 	const std::unique_ptr<Ui::PathShiftGradient> _pathGradient;
 
-	MTPInputStickerSet _input;
+	StickerSetIdentifier _input;
 
 	mtpRequestId _installRequest = 0;
 
@@ -153,7 +154,7 @@ private:
 StickerSetBox::StickerSetBox(
 	QWidget*,
 	not_null<Window::SessionController*> controller,
-	const MTPInputStickerSet &set)
+	const StickerSetIdentifier &set)
 : _controller(controller)
 , _set(set) {
 }
@@ -162,7 +163,7 @@ QPointer<Ui::BoxContent> StickerSetBox::Show(
 		not_null<Window::SessionController*> controller,
 		not_null<DocumentData*> document) {
 	if (const auto sticker = document->sticker()) {
-		if (sticker->set.type() != mtpc_inputStickerSetEmpty) {
+		if (sticker->set) {
 			return controller->show(
 				Box<StickerSetBox>(controller, sticker->set),
 				Ui::LayerOption::KeepOther).data();
@@ -344,28 +345,21 @@ void StickerSetBox::resizeEvent(QResizeEvent *e) {
 StickerSetBox::Inner::Inner(
 	QWidget *parent,
 	not_null<Window::SessionController*> controller,
-	const MTPInputStickerSet &set)
+	const StickerSetIdentifier &set)
 : RpWidget(parent)
 , _controller(controller)
 , _api(&_controller->session().mtp())
+, _setId(set.id)
+, _setAccess(set.accessHash)
+, _setShortName(set.shortName)
 , _pathGradient(std::make_unique<Ui::PathShiftGradient>(
 	st::windowBgRipple,
 	st::windowBgOver,
 	[=] { update(); }))
 , _input(set)
 , _previewTimer([=] { showPreview(); }) {
-	set.match([&](const MTPDinputStickerSetID &data) {
-		_setId = data.vid().v;
-		_setAccess = data.vaccess_hash().v;
-	}, [&](const MTPDinputStickerSetShortName &data) {
-		_setShortName = qs(data.vshort_name());
-	}, [](const MTPDinputStickerSetEmpty &) {
-	}, [](const MTPDinputStickerSetAnimatedEmoji &) {
-	}, [](const MTPDinputStickerSetDice &) {
-	});
-
 	_api.request(MTPmessages_GetStickerSet(
-		_input
+		Data::InputStickerSet(_input)
 	)).done([=](const MTPmessages_StickerSet &result) {
 		gotSet(result);
 	}).fail([=](const MTP::Error &error) {
@@ -428,7 +422,7 @@ void StickerSetBox::Inner::gotSet(const MTPmessages_StickerSet &set) {
 			_setAccess = set.vaccess_hash().v;
 			_setCount = set.vcount().v;
 			_setHash = set.vhash().v;
-			_setFlags = set.vflags().v;
+			_setFlags = Data::ParseStickersSetFlags(set);
 			_setInstallDate = set.vinstalled_date().value_or(0);
 			_setThumbnail = [&] {
 				if (const auto thumbs = set.vthumbs()) {
@@ -448,12 +442,11 @@ void StickerSetBox::Inner::gotSet(const MTPmessages_StickerSet &set) {
 			const auto it = sets.find(_setId);
 			if (it != sets.cend()) {
 				const auto set = it->second.get();
-				using ClientFlag = MTPDstickerSet_ClientFlag;
 				const auto clientFlags = set->flags
-					& (ClientFlag::f_featured
-						| ClientFlag::f_not_loaded
-						| ClientFlag::f_unread
-						| ClientFlag::f_special);
+					& (SetFlag::Featured
+						| SetFlag::NotLoaded
+						| SetFlag::Unread
+						| SetFlag::Special);
 				_setFlags |= clientFlags;
 				set->flags = _setFlags;
 				set->installDate = _setInstallDate;
@@ -499,7 +492,7 @@ void StickerSetBox::Inner::installDone(
 	auto &sets = stickers.setsRef();
 	const auto isMasks = isMasksSet();
 
-	const bool wasArchived = (_setFlags & MTPDstickerSet::Flag::f_archived);
+	const bool wasArchived = (_setFlags & SetFlag::Archived);
 	if (wasArchived) {
 		const auto index = (isMasks
 			? stickers.archivedMaskSetsOrderRef()
@@ -511,8 +504,8 @@ void StickerSetBox::Inner::installDone(
 		}
 	}
 	_setInstallDate = base::unixtime::now();
-	_setFlags &= ~MTPDstickerSet::Flag::f_archived;
-	_setFlags |= MTPDstickerSet::Flag::f_installed_date;
+	_setFlags &= ~SetFlag::Archived;
+	_setFlags |= SetFlag::Installed;
 	auto it = sets.find(_setId);
 	if (it == sets.cend()) {
 		it = sets.emplace(
@@ -850,8 +843,8 @@ bool StickerSetBox::Inner::notInstalled() const {
 	const auto &sets = _controller->session().data().stickers().sets();
 	const auto it = sets.find(_setId);
 	if ((it == sets.cend())
-		|| !(it->second->flags & MTPDstickerSet::Flag::f_installed_date)
-		|| (it->second->flags & MTPDstickerSet::Flag::f_archived)) {
+		|| !(it->second->flags & SetFlag::Installed)
+		|| (it->second->flags & SetFlag::Archived)) {
 		return !_pack.empty();
 	}
 	return false;
@@ -881,7 +874,7 @@ void StickerSetBox::Inner::install() {
 		return;
 	}
 	_installRequest = _api.request(MTPmessages_InstallStickerSet(
-		_input,
+		Data::InputStickerSet(_input),
 		MTP_bool(false)
 	)).done([=](const MTPmessages_StickerSetInstallResult &result) {
 		installDone(result);
@@ -892,7 +885,7 @@ void StickerSetBox::Inner::install() {
 
 void StickerSetBox::Inner::archiveStickers() {
 	_api.request(MTPmessages_InstallStickerSet(
-		_input,
+		Data::InputStickerSet(_input),
 		MTP_boolTrue()
 	)).done([=](const MTPmessages_StickerSetInstallResult &result) {
 		if (result.type() == mtpc_messages_stickerSetInstallResultSuccess) {

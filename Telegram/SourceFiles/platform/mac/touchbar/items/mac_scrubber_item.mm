@@ -179,7 +179,7 @@ bool CanWriteToActiveChat(not_null<Window::Controller*> controller) {
 std::optional<QString> RestrictionToSendStickers(not_null<PeerData*> peer) {
 	return Data::RestrictionError(
 		peer,
-		ChatRestriction::f_send_stickers);
+		ChatRestriction::SendStickers);
 }
 
 std::optional<QString> RestrictionToSendStickers(
@@ -206,10 +206,10 @@ void AppendStickerSet(
 		return;
 	}
 	const auto set = it->second.get();
-	if (set->flags & MTPDstickerSet::Flag::f_archived) {
+	if (set->flags & Data::StickersSetFlag::Archived) {
 		return;
 	}
-	if (!(set->flags & MTPDstickerSet::Flag::f_installed_date)) {
+	if (!(set->flags & Data::StickersSetFlag::Installed)) {
 		return;
 	}
 

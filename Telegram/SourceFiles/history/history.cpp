@@ -980,7 +980,7 @@ void History::applyServiceChanges(
 		}
 	}, [&](const MTPDmessageActionChatMigrateTo &data) {
 		if (const auto chat = peer->asChat()) {
-			chat->addFlags(MTPDchat::Flag::f_deactivated);
+			chat->addFlags(ChatDataFlag::Deactivated);
 			if (const auto channel = owner().channelLoaded(
 					data.vchannel_id().v)) {
 				Data::ApplyMigration(chat, channel);
@@ -988,7 +988,7 @@ void History::applyServiceChanges(
 		}
 	}, [&](const MTPDmessageActionChannelMigrateFrom &data) {
 		if (const auto channel = peer->asChannel()) {
-			channel->addFlags(MTPDchannel::Flag::f_megagroup);
+			channel->addFlags(ChannelDataFlag::Megagroup);
 			if (const auto chat = owner().chatLoaded(data.vchat_id().v)) {
 				Data::ApplyMigration(chat, channel);
 			}
@@ -2568,7 +2568,7 @@ bool History::clearUnreadOnClientSide() const {
 		return false;
 	}
 	if (const auto user = peer->asUser()) {
-		if (user->flags() & MTPDuser::Flag::f_deleted) {
+		if (user->isInaccessible()) {
 			return true;
 		}
 	}

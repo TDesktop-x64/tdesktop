@@ -1224,9 +1224,7 @@ void ApiWrap::requestPeerSettings(not_null<PeerData*> peer) {
 	request(MTPmessages_GetPeerSettings(
 		peer->input
 	)).done([=](const MTPPeerSettings &result) {
-		peer->setSettings(result.match([&](const MTPDpeerSettings &data) {
-			return data.vflags().v;
-		}));
+		peer->setSettings(result);
 		_requestedPeerSettings.erase(peer);
 	}).fail([=](const MTP::Error &error) {
 		_requestedPeerSettings.erase(peer);
@@ -1526,7 +1524,6 @@ void ApiWrap::applyLastParticipantsList(
 		| MegagroupInfo::LastParticipantsOnceReceived;
 
 	auto botStatus = channel->mgInfo->botStatus;
-	const auto emptyAdminRights = MTP_chatAdminRights(MTP_flags(0));
 	for (const auto &p : list) {
 		const auto participantId = p.match([](
 				const MTPDchannelParticipantBanned &data) {
@@ -1547,13 +1544,14 @@ void ApiWrap::applyLastParticipantsList(
 			? channel->amCreator()
 			: false;
 		const auto adminRights = (p.type() == mtpc_channelParticipantAdmin)
-			? p.c_channelParticipantAdmin().vadmin_rights()
+			? ChatAdminRightsInfo(p.c_channelParticipantAdmin().vadmin_rights())
 			: (p.type() == mtpc_channelParticipantCreator)
-			? p.c_channelParticipantCreator().vadmin_rights()
-			: emptyAdminRights;
+			? ChatAdminRightsInfo(p.c_channelParticipantCreator().vadmin_rights())
+			: ChatAdminRightsInfo();
 		const auto restrictedRights = (p.type() == mtpc_channelParticipantBanned)
-			? p.c_channelParticipantBanned().vbanned_rights()
-			: ChannelData::EmptyRestrictedRights(participant);
+			? ChatRestrictionsInfo(
+				p.c_channelParticipantBanned().vbanned_rights())
+			: ChatRestrictionsInfo();
 		if (p.type() == mtpc_channelParticipantCreator) {
 			Assert(user != nullptr);
 			const auto &creator = p.c_channelParticipantCreator();
@@ -1569,11 +1567,11 @@ void ApiWrap::applyLastParticipantsList(
 		if (user
 			&& !base::contains(channel->mgInfo->lastParticipants, user)) {
 			channel->mgInfo->lastParticipants.push_back(user);
-			if (adminRights.c_chatAdminRights().vflags().v) {
+			if (adminRights.flags) {
 				channel->mgInfo->lastAdmins.emplace(
 					user,
 					MegagroupInfo::Admin{ adminRights, adminCanEdit });
-			} else if (Data::ChatBannedRightsFlags(restrictedRights) != 0) {
+			} else if (restrictedRights.flags) {
 				channel->mgInfo->lastRestricted.emplace(
 					user,
 					MegagroupInfo::Restricted{ restrictedRights });
@@ -1731,7 +1729,7 @@ void ApiWrap::kickParticipant(
 void ApiWrap::kickParticipant(
 		not_null<ChannelData*> channel,
 		not_null<PeerData*> participant,
-		const MTPChatBannedRights &currentRights) {
+		ChatRestrictionsInfo currentRights) {
 	const auto kick = KickRequest(channel, participant);
 	if (_kickRequests.contains(kick)) return;
 
@@ -1739,7 +1737,10 @@ void ApiWrap::kickParticipant(
 	const auto requestId = request(MTPchannels_EditBanned(
 		channel->inputChannel,
 		participant->input,
-		rights
+		MTP_chatBannedRights(
+			MTP_flags(
+				MTPDchatBannedRights::Flags::from_raw(uint32(rights.flags))),
+			MTP_int(rights.until))
 	)).done([=](const MTPUpdates &result) {
 		applyUpdates(result);
 
@@ -1763,7 +1764,7 @@ void ApiWrap::unblockParticipant(
 	const auto requestId = request(MTPchannels_EditBanned(
 		channel->inputChannel,
 		participant->input,
-		ChannelData::EmptyRestrictedRights(participant)
+		MTP_chatBannedRights(MTP_flags(0), MTP_int(0))
 	)).done([=](const MTPUpdates &result) {
 		applyUpdates(result);
 
@@ -1945,9 +1946,7 @@ void ApiWrap::saveStickerSets(
 		? _session->data().stickers().maskSetsOrderRef()
 		: _session->data().stickers().setsOrderRef();
 
-	using Flag = MTPDstickerSet::Flag;
-	using ClientFlag = MTPDstickerSet_ClientFlag;
-
+	using Flag = Data::StickersSetFlag;
 	for (const auto removedSetId : localRemoved) {
 		if ((removedSetId == Data::Stickers::CloudRecentSetId)
 			|| (removedSetId == Data::Stickers::CloudRecentAttachedSetId)) {
@@ -1999,10 +1998,10 @@ void ApiWrap::saveStickerSets(
 					++i;
 				}
 			}
-			const auto archived = !!(set->flags & Flag::f_archived);
+			const auto archived = !!(set->flags & Flag::Archived);
 			if (!archived) {
-				const auto featured = !!(set->flags & ClientFlag::f_featured);
-				const auto special = !!(set->flags & ClientFlag::f_special);
+				const auto featured = !!(set->flags & Flag::Featured);
+				const auto special = !!(set->flags & Flag::Special);
 				const auto setId = set->mtpInput();
 
 				auto requestId = request(MTPmessages_UninstallStickerSet(
@@ -2025,8 +2024,7 @@ void ApiWrap::saveStickerSets(
 					if (archived) {
 						writeArchived = true;
 					}
-					set->flags &= ~(Flag::f_installed_date
-						| Flag::f_archived);
+					set->flags &= ~(Flag::Installed | Flag::Archived);
 					set->installDate = TimeId(0);
 				}
 			}
@@ -2035,10 +2033,10 @@ void ApiWrap::saveStickerSets(
 
 	// Clear all installed flags, set only for sets from order.
 	for (auto &[id, set] : sets) {
-		const auto archived = !!(set->flags & Flag::f_archived);
-		const auto masks = !!(set->flags & MTPDstickerSet::Flag::f_masks);
+		const auto archived = !!(set->flags & Flag::Archived);
+		const auto masks = !!(set->flags & Flag::Masks);
 		if (!archived && (setsMasks == masks)) {
-			set->flags &= ~Flag::f_installed_date;
+			set->flags &= ~Flag::Installed;
 		}
 	}
 
@@ -2049,7 +2047,7 @@ void ApiWrap::saveStickerSets(
 			continue;
 		}
 		const auto set = it->second.get();
-		const auto archived = !!(set->flags & Flag::f_archived);
+		const auto archived = !!(set->flags & Flag::Archived);
 		if (archived && !localRemoved.contains(set->id)) {
 			const auto mtpSetId = set->mtpInput();
 
@@ -2068,11 +2066,11 @@ void ApiWrap::saveStickerSets(
 
 			setDisenableRequests.insert(requestId);
 
-			set->flags &= ~Flag::f_archived;
+			set->flags &= ~Flag::Archived;
 			writeArchived = true;
 		}
 		orderRef.push_back(setId);
-		set->flags |= Flag::f_installed_date;
+		set->flags |= Flag::Installed;
 		if (!set->installDate) {
 			set->installDate = base::unixtime::now();
 		}
@@ -2080,10 +2078,10 @@ void ApiWrap::saveStickerSets(
 
 	for (auto it = sets.begin(); it != sets.cend();) {
 		const auto set = it->second.get();
-		if ((set->flags & ClientFlag::f_featured)
-			|| (set->flags & Flag::f_installed_date)
-			|| (set->flags & Flag::f_archived)
-			|| (set->flags & ClientFlag::f_special)) {
+		if ((set->flags & Flag::Featured)
+			|| (set->flags & Flag::Installed)
+			|| (set->flags & Flag::Archived)
+			|| (set->flags & Flag::Special)) {
 			++it;
 		} else {
 			it = sets.erase(it);
@@ -3027,11 +3025,16 @@ void ApiWrap::requestRecentStickersForce(bool attached) {
 	requestRecentStickersWithHash(0, attached);
 }
 
-void ApiWrap::setGroupStickerSet(not_null<ChannelData*> megagroup, const MTPInputStickerSet &set) {
+void ApiWrap::setGroupStickerSet(
+		not_null<ChannelData*> megagroup,
+		const StickerSetIdentifier &set) {
 	Expects(megagroup->mgInfo != nullptr);
 
 	megagroup->mgInfo->stickerSet = set;
-	request(MTPchannels_SetStickers(megagroup->inputChannel, set)).send();
+	request(MTPchannels_SetStickers(
+		megagroup->inputChannel,
+		Data::InputStickerSet(set)
+	)).send();
 	_session->data().stickers().notifyUpdated();
 }
 
@@ -3297,7 +3300,7 @@ void ApiWrap::readFeaturedSets() {
 	for (const auto setId : _featuredSetsRead) {
 		const auto it = sets.find(setId);
 		if (it != sets.cend()) {
-			it->second->flags &= ~MTPDstickerSet_ClientFlag::f_unread;
+			it->second->flags &= ~Data::StickersSetFlag::Unread;
 			wrappedIds.append(MTP_long(setId));
 			if (count) {
 				--count;

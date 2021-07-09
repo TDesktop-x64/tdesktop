@@ -19,6 +19,10 @@ public:
 		QPainter *p,
 		const QStyleOptionGraphicsItem *option,
 		QWidget *widget) override;
+
+	bool hasState(SaveState state) const override;
+	void save(SaveState state) override;
+	void restore(SaveState state) override;
 protected:
 	bool collidesWithItem(
 		const QGraphicsItem *,
@@ -29,6 +33,11 @@ protected:
 private:
 	const QPixmap _pixmap;
 	const QRectF _rect;
+
+	struct {
+		bool saved = false;
+		NumberedItem::Status status;
+	} _saved, _keeped;
 
 };
 

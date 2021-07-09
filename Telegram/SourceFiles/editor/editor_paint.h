@@ -10,6 +10,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/rp_widget.h"
 
 #include "editor/photo_editor_common.h"
+#include "editor/photo_editor_inner_common.h"
+#include "editor/scene/scene_item_base.h"
 
 class QGraphicsItem;
 class QGraphicsView;
@@ -17,7 +19,6 @@ class QGraphicsView;
 namespace Editor {
 
 struct Controllers;
-class ItemBase;
 class Scene;
 
 // Paint control.
@@ -30,6 +31,7 @@ public:
 		std::shared_ptr<Controllers> controllers);
 
 	[[nodiscard]] std::shared_ptr<Scene> saveScene() const;
+	void restoreScene();
 
 	void applyTransform(QRect geometry, int angle, bool flipped);
 	void applyBrush(const Brush &brush);
@@ -45,15 +47,11 @@ private:
 		bool undid = false;
 	};
 
-	bool hasUndo() const;
-	bool hasRedo() const;
+	ItemBase::Data itemBaseData() const;
+
 	void clearRedoList();
 
-	bool isItemToRemove(const std::shared_ptr<QGraphicsItem> &item) const;
-	bool isItemHidden(const std::shared_ptr<QGraphicsItem> &item) const;
-
 	const std::shared_ptr<Controllers> _controllers;
-	const std::shared_ptr<float64> _lastZ;
 	const std::shared_ptr<Scene> _scene;
 	const base::unique_qptr<QGraphicsView> _view;
 	const QSize _imageSize;
@@ -61,11 +59,8 @@ private:
 	struct {
 		int angle = 0;
 		bool flipped = false;
-		rpl::variable<float64> zoom = 0.;
+		float64 zoom = 0.;
 	} _transform;
-
-	std::vector<SavedItem> _previousItems;
-	std::vector<std::shared_ptr<QGraphicsItem>> _itemsToRemove;
 
 	rpl::variable<bool> _hasUndo = true;
 	rpl::variable<bool> _hasRedo = true;

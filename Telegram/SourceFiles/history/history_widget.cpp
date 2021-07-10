@@ -3490,7 +3490,7 @@ bool HistoryWidget::hasDiscussionGroup() const {
 	const auto channel = _peer ? _peer->asChannel() : nullptr;
 	return channel
 		&& channel->isBroadcast()
-		&& (channel->flags() & MTPDchannel::Flag::f_has_link);
+		&& (channel->flags() & ChannelDataFlag::HasLink);
 }
 
 void HistoryWidget::reportSelectedMessages() {

@@ -1385,7 +1385,7 @@ void InnerWidget::suggestRestrictUser(not_null<UserData*> user) {
 
 	_menu->addAction(tr::lng_context_remove_from_group(tr::now), [=] {
 		const auto text = tr::lng_profile_sure_kick(tr::now, lt_user, user->firstName);
-		auto editRestrictions = [=](bool hasAdminRights, const MTPChatBannedRights &currentRights) {
+		auto editRestrictions = [=](bool hasAdminRights, ChatRestrictionsInfo currentRights) {
 			auto weak = QPointer<InnerWidget>(this);
 			auto weakBox = std::make_shared<QPointer<ConfirmBox>>();
 			auto box = Box<ConfirmBox>(
@@ -1404,7 +1404,7 @@ void InnerWidget::suggestRestrictUser(not_null<UserData*> user) {
 				Ui::LayerOption::KeepOther);
 		};
 		if (base::contains(_admins, user)) {
-			editRestrictions(true, MTP_chatBannedRights(MTP_flags(0), MTP_int(0)));
+			editRestrictions(true, ChatRestrictionsInfo());
 		} else {
 			_api.request(MTPchannels_GetParticipant(
 				_channel->inputChannel,
@@ -1417,20 +1417,14 @@ void InnerWidget::suggestRestrictUser(not_null<UserData*> user) {
 				auto type = participant.vparticipant().type();
 				if (type == mtpc_channelParticipantBanned) {
 					auto &banned = participant.vparticipant().c_channelParticipantBanned();
-					editRestrictions(false, banned.vbanned_rights());
+					editRestrictions(false, ChatRestrictionsInfo(banned.vbanned_rights()));
 				} else {
 					auto hasAdminRights = (type == mtpc_channelParticipantAdmin)
-						|| (type == mtpc_channelParticipantCreator);
-					auto bannedRights = MTP_chatBannedRights(
-						MTP_flags(0),
-						MTP_int(0));
-					editRestrictions(hasAdminRights, bannedRights);
+										  || (type == mtpc_channelParticipantCreator);
+					editRestrictions(hasAdminRights, ChatRestrictionsInfo());
 				}
 			}).fail([=](const MTP::Error &error) {
-				auto bannedRights = MTP_chatBannedRights(
-					MTP_flags(0),
-					MTP_int(0));
-				editRestrictions(false, bannedRights);
+				editRestrictions(false, ChatRestrictionsInfo());
 			}).send();
 		}
 	});

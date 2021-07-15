@@ -292,7 +292,7 @@ ChatRestrictions FixDependentRestrictions(ChatRestrictions restrictions) {
 
 	// Apply the strictest.
 	const auto fixOne = [&] {
-		for (const auto [first, second] : dependencies) {
+		for (const auto &[first, second] : dependencies) {
 			if ((restrictions & second) && !(restrictions & first)) {
 				restrictions |= first;
 				return true;
@@ -533,7 +533,7 @@ Fn<int()> EditPeerPermissionsBox::addSlowmodeSlider(
 		return has ? aboutInterval : about;
 	});
 
-	const auto about = container->add(
+	container->add(
 		object_ptr<Ui::DividerLabel>(
 			container,
 			object_ptr<Ui::FlatLabel>(

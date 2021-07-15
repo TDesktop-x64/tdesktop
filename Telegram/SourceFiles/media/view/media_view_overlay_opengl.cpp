@@ -282,8 +282,8 @@ void OverlayWidget::RendererGL::paintTransformedStaticContent(
 			const auto stride = 2;
 			const uint32_t data[4] = { 0 };
 			uploadTexture(
-				GL_RGBA,
-				GL_RGBA,
+				Ui::GL::kFormatRGBA,
+				Ui::GL::kFormatRGBA,
 				QSize(2, 2),
 				_rgbaSize,
 				stride,
@@ -292,8 +292,8 @@ void OverlayWidget::RendererGL::paintTransformedStaticContent(
 			const auto stride = image.bytesPerLine() / 4;
 			const auto data = image.constBits();
 			uploadTexture(
-				GL_RGBA,
-				GL_RGBA,
+				Ui::GL::kFormatRGBA,
+				Ui::GL::kFormatRGBA,
 				image.size(),
 				_rgbaSize,
 				stride,
@@ -512,7 +512,7 @@ void OverlayWidget::RendererGL::validateControls() {
 	};
 	auto maxWidth = 0;
 	auto fullHeight = 0;
-	for (const auto meta : metas) {
+	for (const auto &meta : metas) {
 		maxWidth = std::max(meta.icon->width(), maxWidth);
 		fullHeight += meta.icon->height();
 	}
@@ -525,7 +525,7 @@ void OverlayWidget::RendererGL::validateControls() {
 		auto p = QPainter(&image);
 		auto index = 0;
 		auto height = 0;
-		for (const auto meta : metas) {
+		for (const auto &meta : metas) {
 			meta.icon->paint(p, 0, height, maxWidth);
 			_controlsTextures[index++] = QRect(
 				QPoint(0, height) * _factor,

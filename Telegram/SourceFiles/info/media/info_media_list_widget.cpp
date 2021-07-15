@@ -19,7 +19,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "history/view/history_view_cursor_state.h"
 #include "history/view/history_view_service_message.h"
-#include "window/themes/window_theme.h"
 #include "window/window_session_controller.h"
 #include "window/window_peer_menu.h"
 #include "ui/widgets/popup_menu.h"
@@ -404,7 +403,6 @@ void ListWidget::Section::paint(
 		const Context &context,
 		QRect clip,
 		int outerWidth) const {
-	auto baseIndex = 0;
 	auto header = headerHeight();
 	if (QRect(0, 0, outerWidth, header).intersects(clip)) {
 		p.setPen(st::infoMediaHeaderFg);
@@ -415,17 +413,6 @@ void ListWidget::Section::paint(
 			outerWidth - 2 * st::infoMediaHeaderPosition.x(),
 			outerWidth);
 	}
-	auto top = header + _itemsTop;
-	auto fromcol = floorclamp(
-		clip.x() - _itemsLeft,
-		_itemWidth,
-		0,
-		_itemsInRow);
-	auto tillcol = ceilclamp(
-		clip.x() + clip.width() - _itemsLeft,
-		_itemWidth,
-		0,
-		_itemsInRow);
 	auto localContext = context.layoutContext;
 	localContext.isAfterDate = (header > 0);
 
@@ -644,12 +631,9 @@ Main::Session &ListWidget::session() const {
 
 void ListWidget::start() {
 	_controller->setSearchEnabledByContent(false);
-	ObservableViewer(
-		*Window::Theme::Background()
-	) | rpl::start_with_next([this](const auto &update) {
-		if (update.paletteChanged()) {
-			invalidatePaletteCache();
-		}
+	style::PaletteChanged(
+	) | rpl::start_with_next([=] {
+		invalidatePaletteCache();
 	}, lifetime());
 
 	session().downloaderTaskFinished(
@@ -724,7 +708,6 @@ void ListWidget::itemRemoved(not_null<const HistoryItem*> item) {
 	auto sectionIt = findSectionByItem(id);
 	if (sectionIt != _sections.end()) {
 		if (sectionIt->removeItem(id)) {
-			auto top = sectionIt->top();
 			if (sectionIt->empty()) {
 				_sections.erase(sectionIt);
 			}
@@ -1863,7 +1846,6 @@ void ListWidget::mouseActionUpdate(const QPoint &globalPosition) {
 		point - geometry.topLeft(),
 		inside
 	};
-	auto item = layout ? layout->getItem() : nullptr;
 	if (_overLayout != layout) {
 		repaintItem(_overLayout);
 		_overLayout = layout;
@@ -1983,7 +1965,6 @@ void ListWidget::updateDragSelection() {
 	}
 	for (auto &layoutItem : _layouts) {
 		auto &&universalId = layoutItem.first;
-		auto &&layout = layoutItem.second;
 		if (universalId <= fromId && universalId > tillId) {
 			changeItemSelection(
 				_dragSelected,

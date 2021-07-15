@@ -34,7 +34,7 @@ Open **x64 Native Tools Command Prompt for VS 2019.bat**, go to ***BuildPath*** 
     cd ThirdParty
     git clone https://github.com/desktop-app/patches.git
     cd patches
-    git checkout 505bd20
+    git checkout 4409bae
     cd ../
     git clone https://chromium.googlesource.com/external/gyp
     cd gyp
@@ -65,7 +65,7 @@ Open **x64 Native Tools Command Prompt for VS 2019.bat**, go to ***BuildPath*** 
 
     git clone https://github.com/desktop-app/patches.git
     cd patches
-    git checkout 505bd20
+    git checkout 4409bae
     cd ..
 
     git clone https://github.com/desktop-app/lzma.git
@@ -110,9 +110,9 @@ Open **x64 Native Tools Command Prompt for VS 2019.bat**, go to ***BuildPath*** 
     cmake --build . --config Release
     cd ..
 
-    git clone https://github.com/kcat/openal-soft.git
+    git clone https://github.com/telegramdesktop/openal-soft.git
     cd openal-soft
-    git checkout openal-soft-1.21.0
+    git checkout wasapi_exact_device_time
     cd build
     cmake .. ^
         -G "Visual Studio 16 2019" ^

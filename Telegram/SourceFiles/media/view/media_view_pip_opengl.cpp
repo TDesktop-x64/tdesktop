@@ -356,8 +356,8 @@ void Pip::RendererGL::paintTransformedStaticContent(
 		const auto stride = image.bytesPerLine() / 4;
 		const auto data = image.constBits();
 		uploadTexture(
-			GL_RGBA,
-			GL_RGBA,
+			Ui::GL::kFormatRGBA,
+			Ui::GL::kFormatRGBA,
 			image.size(),
 			_rgbaSize,
 			stride,
@@ -636,7 +636,7 @@ void Pip::RendererGL::validateControls() {
 	};
 	auto maxWidth = 0;
 	auto fullHeight = 0;
-	for (const auto meta : metas) {
+	for (const auto &meta : metas) {
 		Assert(meta.icon->size() == meta.iconOver->size());
 		maxWidth = std::max(meta.icon->width(), maxWidth);
 		fullHeight += 2 * meta.icon->height();
@@ -657,7 +657,7 @@ void Pip::RendererGL::validateControls() {
 				icon->size() * _factor);
 			height += icon->height();
 		};
-		for (const auto meta : metas) {
+		for (const auto &meta : metas) {
 			paint(meta.icon);
 			paint(meta.iconOver);
 		}

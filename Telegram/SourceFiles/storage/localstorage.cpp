@@ -63,7 +63,6 @@ using Database = Storage::Cache::Database;
 
 QString _basePath, _userBasePath, _userDbPath;
 
-bool _started = false;
 TaskQueue *_localLoader = nullptr;
 
 QByteArray _settingsSalt;
@@ -87,7 +86,6 @@ bool _useGlobalBackgroundKeys = false;
 bool _backgroundCanWrite = true;
 
 int32 _oldSettingsVersion = 0;
-bool _settingsRewritten = false;
 bool _settingsRewriteNeeded = false;
 bool _settingsWriteAllowed = false;
 
@@ -96,10 +94,6 @@ enum class WriteMapWhen {
 	Fast,
 	Soon,
 };
-
-bool _working() {
-	return !_basePath.isEmpty();
-}
 
 bool CheckStreamStatus(QDataStream &stream) {
 	if (stream.status() != QDataStream::Ok) {

@@ -424,8 +424,7 @@ BackgroundRow::BackgroundRow(
 	});
 
 	using Update = const Window::Theme::BackgroundUpdate;
-	base::ObservableViewer(
-		*Window::Theme::Background()
+	Window::Theme::Background()->updates(
 	) | rpl::filter([](const Update &update) {
 		return (update.type == Update::Type::New
 			|| update.type == Update::Type::Start
@@ -776,8 +775,6 @@ void SetupMessages(
 				st::settingsSendType),
 			st::settingsSendTypePadding);
 	};
-	const auto small = st::settingsSendTypePadding;
-	const auto top = skip;
 	add(SendByType::Enter, tr::lng_settings_send_enter(tr::now));
 	add(
 		SendByType::CtrlEnter,
@@ -960,8 +957,7 @@ void SetupChatBackground(
 	}, tile->lifetime());
 
 	using Update = const Window::Theme::BackgroundUpdate;
-	base::ObservableViewer(
-		*Window::Theme::Background()
+	Window::Theme::Background()->updates(
 	) | rpl::filter([](const Update &update) {
 		return (update.type == Update::Type::Changed);
 	}) | rpl::map([] {
@@ -1091,8 +1087,7 @@ void SetupDefaultThemes(
 		refreshColorizer(scheme.type);
 	}
 
-	base::ObservableViewer(
-		*Background()
+	Background()->updates(
 	) | rpl::filter([](const BackgroundUpdate &update) {
 		return (update.type == BackgroundUpdate::Type::ApplyingTheme);
 	}) | rpl::map([=] {
@@ -1129,7 +1124,6 @@ void SetupDefaultThemes(
 		const auto fullSkips = width - count * single;
 		const auto skip = fullSkips / float64(skips);
 		auto left = padding.left() + 0.;
-		auto index = 0;
 		for (const auto button : buttons) {
 			button->resizeToWidth(single);
 			button->moveToLeft(int(std::round(left)), 0);
@@ -1257,9 +1251,9 @@ void SetupCloudThemes(
 	editWrap->toggleOn(rpl::single(BackgroundUpdate(
 		BackgroundUpdate::Type::ApplyingTheme,
 		Background()->tile()
-	)) | rpl::then(base::ObservableViewer(
-		*Background()
-	)) | rpl::filter([](const BackgroundUpdate &update) {
+	)) | rpl::then(
+		Background()->updates()
+	) | rpl::filter([](const BackgroundUpdate &update) {
 		return (update.type == BackgroundUpdate::Type::ApplyingTheme);
 	}) | rpl::map([=] {
 		const auto userId = controller->session().userId();

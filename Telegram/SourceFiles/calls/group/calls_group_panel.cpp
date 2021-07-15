@@ -260,12 +260,26 @@ QString Panel::chooseSourceActiveDeviceId() {
 	return _call->screenSharingDeviceId();
 }
 
+bool Panel::chooseSourceActiveWithAudio() {
+	return _call->screenSharingWithAudio();
+}
+
+bool Panel::chooseSourceWithAudioSupported() {
+#ifdef Q_OS_WIN
+	return true;
+#else // Q_OS_WIN
+	return false;
+#endif // Q_OS_WIN
+}
+
 rpl::lifetime &Panel::chooseSourceInstanceLifetime() {
 	return lifetime();
 }
 
-void Panel::chooseSourceAccepted(const QString &deviceId) {
-	_call->toggleScreenSharing(deviceId);
+void Panel::chooseSourceAccepted(
+		const QString &deviceId,
+		bool withAudio) {
+	_call->toggleScreenSharing(deviceId, withAudio);
 }
 
 void Panel::chooseSourceStop() {
@@ -498,7 +512,6 @@ void Panel::refreshLeftButton() {
 }
 
 void Panel::refreshVideoButtons(std::optional<bool> overrideWideMode) {
-	const auto real = _call->lookupReal();
 	const auto create = overrideWideMode.value_or(mode() == PanelMode::Wide)
 		|| (!_call->scheduleDate() && _call->videoIsWorking());
 	const auto created = _video && _screenShare;
@@ -1104,9 +1117,7 @@ void Panel::refreshTopButton() {
 		updateButtonsGeometry(); // _wideMenu <-> _settings
 		return;
 	}
-	const auto real = _call->lookupReal();
 	const auto hasJoinAs = _call->showChooseJoinAs();
-	const auto wide = (_mode.current() == PanelMode::Wide);
 	const auto showNarrowMenu = _call->canManage()
 		|| _call->videoIsWorking();
 	const auto showNarrowUserpic = !showNarrowMenu && hasJoinAs;
@@ -1188,7 +1199,7 @@ void Panel::chooseShareScreenSource() {
 			if (_call->isSharingScreen()) {
 				_call->toggleScreenSharing(std::nullopt);
 			} else {
-				chooseSourceAccepted(*source);
+				chooseSourceAccepted(*source, false);
 			}
 		} else {
 			Ui::DesktopCapture::ChooseSource(this);
@@ -2146,9 +2157,6 @@ void Panel::refreshTitle() {
 		_subtitle->setAttribute(Qt::WA_TransparentForMouseEvents);
 	}
 	if (_subtitle) {
-		const auto middle = _title
-			? (_title->x() + _title->width() / 2)
-			: (widget()->width() / 2);
 		const auto top = _title
 			? st::groupCallSubtitleTop
 			: st::groupCallTitleTop;
@@ -2163,8 +2171,6 @@ void Panel::refreshTitleGeometry() {
 		return;
 	}
 	const auto fullRect = computeTitleRect();
-	const auto recordingWidth = 2 * st::groupCallRecordingMarkSkip
-		+ st::groupCallRecordingMark;
 	const auto titleRect = _recordingMark
 		? QRect(
 			fullRect.x(),

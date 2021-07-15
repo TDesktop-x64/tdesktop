@@ -277,7 +277,6 @@ void UnreadBar::paint(Painter &p, int y, int w, bool chatWide) const {
 	p.setFont(st::historyUnreadBarFont);
 	p.setPen(st::historyUnreadBarFg);
 
-	int left = st::msgServiceMargin.left();
 	int maxwidth = w;
 	if (chatWide) {
 		maxwidth = qMin(

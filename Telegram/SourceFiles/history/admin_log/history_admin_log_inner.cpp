@@ -920,7 +920,6 @@ void InnerWidget::paintEvent(QPaintEvent *e) {
 					? _selectedText
 					: TextSelection();
 				view->draw(p, clip.translated(0, -top), selection, ms);
-				const auto item = view->data();
 				auto height = view->height();
 				top += height;
 				p.translate(0, height);
@@ -1025,7 +1024,6 @@ auto InnerWidget::viewForItem(const HistoryItem *item) -> Element* {
 }
 
 void InnerWidget::paintEmpty(Painter &p) {
-	style::font font(st::msgServiceFont);
 	auto rectWidth = st::historyAdminLogEmptyWidth;
 	auto innerWidth = rectWidth - st::historyAdminLogEmptyPadding.left() - st::historyAdminLogEmptyPadding.right();
 	auto rectHeight = st::historyAdminLogEmptyPadding.top() + _emptyText.countHeight(innerWidth) + st::historyAdminLogEmptyPadding.bottom();
@@ -1781,7 +1779,7 @@ void InnerWidget::updateSelected() {
 void InnerWidget::performDrag() {
 	if (_mouseAction != MouseAction::Dragging) return;
 
-	auto uponSelected = false;
+	//auto uponSelected = false;
 	//if (_mouseActionItem) {
 	//	if (!_selected.isEmpty() && _selected.cbegin().value() == FullSelection) {
 	//		uponSelected = _selected.contains(_mouseActionItem);

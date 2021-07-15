@@ -1456,7 +1456,6 @@ void ParticipantsBoxController::rowActionClicked(
 base::unique_qptr<Ui::PopupMenu> ParticipantsBoxController::rowContextMenu(
 		QWidget *parent,
 		not_null<PeerListRow*> row) {
-	const auto chat = _peer->asChat();
 	const auto channel = _peer->asChannel();
 	const auto participant = row->peer();
 	const auto user = participant->asUser();
@@ -1531,8 +1530,6 @@ void ParticipantsBoxController::showAdmin(not_null<UserData*> user) {
 		user,
 		currentRights,
 		_additional.adminRank(user));
-	const auto chat = _peer->asChat();
-	const auto channel = _peer->asChannel();
 	if (_additional.canAddOrEditAdmin(user)) {
 		const auto done = crl::guard(this, [=](
 				ChatAdminRightsInfo newRights,
@@ -1612,8 +1609,6 @@ void ParticipantsBoxController::showRestricted(not_null<UserData*> user) {
 		user,
 		hasAdminRights,
 		currentRights);
-	const auto chat = _peer->asChat();
-	const auto channel = _peer->asChannel();
 	if (_additional.canRestrictParticipant(user)) {
 		const auto done = crl::guard(this, [=](
 				ChatRestrictionsInfo newRights) {

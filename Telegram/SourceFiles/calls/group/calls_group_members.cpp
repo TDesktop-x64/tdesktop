@@ -41,7 +41,6 @@ namespace Calls::Group {
 namespace {
 
 constexpr auto kKeepRaisedHandStatusDuration = 3 * crl::time(1000);
-constexpr auto kShadowMaxAlpha = 74;
 constexpr auto kUserpicSizeForBlur = 40;
 constexpr auto kUserpicBlurRadius = 8;
 
@@ -225,6 +224,7 @@ private:
 		const Data::GroupCallParticipant &now);
 	void updateRow(
 		not_null<Row*> row,
+		const std::optional<Data::GroupCallParticipant> &was,
 		const Data::GroupCallParticipant *participant);
 	void removeRow(not_null<Row*> row);
 	void updateRowLevel(not_null<Row*> row, float level);
@@ -496,9 +496,8 @@ void Members::Controller::subscribeToChanges(not_null<Data::GroupCall*> real) {
 			: update.now->peer;
 		if (!update.now) {
 			if (const auto row = findRow(participantPeer)) {
-				const auto owner = &participantPeer->owner();
 				if (isMe(participantPeer)) {
-					updateRow(row, nullptr);
+					updateRow(row, update.was, nullptr);
 				} else {
 					removeRow(row);
 					delegate()->peerListRefreshRows();
@@ -598,7 +597,7 @@ void Members::Controller::updateRow(
 		if (row->state() == Row::State::Invited) {
 			reorderIfInvitedBefore = row->absoluteIndex();
 		}
-		updateRow(row, &now);
+		updateRow(row, was, &now);
 		if ((now.speaking && (!was || !was->speaking))
 			|| (now.raisedHandRating != (was ? was->raisedHandRating : 0))
 			|| (!now.canSelfUnmute && was && was->canSelfUnmute)) {
@@ -776,18 +775,25 @@ void Members::Controller::checkRowPosition(not_null<Row*> row) {
 
 void Members::Controller::updateRow(
 		not_null<Row*> row,
+		const std::optional<Data::GroupCallParticipant> &was,
 		const Data::GroupCallParticipant *participant) {
 	const auto wasSounding = row->sounding();
-	const auto wasSsrc = row->ssrc();
-	const auto wasInChat = (row->state() != Row::State::Invited);
+	const auto wasSsrc = was ? was->ssrc : 0;
+	const auto wasAdditionalSsrc = was
+		? GetAdditionalAudioSsrc(was->videoParams)
+		: 0;
 	row->setSkipLevelUpdate(_skipRowLevelUpdate);
 	row->updateState(participant);
 	const auto nowSounding = row->sounding();
-	const auto nowSsrc = row->ssrc();
+	const auto nowSsrc = participant ? participant->ssrc : 0;
+	const auto nowAdditionalSsrc = participant
+		? GetAdditionalAudioSsrc(participant->videoParams)
+		: 0;
 
 	const auto wasNoSounding = _soundingRowBySsrc.empty();
+
 	if (wasSsrc == nowSsrc) {
-		if (nowSounding != wasSounding) {
+		if (nowSsrc && nowSounding != wasSounding) {
 			if (nowSounding) {
 				_soundingRowBySsrc.emplace(nowSsrc, row);
 			} else {
@@ -796,11 +802,25 @@ void Members::Controller::updateRow(
 		}
 	} else {
 		_soundingRowBySsrc.remove(wasSsrc);
-		if (nowSounding) {
-			Assert(nowSsrc != 0);
+		if (nowSounding && nowSsrc) {
 			_soundingRowBySsrc.emplace(nowSsrc, row);
 		}
 	}
+	if (wasAdditionalSsrc == nowAdditionalSsrc) {
+		if (nowAdditionalSsrc && nowSounding != wasSounding) {
+			if (nowSounding) {
+				_soundingRowBySsrc.emplace(nowAdditionalSsrc, row);
+			} else {
+				_soundingRowBySsrc.remove(nowAdditionalSsrc);
+			}
+		}
+	} else {
+		_soundingRowBySsrc.remove(wasAdditionalSsrc);
+		if (nowSounding && nowAdditionalSsrc) {
+			_soundingRowBySsrc.emplace(nowAdditionalSsrc, row);
+		}
+	}
+
 	const auto nowNoSounding = _soundingRowBySsrc.empty();
 	if (wasNoSounding && !nowNoSounding) {
 		_soundingAnimation.start();
@@ -812,7 +832,14 @@ void Members::Controller::updateRow(
 }
 
 void Members::Controller::removeRow(not_null<Row*> row) {
-	_soundingRowBySsrc.remove(row->ssrc());
+	// There may be 0, 1 or 2 entries for a row.
+	for (auto i = begin(_soundingRowBySsrc); i != end(_soundingRowBySsrc);) {
+		if (i->second == row) {
+			i = _soundingRowBySsrc.erase(i);
+		} else {
+			++i;
+		}
+	}
 	delegate()->peerListRemoveRow(row);
 }
 
@@ -1346,11 +1373,17 @@ base::unique_qptr<Ui::PopupMenu> Members::Controller::createRowContextMenu(
 				}
 			}
 		}
-	}
 
-	if (real->ssrc() != 0
-		&& (!isMe(participantPeer) || _peer->canManageGroupCall())) {
-		addMuteActionsToContextMenu(result, participantPeer, admin, real);
+		if (participant
+			&& (!isMe(participantPeer) || _peer->canManageGroupCall())
+			&& (participant->ssrc != 0
+				|| GetAdditionalAudioSsrc(participant->videoParams) != 0)) {
+			addMuteActionsToContextMenu(
+				result,
+				participantPeer,
+				admin,
+				static_cast<Row*>(row.get()));
+		}
 	}
 
 	if (isMe(participantPeer)) {
@@ -1548,14 +1581,14 @@ void Members::Controller::addMuteActionsToContextMenu(
 
 std::unique_ptr<Row> Members::Controller::createRowForMe() {
 	auto result = std::make_unique<Row>(this, _call->joinAs());
-	updateRow(result.get(), nullptr);
+	updateRow(result.get(), std::nullopt, nullptr);
 	return result;
 }
 
 std::unique_ptr<Row> Members::Controller::createRow(
 		const Data::GroupCallParticipant &participant) {
 	auto result = std::make_unique<Row>(this, participant.peer);
-	updateRow(result.get(), &participant);
+	updateRow(result.get(), std::nullopt, &participant);
 	return result;
 }
 
@@ -1565,7 +1598,7 @@ std::unique_ptr<Row> Members::Controller::createInvitedRow(
 		return nullptr;
 	}
 	auto result = std::make_unique<Row>(this, participantPeer);
-	updateRow(result.get(), nullptr);
+	updateRow(result.get(), std::nullopt, nullptr);
 	return result;
 }
 

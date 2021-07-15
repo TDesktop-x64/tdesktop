@@ -111,7 +111,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/unread_badge.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
-#include "window/themes/window_theme.h"
 #include "window/notifications_manager.h"
 #include "window/window_adaptive.h"
 #include "window/window_controller.h"
@@ -154,7 +153,6 @@ constexpr auto kFullDayInMs = 86400 * 1000;
 constexpr auto kSaveDraftTimeout = 1000;
 constexpr auto kSaveDraftAnywayTimeout = 5000;
 constexpr auto kSaveCloudDraftIdleTimeout = 14000;
-constexpr auto kRecordingUpdateDelta = crl::time(100);
 constexpr auto kRefreshSlowmodeLabelTimeout = crl::time(200);
 constexpr auto kCommonModifiers = 0
 	| Qt::ShiftModifier
@@ -402,7 +400,10 @@ HistoryWidget::HistoryWidget(
 	_scroll->hide();
 	_kbScroll->hide();
 
-	updateScrollColors();
+	style::PaletteChanged(
+	) | rpl::start_with_next([=] {
+		_scroll->updateBars();
+	}, lifetime());
 
 	_historyDown->installEventFilter(this);
 	_unreadMentions->installEventFilter(this);
@@ -2716,12 +2717,10 @@ void HistoryWidget::messagesReceived(PeerData *peer, const MTPmessages_Messages 
 	}
 
 	if (_preloadRequest == requestId) {
-		auto to = toMigrated ? _migrated : _history;
 		addMessagesToFront(peer, *histList);
 		_preloadRequest = 0;
 		preloadHistoryIfNeeded();
 	} else if (_preloadDownRequest == requestId) {
-		auto to = toMigrated ? _migrated : _history;
 		addMessagesToBack(peer, *histList);
 		_preloadDownRequest = 0;
 		preloadHistoryIfNeeded();
@@ -3526,7 +3525,6 @@ PeerData *HistoryWidget::peer() const {
 // Sometimes _showAtMsgId is set directly.
 void HistoryWidget::setMsgId(MsgId showAtMsgId) {
 	if (_showAtMsgId != showAtMsgId) {
-		auto wasMsgId = _showAtMsgId;
 		_showAtMsgId = showAtMsgId;
 		if (_history) {
 			controller()->setActiveChatEntry({
@@ -4878,10 +4876,6 @@ void HistoryWidget::itemEdited(not_null<HistoryItem*> item) {
 	}
 }
 
-void HistoryWidget::updateScrollColors() {
-	_scroll->updateBars();
-}
-
 MsgId HistoryWidget::replyToId() const {
 	return _replyToId ? _replyToId : (_kbReplyTo ? _kbReplyTo->id : 0);
 }
@@ -5869,7 +5863,6 @@ void HistoryWidget::setupGroupCallTracker() {
 		_groupCallBar->joinClicks()
 	) | rpl::start_with_next([=] {
 		const auto peer = _history->peer;
-		const auto channel = peer->asChannel();
 		if (peer->groupCall()) {
 			controller()->startOrJoinGroupCall(peer);
 		}

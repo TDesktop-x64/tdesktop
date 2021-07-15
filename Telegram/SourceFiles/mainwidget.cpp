@@ -242,7 +242,6 @@ MainWidget::MainWidget(
 , _cacheBackgroundTimer([=] { cacheBackground(); })
 , _viewsIncrementTimer([=] { viewsIncrement(); })
 , _changelogs(Core::Changelogs::Create(&controller->session())) {
-	updateScrollColors();
 	setupConnectingWidget();
 
 	connect(_dialogs, SIGNAL(cancelled()), this, SLOT(dialogsCancelled()));
@@ -347,11 +346,13 @@ MainWidget::MainWidget(
 	QCoreApplication::instance()->installEventFilter(this);
 
 	using Update = Window::Theme::BackgroundUpdate;
-	subscribe(Window::Theme::Background(), [this](const Update &update) {
-		if (update.type == Update::Type::New || update.type == Update::Type::Changed) {
+	Window::Theme::Background()->updates(
+	) | rpl::start_with_next([=](const Update &update) {
+		if (update.type == Update::Type::New
+			|| update.type == Update::Type::Changed) {
 			clearCachedBackground();
 		}
-	});
+	}, lifetime());
 
 	subscribe(Media::Player::instance()->playerWidgetOver(), [this](bool over) {
 		if (over) {
@@ -797,10 +798,6 @@ void MainWidget::cacheBackground() {
 		result.setDevicePixelRatio(cRetinaFactor());
 		{
 			QPainter p(&result);
-			auto left = 0;
-			auto top = 0;
-			auto right = _willCacheFor.width();
-			auto bottom = _willCacheFor.height();
 			auto w = bg.width() / cRetinaFactor();
 			auto h = bg.height() / cRetinaFactor();
 			auto sx = 0;
@@ -1177,10 +1174,6 @@ QPixmap MainWidget::cachedBackground(const QRect &forRect, int &x, int &y) {
 	return QPixmap();
 }
 
-void MainWidget::updateScrollColors() {
-	_history->updateScrollColors();
-}
-
 void MainWidget::setChatBackground(
 		const Data::WallPaper &background,
 		QImage &&image) {
@@ -1201,8 +1194,7 @@ void MainWidget::setChatBackground(
 	checkChatBackground();
 
 	const auto tile = Data::IsLegacy1DefaultWallPaper(background);
-	using Update = Window::Theme::BackgroundUpdate;
-	Window::Theme::Background()->notify(Update(Update::Type::Start, tile));
+	Window::Theme::Background()->downloadingStarted(tile);
 }
 
 bool MainWidget::isReadyChatBackground(
@@ -1691,7 +1683,6 @@ Window::SectionSlideParams MainWidget::prepareThirdSectionAnimation(Window::Sect
 		result.withTopBarShadow = false;
 	}
 	floatPlayerHideAll();
-	auto sectionTop = getThirdSectionTop();
 	result.oldContentCache = _thirdSection->grabForShowAnimation(result);
 	floatPlayerShowVisible();
 	return result;

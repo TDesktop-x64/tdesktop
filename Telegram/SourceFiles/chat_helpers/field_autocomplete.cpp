@@ -44,10 +44,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtWidgets/QApplication>
 
-class FieldAutocomplete::Inner final
-	: public Ui::RpWidget
-	, private base::Subscriber {
-
+class FieldAutocomplete::Inner final : public Ui::RpWidget {
 public:
 	struct ScrollTo {
 		int top;
@@ -1296,7 +1293,6 @@ void FieldAutocomplete::Inner::selectByMouse(QPoint globalPosition) {
 
 	int32 sel = -1, maxSel = 0;
 	if (!_srows->empty()) {
-		int32 rows = rowscount(_srows->size(), _stickersPerRow);
 		int32 row = (mouse.y() >= st::stickerPanPadding) ? ((mouse.y() - st::stickerPanPadding) / st::stickerPanSize.height()) : -1;
 		int32 col = (mouse.x() >= st::stickerPanPadding) ? ((mouse.x() - st::stickerPanPadding) / st::stickerPanSize.width()) : -1;
 		if (row >= 0 && col >= 0) {

@@ -320,12 +320,6 @@ QByteArray FormatTimeText(TimeId date) {
 		+ Data::NumberToString(parsed.minute(), 2);
 }
 
-QByteArray SerializeLink(
-		const Data::Utf8String &text,
-		const QString &path) {
-	return "<a href=\"" + path.toUtf8() + "\">" + text + "</a>";
-}
-
 } // namespace
 
 namespace details {
@@ -2662,7 +2656,6 @@ Result HtmlWriter::writeSections() {
 }
 
 QByteArray HtmlWriter::wrapMessageLink(int messageId, QByteArray text) {
-	const auto finishedCount = _lastMessageIdsPerFile.size();
 	const auto it = ranges::find_if(_lastMessageIdsPerFile, [&](int maxMessageId) {
 		return messageId <= maxMessageId;
 	});

@@ -172,6 +172,8 @@ struct ParticipantVideoParams;
 	const std::shared_ptr<ParticipantVideoParams> &params);
 [[nodiscard]] bool IsScreenPaused(
 	const std::shared_ptr<ParticipantVideoParams> &params);
+[[nodiscard]] uint32 GetAdditionalAudioSsrc(
+	const std::shared_ptr<ParticipantVideoParams> &params);
 
 class GroupCall final : public base::has_weak_ptr {
 public:
@@ -381,8 +383,11 @@ public:
 	[[nodiscard]] bool isCameraPaused() const;
 	[[nodiscard]] const std::string &cameraSharingEndpoint() const;
 	[[nodiscard]] QString screenSharingDeviceId() const;
+	[[nodiscard]] bool screenSharingWithAudio() const;
 	void toggleVideo(bool active);
-	void toggleScreenSharing(std::optional<QString> uniqueId);
+	void toggleScreenSharing(
+		std::optional<QString> uniqueId,
+		bool withAudio = false);
 	[[nodiscard]] bool hasVideoWithFrames() const;
 	[[nodiscard]] rpl::producer<bool> hasVideoWithFramesValue() const;
 
@@ -485,6 +490,9 @@ private:
 	void sendSelfUpdate(SendUpdateType type);
 	void updateInstanceMuteState();
 	void updateInstanceVolumes();
+	void updateInstanceVolume(
+		const std::optional<Data::GroupCallParticipant> &was,
+		const Data::GroupCallParticipant &now);
 	void applyMeInCallLocally();
 	void rejoin();
 	void leave();
@@ -545,6 +553,8 @@ private:
 		bool paused);
 	void markTrackPaused(const VideoEndpoint &endpoint, bool paused);
 	void markTrackShown(const VideoEndpoint &endpoint, bool shown);
+
+	[[nodiscard]] int activeVideoSendersCount() const;
 
 	[[nodiscard]] MTPInputGroupCall inputCall() const;
 
@@ -612,6 +622,7 @@ private:
 	rpl::variable<Webrtc::VideoState> _screenState;
 	rpl::variable<bool> _isSharingScreen = false;
 	QString _screenDeviceId;
+	bool _screenWithAudio = false;
 
 	base::flags<SendUpdateType> _pendingSelfUpdates;
 	bool _requireARGB32 = true;

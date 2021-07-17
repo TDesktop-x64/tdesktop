@@ -252,6 +252,7 @@ public:
 	void startScheduledNow();
 	void toggleScheduleStartSubscribed(bool subscribed);
 	void setNoiseSuppression(bool enabled);
+	void setStereoMode(bool enabled);
 
 	bool emitShareScreenError();
 	bool emitShareCameraError();

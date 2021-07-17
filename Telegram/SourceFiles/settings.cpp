@@ -78,7 +78,7 @@ bool gHideClassicFwd = false;
 bool gShowPhoneNumber = true;
 bool gShowScheduledButton = false;
 bool gHideFilterAllChats = false;
-bool gRadioMode = false;
+bool gStereoMode = false;
 bool gAutoUnmute = false;
 QString gRadioController;
 int gVoiceChatBitrate = 0;

@@ -2873,7 +2873,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_show_phone_number" = "Show Phone Number";
 "lng_settings_show_scheduled_button" = "Always show scheduled button";
 "lng_settings_voice_chat" = "Voice Chat";
-"lng_settings_radio_mode" = "Radio mode";
+"lng_settings_stereo_mode" = "Enable Stereo Mode";
 "lng_settings_radio_controller" = "Radio controller";
 "lng_settings_auto_unmute" = "Auto unmute";
 "lng_settings_other" = "Other";
@@ -2897,8 +2897,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_net_boost_restart_desc" = "You'll need to restart app to change network boost.\n\nRestart now?";
 "lng_show_messages_id_desc" = "Warning: the changes will take effect immediately with restart.";
 "lng_show_emoji_button_as_text_desc" = "Note: If you can't see an emoji button, please turn on this option.";
-"lng_radio_mode_desc" = "Note: Radio mode is an experimental feature for streaming music through voice chat without audio filtering/processing.";
-"lng_radio_mode_hint" = "Radio mode is enabled! Re-join a voice chat if you're already joined.";
+"lng_stereo_mode_hint" = "Stereo mode is enabled! Re-join a voice chat if you're already joined.";
 "lng_radio_controller_desc" = "Note: Radio controller is an experimental bot for controlling your music streaming session.";
 "lng_auto_unmute_desc" = "Note: Auto unmute when you've joined the voice chat.";
 

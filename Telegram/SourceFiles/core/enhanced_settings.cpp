@@ -241,8 +241,8 @@ namespace EnhancedSettings {
 			cSetShowScheduledButton(v);
 		});
 
-		ReadBoolOption(settings, "radio_mode", [&](auto v) {
-			cSetRadioMode(v);
+		ReadBoolOption(settings, "stereo_mode", [&](auto v) {
+			cSetStereoMode(v);
 		});
 
 		ReadStringOption(settings, "radio_controller", [&](auto v) {
@@ -295,7 +295,7 @@ namespace EnhancedSettings {
 		settings.insert(qsl("disable_cloud_draft_sync"), false);
 		settings.insert(qsl("hide_classic_fwd"), false);
 		settings.insert(qsl("show_scheduled_button"), false);
-		settings.insert(qsl("radio_mode"), false);
+		settings.insert(qsl("stereo_mode"), false);
 		settings.insert(qsl("radio_controller"), "http://localhost:2468");
 		settings.insert(qsl("auto_unmute"), false);
 		settings.insert(qsl("bitrate"), 0);
@@ -332,7 +332,7 @@ namespace EnhancedSettings {
 		settings.insert(qsl("disable_cloud_draft_sync"), cDisableCloudDraftSync());
 		settings.insert(qsl("hide_classic_fwd"), cHideClassicFwd());
 		settings.insert(qsl("show_scheduled_button"), cShowScheduledButton());
-		settings.insert(qsl("radio_mode"), cRadioMode());
+		settings.insert(qsl("stereo_mode"), cStereoMode());
 		settings.insert(qsl("radio_controller"), cRadioController());
 		settings.insert(qsl("auto_unmute"), cAutoUnmute());
 		settings.insert(qsl("bitrate"), cVoiceChatBitrate());

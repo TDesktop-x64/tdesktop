@@ -161,7 +161,7 @@ DeclareSetting(bool, HideClassicFwd);
 DeclareSetting(bool, ShowPhoneNumber);
 DeclareSetting(bool, ShowScheduledButton);
 DeclareSetting(bool, HideFilterAllChats);
-DeclareSetting(bool, RadioMode);
+DeclareSetting(bool, StereoMode);
 DeclareSetting(bool, AutoUnmute);
 DeclareSetting(QString, RadioController);
 

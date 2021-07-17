@@ -48,6 +48,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_settings.h"
 
 #include <QtGui/QGuiApplication>
+#include <core/enhanced_settings.h>
+#include <ui/toast/toast.h>
 
 namespace Calls::Group {
 namespace {
@@ -317,6 +319,25 @@ void SettingsBox(
 		Core::App().settings().setGroupCallNoiseSuppression(enabled);
 		call->setNoiseSuppression(enabled);
 		Core::App().saveSettingsDelayed();
+	}, layout->lifetime());
+
+	AddButton(
+		layout,
+		tr::lng_settings_stereo_mode(),
+		st::groupCallSettingsButton
+	)->toggleOn(
+		rpl::single(cStereoMode())
+	)->toggledChanges(
+	) | rpl::filter([=](bool toggled) {
+		return (toggled != cStereoMode());
+	}) | rpl::start_with_next([=](bool toggled) {
+		call->setStereoMode(toggled);
+		if (call->muted() == MuteState::Active) {
+			call->setMuted(MuteState::Muted);
+			call->setMutedAndUpdate(MuteState::Active);
+		}
+		cSetStereoMode(toggled);
+		EnhancedSettings::Write();
 	}, layout->lifetime());
 
 

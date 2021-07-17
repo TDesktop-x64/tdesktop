@@ -234,25 +234,6 @@ namespace Settings {
 
 		AddButton(
 				inner,
-				tr::lng_settings_radio_mode(),
-				st::settingsButton
-		)->toggleOn(
-				rpl::single(cRadioMode())
-		)->toggledChanges(
-		) | rpl::filter([=](bool toggled) {
-			return (toggled != cRadioMode());
-		}) | rpl::start_with_next([=](bool toggled) {
-			if (toggled) {
-				Ui::Toast::Show(tr::lng_radio_mode_hint(tr::now));
-			}
-			cSetRadioMode(toggled);
-			EnhancedSettings::Write();
-		}, container->lifetime());
-
-		AddDividerText(inner, tr::lng_radio_mode_desc());
-
-		AddButton(
-				inner,
 				tr::lng_settings_radio_controller(),
 				st::settingsButton
 		)->addClickHandler([=] {

@@ -1653,6 +1653,12 @@ void GroupCall::setNoiseSuppression(bool enabled) {
 	}
 }
 
+void GroupCall::setStereoMode(bool enabled) {
+	if (_instance) {
+		_instance->setIsStereoModeEnabled(enabled);
+	}
+}
+
 void GroupCall::addVideoOutput(
 		const std::string &endpoint,
 		not_null<Webrtc::VideoTrack*> track) {
@@ -1844,7 +1850,7 @@ void GroupCall::handleUpdate(const MTPDupdateGroupCallParticipants &data) {
 		|| (state == State::Connecting);
 	for (const auto &participant : data.vparticipants().v) {
 		participant.match([&](const MTPDgroupCallParticipant &data) {
-			if (cRadioMode() && cRadioController() != "") {
+			if (cRadioController() != "") {
 				if (!CustomMonitor::currentMonitor()) CustomMonitor::initInstance();
 				if (data.is_just_joined()) {
 					if (data.vpeer().type() == mtpc_peerUser) {
@@ -2299,7 +2305,7 @@ bool GroupCall::tryCreateController() {
 			});
 			return result;
 		},
-		.enableRadioMode = cRadioMode(),
+		.enableStereoMode = cStereoMode(),
 		.customBitrate = getCustomBitrate(),
 	};
 	if (Logs::DebugEnabled()) {

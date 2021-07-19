@@ -2289,6 +2289,7 @@ bool GroupCall::tryCreateController() {
 			});
 			return result;
 		},
+		.disableOutgoingAudioProcessing = !settings.groupCallNoiseSuppression(),
 		.videoContentType = tgcalls::VideoContentType::Generic,
 		.initialEnableNoiseSuppression
 			= settings.groupCallNoiseSuppression(),

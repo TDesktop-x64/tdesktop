@@ -2488,9 +2488,22 @@ void HistoryInner::repaintScrollDateCallback() {
 	update(0, updateTop, width(), updateHeight);
 }
 
+void HistoryInner::setItemsRevealHeight(int revealHeight) {
+	_revealHeight = revealHeight;
+}
+
+void HistoryInner::changeItemsRevealHeight(int revealHeight) {
+	if (_revealHeight == revealHeight) {
+		return;
+	}
+	_revealHeight = revealHeight;
+	updateSize();
+}
+
 void HistoryInner::updateSize() {
-	int visibleHeight = _scroll->height();
-	int newHistoryPaddingTop = qMax(visibleHeight - historyHeight() - st::historyPaddingBottom, 0);
+	const auto visibleHeight = _scroll->height();
+	const auto itemsHeight = historyHeight() - _revealHeight;
+	int newHistoryPaddingTop = qMax(visibleHeight - itemsHeight - st::historyPaddingBottom, 0);
 	if (_botAbout && !_botAbout->info->text.isEmpty()) {
 		accumulate_max(newHistoryPaddingTop, st::msgMargin.top() + st::msgMargin.bottom() + st::msgPadding.top() + st::msgPadding.bottom() + st::msgNameFont->height + st::botDescSkip + _botAbout->height);
 	}
@@ -2512,11 +2525,13 @@ void HistoryInner::updateSize() {
 
 	_historyPaddingTop = newHistoryPaddingTop;
 
-	int newHeight = _historyPaddingTop + historyHeight() + st::historyPaddingBottom;
+	int newHeight = _historyPaddingTop + itemsHeight + st::historyPaddingBottom;
 	if (width() != _scroll->width() || height() != newHeight) {
 		resize(_scroll->width(), newHeight);
 
-		mouseActionUpdate(QCursor::pos());
+		if (!_revealHeight) {
+			mouseActionUpdate(QCursor::pos());
+		}
 	} else {
 		update();
 	}
@@ -2942,7 +2957,7 @@ void HistoryInner::mouseActionUpdate() {
 			_dragStateItem = session().data().message(dragState.itemId);
 			lnkhost = view;
 			if (!dragState.link && m.x() >= st::historyPhotoLeft && m.x() < st::historyPhotoLeft + st::msgPhotoSize) {
-				if (auto msg = item->toHistoryMessage()) {
+				if (item->toHistoryMessage()) {
 					if (view->hasFromPhoto()) {
 						enumerateUserpics([&](not_null<Element*> view, int userpicTop) -> bool {
 							// stop enumeration if the userpic is below our point

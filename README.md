@@ -44,9 +44,9 @@ Then your language translation filename is `en.json` or something like that.
 
 ## Build instructions
 
-* Visual Studio 2019 [(32 bits)][msvc32] [(64 bits)][msvc64]
-* [CMake on GNU/Linux][cmake]
-* [Xcode 12][xcode]
+* Windows [(32-bit)][win32] [(64-bit)][win64]
+* [macOS][mac]
+* [GNU/Linux using Docker][linux]
 
 ## Links
 
@@ -55,9 +55,9 @@ Then your language translation filename is `en.json` or something like that.
 
 [//]: # (LINKS)
 [license]: LICENSE
-[msvc32]: docs/building-msvc.md
-[msvc64]: docs/building-msvc_x64.md
-[xcode]: docs/building-xcode.md
-[cmake]: docs/building-cmake.md
+[win32]: docs/building-win.md
+[win64]: docs/building-msvc_x64.md
+[mac]: docs/building-mac.md
+[linux]: docs/building-linux.md
 [preview_image]: https://github.com/TDesktop-x64/tdesktop/blob/dev/docs/assets/preview.png "Preview of 64Gram Desktop"
 [preview_image_url]: https://raw.githubusercontent.com/TDesktop-x64/tdesktop/dev/docs/assets/preview.png

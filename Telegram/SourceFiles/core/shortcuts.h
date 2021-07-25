@@ -66,7 +66,7 @@ enum class Command {
 	FastCopy,
 };
 
-constexpr auto kShowFolder = {
+[[maybe_unused]] constexpr auto kShowFolder = {
 	Command::ShowAllChats,
 	Command::ShowFolder1,
 	Command::ShowFolder2,

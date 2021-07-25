@@ -82,59 +82,6 @@ PRIVATE
     desktop-app::external_xxhash
 )
 
-if (LINUX)
-    target_link_libraries(Telegram
-    PRIVATE
-        desktop-app::external_glibmm
-        desktop-app::external_glib
-    )
-
-    if (NOT DESKTOP_APP_DISABLE_DBUS_INTEGRATION)
-        target_link_libraries(Telegram
-        PRIVATE
-            desktop-app::external_statusnotifieritem
-            desktop-app::external_dbusmenu_qt
-        )
-    endif()
-
-    if (NOT DESKTOP_APP_DISABLE_X11_INTEGRATION)
-        target_link_libraries(Telegram
-        PRIVATE
-            desktop-app::external_xcb
-        )
-    endif()
-
-    if (NOT DESKTOP_APP_DISABLE_WAYLAND_INTEGRATION)
-        target_link_libraries(Telegram
-        PRIVATE
-            desktop-app::lib_waylandshells
-            desktop-app::external_kwayland
-        )
-    endif()
-
-    if (NOT DESKTOP_APP_DISABLE_GTK_INTEGRATION)
-        target_link_libraries(Telegram PRIVATE rt)
-        find_package(PkgConfig REQUIRED)
-
-        if (DESKTOP_APP_USE_PACKAGED AND NOT DESKTOP_APP_USE_PACKAGED_LAZY)
-            pkg_check_modules(GTK3 REQUIRED IMPORTED_TARGET gtk+-3.0)
-            target_link_libraries(Telegram PRIVATE PkgConfig::GTK3)
-
-            if (NOT DESKTOP_APP_DISABLE_X11_INTEGRATION)
-                pkg_check_modules(X11 REQUIRED IMPORTED_TARGET x11)
-                target_link_libraries(Telegram PRIVATE PkgConfig::X11)
-            endif()
-        else()
-            pkg_check_modules(GTK REQUIRED gtk+-3.0)
-            target_include_directories(Telegram PRIVATE ${GTK_INCLUDE_DIRS})
-
-            if (NOT DESKTOP_APP_DISABLE_X11_INTEGRATION)
-                target_link_libraries(Telegram PRIVATE X11)
-            endif()
-        endif()
-    endif()
-endif()
-
 target_precompile_headers(Telegram PRIVATE ${src_loc}/stdafx.h)
 nice_target_sources(Telegram ${src_loc}
 PRIVATE
@@ -621,6 +568,8 @@ PRIVATE
     history/view/history_view_cursor_state.h
     history/view/history_view_element.cpp
     history/view/history_view_element.h
+    history/view/history_view_empty_list_bubble.cpp
+    history/view/history_view_empty_list_bubble.h
     history/view/history_view_group_call_tracker.cpp
     history/view/history_view_group_call_tracker.h
     history/view/history_view_list_widget.cpp
@@ -731,6 +680,8 @@ PRIVATE
     inline_bots/inline_bot_send_data.h
     inline_bots/inline_results_inner.cpp
     inline_bots/inline_results_inner.h
+    inline_bots/inline_results_mosaic_layout.cpp
+    inline_bots/inline_results_mosaic_layout.h
     inline_bots/inline_results_widget.cpp
     inline_bots/inline_results_widget.h
     intro/intro_code.cpp
@@ -757,6 +708,8 @@ PRIVATE
     lang/lang_numbers_animation.h
     lang/lang_translator.cpp
     lang/lang_translator.h
+    layout/layout_utils.cpp
+    layout/layout_utils.h
     main/main_account.cpp
     main/main_account.h
     main/main_app_config.cpp
@@ -870,6 +823,8 @@ PRIVATE
     overview/overview_layout.cpp
     overview/overview_layout.h
     overview/overview_layout_delegate.h
+    overview/overview_mosaic_layout.cpp
+    overview/overview_mosaic_layout.h
     passport/passport_encryption.cpp
     passport/passport_encryption.h
     passport/passport_form_controller.cpp
@@ -898,16 +853,12 @@ PRIVATE
     platform/linux/linux_desktop_environment.h
     platform/linux/linux_gdk_helper.cpp
     platform/linux/linux_gdk_helper.h
-    platform/linux/linux_gsd_media_keys.cpp
-    platform/linux/linux_gsd_media_keys.h
     platform/linux/linux_gtk_integration_dummy.cpp
     platform/linux/linux_gtk_integration_p.h
     platform/linux/linux_gtk_integration.cpp
     platform/linux/linux_gtk_integration.h
     platform/linux/linux_gtk_open_with_dialog.cpp
     platform/linux/linux_gtk_open_with_dialog.h
-    platform/linux/linux_notification_service_watcher.cpp
-    platform/linux/linux_notification_service_watcher.h
     platform/linux/linux_wayland_integration_dummy.cpp
     platform/linux/linux_wayland_integration.cpp
     platform/linux/linux_wayland_integration.h
@@ -1205,12 +1156,6 @@ endif()
 
 if (DESKTOP_APP_DISABLE_DBUS_INTEGRATION)
     remove_target_sources(Telegram ${src_loc}
-        platform/linux/linux_gsd_media_keys.cpp
-        platform/linux/linux_gsd_media_keys.h
-        platform/linux/linux_mpris_support.cpp
-        platform/linux/linux_mpris_support.h
-        platform/linux/linux_notification_service_watcher.cpp
-        platform/linux/linux_notification_service_watcher.h
         platform/linux/linux_xdp_file_dialog.cpp
         platform/linux/linux_xdp_file_dialog.h
         platform/linux/linux_xdp_open_with_dialog.cpp
@@ -1328,6 +1273,48 @@ elseif (APPLE)
                 COMMAND cp ${libs_loc}/crashpad/out/$<IF:$<CONFIG:Debug>,Debug,Release>/crashpad_handler $<TARGET_FILE_DIR:Telegram>/../Helpers/
             )
         endif()
+    endif()
+else()
+    target_link_libraries(Telegram
+    PRIVATE
+        desktop-app::external_glibmm
+        desktop-app::external_glib
+    )
+
+    if (NOT DESKTOP_APP_DISABLE_DBUS_INTEGRATION)
+        target_link_libraries(Telegram
+        PRIVATE
+            desktop-app::external_statusnotifieritem
+            desktop-app::external_dbusmenu_qt
+        )
+    endif()
+
+    if (NOT DESKTOP_APP_DISABLE_X11_INTEGRATION)
+        target_link_libraries(Telegram
+        PRIVATE
+            desktop-app::external_xcb
+        )
+    endif()
+
+    if (NOT DESKTOP_APP_DISABLE_WAYLAND_INTEGRATION)
+        target_link_libraries(Telegram
+        PRIVATE
+            desktop-app::lib_waylandshells
+            desktop-app::external_kwayland
+        )
+    endif()
+
+    if (NOT DESKTOP_APP_DISABLE_GTK_INTEGRATION)
+        find_package(PkgConfig REQUIRED)
+
+        pkg_check_modules(GTK REQUIRED gtk+-3.0)
+        target_include_directories(Telegram SYSTEM PRIVATE ${GTK_INCLUDE_DIRS})
+
+        if (NOT DESKTOP_APP_DISABLE_X11_INTEGRATION)
+            target_link_libraries(Telegram PRIVATE X11)
+        endif()
+
+        target_link_libraries(Telegram PRIVATE rt)
     endif()
 endif()
 
@@ -1471,7 +1458,7 @@ if ((NOT DESKTOP_APP_DISABLE_AUTOUPDATE OR APPLE) AND NOT build_macstore AND NOT
     endif()
 
     if (DESKTOP_APP_SPECIAL_TARGET)
-        add_executable(Packer WIN32)
+        add_executable(Packer)
         init_target(Packer)
 
         add_dependencies(Telegram Packer)

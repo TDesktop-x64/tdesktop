@@ -227,6 +227,7 @@ public:
 	// With force=true the markup is updated even if it is
 	// already shown for the passed history item.
 	void updateBotKeyboard(History *h = nullptr, bool force = false);
+	void botCallbackSent(not_null<HistoryItem*> item);
 
 	void fastShowAtEnd(not_null<History*> history);
 	void applyDraft(
@@ -326,6 +327,10 @@ private:
 		Fn<void(MessageIdsList)> callback;
 		bool active = false;
 	};
+	struct ItemRevealAnimation {
+		Ui::Animations::Simple animation;
+		int startHeight = 0;
+	};
 	enum class TextUpdateEvent {
 		SaveDraft = (1 << 0),
 		SendTyping = (1 << 1),
@@ -422,7 +427,7 @@ private:
 	void historyDownAnimationFinish();
 	void unreadMentionsAnimationFinish();
 	void sendButtonClicked();
-	void unreadMessageAdded(not_null<HistoryItem*> item);
+	void newItemAdded(not_null<HistoryItem*> item);
 
 	bool canSendFiles(not_null<const QMimeData*> data) const;
 	bool confirmSendingFiles(
@@ -538,6 +543,8 @@ private:
 
 	void updateHistoryGeometry(bool initial = false, bool loadedDown = false, const ScrollChange &change = { ScrollChangeNone, 0 });
 	void updateListSize();
+	void startItemRevealAnimations();
+	void revealItemsCallback();
 
 	// Does any of the shown histories has this flag set.
 	bool hasPendingResizedItems() const;
@@ -672,7 +679,6 @@ private:
 	bool _historyInited = false;
 	// If updateListSize() was called without updateHistoryGeometry().
 	bool _updateHistoryGeometryRequired = false;
-	int _addToScroll = 0;
 
 	int _lastScrollTop = 0; // gifs optimization
 	crl::time _lastScrolled = 0;
@@ -763,6 +769,12 @@ private:
 
 	base::weak_ptr<Ui::Toast::Instance> _topToast;
 	std::unique_ptr<ChooseMessagesForReport> _chooseForReport;
+
+	base::flat_set<not_null<HistoryItem*>> _itemRevealPending;
+	base::flat_map<
+		not_null<HistoryItem*>,
+		ItemRevealAnimation> _itemRevealAnimations;
+	int _itemsRevealHeight = 0;
 
 	object_ptr<Ui::PlainShadow> _topShadow;
 	bool _inGrab = false;

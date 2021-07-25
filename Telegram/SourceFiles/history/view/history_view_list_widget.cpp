@@ -76,6 +76,8 @@ ListWidget::MouseState::MouseState(
 , pointState(pointState) {
 }
 
+const crl::time ListWidget::kItemRevealDuration = crl::time(150);
+
 template <ListWidget::EnumItemsDirection direction, typename Method>
 void ListWidget::enumerateItems(Method method) {
 	constexpr auto TopToBottom = (direction == EnumItemsDirection::TopToBottom);
@@ -341,13 +343,23 @@ void ListWidget::refreshViewer() {
 		_idsLimit,
 		_idsLimit
 	) | rpl::start_with_next([=](Data::MessagesSlice &&slice) {
-		_slice = std::move(slice);
-		refreshRows();
+		std::swap(_slice, slice);
+		refreshRows(slice);
 	}, _viewerLifetime);
 }
 
-void ListWidget::refreshRows() {
+void ListWidget::refreshRows(const Data::MessagesSlice &old) {
 	saveScrollState();
+
+	const auto addedToEndFrom = (old.skippedAfter == 0
+		&& (_slice.skippedAfter == 0)
+		&& !old.ids.empty())
+		? ranges::find(_slice.ids, old.ids.back())
+		: end(_slice.ids);
+	const auto addedToEndCount = std::max(
+		int(end(_slice.ids) - addedToEndFrom),
+		1
+	) - 1;
 
 	_items.clear();
 	_items.reserve(_slice.ids.size());
@@ -360,12 +372,20 @@ void ListWidget::refreshRows() {
 			_items.push_back(enforceViewForItem(item));
 		}
 	}
+	for (auto e = end(_items), i = e - addedToEndCount; i != e; ++i) {
+		_itemRevealPending.emplace(*i);
+	}
 	updateAroundPositionFromNearest(nearestIndex);
 
 	updateItemsGeometry();
 	checkUnreadBarCreation();
 	restoreScrollState();
-	mouseActionUpdate(QCursor::pos());
+	if (!_itemsRevealHeight) {
+		mouseActionUpdate(QCursor::pos());
+	}
+	if (_emptyInfo) {
+		_emptyInfo->setVisible(isEmpty());
+	}
 	_delegate->listContentRefreshed();
 }
 
@@ -1125,7 +1145,9 @@ bool ListWidget::loadedAtBottom() const {
 }
 
 bool ListWidget::isEmpty() const {
-	return loadedAtTop() && loadedAtBottom() && (_itemsHeight == 0);
+	return loadedAtTop()
+		&& loadedAtBottom()
+		&& (_itemsHeight + _itemsRevealHeight == 0);
 }
 
 int ListWidget::itemMinimalHeight() const {
@@ -1406,6 +1428,68 @@ void ListWidget::resizeToWidth(int newWidth, int minHeight) {
 	restoreScrollPosition();
 }
 
+void ListWidget::startItemRevealAnimations() {
+	for (const auto view : base::take(_itemRevealPending)) {
+		if (const auto height = view->height()) {
+			if (!_itemRevealAnimations.contains(view)) {
+				auto &animation = _itemRevealAnimations[view];
+				animation.startHeight = height;
+				_itemsRevealHeight += height;
+				animation.animation.start(
+					[=] { revealItemsCallback(); },
+					0.,
+					1.,
+					kItemRevealDuration,
+					anim::easeOutCirc);
+			}
+		}
+	}
+}
+
+void ListWidget::revealItemsCallback() {
+	auto revealHeight = 0;
+	for (auto i = begin(_itemRevealAnimations)
+		; i != end(_itemRevealAnimations);) {
+		if (!i->second.animation.animating()) {
+			i = _itemRevealAnimations.erase(i);
+		} else {
+			revealHeight += anim::interpolate(
+				i->second.startHeight,
+				0,
+				i->second.animation.value(1.));
+			++i;
+		}
+	}
+	if (_itemsRevealHeight != revealHeight) {
+		updateVisibleTopItem();
+		if (_visibleTopItem) {
+			// We're not at the bottom.
+			revealHeight = 0;
+			_itemRevealAnimations.clear();
+		}
+		const auto old = std::exchange(_itemsRevealHeight, revealHeight);
+		const auto delta = old - _itemsRevealHeight;
+		_itemsHeight += delta;
+		_itemsTop = (_minHeight > _itemsHeight + st::historyPaddingBottom)
+			? (_minHeight - _itemsHeight - st::historyPaddingBottom)
+			: 0;
+		const auto wasHeight = height();
+		const auto nowHeight = _itemsTop
+			+ _itemsHeight
+			+ st::historyPaddingBottom;
+		if (wasHeight != nowHeight) {
+			resize(width(), nowHeight);
+		}
+		update();
+		restoreScrollPosition();
+		updateVisibleTopItem();
+
+		if (!_itemsRevealHeight) {
+			mouseActionUpdate(QCursor::pos());
+		}
+	}
+}
+
 int ListWidget::resizeGetHeight(int newWidth) {
 	update();
 
@@ -1424,8 +1508,9 @@ int ListWidget::resizeGetHeight(int newWidth) {
 			itemMinimalHeight(),
 			newHeight / int(_items.size()));
 	}
+	startItemRevealAnimations();
 	_itemsWidth = newWidth;
-	_itemsHeight = newHeight;
+	_itemsHeight = newHeight - _itemsRevealHeight;
 	_itemsTop = (_minHeight > _itemsHeight + st::historyPaddingBottom)
 		? (_minHeight - _itemsHeight - st::historyPaddingBottom)
 		: 0;
@@ -2727,6 +2812,23 @@ void ListWidget::viewReplaced(not_null<const Element*> was, Element *now) {
 			_bar.element->createUnreadBar(_barText.value());
 		}
 	}
+	const auto i = _itemRevealPending.find(was);
+	if (i != end(_itemRevealPending)) {
+		_itemRevealPending.erase(i);
+		if (now) {
+			_itemRevealPending.emplace(now);
+		}
+	}
+	const auto j = _itemRevealAnimations.find(was);
+	if (j != end(_itemRevealAnimations)) {
+		auto data = std::move(j->second);
+		_itemRevealAnimations.erase(j);
+		if (now) {
+			_itemRevealAnimations.emplace(now, std::move(data));
+		} else {
+			revealItemsCallback();
+		}
+	}
 }
 
 void ListWidget::itemRemoved(not_null<const HistoryItem*> item) {
@@ -2840,6 +2942,10 @@ void ListWidget::replyNextMessage(FullMsgId fullId, bool next) {
 			reply(nextIt->get());
 		}
 	}
+}
+
+void ListWidget::setEmptyInfoWidget(base::unique_qptr<Ui::RpWidget> &&w) {
+	_emptyInfo = std::move(w);
 }
 
 ListWidget::~ListWidget() = default;
@@ -2966,11 +3072,16 @@ void ConfirmSendNowSelectedItems(not_null<ListWidget*> widget) {
 	if (!history) {
 		return;
 	}
+	const auto clearSelection = [weak = Ui::MakeWeak(widget)] {
+		if (const auto strong = weak.data()) {
+			strong->cancelSelection();
+		}
+	};
 	Window::ShowSendNowMessagesBox(
 		navigation,
 		history,
 		widget->getSelectedIds(),
-		[=] { navigation->showBackFromStack(); });
+		clearSelection);
 }
 
 QString WrapBotCommandInChat(

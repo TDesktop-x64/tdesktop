@@ -1445,12 +1445,12 @@ rpl::producer<not_null<const ViewElement*>> Session::viewLayoutChanged() const {
 	return _viewLayoutChanges.events();
 }
 
-void Session::notifyUnreadItemAdded(not_null<HistoryItem*> item) {
-	_unreadItemAdded.fire_copy(item);
+void Session::notifyNewItemAdded(not_null<HistoryItem*> item) {
+	_newItemAdded.fire_copy(item);
 }
 
-rpl::producer<not_null<HistoryItem*>> Session::unreadItemAdded() const {
-	return _unreadItemAdded.events();
+rpl::producer<not_null<HistoryItem*>> Session::newItemAdded() const {
+	return _newItemAdded.events();
 }
 
 void Session::changeMessageId(ChannelId channel, MsgId wasId, MsgId nowId) {
@@ -4159,10 +4159,19 @@ void Session::setWallpapers(const QVector<MTPWallPaper> &data, int32 hash) {
 			_wallpapers.push_back(*parsed);
 		}
 	}
+
+	// Put the legacy2 (flowers) wallpaper to the front of the list.
+	const auto legacy2 = ranges::find_if(
+		_wallpapers,
+		Data::IsLegacy2DefaultWallPaper);
+	if (legacy2 != end(_wallpapers)) {
+		ranges::rotate(begin(_wallpapers), legacy2, legacy2 + 1);
+	}
+
 	if (ranges::none_of(_wallpapers, Data::IsDefaultWallPaper)) {
 		_wallpapers.push_back(Data::DefaultWallPaper());
 		_wallpapers.back().setLocalImageAsThumbnail(std::make_shared<Image>(
-			u":/gui/arg/bg.jpg"_q));
+			u":/gui/art/background.jpg"_q));
 	}
 }
 

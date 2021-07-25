@@ -177,7 +177,6 @@ object_ptr<Ui::RpWidget> InnerWidget::setupSharedMedia(
 	};
 
 	addMediaButton(MediaType::Photo, st::infoIconMediaPhoto);
-	addMediaButton(MediaType::GIF, st::infoIconMediaGif);
 	addMediaButton(MediaType::Video, st::infoIconMediaVideo);
 	addMediaButton(MediaType::File, st::infoIconMediaFile);
 	addMediaButton(MediaType::MusicFile, st::infoIconMediaAudio);

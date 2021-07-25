@@ -120,7 +120,6 @@ void InnerWidget::createTypeButtons() {
 	//};
 
 	addMediaButton(Type::Photo, st::infoIconMediaPhoto);
-	addMediaButton(Type::GIF, st::infoIconMediaGif);
 	addMediaButton(Type::Video, st::infoIconMediaVideo);
 	addMediaButton(Type::File, st::infoIconMediaFile);
 	addMediaButton(Type::MusicFile, st::infoIconMediaAudio);

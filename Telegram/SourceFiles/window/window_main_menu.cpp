@@ -1112,7 +1112,7 @@ void MainMenu::updateInnerControlsGeometry() {
 
 void MainMenu::updatePhone() {
 	if (cShowPhoneNumber()) {
-		_phoneText = Ui::formatPhone(_controller->session().user()->phone());
+		_phoneText = Ui::FormatPhone(_controller->session().user()->phone());
 	} else {
 		_phoneText = "";
 	}

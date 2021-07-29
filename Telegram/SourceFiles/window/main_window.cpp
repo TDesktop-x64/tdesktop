@@ -592,7 +592,7 @@ void MainWindow::updateUnreadCounter() {
 	}
 
 	const auto counter = Core::App().unreadBadge();
-	_titleText = (counter > 0) ? qsl("64Gram (%1)").arg(counter) : qsl("64Gram");
+	setTitle((counter > 0) ? qsl("64Gram (%1)").arg(counter) : qsl("64Gram"));
 
 	unreadCounterChangedHook();
 }

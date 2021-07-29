@@ -210,6 +210,34 @@ void activateBotCommand(
 	}
 }
 
+void searchByHashtag(const QString &tag, PeerData *inPeer, UserData *from) {
+	const auto m = inPeer
+		? CheckMainWidget(&inPeer->session())
+		: App::main(); // multi good
+	if (m) {
+		if (m->controller()->openedFolder().current()) {
+			m->controller()->closeFolder();
+		}
+		Ui::hideSettingsAndLayer();
+		Core::App().hideMediaView();
+		if (tag.startsWith("#")) {
+			m->searchMessages(
+					tag + ' ',
+					(inPeer && !inPeer->isUser())
+					? inPeer->owner().history(inPeer).get()
+					: Dialogs::Key(),
+					from);
+		} else {
+			m->searchMessages(
+					tag + ' ',
+					(inPeer && !inPeer->isUser())
+					? inPeer->owner().history(inPeer).get()
+					: Dialogs::Key(),
+					from ? from : inPeer);
+		}
+	}
+}
+
 } // namespace App
 
 namespace Ui {

@@ -52,7 +52,7 @@ void SearchByHashtag(ClickContext context, const QString &tag) {
 		tag + ' ',
 		(inPeer && !inPeer->isUser())
 			? data.history(inPeer).get()
-			: Dialogs::Key());
+			: Dialogs::Key(), nullptr);
 }
 
 } // namespace

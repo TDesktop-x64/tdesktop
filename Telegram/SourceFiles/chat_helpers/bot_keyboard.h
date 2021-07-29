@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "ui/widgets/tooltip.h"
+#include "chat_helpers/bot_command.h"
 
 class ReplyKeyboard;
 
@@ -15,16 +16,18 @@ namespace style {
 struct BotKeyboardButton;
 } // namespace style
 
-namespace Main {
-class Session;
-} // namespace Main
+namespace Window {
+class SessionController;
+} // namespace Window
 
 class BotKeyboard
 	: public TWidget
 	, public Ui::AbstractTooltipShower
 	, public ClickHandlerHost {
 public:
-	BotKeyboard(not_null<Main::Session*> session, QWidget *parent);
+	BotKeyboard(
+		not_null<Window::SessionController*> controller,
+		QWidget *parent);
 
 	bool moderateKeyActivate(int index);
 
@@ -60,6 +63,8 @@ public:
 	void clickHandlerActiveChanged(const ClickHandlerPtr &p, bool active) override;
 	void clickHandlerPressedChanged(const ClickHandlerPtr &p, bool pressed) override;
 
+	rpl::producer<Bot::SendCommandRequest> sendCommandRequests() const;
+
 	~BotKeyboard();
 
 protected:
@@ -78,7 +83,7 @@ private:
 	void updateStyle(int newWidth);
 	void clearSelection();
 
-	const not_null<Main::Session*> _session;
+	const not_null<Window::SessionController*> _controller;
 	FullMsgId _wasForMsgId;
 	QString _placeholder;
 	int _height = 0;
@@ -89,6 +94,8 @@ private:
 
 	QPoint _lastMousePos;
 	std::unique_ptr<ReplyKeyboard> _impl;
+
+	rpl::event_stream<Bot::SendCommandRequest> _sendCommandRequests;
 
 	const style::BotKeyboardButton *_st = nullptr;
 

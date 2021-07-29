@@ -7,7 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "layout.h"
+#include "layout/layout_item_base.h"
 #include "ui/text/text.h"
 
 class Image;
@@ -77,9 +77,6 @@ public:
 
 	virtual void paint(Painter &p, const QRect &clip, const PaintContext *context) const = 0;
 
-	virtual void setPosition(int32 position);
-	int32 position() const;
-
 	virtual bool isFullLine() const {
 		return true;
 	}
@@ -143,8 +140,6 @@ protected:
 
 	ClickHandlerPtr _send = ClickHandlerPtr{ new SendClickHandler() };
 	ClickHandlerPtr _open = ClickHandlerPtr{ new OpenFileClickHandler() };
-
-	int _position = 0; // < 0 means removed from layout
 
 private:
 	not_null<Context*> _context;

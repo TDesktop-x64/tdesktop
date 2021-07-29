@@ -7,7 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "layout.h"
+#include "layout/layout_item_base.h"
+#include "layout/layout_document_generic_preview.h"
 #include "media/clip/media_clip_reader.h"
 #include "core/click_handler_types.h"
 #include "ui/effects/animations.h"
@@ -54,13 +55,6 @@ public:
 
 	QDateTime dateTime() const;
 
-	void setPosition(int position) {
-		_position = position;
-	}
-	int position() const {
-		return _position;
-	}
-
 	HistoryItem *getItem() const {
 		return _parent;
 	}
@@ -94,7 +88,6 @@ private:
 	const not_null<HistoryItem*> _parent;
 	const QDateTime _dateTime;
 	std::unique_ptr<Checkbox> _check;
-	int _position = 0;
 
 };
 
@@ -225,7 +218,7 @@ public:
 		StateRequest request) const override;
 
 	void clearHeavyPart() override;
-	void setPosition(int32 position);
+	void setPosition(int32 position) override;
 
 protected:
 	float64 dataProgress() const override;
@@ -380,6 +373,7 @@ private:
 	ClickHandlerPtr _msgl, _namel;
 
 	const style::OverviewFileLayout &_st;
+	const ::Layout::DocumentGenericPreview _generic;
 
 	bool _thumbLoaded = false;
 	QPixmap _thumb;
@@ -387,7 +381,7 @@ private:
 	Ui::Text::String _name;
 	QString _date, _ext;
 	int32 _datew, _extw;
-	int32 _thumbw, _colorIndex;
+	int32 _thumbw;
 
 	bool withThumb() const;
 	bool updateStatusText();

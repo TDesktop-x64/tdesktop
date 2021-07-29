@@ -18,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/crash_reports.h" // CrashReports::SetAnnotation
 #include "ui/image/image.h"
 #include "ui/image/image_location_factory.h" // Images::FromPhotoSize
+#include "ui/text/format_values.h" // Ui::FormatPhone
 #include "export/export_manager.h"
 #include "export/view/export_view_panel_controller.h"
 #include "mtproto/mtproto_config.h"
@@ -508,7 +509,7 @@ not_null<UserData*> Session::processUser(const MTPUser &data) {
 
 			const auto pname = (showPhoneChanged || phoneChanged || nameChanged)
 				? ((showPhone && !phone.isEmpty())
-					? App::formatPhone(phone)
+					? Ui::FormatPhone(phone)
 					: QString())
 				: result->nameOrPhone;
 
@@ -1967,7 +1968,7 @@ void Session::processMessages(
 	for (const auto &[position, index] : indices) {
 		addNewMessage(
 			data[index],
-			MTPDmessage_ClientFlags(),
+			MessageFlags(),
 			type);
 	}
 }
@@ -2284,7 +2285,7 @@ void Session::unmuteByFinished() {
 
 HistoryItem *Session::addNewMessage(
 		const MTPMessage &data,
-		MTPDmessage_ClientFlags clientFlags,
+		MessageFlags localFlags,
 		NewMessageType type) {
 	const auto peerId = PeerFromMessage(data);
 	if (!peerId) {
@@ -2293,7 +2294,7 @@ HistoryItem *Session::addNewMessage(
 
 	const auto result = history(peerId)->addNewMessage(
 		data,
-		clientFlags,
+		localFlags,
 		type);
 	if (result && type == NewMessageType::Unread) {
 		CheckForSwitchInlineButton(result);
@@ -3591,7 +3592,7 @@ QString Session::findContactPhone(not_null<UserData*> contact) const {
 	const auto result = contact->phone();
 	return result.isEmpty()
 		? findContactPhone(peerToUser(contact->id))
-		: App::formatPhone(result);
+		: Ui::FormatPhone(result);
 }
 
 QString Session::findContactPhone(UserId contactId) const {
@@ -4065,8 +4066,8 @@ void Session::insertCheckedServiceNotification(
 	const auto flags = MTPDmessage::Flag::f_entities
 		| MTPDmessage::Flag::f_from_id
 		| MTPDmessage::Flag::f_media;
-	const auto clientFlags = MTPDmessage_ClientFlag::f_clientside_unread
-		| MTPDmessage_ClientFlag::f_local_history_entry;
+	const auto localFlags = MessageFlag::ClientSideUnread
+		| MessageFlag::LocalHistoryEntry;
 	auto sending = TextWithEntities(), left = message;
 	while (TextUtilities::CutPart(sending, left, MaxMessageSize)) {
 		addNewMessage(
@@ -4092,7 +4093,7 @@ void Session::insertCheckedServiceNotification(
 				//MTPMessageReactions(),
 				MTPVector<MTPRestrictionReason>(),
 				MTPint()), // ttl_period
-			clientFlags,
+			localFlags,
 			NewMessageType::Unread);
 	}
 	sendHistoryChangeNotifications();

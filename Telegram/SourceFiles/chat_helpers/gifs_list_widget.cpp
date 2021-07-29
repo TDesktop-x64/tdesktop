@@ -18,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_document_media.h"
 #include "data/stickers/data_stickers.h"
 #include "chat_helpers/send_context_menu.h" // SendMenu::FillSendMenu
+#include "core/click_handler_types.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/input_fields.h"
 #include "ui/widgets/popup_menu.h"
@@ -27,7 +28,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "inline_bots/inline_bot_result.h"
 #include "storage/localstorage.h"
 #include "lang/lang_keys.h"
-#include "layout/layout_utils.h"
+#include "layout/layout_position.h"
 #include "mainwindow.h"
 #include "main/main_session.h"
 #include "window/window_session_controller.h"
@@ -202,6 +203,11 @@ GifsListWidget::GifsListWidget(
 	) | rpl::start_with_next([=](const QSize &s) {
 		_mosaic.setFullWidth(s.width());
 	}, lifetime());
+
+	_mosaic.setOffset(
+		st::inlineResultsLeft - st::roundRadiusSmall,
+		st::stickerPanPadding);
+	_mosaic.setRightSkip(st::inlineResultsSkip);
 }
 
 rpl::producer<TabbedSelector::FileChosen> GifsListWidget::fileChosen() const {
@@ -337,12 +343,15 @@ void GifsListWidget::paintInlineItems(Painter &p, QRect clip) {
 	using namespace InlineBots::Layout;
 	PaintContext context(crl::now(), false, gifPaused, false);
 
-	_mosaic.paint(
-		p,
-		st::stickerPanPadding,
-		st::inlineResultsLeft - st::roundRadiusSmall,
-		clip,
-		context);
+	auto paintItem = [&](not_null<const ItemBase*> item, QPoint point) {
+		p.translate(point.x(), point.y());
+		item->paint(
+			p,
+			clip.translated(-point),
+			&context);
+		p.translate(-point.x(), -point.y());
+	};
+	_mosaic.paint(std::move(paintItem), clip);
 }
 
 void GifsListWidget::mousePressEvent(QMouseEvent *e) {
@@ -407,7 +416,12 @@ void GifsListWidget::mouseReleaseEvent(QMouseEvent *e) {
 	if (dynamic_cast<InlineBots::Layout::SendClickHandler*>(activated.get())) {
 		selectInlineResult(_selected, {});
 	} else {
-		ActivateClickHandler(window(), activated, e->button());
+		ActivateClickHandler(window(), activated, {
+			e->button(),
+			QVariant::fromValue(ClickHandlerContext{
+				.sessionWindow = base::make_weak(controller().get()),
+			})
+		});
 	}
 }
 
@@ -520,7 +534,7 @@ void GifsListWidget::refreshSavedGifs() {
 				return layoutPrepareSavedGif(gif);
 			}) | ranges::views::filter([](const LayoutItem *item) {
 				return item != nullptr;
-			}) | ranges::to_vector;
+			}) | ranges::to<std::vector<not_null<LayoutItem*>>>;
 
 			_mosaic.addItems(layouts);
 		}
@@ -610,7 +624,9 @@ void GifsListWidget::deleteUnusedInlineLayouts() {
 }
 
 void GifsListWidget::preloadImages() {
-	_mosaic.preloadImages();
+	_mosaic.forEach([](not_null<const LayoutItem*> item) {
+		item->preload();
+	});
 }
 
 void GifsListWidget::switchToSavedGifs() {
@@ -645,10 +661,11 @@ int GifsListWidget::refreshInlineRows(const InlineCacheEntry *entry, bool result
 			return layoutPrepareInlineResult(r.get());
 		}) | ranges::views::filter([](const LayoutItem *item) {
 			return item != nullptr;
-		}) | ranges::to_vector;
+		}) | ranges::to<std::vector<not_null<LayoutItem*>>>;
 
 		_mosaic.addItems(resultLayouts);
 		added = resultLayouts.size();
+		preloadImages();
 	}
 
 	resizeToWidth(width());
@@ -661,7 +678,11 @@ int GifsListWidget::refreshInlineRows(const InlineCacheEntry *entry, bool result
 }
 
 int GifsListWidget::validateExistingInlineRows(const InlineResults &results) {
-	const auto until = _mosaic.validateExistingRows(results);
+	const auto until = _mosaic.validateExistingRows([&](
+			not_null<const LayoutItem*> item,
+			int untilIndex) {
+		return item->getResult() != results[untilIndex].get();
+	}, results.size());
 
 	if (_mosaic.empty()) {
 		_inlineWithThumb = false;
@@ -853,10 +874,12 @@ void GifsListWidget::updateSelected() {
 	}
 
 	const auto p = mapFromGlobal(_lastMousePos);
-	const auto sx = (rtl() ? width() - p.x() : p.x())
-		- (st::inlineResultsLeft - st::roundRadiusSmall);
-	const auto sy = p.y() - st::stickerPanPadding;
-	const auto &[link, item, selected] = _mosaic.findByPoint({ sx, sy });
+	const auto sx = rtl() ? (width() - p.x()) : p.x();
+	const auto sy = p.y();
+	const auto &[index, exact, relative] = _mosaic.findByPoint({ sx, sy });
+	const auto selected = exact ? index : -1;
+	const auto item = exact ? _mosaic.itemAt(selected).get() : nullptr;
+	const auto link = exact ? item->getState(relative, {}).link : nullptr;
 
 	if (_selected != selected) {
 		if (const auto s = _mosaic.maybeItemAt(_selected)) {

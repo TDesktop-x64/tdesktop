@@ -510,7 +510,6 @@ void GenerateItems(
 		return callback(OwnedItem(delegate, item), sentDate);
 	};
 
-	using Flag = MTPDmessage::Flag;
 	const auto fromName = from->name;
 	const auto fromLink = from->createOpenLink();
 	const auto fromLinkText = textcmdLink(1, fromName);
@@ -520,10 +519,9 @@ void GenerateItems(
 		message.links.push_back(fromLink);
 		addPart(history->makeServiceMessage(
 			history->nextNonHistoryEntryId(),
-			MTPDmessage_ClientFlag::f_admin_log_entry,
+			MessageFlag::AdminLogEntry,
 			date,
 			message,
-			MTPDmessage::Flags(0),
 			peerToUser(from->id),
 			photo));
 	};
@@ -540,6 +538,29 @@ void GenerateItems(
 		addSimpleServiceMessage(text);
 	};
 
+	auto makeSimpleTextMessage = [&](TextWithEntities &&text) {
+		auto bodyFlags = MessageFlag::HasFromId | MessageFlag::AdminLogEntry;
+		auto bodyReplyTo = MsgId();
+		auto bodyViaBotId = UserId();
+		auto bodyGroupedId = uint64();
+		return history->makeMessage(
+			history->nextNonHistoryEntryId(),
+			bodyFlags,
+			bodyReplyTo,
+			bodyViaBotId,
+			date,
+			peerToUser(from->id),
+			QString(),
+			std::move(text),
+			MTP_messageMediaEmpty(),
+			MTPReplyMarkup(),
+			bodyGroupedId);
+	};
+
+	auto addSimpleTextMessage = [&](TextWithEntities &&text) {
+		addPart(makeSimpleTextMessage(std::move(text)));
+	};
+
 	auto createChangeAbout = [&](const MTPDchannelAdminLogEventActionChangeAbout &action) {
 		auto newValue = qs(action.vnew_value());
 		auto oldValue = qs(action.vprev_value());
@@ -553,21 +574,8 @@ void GenerateItems(
 			)(tr::now, lt_from, fromLinkText);
 		addSimpleServiceMessage(text);
 
-		auto bodyFlags = Flag::f_entities | Flag::f_from_id;
-		auto bodyClientFlags = MTPDmessage_ClientFlag::f_admin_log_entry;
-		auto bodyReplyTo = 0;
-		auto bodyViaBotId = 0;
 		auto newDescription = PrepareText(newValue, QString());
-		auto body = history->makeMessage(
-			history->nextNonHistoryEntryId(),
-			bodyFlags,
-			bodyClientFlags,
-			bodyReplyTo,
-			bodyViaBotId,
-			date,
-			peerToUser(from->id),
-			QString(),
-			newDescription);
+		auto body = makeSimpleTextMessage(PrepareText(newValue, QString()));
 		if (!oldValue.isEmpty()) {
 			auto oldDescription = PrepareText(oldValue, QString());
 			body->addLogEntryOriginal(id, tr::lng_admin_log_previous_description(tr::now), oldDescription);
@@ -588,25 +596,20 @@ void GenerateItems(
 			)(tr::now, lt_from, fromLinkText);
 		addSimpleServiceMessage(text);
 
-		auto bodyFlags = Flag::f_entities | Flag::f_from_id;
-		auto bodyClientFlags = MTPDmessage_ClientFlag::f_admin_log_entry;
-		auto bodyReplyTo = 0;
-		auto bodyViaBotId = 0;
+		auto bodyFlags = MessageFlag::Outgoing | MessageFlag::AdminLogEntry;
+		auto bodyReplyTo = MsgId();
+		auto bodyViaBotId = UserId();
+		auto bodyGroupedId = uint64();
 		auto newLink = newValue.isEmpty()
 			? TextWithEntities()
 			: PrepareText(
 				history->session().createInternalLinkFull(newValue),
 				QString());
-		auto body = history->makeMessage(
-			history->nextNonHistoryEntryId(),
-			bodyFlags,
-			bodyClientFlags,
-			bodyReplyTo,
-			bodyViaBotId,
-			date,
-			peerToUser(from->id),
-			QString(),
-			newLink);
+		auto body = makeSimpleTextMessage(newValue.isEmpty()
+			? TextWithEntities()
+			: PrepareText(
+				history->session().createInternalLinkFull(newValue),
+				QString()));
 		if (!oldValue.isEmpty()) {
 			auto oldLink = PrepareText(
 				history->session().createInternalLinkFull(oldValue),
@@ -668,7 +671,7 @@ void GenerateItems(
 						action.vmessage(),
 						history->nextNonHistoryEntryId(),
 						date),
-					MTPDmessage_ClientFlag::f_admin_log_entry,
+					MessageFlag::AdminLogEntry,
 					detachExistingItem),
 				ExtractSentDate(action.vmessage()));
 		}, [&](const auto &) {
@@ -697,7 +700,7 @@ void GenerateItems(
 				action.vnew_message(),
 				history->nextNonHistoryEntryId(),
 				date),
-			MTPDmessage_ClientFlag::f_admin_log_entry,
+			MessageFlag::AdminLogEntry,
 			detachExistingItem);
 		if (oldValue.text.isEmpty()) {
 			oldValue = PrepareText(QString(), tr::lng_admin_log_empty_text(tr::now));
@@ -723,7 +726,7 @@ void GenerateItems(
 					action.vmessage(),
 					history->nextNonHistoryEntryId(),
 					date),
-				MTPDmessage_ClientFlag::f_admin_log_entry,
+				MessageFlag::AdminLogEntry,
 				detachExistingItem),
 			ExtractSentDate(action.vmessage()));
 	};
@@ -743,39 +746,13 @@ void GenerateItems(
 	};
 
 	auto createParticipantInvite = [&](const MTPDchannelAdminLogEventActionParticipantInvite &action) {
-		auto bodyFlags = Flag::f_entities | Flag::f_from_id;
-		auto bodyClientFlags = MTPDmessage_ClientFlag::f_admin_log_entry;
-		auto bodyReplyTo = 0;
-		auto bodyViaBotId = 0;
-		auto bodyText = GenerateParticipantChangeText(channel, action.vparticipant());
-		addPart(history->makeMessage(
-			history->nextNonHistoryEntryId(),
-			bodyFlags,
-			bodyClientFlags,
-			bodyReplyTo,
-			bodyViaBotId,
-			date,
-			peerToUser(from->id),
-			QString(),
-			bodyText));
+		addSimpleTextMessage(
+			GenerateParticipantChangeText(channel, action.vparticipant()));
 	};
 
 	auto createParticipantToggleBan = [&](const MTPDchannelAdminLogEventActionParticipantToggleBan &action) {
-		auto bodyFlags = Flag::f_entities | Flag::f_from_id;
-		auto bodyClientFlags = MTPDmessage_ClientFlag::f_admin_log_entry;
-		auto bodyReplyTo = 0;
-		auto bodyViaBotId = 0;
-		auto bodyText = GenerateParticipantChangeText(channel, action.vnew_participant(), &action.vprev_participant());
-		addPart(history->makeMessage(
-			history->nextNonHistoryEntryId(),
-			bodyFlags,
-			bodyClientFlags,
-			bodyReplyTo,
-			bodyViaBotId,
-			date,
-			peerToUser(from->id),
-			QString(),
-			bodyText));
+		addSimpleTextMessage(
+			GenerateParticipantChangeText(channel, action.vnew_participant(), &action.vprev_participant()));
 	};
 
 	auto createParticipantToggleAdmin = [&](const MTPDchannelAdminLogEventActionParticipantToggleAdmin &action) {
@@ -785,21 +762,8 @@ void GenerateItems(
 			// the "User > Creator" part and skip the "Creator > Admin" part.
 			return;
 		}
-		auto bodyFlags = Flag::f_entities | Flag::f_from_id;
-		auto bodyClientFlags = MTPDmessage_ClientFlag::f_admin_log_entry;
-		auto bodyReplyTo = 0;
-		auto bodyViaBotId = 0;
-		auto bodyText = GenerateParticipantChangeText(channel, action.vnew_participant(), &action.vprev_participant());
-		addPart(history->makeMessage(
-			history->nextNonHistoryEntryId(),
-			bodyFlags,
-			bodyClientFlags,
-			bodyReplyTo,
-			bodyViaBotId,
-			date,
-			peerToUser(from->id),
-			QString(),
-			bodyText));
+		addSimpleTextMessage(
+			GenerateParticipantChangeText(channel, action.vnew_participant(), &action.vprev_participant()));
 	};
 
 	auto createChangeStickerSet = [&](const MTPDchannelAdminLogEventActionChangeStickerSet &action) {
@@ -825,10 +789,9 @@ void GenerateItems(
 			message.links.push_back(setLink);
 			addPart(history->makeServiceMessage(
 				history->nextNonHistoryEntryId(),
-				MTPDmessage_ClientFlag::f_admin_log_entry,
+				MessageFlag::AdminLogEntry,
 				date,
 				message,
-				MTPDmessage::Flags(0),
 				peerToUser(from->id)));
 		}
 	};
@@ -842,24 +805,11 @@ void GenerateItems(
 	};
 
 	auto createDefaultBannedRights = [&](const MTPDchannelAdminLogEventActionDefaultBannedRights &action) {
-		auto bodyFlags = Flag::f_entities | Flag::f_from_id;
-		auto bodyClientFlags = MTPDmessage_ClientFlag::f_admin_log_entry;
-		auto bodyReplyTo = 0;
-		auto bodyViaBotId = 0;
-		auto bodyText = GenerateDefaultBannedRightsChangeText(
-			channel,
-			ChatRestrictionsInfo(action.vnew_banned_rights()),
-			ChatRestrictionsInfo(action.vprev_banned_rights()));
-		addPart(history->makeMessage(
-			history->nextNonHistoryEntryId(),
-			bodyFlags,
-			bodyClientFlags,
-			bodyReplyTo,
-			bodyViaBotId,
-			date,
-			peerToUser(from->id),
-			QString(),
-			bodyText));
+		addSimpleTextMessage(
+			GenerateDefaultBannedRightsChangeText(
+				channel,
+				ChatRestrictionsInfo(action.vnew_banned_rights()),
+				ChatRestrictionsInfo(action.vprev_banned_rights())));
 	};
 
 	auto createStopPoll = [&](const MTPDchannelAdminLogEventActionStopPoll &action) {
@@ -873,7 +823,7 @@ void GenerateItems(
 					action.vmessage(),
 					history->nextNonHistoryEntryId(),
 					date),
-				MTPDmessage_ClientFlag::f_admin_log_entry,
+				MessageFlag::AdminLogEntry,
 				detachExistingItem),
 			ExtractSentDate(action.vmessage()));
 	};
@@ -906,10 +856,9 @@ void GenerateItems(
 			message.links.push_back(chatLink);
 			addPart(history->makeServiceMessage(
 				history->nextNonHistoryEntryId(),
-				MTPDmessage_ClientFlag::f_admin_log_entry,
+				MessageFlag::AdminLogEntry,
 				date,
 				message,
-				MTPDmessage::Flags(0),
 				peerToUser(from->id)));
 		}
 	};
@@ -977,10 +926,9 @@ void GenerateItems(
 		message.links.push_back(link);
 		addPart(history->makeServiceMessage(
 			history->nextNonHistoryEntryId(),
-			MTPDmessage_ClientFlag::f_admin_log_entry,
+			MessageFlag::AdminLogEntry,
 			date,
 			message,
-			MTPDmessage::Flags(0),
 			peerToUser(from->id)));
 	};
 
@@ -1025,10 +973,9 @@ void GenerateItems(
 		}
 		addPart(history->makeServiceMessage(
 			history->nextNonHistoryEntryId(),
-			MTPDmessage_ClientFlag::f_admin_log_entry,
+			MessageFlag::AdminLogEntry,
 			date,
 			message,
-			MTPDmessage::Flags(0),
 			peerToUser(from->id),
 			nullptr));
 	};
@@ -1070,21 +1017,8 @@ void GenerateItems(
 	};
 
 	auto createExportedInviteEdit = [&](const MTPDchannelAdminLogEventActionExportedInviteEdit &data) {
-		auto bodyFlags = Flag::f_entities | Flag::f_from_id;
-		auto bodyClientFlags = MTPDmessage_ClientFlag::f_admin_log_entry;
-		auto bodyReplyTo = 0;
-		auto bodyViaBotId = 0;
-		auto bodyText = GenerateInviteLinkChangeText(data.vnew_invite(), data.vprev_invite());
-		addPart(history->makeMessage(
-			history->nextNonHistoryEntryId(),
-			bodyFlags,
-			bodyClientFlags,
-			bodyReplyTo,
-			bodyViaBotId,
-			date,
-			peerToUser(from->id),
-			QString(),
-			bodyText));
+		addSimpleTextMessage(
+			GenerateInviteLinkChangeText(data.vnew_invite(), data.vprev_invite()));
 	};
 
 	auto createParticipantVolume = [&](const MTPDchannelAdminLogEventActionParticipantVolume &data) {

@@ -571,14 +571,6 @@ bool MainWidget::shareUrl(
 	return true;
 }
 
-void MainWidget::replyToItem(not_null<HistoryItem*> item) {
-	if ((!_mainSection || !_mainSection->replyToMessage(item))
-		&& (_history->peer() == item->history()->peer
-			|| _history->peer() == item->history()->peer->migrateTo())) {
-		_history->replyToMessage(item);
-	}
-}
-
 bool MainWidget::inlineSwitchChosen(PeerId peerId, const QString &botAndQuery) {
 	Expects(peerId != 0);
 
@@ -835,12 +827,17 @@ crl::time MainWidget::highlightStartTime(not_null<const HistoryItem*> item) cons
 	return _history->highlightStartTime(item);
 }
 
-void MainWidget::sendBotCommand(
-		not_null<PeerData*> peer,
-		UserData *bot,
-		const QString &cmd,
-		MsgId replyTo) {
-	_history->sendBotCommand(peer, bot, cmd, replyTo);
+void MainWidget::sendBotCommand(Bot::SendCommandRequest request) {
+	const auto type = _mainSection
+		? _mainSection->sendBotCommand(request)
+		: Window::SectionActionResult::Fallback;
+	if (type == Window::SectionActionResult::Fallback) {
+		ui_showPeerHistory(
+			request.peer->id,
+			SectionShow::Way::ClearStack,
+			ShowAtTheEndMsgId);
+		_history->sendBotCommand(request);
+	}
 }
 
 void MainWidget::hideSingleUseKeyboard(PeerData *peer, MsgId replyTo) {
@@ -1610,10 +1607,6 @@ void MainWidget::ui_showPeerHistory(
 	}
 
 	floatPlayerCheckVisibility();
-}
-
-PeerData *MainWidget::ui_getPeerForMouseAction() {
-	return _history->ui_getPeerForMouseAction();
 }
 
 PeerData *MainWidget::peer() {

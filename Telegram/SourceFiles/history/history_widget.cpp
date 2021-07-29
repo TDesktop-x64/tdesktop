@@ -312,7 +312,7 @@ HistoryWidget::HistoryWidget(
 	tr::lng_message_ph())
 , _kbScroll(this, st::botKbScroll)
 , _keyboard(_kbScroll->setOwnedWidget(object_ptr<BotKeyboard>(
-	&session(),
+	controller,
 	this)))
 , _membersDropdownShowTimer([=] { showMembersDropdown(); })
 , _scrollTimer([=] { scrollByTimer(); })
@@ -409,6 +409,11 @@ HistoryWidget::HistoryWidget(
 	_unreadMentions->installEventFilter(this);
 
 	InitMessageField(controller, _field);
+
+	_keyboard->sendCommandRequests(
+	) | rpl::start_with_next([=](Bot::SendCommandRequest r) {
+		sendBotCommand(r);
+	}, lifetime());
 
 	_fieldAutocomplete->mentionChosen(
 	) | rpl::start_with_next([=](FieldAutocomplete::MentionChosen data) {
@@ -1302,7 +1307,7 @@ void HistoryWidget::insertHashtagOrBotCommand(
 
 	// Send bot command at once, if it was not inserted by pressing Tab.
 	if (str.at(0) == '/' && method != FieldAutocomplete::ChooseMethod::ByTab) {
-		App::sendBotCommand(_peer, nullptr, str, replyToId());
+		sendBotCommand({ _peer, str, FullMsgId(), replyToId() });
 		session().api().finishForwarding(Api::SendAction(_history));
 		setFieldText(_field->getTextWithTagsPart(_field->textCursor().position()));
 	} else {
@@ -3757,34 +3762,33 @@ void HistoryWidget::mouseReleaseEvent(QMouseEvent *e) {
 	}
 }
 
-void HistoryWidget::sendBotCommand(
-		not_null<PeerData*> peer,
-		UserData *bot,
-		const QString &cmd,
-		MsgId replyTo) { // replyTo != 0 from ReplyKeyboardMarkup, == 0 from cmd links
-	if (_peer != peer.get()) {
+void HistoryWidget::sendBotCommand(const Bot::SendCommandRequest &request) {
+// replyTo != 0 from ReplyKeyboardMarkup, == 0 from command links
+	if (_peer != request.peer.get()) {
 		return;
 	} else if (showSlowmodeError()) {
 		return;
 	}
 
-	bool lastKeyboardUsed = (_keyboard->forMsgId() == FullMsgId(_channel, _history->lastKeyboardId)) && (_keyboard->forMsgId() == FullMsgId(_channel, replyTo));
+	const auto lastKeyboardUsed = (_keyboard->forMsgId()
+			== FullMsgId(_channel, _history->lastKeyboardId))
+		&& (_keyboard->forMsgId() == FullMsgId(_channel, request.replyTo));
 
 	// 'bot' may be nullptr in case of sending from FieldAutocomplete.
-	const auto toSend = (replyTo || !bot)
-		? cmd
-		: HistoryView::WrapBotCommandInChat(_peer, cmd, bot);
+	const auto toSend = (request.replyTo/* || !bot*/)
+		? request.command
+		: Bot::WrapCommandInChat(_peer, request.command, request.context);
 
 	auto message = ApiWrap::MessageToSend(_history);
 	message.textWithTags = { toSend, TextWithTags::Tags() };
-	message.action.replyTo = replyTo
+	message.action.replyTo = request.replyTo
 		? ((!_peer->isUser()/* && (botStatus == 0 || botStatus == 2)*/)
-			? replyTo
+			? request.replyTo
 			: replyToId())
 		: 0;
 	session().api().sendMessage(std::move(message));
-	if (replyTo) {
-		if (_replyToId == replyTo) {
+	if (request.replyTo) {
+		if (_replyToId == request.replyTo) {
 			cancelReply();
 			saveCloudDraft();
 		}
@@ -4763,10 +4767,6 @@ void HistoryWidget::updateHistoryItemsByTimer() {
 		_updateHistoryItems.callOnce(
 			_lastScrolled + kSkipRepaintWhileScrollMs - ms);
 	}
-}
-
-PeerData *HistoryWidget::ui_getPeerForMouseAction() {
-	return _peer;
 }
 
 void HistoryWidget::handlePendingHistoryUpdate() {

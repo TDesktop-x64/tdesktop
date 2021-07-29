@@ -1177,11 +1177,23 @@ bool ScheduledWidget::listIsGoodForAroundPosition(
 	return true;
 }
 
+Window::SectionActionResult ScheduledWidget::sendBotCommand(
+		Bot::SendCommandRequest request) {
+	if (request.peer != _history->peer) {
+		return Window::SectionActionResult::Ignore;
+	}
+	listSendBotCommand(request.command, request.context);
+	return Window::SectionActionResult::Handle;
+}
+
 void ScheduledWidget::listSendBotCommand(
 		const QString &command,
 		const FullMsgId &context) {
 	const auto callback = [=](Api::SendOptions options) {
-		const auto text = WrapBotCommandInChat(_history->peer, command, context);
+		const auto text = Bot::WrapCommandInChat(
+			_history->peer,
+			command,
+			context);
 		auto message = ApiWrap::MessageToSend(_history);
 		message.textWithTags = { text };
 		message.action.options = options;

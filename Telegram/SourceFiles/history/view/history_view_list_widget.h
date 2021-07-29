@@ -256,6 +256,7 @@ public:
 	void elementHandleViaClick(not_null<UserData*> bot) override;
 	bool elementIsChatWide() override;
 	not_null<Ui::PathShiftGradient*> elementPathShiftGradient() override;
+	void elementReplyTo(const FullMsgId &to) override;
 
 	void setEmptyInfoWidget(base::unique_qptr<Ui::RpWidget> &&w);
 
@@ -599,14 +600,5 @@ void ConfirmForwardSelectedItems(not_null<ListWidget*> widget);
 void ConfirmForwardNoQuoteSelectedItems(not_null<ListWidget*> widget);
 void ConfirmForwardSelectedToSavedMessagesItems(not_null<ListWidget*> widget);
 void ConfirmSendNowSelectedItems(not_null<ListWidget*> widget);
-
-[[nodiscard]] QString WrapBotCommandInChat(
-	not_null<PeerData*> peer,
-	const QString &command,
-	const FullMsgId &context);
-[[nodiscard]] QString WrapBotCommandInChat(
-	not_null<PeerData*> peer,
-	const QString &command,
-	not_null<UserData*> bot);
 
 } // namespace HistoryView

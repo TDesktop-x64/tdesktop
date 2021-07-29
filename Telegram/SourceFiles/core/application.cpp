@@ -272,7 +272,7 @@ void Application::run() {
 
 	const auto currentGeometry = _window->widget()->geometry();
 	_mediaView = std::make_unique<Media::View::OverlayWidget>();
-	_window->widget()->setGeometry(currentGeometry);
+	_window->widget()->Ui::RpWidget::setGeometry(currentGeometry);
 
 	DEBUG_LOG(("Application Info: showing."));
 	_window->finishFirstShow();
@@ -393,15 +393,6 @@ bool Application::hideMediaView() {
 		return true;
 	}
 	return false;
-}
-
-PeerData *Application::ui_getPeerForMouseAction() {
-	if (_mediaView && !_mediaView->isHidden()) {
-		return _mediaView->ui_getPeerForMouseAction();
-	} else if (const auto m = App::main()) { // multi good
-		return m->ui_getPeerForMouseAction();
-	}
-	return nullptr;
 }
 
 bool Application::eventFilter(QObject *object, QEvent *e) {

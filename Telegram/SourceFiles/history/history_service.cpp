@@ -12,7 +12,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "main/main_domain.h" // Core::App().domain().activate().
 #include "apiwrap.h"
-#include "layout.h"
 #include "history/history.h"
 #include "history/view/media/history_view_invoice.h"
 #include "history/history_message.h"
@@ -527,13 +526,13 @@ void HistoryService::applyAction(const MTPMessageAction &action) {
 		}, [](const MTPDphotoEmpty &) {
 		});
 	}, [&](const MTPDmessageActionChatCreate &) {
-		_clientFlags |= MTPDmessage_ClientFlag::f_is_group_essential;
+		_flags |= MessageFlag::IsGroupEssential;
 	}, [&](const MTPDmessageActionChannelCreate &) {
-		_clientFlags |= MTPDmessage_ClientFlag::f_is_group_essential;
+		_flags |= MessageFlag::IsGroupEssential;
 	}, [&](const MTPDmessageActionChatMigrateTo &) {
-		_clientFlags |= MTPDmessage_ClientFlag::f_is_group_essential;
+		_flags |= MessageFlag::IsGroupEssential;
 	}, [&](const MTPDmessageActionChannelMigrateFrom &) {
-		_clientFlags |= MTPDmessage_ClientFlag::f_is_group_essential;
+		_flags |= MessageFlag::IsGroupEssential;
 	}, [](const auto &) {
 	});
 }
@@ -845,12 +844,11 @@ HistoryService::PreparedText HistoryService::prepareCallScheduledText(
 HistoryService::HistoryService(
 	not_null<History*> history,
 	const MTPDmessage &data,
-	MTPDmessage_ClientFlags clientFlags)
+	MessageFlags localFlags)
 : HistoryItem(
 		history,
 		data.vid().v,
-		data.vflags().v,
-		clientFlags,
+		FlagsFromMTP(data.vflags().v) | localFlags,
 		data.vdate().v,
 		data.vfrom_id() ? peerFromMTP(*data.vfrom_id()) : PeerId(0)) {
 	createFromMtp(data);
@@ -860,12 +858,11 @@ HistoryService::HistoryService(
 HistoryService::HistoryService(
 	not_null<History*> history,
 	const MTPDmessageService &data,
-	MTPDmessage_ClientFlags clientFlags)
+	MessageFlags localFlags)
 : HistoryItem(
 		history,
 		data.vid().v,
-		mtpCastFlags(data.vflags().v),
-		clientFlags,
+		FlagsFromMTP(data.vflags().v) | localFlags,
 		data.vdate().v,
 		data.vfrom_id() ? peerFromMTP(*data.vfrom_id()) : PeerId(0)) {
 	createFromMtp(data);
@@ -875,13 +872,12 @@ HistoryService::HistoryService(
 HistoryService::HistoryService(
 	not_null<History*> history,
 	MsgId id,
-	MTPDmessage_ClientFlags clientFlags,
+	MessageFlags flags,
 	TimeId date,
 	const PreparedText &message,
-	MTPDmessage::Flags flags,
 	PeerId from,
 	PhotoData *photo)
-: HistoryItem(history, id, flags, clientFlags, date, from) {
+: HistoryItem(history, id, flags, date, from) {
 	setServiceText(message);
 	if (photo) {
 		_media = std::make_unique<Data::MediaPhoto>(
@@ -1236,14 +1232,12 @@ HistoryService::PreparedText GenerateJoinedText(
 not_null<HistoryService*> GenerateJoinedMessage(
 		not_null<History*> history,
 		TimeId inviteDate,
-		not_null<UserData*> inviter,
-		MTPDmessage::Flags flags) {
+		not_null<UserData*> inviter) {
 	return history->makeServiceMessage(
 		history->owner().nextLocalMessageId(),
-		MTPDmessage_ClientFlag::f_local_history_entry,
+		MessageFlag::LocalHistoryEntry,
 		inviteDate,
-		GenerateJoinedText(history, inviter),
-		flags);
+		GenerateJoinedText(history, inviter));
 }
 
 std::optional<bool> PeerHasThisCall(

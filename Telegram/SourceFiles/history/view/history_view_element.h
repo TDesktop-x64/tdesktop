@@ -84,6 +84,7 @@ public:
 	virtual void elementHandleViaClick(not_null<UserData*> bot) = 0;
 	virtual bool elementIsChatWide() = 0;
 	virtual not_null<Ui::PathShiftGradient*> elementPathShiftGradient() = 0;
+	virtual void elementReplyTo(const FullMsgId &to) = 0;
 
 	virtual ~ElementDelegate() {
 	}
@@ -138,6 +139,7 @@ public:
 	void elementHandleViaClick(not_null<UserData*> bot) override;
 	bool elementIsChatWide() override;
 	not_null<Ui::PathShiftGradient*> elementPathShiftGradient() override;
+	void elementReplyTo(const FullMsgId &to) override;
 
 private:
 	const not_null<Window::SessionController*> _controller;
@@ -383,7 +385,7 @@ private:
 	// This should be called only from previousInBlocksChanged() or when
 	// DateBadge or UnreadBar bit is changed in the Composer mask
 	// then the result should be cached in a client side flag
-	// MTPDmessage_ClientFlag::f_attach_to_previous.
+	// HistoryView::Element::Flag::AttachedToPrevious.
 	void recountAttachToPreviousInBlocks();
 
 	QSize countOptimalSize() final override;

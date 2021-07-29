@@ -577,7 +577,7 @@ void RegisterAppMenu(QWindow *window, const QString &menuPath) {
 		qsl("RegisterWindow"));
 
 	message.setArguments({
-		window->winId(),
+		uint(window->winId()),
 		QVariant::fromValue(QDBusObjectPath(menuPath))
 	});
 
@@ -598,7 +598,7 @@ void UnregisterAppMenu(QWindow *window) {
 		qsl("UnregisterWindow"));
 
 	message.setArguments({
-		window->winId()
+		uint(window->winId())
 	});
 
 	QDBusConnection::sessionBus().send(message);
@@ -971,7 +971,6 @@ void MainWindow::workmodeUpdated(Core::Settings::WorkMode mode) {
 }
 
 void MainWindow::unreadCounterChangedHook() {
-	setWindowTitle(titleText());
 	updateIconCounters();
 }
 

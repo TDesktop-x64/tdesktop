@@ -41,7 +41,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_controller.h"
 #include "boxes/confirm_box.h"
 #include "apiwrap.h"
-#include "app.h" // App::formatPhone
+#include "ui/text/format_values.h" // Ui::FormatPhone
+#include "app.h" // App::quitting
 
 namespace Api {
 namespace {
@@ -1054,7 +1055,7 @@ void Updates::applyUpdatesNoPtsCheck(const MTPUpdates &updates) {
 				//MTPMessageReactions(),
 				MTPVector<MTPRestrictionReason>(),
 				MTP_int(d.vttl_period().value_or_empty())),
-			MTPDmessage_ClientFlags(),
+			MessageFlags(),
 			NewMessageType::Unread);
 	} break;
 
@@ -1085,7 +1086,7 @@ void Updates::applyUpdatesNoPtsCheck(const MTPUpdates &updates) {
 				//MTPMessageReactions(),
 				MTPVector<MTPRestrictionReason>(),
 				MTP_int(d.vttl_period().value_or_empty())),
-			MTPDmessage_ClientFlags(),
+			MessageFlags(),
 			NewMessageType::Unread);
 	} break;
 
@@ -1114,7 +1115,7 @@ void Updates::applyUpdateNoPtsCheck(const MTPUpdate &update) {
 		if (needToAdd) {
 			_session->data().addNewMessage(
 				d.vmessage(),
-				MTPDmessage_ClientFlags(),
+				MessageFlags(),
 				NewMessageType::Unread);
 		}
 	} break;
@@ -1208,7 +1209,7 @@ void Updates::applyUpdateNoPtsCheck(const MTPUpdate &update) {
 		if (needToAdd) {
 			_session->data().addNewMessage(
 				d.vmessage(),
-				MTPDmessage_ClientFlags(),
+				MessageFlags(),
 				NewMessageType::Unread);
 		}
 	} break;
@@ -1844,7 +1845,7 @@ void Updates::feedUpdate(const MTPUpdate &update) {
 						|| user->isSelf()
 						|| user->phone().isEmpty())
 						? QString()
-						: App::formatPhone(user->phone())),
+						: Ui::FormatPhone(user->phone())),
 					user->username);
 
 				session().changes().peerUpdated(

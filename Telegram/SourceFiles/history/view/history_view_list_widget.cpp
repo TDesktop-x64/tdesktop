@@ -24,7 +24,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mainwidget.h"
 #include "core/click_handler_types.h"
 #include "apiwrap.h"
-#include "layout.h"
+#include "layout/layout_selection.h"
 #include "window/window_adaptive.h"
 #include "window/window_session_controller.h"
 #include "window/window_peer_menu.h"
@@ -1378,6 +1378,10 @@ bool ListWidget::elementIsChatWide() {
 
 not_null<Ui::PathShiftGradient*> ListWidget::elementPathShiftGradient() {
 	return _pathGradient.get();
+}
+
+void ListWidget::elementReplyTo(const FullMsgId &to) {
+	replyToMessageRequestNotify(to);
 }
 
 void ListWidget::saveState(not_null<ListMemento*> memento) {
@@ -3082,36 +3086,6 @@ void ConfirmSendNowSelectedItems(not_null<ListWidget*> widget) {
 		history,
 		widget->getSelectedIds(),
 		clearSelection);
-}
-
-QString WrapBotCommandInChat(
-		not_null<PeerData*> peer,
-		const QString &command,
-		const FullMsgId &context) {
-	auto result = command;
-	if (const auto item = peer->owner().message(context)) {
-		if (const auto user = item->fromOriginal()->asUser()) {
-			return WrapBotCommandInChat(peer, command, user);
-		}
-	}
-	return result;
-}
-
-QString WrapBotCommandInChat(
-		not_null<PeerData*> peer,
-		const QString &command,
-		not_null<UserData*> bot) {
-	if (!bot->isBot() || bot->username.isEmpty()) {
-		return command;
-	}
-	const auto botStatus = peer->isChat()
-		? peer->asChat()->botStatus
-		: peer->isMegagroup()
-		? peer->asChannel()->mgInfo->botStatus
-		: -1;
-	return ((command.indexOf('@') < 2) && (botStatus == 0 || botStatus == 2))
-		? command + '@' + bot->username
-		: command;
 }
 
 } // namespace HistoryView

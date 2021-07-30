@@ -596,10 +596,6 @@ void GenerateItems(
 			)(tr::now, lt_from, fromLinkText);
 		addSimpleServiceMessage(text);
 
-		auto bodyFlags = MessageFlag::Outgoing | MessageFlag::AdminLogEntry;
-		auto bodyReplyTo = MsgId();
-		auto bodyViaBotId = UserId();
-		auto bodyGroupedId = uint64();
 		auto newLink = newValue.isEmpty()
 			? TextWithEntities()
 			: PrepareText(
@@ -1047,9 +1043,11 @@ void GenerateItems(
 		const auto wrap = [](int duration) {
 			return (duration == 5)
 				? u"5 seconds"_q
-				: (duration < 3 * 86400)
+				: (duration < 2 * 86400)
 				? tr::lng_manage_messages_ttl_after1(tr::now)
-				: tr::lng_manage_messages_ttl_after2(tr::now);
+				: (duration < 8 * 86400)
+				? tr::lng_manage_messages_ttl_after2(tr::now)
+				: tr::lng_manage_messages_ttl_after3(tr::now);
 		};
 		auto text = !was
 			? tr::lng_admin_log_messages_ttl_set(tr::now, lt_from, fromLinkText, lt_duration, wrap(now))

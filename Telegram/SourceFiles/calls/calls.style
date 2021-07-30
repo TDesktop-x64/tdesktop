@@ -173,6 +173,24 @@ callCameraUnmute: CallButton(callMicrophoneUnmute) {
 		}
 	}
 }
+callScreencastOn: CallButton(callMicrophoneMute) {
+	button: IconButton(callButton) {
+		icon: icon {{ "calls/calls_present", callIconFg }};
+		iconPosition: point(-1px, 22px);
+		ripple: RippleAnimation(defaultRippleAnimation) {
+			color: callMuteRipple;
+		}
+	}
+}
+callScreencastOff: CallButton(callMicrophoneUnmute) {
+	button: IconButton(callButton) {
+		icon: icon {{ "calls/calls_present", callIconFgActive }};
+		iconPosition: point(-1px, 22px);
+		ripple: RippleAnimation(defaultRippleAnimation) {
+			color: callIconActiveRipple;
+		}
+	}
+}
 callBottomShadowSize: 124px;
 
 CallMuteButton {
@@ -733,6 +751,12 @@ groupCallTitleLabel: FlatLabel(groupCallSubtitleLabel) {
 		linkFont: font(semibold 14px);
 		linkFontOver: font(semibold 14px);
 	}
+}
+groupCallVideoLimitLabel: FlatLabel(defaultFlatLabel) {
+	align: align(top);
+	textFg: groupCallMemberNotJoinedStatus;
+	style: semiboldTextStyle;
+	minWidth: 96px;
 }
 groupCallAddButtonPosition: point(10px, 7px);
 groupCallMembersWidthMax: 480px;

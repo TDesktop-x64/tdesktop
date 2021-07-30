@@ -89,8 +89,7 @@ void Launcher::initHook() {
 				appimagePath.size(),
 				md5Hash);
 
-			return qsl("appimagekit_%1-%2.desktop").arg(
-				md5Hash,
+			return qsl("appimagekit_%1.desktop").arg(
 				AppName.utf16().replace(' ', '_'));
 		}
 

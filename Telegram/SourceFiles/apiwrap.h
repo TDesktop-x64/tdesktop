@@ -45,10 +45,6 @@ namespace Dialogs {
 class Key;
 } // namespace Dialogs
 
-namespace Core {
-struct CloudPasswordState;
-} // namespace Core
-
 namespace Ui {
 struct PreparedList;
 } // namespace Ui
@@ -58,9 +54,12 @@ namespace Api {
 class Updates;
 class Authorizations;
 class AttachedStickers;
+class BlockedPeers;
+class CloudPassword;
 class SelfDestruct;
 class SensitiveContent;
 class GlobalPrivacy;
+class UserPrivacy;
 class InviteLinks;
 
 namespace details {
@@ -112,46 +111,6 @@ class ApiWrap final : public MTP::Sender {
 public:
 	using SendAction = Api::SendAction;
 	using MessageToSend = Api::MessageToSend;
-
-	struct Privacy {
-		enum class Key {
-			PhoneNumber,
-			AddedByPhone,
-			LastSeen,
-			Calls,
-			Invites,
-			CallsPeer2Peer,
-			Forwards,
-			ProfilePhoto,
-		};
-		enum class Option {
-			Everyone,
-			Contacts,
-			Nobody,
-		};
-		Option option = Option::Everyone;
-		std::vector<not_null<PeerData*>> always;
-		std::vector<not_null<PeerData*>> never;
-
-		static MTPInputPrivacyKey Input(Key key);
-		static std::optional<Key> KeyFromMTP(mtpTypeId type);
-	};
-
-	struct BlockedPeersSlice {
-		struct Item {
-			PeerData *peer = nullptr;
-			TimeId date = 0;
-
-			bool operator==(const Item &other) const;
-			bool operator!=(const Item &other) const;
-		};
-
-		QVector<Item> list;
-		int total = 0;
-
-		bool operator==(const BlockedPeersSlice &other) const;
-		bool operator!=(const BlockedPeersSlice &other) const;
-	};
 
 	explicit ApiWrap(not_null<Main::Session*> session);
 	~ApiWrap();
@@ -295,19 +254,10 @@ public:
 	void joinChannel(not_null<ChannelData*> channel);
 	void leaveChannel(not_null<ChannelData*> channel);
 
-	void blockPeer(not_null<PeerData*> peer);
-	void unblockPeer(not_null<PeerData*> peer, Fn<void()> onDone = nullptr);
-
 	void requestNotifySettings(const MTPInputNotifyPeer &peer);
 	void updateNotifySettingsDelayed(not_null<const PeerData*> peer);
 	void saveDraftToCloudDelayed(not_null<History*> history);
 
-	void savePrivacy(
-		const MTPInputPrivacyKey &key,
-		QVector<MTPInputPrivacyRule> &&rules);
-	void handlePrivacyChange(
-		Privacy::Key key,
-		const MTPVector<MTPPrivacyRule> &rules);
 	static int OnlineTillFromStatus(
 		const MTPUserStatus &status,
 		int currentOnlineTill);
@@ -433,12 +383,6 @@ public:
 	void uploadPeerPhoto(not_null<PeerData*> peer, QImage &&image);
 	void clearPeerPhoto(not_null<PhotoData*> photo);
 
-	void reloadPasswordState();
-	void applyPendingReset(const MTPaccount_ResetPasswordResult &data);
-	void clearUnconfirmedPassword();
-	rpl::producer<Core::CloudPasswordState> passwordState() const;
-	std::optional<Core::CloudPasswordState> passwordStateCurrent() const;
-
 	void reloadContactSignupSilent();
 	rpl::producer<bool> contactSignupSilent() const;
 	std::optional<bool> contactSignupSilentCurrent() const;
@@ -446,17 +390,14 @@ public:
 
 	void saveSelfBio(const QString &text, FnMut<void()> done);
 
-	void reloadPrivacy(Privacy::Key key);
-	rpl::producer<Privacy> privacyValue(Privacy::Key key);
-
-	void reloadBlockedPeers();
-	rpl::producer<BlockedPeersSlice> blockedPeersSlice();
-
 	[[nodiscard]] Api::Authorizations &authorizations();
 	[[nodiscard]] Api::AttachedStickers &attachedStickers();
+	[[nodiscard]] Api::BlockedPeers &blockedPeers();
+	[[nodiscard]] Api::CloudPassword &cloudPassword();
 	[[nodiscard]] Api::SelfDestruct &selfDestruct();
 	[[nodiscard]] Api::SensitiveContent &sensitiveContent();
 	[[nodiscard]] Api::GlobalPrivacy &globalPrivacy();
+	[[nodiscard]] Api::UserPrivacy &userPrivacy();
 	[[nodiscard]] Api::InviteLinks &inviteLinks();
 
 	void createPoll(
@@ -469,6 +410,8 @@ public:
 		const std::vector<QByteArray> &options);
 	void closePoll(not_null<HistoryItem*> item);
 	void reloadPollResults(not_null<HistoryItem*> item);
+
+	void updatePrivacyLastSeens();
 
 private:
 	struct MessageDataRequest {
@@ -626,12 +569,6 @@ private:
 
 	void photoUploadReady(const FullMsgId &msgId, const MTPInputFile &file);
 
-	Privacy parsePrivacy(const QVector<MTPPrivacyRule> &rules);
-	void pushPrivacy(
-		Privacy::Key key,
-		const QVector<MTPPrivacyRule> &rules);
-	void updatePrivacyLastSeens(const QVector<MTPPrivacyRule> &rules);
-
 	void migrateDone(
 		not_null<PeerData*> peer,
 		not_null<ChannelData*> channel);
@@ -676,7 +613,6 @@ private:
 	QMap<uint64, QPair<uint64, mtpRequestId> > _stickerSetRequests;
 
 	QMap<ChannelData*, mtpRequestId> _channelAmInRequests;
-	base::flat_map<not_null<PeerData*>, mtpRequestId> _blockRequests;
 	base::flat_map<PeerId, mtpRequestId> _notifySettingRequests;
 	base::flat_map<not_null<History*>, mtpRequestId> _draftsSaveRequestIds;
 	base::Timer _draftsSaveTimer;
@@ -700,8 +636,6 @@ private:
 	base::flat_set<uint64> _featuredSetsRead;
 
 	base::flat_map<not_null<EmojiPtr>, StickersByEmoji> _stickersByEmoji;
-
-	base::flat_map<mtpTypeId, mtpRequestId> _privacySaveRequests;
 
 	mtpRequestId _contactsRequestId = 0;
 	mtpRequestId _contactsStatusesRequestId = 0;
@@ -765,27 +699,18 @@ private:
 
 	base::flat_map<FullMsgId, not_null<PeerData*>> _peerPhotoUploads;
 
-	mtpRequestId _passwordRequestId = 0;
-	std::unique_ptr<Core::CloudPasswordState> _passwordState;
-	rpl::event_stream<Core::CloudPasswordState> _passwordStateChanges;
-
 	mtpRequestId _saveBioRequestId = 0;
 	FnMut<void()> _saveBioDone;
 	QString _saveBioText;
 
-	base::flat_map<Privacy::Key, mtpRequestId> _privacyRequestIds;
-	base::flat_map<Privacy::Key, Privacy> _privacyValues;
-	std::map<Privacy::Key, rpl::event_stream<Privacy>> _privacyChanges;
-
-	mtpRequestId _blockedPeersRequestId = 0;
-	std::optional<BlockedPeersSlice> _blockedPeersSlice;
-	rpl::event_stream<BlockedPeersSlice> _blockedPeersChanges;
-
 	const std::unique_ptr<Api::Authorizations> _authorizations;
 	const std::unique_ptr<Api::AttachedStickers> _attachedStickers;
+	const std::unique_ptr<Api::BlockedPeers> _blockedPeers;
+	const std::unique_ptr<Api::CloudPassword> _cloudPassword;
 	const std::unique_ptr<Api::SelfDestruct> _selfDestruct;
 	const std::unique_ptr<Api::SensitiveContent> _sensitiveContent;
 	const std::unique_ptr<Api::GlobalPrivacy> _globalPrivacy;
+	const std::unique_ptr<Api::UserPrivacy> _userPrivacy;
 	const std::unique_ptr<Api::InviteLinks> _inviteLinks;
 
 	base::flat_map<FullMsgId, mtpRequestId> _pollVotesRequestIds;

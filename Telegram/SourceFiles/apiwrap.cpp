@@ -9,6 +9,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "api/api_authorizations.h"
 #include "api/api_attached_stickers.h"
+#include "api/api_blocked_peers.h"
+#include "api/api_cloud_password.h"
 #include "api/api_hash.h"
 #include "api/api_invite_links.h"
 #include "api/api_media.h"
@@ -18,6 +20,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_sensitive_content.h"
 #include "api/api_global_privacy.h"
 #include "api/api_updates.h"
+#include "api/api_user_privacy.h"
 #include "data/stickers/data_stickers.h"
 #include "data/data_drafts.h"
 #include "data/data_changes.h"
@@ -42,7 +45,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "dialogs/dialogs_key.h"
 #include "core/core_cloud_password.h"
 #include "core/application.h"
-#include "base/openssl_help.h"
 #include "base/unixtime.h"
 #include "base/qt_adapters.h"
 #include "base/call_delayed.h"
@@ -108,7 +110,6 @@ constexpr auto kStickersByEmojiInvalidateTimeout = crl::time(60 * 60 * 1000);
 constexpr auto kNotifySettingSaveTimeout = crl::time(1000);
 constexpr auto kDialogsFirstLoad = 20;
 constexpr auto kDialogsPerPage = 500;
-constexpr auto kBlockedFirstSlice = 16;
 
 using PhotoFileLocationId = Data::PhotoFileLocationId;
 using DocumentFileLocationId = Data::DocumentFileLocationId;
@@ -119,65 +120,6 @@ using UpdatedFileReferences = Data::UpdatedFileReferences;
 }
 
 } // namespace
-
-MTPInputPrivacyKey ApiWrap::Privacy::Input(Key key) {
-	switch (key) {
-	case Privacy::Key::Calls: return MTP_inputPrivacyKeyPhoneCall();
-	case Privacy::Key::Invites: return MTP_inputPrivacyKeyChatInvite();
-	case Privacy::Key::PhoneNumber: return MTP_inputPrivacyKeyPhoneNumber();
-	case Privacy::Key::AddedByPhone:
-		return MTP_inputPrivacyKeyAddedByPhone();
-	case Privacy::Key::LastSeen:
-		return MTP_inputPrivacyKeyStatusTimestamp();
-	case Privacy::Key::CallsPeer2Peer:
-		return MTP_inputPrivacyKeyPhoneP2P();
-	case Privacy::Key::Forwards:
-		return MTP_inputPrivacyKeyForwards();
-	case Privacy::Key::ProfilePhoto:
-		return MTP_inputPrivacyKeyProfilePhoto();
-	}
-	Unexpected("Key in ApiWrap::Privacy::Input.");
-}
-
-std::optional<ApiWrap::Privacy::Key> ApiWrap::Privacy::KeyFromMTP(
-		mtpTypeId type) {
-	using Key = Privacy::Key;
-	switch (type) {
-	case mtpc_privacyKeyPhoneNumber:
-	case mtpc_inputPrivacyKeyPhoneNumber: return Key::PhoneNumber;
-	case mtpc_privacyKeyAddedByPhone:
-	case mtpc_inputPrivacyKeyAddedByPhone: return Key::AddedByPhone;
-	case mtpc_privacyKeyStatusTimestamp:
-	case mtpc_inputPrivacyKeyStatusTimestamp: return Key::LastSeen;
-	case mtpc_privacyKeyChatInvite:
-	case mtpc_inputPrivacyKeyChatInvite: return Key::Invites;
-	case mtpc_privacyKeyPhoneCall:
-	case mtpc_inputPrivacyKeyPhoneCall: return Key::Calls;
-	case mtpc_privacyKeyPhoneP2P:
-	case mtpc_inputPrivacyKeyPhoneP2P: return Key::CallsPeer2Peer;
-	case mtpc_privacyKeyForwards:
-	case mtpc_inputPrivacyKeyForwards: return Key::Forwards;
-	case mtpc_privacyKeyProfilePhoto:
-	case mtpc_inputPrivacyKeyProfilePhoto: return Key::ProfilePhoto;
-	}
-	return std::nullopt;
-}
-
-bool ApiWrap::BlockedPeersSlice::Item::operator==(const Item &other) const {
-	return (peer == other.peer) && (date == other.date);
-}
-
-bool ApiWrap::BlockedPeersSlice::Item::operator!=(const Item &other) const {
-	return !(*this == other);
-}
-
-bool ApiWrap::BlockedPeersSlice::operator==(const BlockedPeersSlice &other) const {
-	return (total == other.total) && (list == other.list);
-}
-
-bool ApiWrap::BlockedPeersSlice::operator!=(const BlockedPeersSlice &other) const {
-	return !(*this == other);
-}
 
 ApiWrap::ApiWrap(not_null<Main::Session*> session)
 : MTP::Sender(&session->account().mtp())
@@ -192,9 +134,12 @@ ApiWrap::ApiWrap(not_null<Main::Session*> session)
 , _updateNotifySettingsTimer([=] { sendNotifySettingsUpdates(); })
 , _authorizations(std::make_unique<Api::Authorizations>(this))
 , _attachedStickers(std::make_unique<Api::AttachedStickers>(this))
+, _blockedPeers(std::make_unique<Api::BlockedPeers>(this))
+, _cloudPassword(std::make_unique<Api::CloudPassword>(this))
 , _selfDestruct(std::make_unique<Api::SelfDestruct>(this))
 , _sensitiveContent(std::make_unique<Api::SensitiveContent>(this))
 , _globalPrivacy(std::make_unique<Api::GlobalPrivacy>(this))
+, _userPrivacy(std::make_unique<Api::UserPrivacy>(this))
 , _inviteLinks(std::make_unique<Api::InviteLinks>(this)) {
 	crl::on_main(session, [=] {
 		// You can't use _session->lifetime() in the constructor,
@@ -2175,68 +2120,6 @@ void ApiWrap::leaveChannel(not_null<ChannelData*> channel) {
 	}
 }
 
-void ApiWrap::blockPeer(not_null<PeerData*> peer) {
-	if (peer->isBlocked()) {
-		session().changes().peerUpdated(
-			peer,
-			Data::PeerUpdate::Flag::IsBlocked);
-	} else if (_blockRequests.find(peer) == end(_blockRequests)) {
-		const auto requestId = request(MTPcontacts_Block(
-			peer->input
-		)).done([=](const MTPBool &result) {
-			_blockRequests.erase(peer);
-			peer->setIsBlocked(true);
-			if (_blockedPeersSlice) {
-				_blockedPeersSlice->list.insert(
-					_blockedPeersSlice->list.begin(),
-					{ peer, base::unixtime::now() });
-				++_blockedPeersSlice->total;
-				_blockedPeersChanges.fire_copy(*_blockedPeersSlice);
-			}
-		}).fail([=](const MTP::Error &error) {
-			_blockRequests.erase(peer);
-		}).send();
-
-		_blockRequests.emplace(peer, requestId);
-	}
-}
-
-void ApiWrap::unblockPeer(not_null<PeerData*> peer, Fn<void()> onDone) {
-	if (!peer->isBlocked()) {
-		session().changes().peerUpdated(
-			peer,
-			Data::PeerUpdate::Flag::IsBlocked);
-		return;
-	} else if (_blockRequests.find(peer) != end(_blockRequests)) {
-		return;
-	}
-	const auto requestId = request(MTPcontacts_Unblock(
-		peer->input
-	)).done([=](const MTPBool &result) {
-		_blockRequests.erase(peer);
-		peer->setIsBlocked(false);
-		if (_blockedPeersSlice) {
-			auto &list = _blockedPeersSlice->list;
-			for (auto i = list.begin(); i != list.end(); ++i) {
-				if (i->peer == peer) {
-					list.erase(i);
-					break;
-				}
-			}
-			if (_blockedPeersSlice->total > list.size()) {
-				--_blockedPeersSlice->total;
-			}
-			_blockedPeersChanges.fire_copy(*_blockedPeersSlice);
-		}
-		if (onDone) {
-			onDone();
-		}
-	}).fail([=](const MTP::Error &error) {
-		_blockRequests.erase(peer);
-	}).send();
-	_blockRequests.emplace(peer, requestId);
-}
-
 void ApiWrap::requestNotifySettings(const MTPInputNotifyPeer &peer) {
 	const auto key = [&] {
 		switch (peer.type()) {
@@ -2309,45 +2192,7 @@ void ApiWrap::saveDraftToCloudDelayed(not_null<History*> history) {
 	}
 }
 
-void ApiWrap::savePrivacy(
-		const MTPInputPrivacyKey &key,
-		QVector<MTPInputPrivacyRule> &&rules) {
-	const auto keyTypeId = key.type();
-	const auto it = _privacySaveRequests.find(keyTypeId);
-	if (it != _privacySaveRequests.cend()) {
-		request(it->second).cancel();
-		_privacySaveRequests.erase(it);
-	}
-
-	const auto requestId = request(MTPaccount_SetPrivacy(
-		key,
-		MTP_vector<MTPInputPrivacyRule>(std::move(rules))
-	)).done([=](const MTPaccount_PrivacyRules &result) {
-		result.match([&](const MTPDaccount_privacyRules &data) {
-			_session->data().processUsers(data.vusers());
-			_session->data().processChats(data.vchats());
-			_privacySaveRequests.remove(keyTypeId);
-			if (const auto key = Privacy::KeyFromMTP(keyTypeId)) {
-				handlePrivacyChange(*key, data.vrules());
-			}
-		});
-	}).fail([=](const MTP::Error &error) {
-		_privacySaveRequests.remove(keyTypeId);
-	}).send();
-
-	_privacySaveRequests.emplace(keyTypeId, requestId);
-}
-
-void ApiWrap::handlePrivacyChange(
-		Privacy::Key key,
-		const MTPVector<MTPPrivacyRule> &rules) {
-	pushPrivacy(key, rules.v);
-	if (key == Privacy::Key::LastSeen) {
-		updatePrivacyLastSeens(rules.v);
-	}
-}
-
-void ApiWrap::updatePrivacyLastSeens(const QVector<MTPPrivacyRule> &rules) {
+void ApiWrap::updatePrivacyLastSeens() {
 	const auto now = base::unixtime::now();
 	_session->data().enumerateUsers([&](UserData *user) {
 		if (user->isSelf() || !user->isFullLoaded()) {
@@ -4742,69 +4587,6 @@ void ApiWrap::clearPeerPhoto(not_null<PhotoData*> photo) {
 	}
 }
 
-void ApiWrap::reloadPasswordState() {
-	if (_passwordRequestId) {
-		return;
-	}
-	_passwordRequestId = request(MTPaccount_GetPassword(
-	)).done([=](const MTPaccount_Password &result) {
-		_passwordRequestId = 0;
-		result.match([&](const MTPDaccount_password &data) {
-			openssl::AddRandomSeed(bytes::make_span(data.vsecure_random().v));
-			if (_passwordState) {
-				*_passwordState = Core::ParseCloudPasswordState(data);
-			} else {
-				_passwordState = std::make_unique<Core::CloudPasswordState>(
-					Core::ParseCloudPasswordState(data));
-			}
-			_passwordStateChanges.fire_copy(*_passwordState);
-		});
-	}).fail([=](const MTP::Error &error) {
-		_passwordRequestId = 0;
-	}).send();
-}
-
-void ApiWrap::applyPendingReset(const MTPaccount_ResetPasswordResult &data) {
-	if (!_passwordState) {
-		reloadPasswordState();
-		return;
-	}
-	data.match([&](const MTPDaccount_resetPasswordOk &data) {
-		reloadPasswordState();
-	}, [&](const MTPDaccount_resetPasswordRequestedWait &data) {
-		const auto until = data.vuntil_date().v;
-		if (_passwordState->pendingResetDate != until) {
-			_passwordState->pendingResetDate = until;
-			_passwordStateChanges.fire_copy(*_passwordState);
-		}
-	}, [&](const MTPDaccount_resetPasswordFailedWait &data) {
-	});
-}
-
-void ApiWrap::clearUnconfirmedPassword() {
-	_passwordRequestId = request(MTPaccount_CancelPasswordEmail(
-	)).done([=](const MTPBool &result) {
-		_passwordRequestId = 0;
-		reloadPasswordState();
-	}).fail([=](const MTP::Error &error) {
-		_passwordRequestId = 0;
-		reloadPasswordState();
-	}).send();
-}
-
-rpl::producer<Core::CloudPasswordState> ApiWrap::passwordState() const {
-	return _passwordState
-		? _passwordStateChanges.events_starting_with_copy(*_passwordState)
-		: (_passwordStateChanges.events() | rpl::type_erased());
-}
-
-auto ApiWrap::passwordStateCurrent() const
--> std::optional<Core::CloudPasswordState> {
-	return _passwordState
-		? base::make_optional(*_passwordState)
-		: std::nullopt;
-}
-
 void ApiWrap::reloadContactSignupSilent() {
 	if (_contactSignupSilentRequestId) {
 		return;
@@ -4878,182 +4660,20 @@ void ApiWrap::saveSelfBio(const QString &text, FnMut<void()> done) {
 	}).send();
 }
 
-void ApiWrap::reloadPrivacy(Privacy::Key key) {
-	if (_privacyRequestIds.contains(key)) {
-		return;
-	}
-	const auto requestId = request(MTPaccount_GetPrivacy(
-		Privacy::Input(key)
-	)).done([=](const MTPaccount_PrivacyRules &result) {
-		_privacyRequestIds.erase(key);
-		result.match([&](const MTPDaccount_privacyRules &data) {
-			_session->data().processUsers(data.vusers());
-			_session->data().processChats(data.vchats());
-			pushPrivacy(key, data.vrules().v);
-		});
-	}).fail([=](const MTP::Error &error) {
-		_privacyRequestIds.erase(key);
-	}).send();
-	_privacyRequestIds.emplace(key, requestId);
-}
-
-auto ApiWrap::parsePrivacy(const QVector<MTPPrivacyRule> &rules)
--> Privacy {
-	using Option = Privacy::Option;
-
-	// This is simplified version of privacy rules interpretation.
-	// But it should be fine for all the apps
-	// that use the same subset of features.
-	auto result = Privacy();
-	auto optionSet = false;
-	const auto SetOption = [&](Option option) {
-		if (optionSet) return;
-		optionSet = true;
-		result.option = option;
-	};
-	auto &always = result.always;
-	auto &never = result.never;
-	const auto Feed = [&](const MTPPrivacyRule &rule) {
-		rule.match([&](const MTPDprivacyValueAllowAll &) {
-			SetOption(Option::Everyone);
-		}, [&](const MTPDprivacyValueAllowContacts &) {
-			SetOption(Option::Contacts);
-		}, [&](const MTPDprivacyValueAllowUsers &data) {
-			const auto &users = data.vusers().v;
-			always.reserve(always.size() + users.size());
-			for (const auto userId : users) {
-				const auto user = _session->data().user(UserId(userId.v));
-				if (!base::contains(never, user)
-					&& !base::contains(always, user)) {
-					always.emplace_back(user);
-				}
-			}
-		}, [&](const MTPDprivacyValueAllowChatParticipants &data) {
-			const auto &chats = data.vchats().v;
-			always.reserve(always.size() + chats.size());
-			for (const auto &chatId : chats) {
-				const auto chat = _session->data().chatLoaded(chatId);
-				const auto peer = chat
-					? static_cast<PeerData*>(chat)
-					: _session->data().channelLoaded(chatId);
-				if (peer
-					&& !base::contains(never, peer)
-					&& !base::contains(always, peer)) {
-					always.emplace_back(peer);
-				}
-			}
-		}, [&](const MTPDprivacyValueDisallowContacts &) {
-			// not supported
-		}, [&](const MTPDprivacyValueDisallowAll &) {
-			SetOption(Option::Nobody);
-		}, [&](const MTPDprivacyValueDisallowUsers &data) {
-			const auto &users = data.vusers().v;
-			never.reserve(never.size() + users.size());
-			for (const auto userId : users) {
-				const auto user = _session->data().user(UserId(userId.v));
-				if (!base::contains(always, user)
-					&& !base::contains(never, user)) {
-					never.emplace_back(user);
-				}
-			}
-		}, [&](const MTPDprivacyValueDisallowChatParticipants &data) {
-			const auto &chats = data.vchats().v;
-			never.reserve(never.size() + chats.size());
-			for (const auto &chatId : chats) {
-				const auto chat = _session->data().chatLoaded(chatId);
-				const auto peer = chat
-					? static_cast<PeerData*>(chat)
-					: _session->data().channelLoaded(chatId);
-				if (peer
-					&& !base::contains(always, peer)
-					&& !base::contains(never, peer)) {
-					never.emplace_back(peer);
-				}
-			}
-		});
-	};
-	for (const auto &rule : rules) {
-		Feed(rule);
-	}
-	Feed(MTP_privacyValueDisallowAll()); // disallow by default.
-	return result;
-}
-
-void ApiWrap::pushPrivacy(
-		Privacy::Key key,
-		const QVector<MTPPrivacyRule> &rules) {
-	const auto &saved = (_privacyValues[key] = parsePrivacy(rules));
-	const auto i = _privacyChanges.find(key);
-	if (i != end(_privacyChanges)) {
-		i->second.fire_copy(saved);
-	}
-}
-
-auto ApiWrap::privacyValue(Privacy::Key key) -> rpl::producer<Privacy> {
-	if (const auto i = _privacyValues.find(key); i != end(_privacyValues)) {
-		return _privacyChanges[key].events_starting_with_copy(i->second);
-	} else {
-		return _privacyChanges[key].events();
-	}
-}
-
-void ApiWrap::reloadBlockedPeers() {
-	if (_blockedPeersRequestId) {
-		return;
-	}
-	_blockedPeersRequestId = request(MTPcontacts_GetBlocked(
-		MTP_int(0),
-		MTP_int(kBlockedFirstSlice)
-	)).done([=](const MTPcontacts_Blocked &result) {
-		_blockedPeersRequestId = 0;
-		const auto push = [&](
-				int count,
-				const QVector<MTPPeerBlocked> &list) {
-			auto slice = BlockedPeersSlice();
-			slice.total = std::max(count, list.size());
-			slice.list.reserve(list.size());
-			for (const auto &contact : list) {
-				contact.match([&](const MTPDpeerBlocked &data) {
-					const auto peer = _session->data().peerLoaded(
-						peerFromMTP(data.vpeer_id()));
-					if (peer) {
-						peer->setIsBlocked(true);
-						slice.list.push_back({ peer, data.vdate().v });
-					}
-				});
-			}
-			if (!_blockedPeersSlice || *_blockedPeersSlice != slice) {
-				_blockedPeersSlice = slice;
-				_blockedPeersChanges.fire(std::move(slice));
-			}
-		};
-		result.match([&](const MTPDcontacts_blockedSlice &data) {
-			_session->data().processUsers(data.vusers());
-			push(data.vcount().v, data.vblocked().v);
-		}, [&](const MTPDcontacts_blocked &data) {
-			_session->data().processUsers(data.vusers());
-			push(0, data.vblocked().v);
-		});
-	}).fail([=](const MTP::Error &error) {
-		_blockedPeersRequestId = 0;
-	}).send();
-}
-
-auto ApiWrap::blockedPeersSlice() -> rpl::producer<BlockedPeersSlice> {
-	if (!_blockedPeersSlice) {
-		reloadBlockedPeers();
-	}
-	return _blockedPeersSlice
-		? _blockedPeersChanges.events_starting_with_copy(*_blockedPeersSlice)
-		: (_blockedPeersChanges.events() | rpl::type_erased());
-}
-
 Api::Authorizations &ApiWrap::authorizations() {
 	return *_authorizations;
 }
 
 Api::AttachedStickers &ApiWrap::attachedStickers() {
 	return *_attachedStickers;
+}
+
+Api::BlockedPeers &ApiWrap::blockedPeers() {
+	return *_blockedPeers;
+}
+
+Api::CloudPassword &ApiWrap::cloudPassword() {
+	return *_cloudPassword;
 }
 
 Api::SelfDestruct &ApiWrap::selfDestruct() {
@@ -5066,6 +4686,10 @@ Api::SensitiveContent &ApiWrap::sensitiveContent() {
 
 Api::GlobalPrivacy &ApiWrap::globalPrivacy() {
 	return *_globalPrivacy;
+}
+
+Api::UserPrivacy &ApiWrap::userPrivacy() {
+	return *_userPrivacy;
 }
 
 Api::InviteLinks &ApiWrap::inviteLinks() {

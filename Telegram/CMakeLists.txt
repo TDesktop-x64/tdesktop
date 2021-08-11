@@ -91,12 +91,16 @@ PRIVATE
     api/api_attached_stickers.h
     api/api_authorizations.cpp
     api/api_authorizations.h
+    api/api_blocked_peers.cpp
+    api/api_blocked_peers.h
     api/api_bot.cpp
     api/api_bot.h
     api/api_chat_filters.cpp
     api/api_chat_filters.h
     api/api_chat_invite.cpp
     api/api_chat_invite.h
+    api/api_cloud_password.cpp
+    api/api_cloud_password.h
     api/api_common.h
     api/api_editing.cpp
     api/api_editing.h
@@ -124,6 +128,8 @@ PRIVATE
     api/api_toggling_media.h
     api/api_updates.cpp
     api/api_updates.h
+    api/api_user_privacy.cpp
+    api/api_user_privacy.h
     boxes/filters/edit_filter_box.cpp
     boxes/filters/edit_filter_box.h
     boxes/filters/edit_filter_chats_list.cpp

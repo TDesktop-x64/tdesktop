@@ -656,7 +656,7 @@ void GroupCall::toggleScreenSharing(
 	_screenWithAudio = withAudio;
 	_screenState = Webrtc::VideoState::Active;
 	if (changed && wasSharing && isSharingScreen()) {
-		_screenCapture->switchToDevice(uniqueId->toStdString());
+		_screenCapture->switchToDevice(uniqueId->toStdString(), true);
 	}
 	if (_screenInstance) {
 		_screenInstance->setIsMuted(!withAudio);
@@ -1974,7 +1974,7 @@ void GroupCall::setupMediaDevices() {
 	) | rpl::start_with_next([=](QString id) {
 		_cameraInputId = id;
 		if (_cameraCapture) {
-			_cameraCapture->switchToDevice(id.toStdString());
+			_cameraCapture->switchToDevice(id.toStdString(), false);
 		}
 	}, _lifetime);
 }
@@ -2087,7 +2087,9 @@ void GroupCall::setupOutgoingVideo() {
 					});
 				});
 			} else {
-				_cameraCapture->switchToDevice(_cameraInputId.toStdString());
+				_cameraCapture->switchToDevice(
+					_cameraInputId.toStdString(),
+					false);
 			}
 			if (_instance) {
 				_instance->setVideoCapture(_cameraCapture);
@@ -2154,7 +2156,8 @@ void GroupCall::setupOutgoingVideo() {
 				});
 			} else {
 				_screenCapture->switchToDevice(
-					_screenDeviceId.toStdString());
+					_screenDeviceId.toStdString(),
+					true);
 			}
 			if (_screenInstance) {
 				_screenInstance->setVideoCapture(_screenCapture);

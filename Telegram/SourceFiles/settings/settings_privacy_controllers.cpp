@@ -45,7 +45,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Settings {
 namespace {
 
-constexpr auto kBlockedPerPage = 40;
+using UserPrivacy = Api::UserPrivacy;
+using PrivacyRule = Api::UserPrivacy::Rule;
 
 class BlockPeerBoxController final : public ChatsListBoxController {
 public:
@@ -177,8 +178,7 @@ AdminLog::OwnedItem GenerateForwardedItem(
 
 BlockedBoxController::BlockedBoxController(
 	not_null<Window::SessionController*> window)
-: _window(window)
-, _api(&_window->session().mtp()) {
+: _window(window) {
 }
 
 Main::Session &BlockedBoxController::session() const {
@@ -196,52 +196,26 @@ void BlockedBoxController::prepare() {
 		handleBlockedEvent(update.peer);
 	}, lifetime());
 
-	_loadRequestId = -1;
-	_window->session().api().blockedPeersSlice(
+	session().api().blockedPeers().slice(
 	) | rpl::take(
 		1
-	) | rpl::start_with_next([=](const ApiWrap::BlockedPeersSlice &result) {
+	) | rpl::start_with_next([=](const Api::BlockedPeers::Slice &result) {
 		setDescriptionText(tr::lng_blocked_list_about(tr::now));
-		_loadRequestId = 0;
-		_offset = result.list.size();
-		_allLoaded = (_offset >= result.total);
-		for (const auto item : result.list) {
-			appendRow(item.peer);
-		};
-		delegate()->peerListRefreshRows();
+		applySlice(result);
 		loadMoreRows();
 	}, lifetime());
 }
 
 void BlockedBoxController::loadMoreRows() {
-	if (_loadRequestId || _allLoaded) {
+	if (_allLoaded) {
 		return;
 	}
 
-	_loadRequestId = _api.request(MTPcontacts_GetBlocked(
-		MTP_int(_offset),
-		MTP_int(kBlockedPerPage)
-	)).done([=](const MTPcontacts_Blocked &result) {
-		_loadRequestId = 0;
-
-		auto handleContactsBlocked = [&](auto &list) {
-			_window->session().data().processUsers(list.vusers());
-			_window->session().data().processChats(list.vchats());
-			return list.vblocked().v;
-		};
-		switch (result.type()) {
-		case mtpc_contacts_blockedSlice: {
-			receivedPeers(handleContactsBlocked(result.c_contacts_blockedSlice()));
-		} break;
-		case mtpc_contacts_blocked: {
-			_allLoaded = true;
-			receivedPeers(handleContactsBlocked(result.c_contacts_blocked()));
-		} break;
-		default: Unexpected("Bad type() in MTPcontacts_GetBlocked() result.");
-		}
-	}).fail([this](const MTP::Error &error) {
-		_loadRequestId = 0;
-	}).send();
+	session().api().blockedPeers().request(
+		_offset,
+		crl::guard(&_guard, [=](const Api::BlockedPeers::Slice &slice) {
+			applySlice(slice);
+		}));
 }
 
 void BlockedBoxController::rowClicked(not_null<PeerListRow*> row) {
@@ -252,23 +226,23 @@ void BlockedBoxController::rowClicked(not_null<PeerListRow*> row) {
 }
 
 void BlockedBoxController::rowActionClicked(not_null<PeerListRow*> row) {
-	_window->session().api().unblockPeer(row->peer());
+	session().api().blockedPeers().unblock(row->peer());
 }
 
-void BlockedBoxController::receivedPeers(
-		const QVector<MTPPeerBlocked> &result) {
-	if (result.empty()) {
+void BlockedBoxController::applySlice(const Api::BlockedPeers::Slice &slice) {
+	if (slice.list.empty()) {
 		_allLoaded = true;
 	}
 
-	_offset += result.size();
-	for (const auto &item : result) {
-		item.match([&](const MTPDpeerBlocked &data) {
-			if (const auto peer = _window->session().data().peerLoaded(peerFromMTP(data.vpeer_id()))) {
-				appendRow(peer);
-				peer->setIsBlocked(true);
-			}
-		});
+	_offset += slice.list.size();
+	for (const auto &item : slice.list) {
+		if (const auto peer = session().data().peerLoaded(item.id)) {
+			appendRow(peer);
+			peer->setIsBlocked(true);
+		}
+	}
+	if (_offset >= slice.total) {
+		_allLoaded = true;
 	}
 	delegate()->peerListRefreshRows();
 }
@@ -292,7 +266,7 @@ void BlockedBoxController::BlockNewPeer(
 	auto initBox = [=, controller = controller.get()](
 			not_null<PeerListBox*> box) {
 		controller->setBlockPeerCallback([=](not_null<PeerData*> peer) {
-			window->session().api().blockPeer(peer);
+			window->session().api().blockedPeers().block(peer);
 			box->closeBox();
 		});
 		box->addButton(tr::lng_cancel(), [box] { box->closeBox(); });
@@ -339,12 +313,8 @@ std::unique_ptr<PeerListRow> BlockedBoxController::createRow(
 	return row;
 }
 
-ApiWrap::Privacy::Key PhoneNumberPrivacyController::key() {
+UserPrivacy::Key PhoneNumberPrivacyController::key() {
 	return Key::PhoneNumber;
-}
-
-MTPInputPrivacyKey PhoneNumberPrivacyController::apiKey() {
-	return MTP_inputPrivacyKeyPhoneNumber();
 }
 
 rpl::producer<QString> PhoneNumberPrivacyController::title() {
@@ -396,8 +366,8 @@ object_ptr<Ui::RpWidget> PhoneNumberPrivacyController::setupMiddleWidget(
 		not_null<Window::SessionController*> controller,
 		not_null<QWidget*> parent,
 		rpl::producer<Option> optionValue) {
-	const auto key = ApiWrap::Privacy::Key::AddedByPhone;
-	controller->session().api().reloadPrivacy(key);
+	const auto key = UserPrivacy::Key::AddedByPhone;
+	controller->session().api().userPrivacy().reload(key);
 
 	_phoneNumberOption = std::move(optionValue);
 
@@ -413,11 +383,11 @@ object_ptr<Ui::RpWidget> PhoneNumberPrivacyController::setupMiddleWidget(
 	group->setChangedCallback([=](Option value) {
 		_addedByPhone = value;
 	});
-	controller->session().api().privacyValue(
+	controller->session().api().userPrivacy().value(
 		key
 	) | rpl::take(
 		1
-	) | rpl::start_with_next([=](const ApiWrap::Privacy &value) {
+	) | rpl::start_with_next([=](const PrivacyRule &value) {
 		group->setValue(value.option);
 	}, widget->lifetime());
 
@@ -435,15 +405,9 @@ object_ptr<Ui::RpWidget> PhoneNumberPrivacyController::setupMiddleWidget(
 	));
 
 	_saveAdditional = [=] {
-		const auto value = [&] {
-			switch (group->value()) {
-			case Option::Everyone: return MTP_inputPrivacyValueAllowAll();
-			default: return MTP_inputPrivacyValueAllowContacts();
-			}
-		}();
-		controller->session().api().savePrivacy(
-			MTP_inputPrivacyKeyAddedByPhone(),
-			QVector<MTPInputPrivacyRule>(1, value));
+		controller->session().api().userPrivacy().save(
+			Api::UserPrivacy::Key::AddedByPhone,
+			Api::UserPrivacy::Rule{ .option = group->value() });
 	};
 
 	return widget;
@@ -460,12 +424,8 @@ LastSeenPrivacyController::LastSeenPrivacyController(
 : _session(session) {
 }
 
-ApiWrap::Privacy::Key LastSeenPrivacyController::key() {
+UserPrivacy::Key LastSeenPrivacyController::key() {
 	return Key::LastSeen;
-}
-
-MTPInputPrivacyKey LastSeenPrivacyController::apiKey() {
-	return MTP_inputPrivacyKeyStatusTimestamp();
 }
 
 rpl::producer<QString> LastSeenPrivacyController::title() {
@@ -528,12 +488,8 @@ void LastSeenPrivacyController::confirmSave(
 	}
 }
 
-ApiWrap::Privacy::Key GroupsInvitePrivacyController::key() {
+UserPrivacy::Key GroupsInvitePrivacyController::key() {
 	return Key::Invites;
-}
-
-MTPInputPrivacyKey GroupsInvitePrivacyController::apiKey() {
-	return MTP_inputPrivacyKeyChatInvite();
 }
 
 rpl::producer<QString> GroupsInvitePrivacyController::title() {
@@ -571,12 +527,8 @@ auto GroupsInvitePrivacyController::exceptionsDescription()
 	return tr::lng_edit_privacy_groups_exceptions();
 }
 
-ApiWrap::Privacy::Key CallsPrivacyController::key() {
+UserPrivacy::Key CallsPrivacyController::key() {
 	return Key::Calls;
-}
-
-MTPInputPrivacyKey CallsPrivacyController::apiKey() {
-	return MTP_inputPrivacyKeyPhoneCall();
 }
 
 rpl::producer<QString> CallsPrivacyController::title() {
@@ -622,19 +574,15 @@ object_ptr<Ui::RpWidget> CallsPrivacyController::setupBelowWidget(
 		controller,
 		content,
 		tr::lng_settings_calls_peer_to_peer_button(),
-		ApiWrap::Privacy::Key::CallsPeer2Peer,
+		UserPrivacy::Key::CallsPeer2Peer,
 		[] { return std::make_unique<CallsPeer2PeerPrivacyController>(); });
 	AddSkip(content);
 
 	return result;
 }
 
-ApiWrap::Privacy::Key CallsPeer2PeerPrivacyController::key() {
+UserPrivacy::Key CallsPeer2PeerPrivacyController::key() {
 	return Key::CallsPeer2Peer;
-}
-
-MTPInputPrivacyKey CallsPeer2PeerPrivacyController::apiKey() {
-	return MTP_inputPrivacyKeyPhoneP2P();
 }
 
 rpl::producer<QString> CallsPeer2PeerPrivacyController::title() {
@@ -687,12 +635,8 @@ ForwardsPrivacyController::ForwardsPrivacyController(
 , _controller(controller) {
 }
 
-ApiWrap::Privacy::Key ForwardsPrivacyController::key() {
+UserPrivacy::Key ForwardsPrivacyController::key() {
 	return Key::Forwards;
-}
-
-MTPInputPrivacyKey ForwardsPrivacyController::apiKey() {
-	return MTP_inputPrivacyKeyForwards();
 }
 
 rpl::producer<QString> ForwardsPrivacyController::title() {
@@ -882,12 +826,8 @@ HistoryView::Context ForwardsPrivacyController::elementContext() {
 	return HistoryView::Context::ContactPreview;
 }
 
-ApiWrap::Privacy::Key ProfilePhotoPrivacyController::key() {
+UserPrivacy::Key ProfilePhotoPrivacyController::key() {
 	return Key::ProfilePhoto;
-}
-
-MTPInputPrivacyKey ProfilePhotoPrivacyController::apiKey() {
-	return MTP_inputPrivacyKeyProfilePhoto();
 }
 
 rpl::producer<QString> ProfilePhotoPrivacyController::title() {

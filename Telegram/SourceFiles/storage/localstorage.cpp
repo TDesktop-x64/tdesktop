@@ -1284,6 +1284,12 @@ CustomLangPack *CustomLangPack::currentInstance() {
 void CustomLangPack::fetchCustomLangPack(QString langPackId, QString langPackBaseId) {
 	LOG(("Current Language ID: %1, Base ID: %2").arg(langPackId, langPackBaseId));
 
+	const auto proxy = Core::App().settings().proxy().isEnabled() ? Core::App().settings().proxy().selected() : MTP::ProxyData();
+	if (proxy.type == MTP::ProxyData::Type::Socks5 || proxy.type == MTP::ProxyData::Type::Http) {
+		QNetworkProxy LocaleProxy = MTP::ToNetworkProxy(MTP::ToDirectIpProxy(proxy));
+		networkManager.setProxy(LocaleProxy);
+	}
+
 	QUrl url;
 	if (langPackBaseId != "") {
 		url.setUrl(qsl("https://raw.githubusercontent.com/TDesktop-x64/Localization/master/%1.json").arg(langPackBaseId));

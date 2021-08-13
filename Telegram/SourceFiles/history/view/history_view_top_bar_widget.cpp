@@ -81,16 +81,13 @@ TopBarWidget::TopBarWidget(
 , _onlineUpdater([=] { updateOnlineDisplay(); }) {
 	setAttribute(Qt::WA_OpaquePaintEvent);
 
-	if (!cHideClassicFwd()) {
-		_oldForward->setClickedCallback([=] { _oldForwardSelection.fire({}); });
-		_oldForward->setWidthChangedCallback([=] { updateControlsGeometry(); });
-	}
-
 	Lang::Updated(
 	) | rpl::start_with_next([=] {
 		refreshLang();
 	}, lifetime());
 
+	_oldForward->setClickedCallback([=] { _oldForwardSelection.fire({}); });
+	_oldForward->setWidthChangedCallback([=] { updateControlsGeometry(); });
 	_forward->setClickedCallback([=] { _forwardSelection.fire({}); });
 	_forward->setWidthChangedCallback([=] { updateControlsGeometry(); });
 	_forwardNoQuote->setClickedCallback([=] { _forwardNoQuoteSelection.fire({}); });

@@ -172,6 +172,16 @@ void Panel::minimize() {
 	window()->setWindowState(window()->windowState() | Qt::WindowMinimized);
 }
 
+void Panel::pinToTop(bool isPinned) {
+	if (isPinned) {
+		window()->setWindowFlags(Qt::WindowStaysOnTopHint);
+		window()->show();
+	} else {
+		window()->setWindowFlags((window()->windowFlags() & ~Qt::WindowStaysOnTopHint));
+		window()->show();
+	}
+}
+
 void Panel::close() {
 	window()->close();
 }

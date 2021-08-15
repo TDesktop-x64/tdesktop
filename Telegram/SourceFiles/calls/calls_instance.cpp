@@ -637,6 +637,14 @@ bool Instance::minimizeCurrentActiveCall() {
 	return false;
 }
 
+void Instance::setVoiceChatPinned(bool isPinned) {
+	if (inCall() && _currentCallPanel->isActive()) {
+		_currentCallPanel->pinToTop(isPinned);
+	} else if (inGroupCall() && _currentGroupCallPanel->isActive()) {
+		_currentGroupCallPanel->pinToTop(isPinned);
+	}
+}
+
 bool Instance::closeCurrentActiveCall() {
 	if (inGroupCall() && _currentGroupCallPanel->isActive()) {
 		_currentGroupCallPanel->close();

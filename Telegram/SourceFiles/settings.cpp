@@ -80,6 +80,7 @@ bool gShowScheduledButton = false;
 bool gHideFilterAllChats = false;
 bool gStereoMode = false;
 bool gAutoUnmute = false;
+bool gVoiceChatPinned = false;
 QString gRadioController;
 int gVoiceChatBitrate = 0;
 

@@ -60,6 +60,7 @@ public:
 	[[nodiscard]] bool isActive() const;
 	void showAndActivate();
 	void minimize();
+	void pinToTop(bool isPinned);
 	void replaceCall(not_null<Call*> call);
 	void closeBeforeDestroy();
 

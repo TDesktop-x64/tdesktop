@@ -21,6 +21,8 @@
     "lng_settings_show_scheduled_button": "Always show scheduled button",
     "lng_settings_voice_chat": "Voice Chat",
     "lng_settings_stereo_mode": "Enable Stereo Mode",
+    "lng_settings_pin_voice_chat": "Pin To Top",
+    "lng_settings_unpin_voice_chat": "Unpin",
     "lng_settings_radio_controller": "Radio controller",
     "lng_settings_auto_unmute": "Auto unmute",
     "lng_settings_other": "Other",

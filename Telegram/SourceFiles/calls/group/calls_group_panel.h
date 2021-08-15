@@ -76,6 +76,7 @@ public:
 	void showToast(TextWithEntities &&text, crl::time duration = 0);
 
 	void minimize();
+	void pinToTop(bool isPinned);
 	void close();
 	void showAndActivate();
 	void closeBeforeDestroy();

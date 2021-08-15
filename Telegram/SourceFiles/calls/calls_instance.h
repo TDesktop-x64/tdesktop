@@ -83,6 +83,8 @@ public:
 
 	void setCurrentAudioDevice(bool input, const QString &deviceId);
 
+	void setVoiceChatPinned(bool isPinned);
+
 	[[nodiscard]] FnMut<void()> addAsyncWaiter();
 
 	[[nodiscard]] bool isQuitPrevent();

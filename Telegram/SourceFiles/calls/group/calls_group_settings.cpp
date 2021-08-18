@@ -344,22 +344,6 @@ void SettingsBox(
 		EnhancedSettings::Write();
 	}, layout->lifetime());
 
-	AddButton(
-		layout,
-		tr::lng_settings_pin_voice_chat(),
-		st::groupCallSettingsButton
-	)->toggleOn(
-			rpl::single(cVoiceChatPinned())
-	)->toggledChanges(
-	) | rpl::filter([=](bool toggled) {
-		return (toggled != cVoiceChatPinned());
-	}) | rpl::start_with_next([=](bool toggled) {
-		cSetVoiceChatPinned(toggled);
-		box->setWindowFlags(Qt::WindowStaysOnTopHint);
-		box->show();
-	}, layout->lifetime());
-
-
 	using GlobalShortcut = base::GlobalShortcut;
 	struct PushToTalkState {
 		rpl::variable<QString> recordText = tr::lng_group_call_ptt_shortcut();

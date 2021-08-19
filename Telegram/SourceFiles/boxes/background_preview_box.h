@@ -56,11 +56,11 @@ private:
 	void radialAnimationCallback(crl::time now);
 	QRect radialRect() const;
 
+	void generateBackground();
 	void checkLoadedDocument();
-	bool setScaledFromThumb();
+	void setScaledFromThumb();
 	void setScaledFromImage(QImage &&image, QImage &&blurred);
-	void updateServiceBg(std::optional<QColor> background);
-	std::optional<QColor> patternBackgroundColor() const;
+	void updateServiceBg(const std::vector<QColor> &bg);
 	void paintImage(Painter &p);
 	void paintRadial(Painter &p);
 	void paintTexts(Painter &p, crl::time ms);
@@ -76,7 +76,7 @@ private:
 	Data::WallPaper _paper;
 	std::shared_ptr<Data::DocumentMedia> _media;
 	QImage _full;
-	QPixmap _scaled, _blurred, _fadeOutThumbnail;
+	QPixmap _generated, _scaled, _blurred, _fadeOutThumbnail;
 	Ui::Animations::Simple _fadeIn;
 	Ui::RadialAnimation _radial;
 	base::binary_guard _generating;

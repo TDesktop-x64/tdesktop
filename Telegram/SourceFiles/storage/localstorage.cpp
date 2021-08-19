@@ -740,14 +740,12 @@ bool readBackground() {
 	} else {
 		auto buffer = QBuffer(&imageData);
 		auto reader = QImageReader(&buffer);
-#ifndef OS_MAC_OLD
 		reader.setAutoTransform(true);
-#endif // OS_MAC_OLD
 		if (!reader.read(&image)) {
 			image = QImage();
 		}
 	}
-	if (!image.isNull() || paper->backgroundColor()) {
+	if (!image.isNull() || !paper->backgroundColors().empty()) {
 		_backgroundCanWrite = false;
 		Window::Theme::Background()->set(*paper, std::move(image));
 		_backgroundCanWrite = true;

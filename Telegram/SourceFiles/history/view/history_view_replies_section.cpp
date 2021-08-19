@@ -55,10 +55,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/storage_media_prepare.h"
 #include "storage/storage_account.h"
 #include "inline_bots/inline_bot_result.h"
-#include "platform/platform_specific.h"
 #include "lang/lang_keys.h"
 #include "facades.h"
-#include "app.h"
 #include "styles/style_chat.h"
 #include "styles/style_window.h"
 #include "styles/style_info.h"
@@ -148,7 +146,7 @@ RepliesWidget::RepliesWidget(
 	not_null<Window::SessionController*> controller,
 	not_null<History*> history,
 	MsgId rootId)
-: Window::SectionWidget(parent, controller)
+: Window::SectionWidget(parent, controller, PaintedBackground::Section)
 , _history(history)
 , _rootId(rootId)
 , _root(lookupRoot())
@@ -566,15 +564,12 @@ void RepliesWidget::chooseAttach() {
 		}
 
 		if (!result.remoteContent.isEmpty()) {
-			auto animated = false;
-			auto image = App::readImage(
-				result.remoteContent,
-				nullptr,
-				false,
-				&animated);
-			if (!image.isNull() && !animated) {
+			auto read = Images::Read({
+				.content = result.remoteContent,
+			});
+			if (!read.image.isNull() && !read.animated) {
 				confirmSendingFiles(
-					std::move(image),
+					std::move(read.image),
 					std::move(result.remoteContent));
 			} else {
 				uploadFile(result.remoteContent, SendMediaType::File);
@@ -610,10 +605,7 @@ bool RepliesWidget::confirmSendingFiles(
 	}
 
 	if (hasImage) {
-		auto image = Platform::GetImageFromClipboard();
-		if (image.isNull()) {
-			image = qvariant_cast<QImage>(data->imageData());
-		}
+		auto image = qvariant_cast<QImage>(data->imageData());
 		if (!image.isNull()) {
 			confirmSendingFiles(
 				std::move(image),

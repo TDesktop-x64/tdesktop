@@ -14,7 +14,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/image/image_prepare.h"
 #include "ui/chat/attach/attach_extensions.h"
 #include "ui/chat/attach/attach_prepare.h"
-#include "app.h"
 
 #include <QtCore/QSemaphore>
 #include <QtCore/QMimeData>
@@ -164,7 +163,7 @@ MimeDataState ComputeMimeDataState(const QMimeData *data) {
 		if (filesize > kFileSizeLimit) {
 			return MimeDataState::None;
 		} else if (allAreSmallImages) {
-			if (filesize > App::kImageSizeLimit) {
+			if (filesize > Images::kReadBytesLimit) {
 				allAreSmallImages = false;
 			} else if (!HasExtensionFrom(file, imageExtensions)) {
 				allAreSmallImages = false;
@@ -329,7 +328,7 @@ void UpdateImageDetails(PreparedFile &file, int previewWidth) {
 	file.preview.setDevicePixelRatio(cRetinaFactor());
 }
 
-bool ApplyModifications(const PreparedList &list) {
+bool ApplyModifications(PreparedList &list) {
 	auto applied = false;
 	for (auto &file : list.files) {
 		const auto image = std::get_if<Image>(&file.information->media);
@@ -337,6 +336,9 @@ bool ApplyModifications(const PreparedList &list) {
 			continue;
 		}
 		applied = true;
+		if (!file.path.isEmpty()) {
+			file.path = QString();
+		}
 		image->data = Editor::ImageModified(
 			std::move(image->data),
 			image->modifications);

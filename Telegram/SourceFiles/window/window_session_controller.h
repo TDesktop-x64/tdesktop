@@ -7,13 +7,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include <rpl/variable.h>
 #include "base/flags.h"
 #include "base/object_ptr.h"
 #include "base/weak_ptr.h"
 #include "base/timer.h"
 #include "dialogs/dialogs_key.h"
-#include "ui/effects/animation_value.h"
+#include "ui/effects/animations.h"
 #include "ui/layers/layer_widget.h"
 #include "window/window_adaptive.h"
 
@@ -55,6 +54,54 @@ class MainWindow;
 class SectionMemento;
 class Controller;
 class FiltersMenu;
+
+struct CacheBackgroundRequest {
+	QImage prepared;
+	QImage preparedForTiled;
+	QSize area;
+	int gradientRotation = 0;
+	bool tile = false;
+	bool recreateGradient = false;
+	QImage gradient;
+	std::vector<QColor> gradientColors;
+	float64 gradientProgress = 1.;
+	float64 patternOpacity = 1.;
+
+	explicit operator bool() const {
+		return !prepared.isNull() || !gradient.isNull();
+	}
+};
+
+bool operator==(
+	const CacheBackgroundRequest &a,
+	const CacheBackgroundRequest &b);
+bool operator!=(
+	const CacheBackgroundRequest &a,
+	const CacheBackgroundRequest &b);
+
+struct CacheBackgroundResult {
+	QImage image;
+	QImage gradient;
+	QSize area;
+	int x = 0;
+	int y = 0;
+};
+
+struct CachedBackground {
+	CachedBackground() = default;
+	CachedBackground(CacheBackgroundResult &&result);
+
+	QPixmap pixmap;
+	QSize area;
+	int x = 0;
+	int y = 0;
+};
+
+struct BackgroundState {
+	CachedBackground was;
+	CachedBackground now;
+	float64 shown = 1.;
+};
 
 enum class GifPauseReason {
 	Any           = 0,
@@ -225,7 +272,6 @@ private:
 	MsgId _showingRepliesRootId = 0;
 	mtpRequestId _showingRepliesRequestId = 0;
 
-
 };
 
 class SessionController : public SessionNavigation {
@@ -289,11 +335,11 @@ public:
 	void floatPlayerAreaUpdated();
 
 	struct ColumnLayout {
-		int bodyWidth;
-		int dialogsWidth;
-		int chatWidth;
-		int thirdWidth;
-		Adaptive::WindowLayout windowLayout;
+		int bodyWidth = 0;
+		int dialogsWidth = 0;
+		int chatWidth = 0;
+		int thirdWidth = 0;
+		Adaptive::WindowLayout windowLayout = Adaptive::WindowLayout();
 	};
 	[[nodiscard]] ColumnLayout computeColumnLayout() const;
 	int dialogsSmallColumnWidth() const;
@@ -395,6 +441,10 @@ public:
 	[[nodiscard]] rpl::producer<> filtersMenuChanged() const;
 	void reloadFiltersMenu();
 
+	[[nodiscard]] const BackgroundState &backgroundState(QSize area);
+	[[nodiscard]] rpl::producer<> repaintBackgroundRequests() const;
+	void rotateComplexGradientBackground();
+
 	rpl::lifetime &lifetime() {
 		return _lifetime;
 	}
@@ -424,6 +474,19 @@ private:
 
 	void checkInvitePeek();
 
+	void cacheBackground();
+	void cacheBackgroundNow();
+	void cacheBackgroundAsync(
+		const CacheBackgroundRequest &request,
+		Fn<void(CacheBackgroundResult&&)> done = nullptr);
+	void clearCachedBackground();
+	void setCachedBackground(CacheBackgroundResult &&cached);
+	[[nodiscard]] CacheBackgroundRequest currentCacheRequest(
+		QSize area,
+		int addRotation = 0) const;
+	[[nodiscard]] bool readyForBackgroundRotation() const;
+	void generateNextBackgroundRotation();
+
 	const not_null<Controller*> _window;
 
 	std::unique_ptr<Passport::FormController> _passportForm;
@@ -450,6 +513,16 @@ private:
 	rpl::variable<Data::Folder*> _openedFolder;
 
 	rpl::event_stream<> _filtersMenuChanged;
+
+	BackgroundState _backgroundState;
+	Ui::Animations::Simple _backgroundFade;
+	CacheBackgroundRequest _backgroundCachingRequest;
+	CacheBackgroundResult _backgroundNext;
+	int _backgroundAddRotation = 0;
+	QSize _willCacheForArea;
+	crl::time _lastAreaChangeTime = 0;
+	base::Timer _cacheBackgroundTimer;
+	rpl::event_stream<> _repaintBackgroundRequests;
 
 	rpl::lifetime _lifetime;
 

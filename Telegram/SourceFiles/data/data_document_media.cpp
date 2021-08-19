@@ -24,7 +24,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "storage/file_download.h"
 #include "ui/image/image.h"
-#include "app.h"
 
 #include <QtCore/QBuffer>
 #include <QtGui/QImageReader>
@@ -40,6 +39,8 @@ enum class FileType {
 	Video,
 	AnimatedSticker,
 	WallPaper,
+	WallPatternPNG,
+	WallPatternSVG,
 	Theme,
 };
 
@@ -61,6 +62,15 @@ enum class FileType {
 		return Lottie::ReadThumbnail(Lottie::ReadContent(data, path));
 	} else if (type == FileType::Theme) {
 		return Window::Theme::GeneratePreview(data, path);
+	} else if (type == FileType::WallPatternSVG) {
+		return Images::Read({
+			.path = path,
+			.content = std::move(data),
+			.maxSize = QSize(
+				kWallPaperThumbnailLimit,
+				kWallPaperThumbnailLimit),
+			.gzipSvg = true,
+		}).image;
 	}
 	auto buffer = QBuffer(&data);
 	auto file = QFile(path);
@@ -391,7 +401,11 @@ void DocumentMedia::checkStickerLarge(not_null<FileLoader*> loader) {
 void DocumentMedia::GenerateGoodThumbnail(
 		not_null<DocumentData*> document,
 		QByteArray data) {
-	const auto type = document->isWallPaper()
+	const auto type = document->isPatternWallPaperSVG()
+		? FileType::WallPatternSVG
+		: document->isPatternWallPaperPNG()
+		? FileType::WallPatternPNG
+		: document->isWallPaper()
 		? FileType::WallPaper
 		: document->isTheme()
 		? FileType::Theme
@@ -416,7 +430,8 @@ void DocumentMedia::GenerateGoodThumbnail(
 			auto buffer = QBuffer(&bytes);
 			const auto format = (type == FileType::AnimatedSticker)
 				? "WEBP"
-				: (type == FileType::WallPaper && result.hasAlphaChannel())
+				: (type == FileType::WallPatternPNG
+					|| type == FileType::WallPatternSVG)
 				? "PNG"
 				: "JPG";
 			result.save(&buffer, format, kGoodThumbQuality);
@@ -464,11 +479,11 @@ void DocumentMedia::ReadOrGenerateThumbnail(
 			});
 		} else if (active) {
 			crl::async([=] {
-				const auto image = App::readImage(value, nullptr, false);
-				crl::on_main(guard, [=] {
+				auto image = Images::Read({ .content = value }).image;
+				crl::on_main(guard, [=, image = std::move(image)]() mutable {
 					document->setGoodThumbnailChecked(true);
 					if (const auto active = document->activeMediaView()) {
-						active->setGoodThumbnail(image);
+						active->setGoodThumbnail(std::move(image));
 					}
 				});
 			});

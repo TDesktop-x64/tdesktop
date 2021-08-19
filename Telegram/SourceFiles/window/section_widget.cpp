@@ -18,14 +18,29 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace Window {
 
+AbstractSectionWidget::AbstractSectionWidget(
+	QWidget *parent,
+	not_null<SessionController*> controller,
+	PaintedBackground paintedBackground)
+: RpWidget(parent)
+, _controller(controller) {
+	if (paintedBackground == PaintedBackground::Section) {
+		controller->repaintBackgroundRequests(
+		) | rpl::start_with_next([=] {
+			update();
+		}, lifetime());
+	}
+}
+
 Main::Session &AbstractSectionWidget::session() const {
 	return _controller->session();
 }
 
 SectionWidget::SectionWidget(
 	QWidget *parent,
-	not_null<Window::SessionController*> controller)
-: AbstractSectionWidget(parent, controller) {
+	not_null<Window::SessionController*> controller,
+	PaintedBackground paintedBackground)
+: AbstractSectionWidget(parent, controller, paintedBackground) {
 }
 
 void SectionWidget::setGeometryWithTopMoved(
@@ -90,43 +105,78 @@ void SectionWidget::PaintBackground(
 		QRect clip) {
 	Painter p(widget);
 
-	auto fill = QRect(0, 0, widget->width(), controller->content()->height());
-	if (const auto color = Window::Theme::Background()->colorForFill()) {
-		p.fillRect(fill, *color);
+	const auto background = Window::Theme::Background();
+	const auto fullHeight = controller->content()->height();
+	if (const auto color = background->colorForFill()) {
+		p.fillRect(clip, *color);
 		return;
 	}
+	const auto gradient = background->gradientForFill();
+	const auto fill = QSize(widget->width(), fullHeight);
 	auto fromy = controller->content()->backgroundFromY();
-	auto x = 0, y = 0;
-	auto cached = controller->content()->cachedBackground(fill, x, y);
-	if (cached.isNull()) {
-		if (Window::Theme::Background()->tile()) {
-			auto &pix = Window::Theme::Background()->pixmapForTiled();
-			auto left = clip.left();
-			auto top = clip.top();
-			auto right = clip.left() + clip.width();
-			auto bottom = clip.top() + clip.height();
-			auto w = pix.width() / cRetinaFactor();
-			auto h = pix.height() / cRetinaFactor();
-			auto sx = qFloor(left / w);
-			auto sy = qFloor((top - fromy) / h);
-			auto cx = qCeil(right / w);
-			auto cy = qCeil((bottom - fromy) / h);
-			for (auto i = sx; i < cx; ++i) {
-				for (auto j = sy; j < cy; ++j) {
-					p.drawPixmap(QPointF(i * w, fromy + j * h), pix);
-				}
-			}
+	auto state = controller->backgroundState(fill);
+	const auto paintCache = [&](const CachedBackground &cache) {
+		const auto to = QRect(
+			QPoint(cache.x, fromy + cache.y),
+			cache.pixmap.size() / cIntRetinaFactor());
+		if (cache.area == fill) {
+			p.drawPixmap(to, cache.pixmap);
 		} else {
-			PainterHighQualityEnabler hq(p);
-
-			auto &pix = Window::Theme::Background()->pixmap();
-			QRect to, from;
-			Window::Theme::ComputeBackgroundRects(fill, pix.size(), to, from);
-			to.moveTop(to.top() + fromy);
-			p.drawPixmap(to, pix, from);
+			const auto sx = fill.width() / float64(cache.area.width());
+			const auto sy = fill.height() / float64(cache.area.height());
+			const auto round = [](float64 value) -> int {
+				return (value >= 0.)
+					? int(std::ceil(value))
+					: int(std::floor(value));
+			};
+			const auto sto = QPoint(round(to.x() * sx), round(to.y() * sy));
+			p.drawPixmap(
+				sto.x(),
+				sto.y(),
+				round((to.x() + to.width()) * sx) - sto.x(),
+				round((to.y() + to.height()) * sy) - sto.y(),
+				cache.pixmap);
 		}
-	} else {
-		p.drawPixmap(x, fromy + y, cached);
+	};
+	const auto hasNow = !state.now.pixmap.isNull();
+	const auto goodNow = hasNow && (state.now.area == fill);
+	const auto useCache = goodNow || !gradient.isNull();
+	if (useCache) {
+		if (state.shown < 1. && !gradient.isNull()) {
+			paintCache(state.was);
+			p.setOpacity(state.shown);
+		}
+		paintCache(state.now);
+		return;
+	}
+	const auto &prepared = background->prepared();
+	if (!prepared.isNull() && !background->tile()) {
+		const auto hq = PainterHighQualityEnabler(p);
+		const auto rects = Window::Theme::ComputeBackgroundRects(
+			fill,
+			prepared.size());
+		auto to = rects.to;
+		to.moveTop(to.top() + fromy);
+		p.drawImage(to, prepared, rects.from);
+		return;
+	}
+	if (!prepared.isNull()) {
+		const auto &tiled = background->preparedForTiled();
+		auto left = clip.left();
+		auto top = clip.top();
+		auto right = clip.left() + clip.width();
+		auto bottom = clip.top() + clip.height();
+		auto w = tiled.width() / cRetinaFactor();
+		auto h = tiled.height() / cRetinaFactor();
+		auto sx = qFloor(left / w);
+		auto sy = qFloor((top - fromy) / h);
+		auto cx = qCeil(right / w);
+		auto cy = qCeil((bottom - fromy) / h);
+		for (auto i = sx; i < cx; ++i) {
+			for (auto j = sy; j < cy; ++j) {
+				p.drawImage(QPointF(i * w, fromy + j * h), tiled);
+			}
+		}
 	}
 }
 

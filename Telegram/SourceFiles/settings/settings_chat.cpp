@@ -55,7 +55,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mainwidget.h"
 #include "mainwindow.h"
 #include "facades.h"
-#include "app.h"
 #include "styles/style_settings.h"
 #include "styles/style_layers.h"
 
@@ -552,43 +551,62 @@ void BackgroundRow::radialAnimationCallback(crl::time now) {
 }
 
 void BackgroundRow::updateImage() {
-	int32 size = st::settingsBackgroundThumb * cIntRetinaFactor();
-	QImage back(size, size, QImage::Format_ARGB32_Premultiplied);
+	const auto size = st::settingsBackgroundThumb;
+	const auto fullsize = size * cIntRetinaFactor();
+
+	// We use Format_RGB32 so that DestinationIn shows black, not transparent.
+	// Then we'll convert to Format_ARGB32_Premultiplied for round corners.
+	auto back = QImage(fullsize, fullsize, QImage::Format_RGB32);
 	back.setDevicePixelRatio(cRetinaFactor());
 	{
 		Painter p(&back);
 		PainterHighQualityEnabler hq(p);
 
-		if (const auto color = Window::Theme::Background()->colorForFill()) {
-			p.fillRect(
-				0,
-				0,
-				st::settingsBackgroundThumb,
-				st::settingsBackgroundThumb,
-				*color);
+		const auto background = Window::Theme::Background();
+		if (const auto color = background->colorForFill()) {
+			p.fillRect(0, 0, size, size, *color);
 		} else {
-			const auto &pix = Window::Theme::Background()->pixmap();
-			const auto sx = (pix.width() > pix.height())
-				? ((pix.width() - pix.height()) / 2)
-				: 0;
-			const auto sy = (pix.height() > pix.width())
-				? ((pix.height() - pix.width()) / 2)
-				: 0;
-			const auto s = (pix.width() > pix.height())
-				? pix.height()
-				: pix.width();
-			p.drawPixmap(
-				0,
-				0,
-				st::settingsBackgroundThumb,
-				st::settingsBackgroundThumb,
-				pix,
-				sx,
-				sy,
-				s,
-				s);
+			const auto gradient = background->gradientForFill();
+			const auto patternOpacity = background->paper().patternOpacity();
+			if (!gradient.isNull()) {
+				auto hq = PainterHighQualityEnabler(p);
+				p.drawImage(QRect(0, 0, size, size), gradient);
+				if (patternOpacity >= 0.) {
+					p.setCompositionMode(QPainter::CompositionMode_SoftLight);
+					p.setOpacity(patternOpacity);
+				} else {
+					p.setCompositionMode(
+						QPainter::CompositionMode_DestinationIn);
+				}
+			}
+			const auto &prepared = background->prepared();
+			if (!prepared.isNull()) {
+				const auto sx = (prepared.width() > prepared.height())
+					? ((prepared.width() - prepared.height()) / 2)
+					: 0;
+				const auto sy = (prepared.height() > prepared.width())
+					? ((prepared.height() - prepared.width()) / 2)
+					: 0;
+				const auto s = (prepared.width() > prepared.height())
+					? prepared.height()
+					: prepared.width();
+				p.drawImage(
+					QRect(0, 0, size, size),
+					prepared,
+					QRect(sx, sy, s, s));
+			}
+			if (!gradient.isNull()
+				&& !prepared.isNull()
+				&& patternOpacity < 0.
+				&& patternOpacity > -1.) {
+				p.setCompositionMode(QPainter::CompositionMode_SourceOver);
+				p.setOpacity(patternOpacity);
+				p.fillRect(QRect(0, 0, size, size), Qt::black);
+			}
 		}
 	}
+	back = std::move(back).convertToFormat(
+		QImage::Format_ARGB32_Premultiplied);
 	Images::prepareRound(back, ImageRoundRadius::Small);
 	_background = Ui::PixmapFromImage(std::move(back));
 	_background.setDevicePixelRatio(cRetinaFactor());
@@ -626,9 +644,11 @@ void ChooseFromFile(
 			}
 		}
 
-		auto image = result.remoteContent.isEmpty()
-			? App::readImage(result.paths.front())
-			: App::readImage(result.remoteContent);
+		auto image = Images::Read({
+			.path = result.paths.isEmpty() ? QString() : result.paths.front(),
+			.content = result.remoteContent,
+			.forceOpaque = true,
+		}).image;
 		if (image.isNull() || image.width() <= 0 || image.height() <= 0) {
 			return;
 		}

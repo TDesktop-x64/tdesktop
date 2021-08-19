@@ -279,7 +279,7 @@ bool ServiceCheck::checkRippleStartPosition(QPoint position) const {
 	});
 }
 
-AdminLog::OwnedItem GenerateTextItem(
+[[nodiscard]] AdminLog::OwnedItem GenerateTextItem(
 		not_null<HistoryView::ElementDelegate*> delegate,
 		not_null<History*> history,
 		const QString &text,
@@ -308,7 +308,7 @@ AdminLog::OwnedItem GenerateTextItem(
 	return AdminLog::OwnedItem(delegate, item);
 }
 
-QImage PrepareScaledNonPattern(
+[[nodiscard]] QImage PrepareScaledNonPattern(
 		const QImage &image,
 		Images::Option blur) {
 	const auto size = st::boxWideWidth;
@@ -331,64 +331,29 @@ QImage PrepareScaledNonPattern(
 		size);
 }
 
-QImage ColorizePattern(QImage image, QColor color) {
-	if (image.format() != QImage::Format_ARGB32_Premultiplied) {
-		image = std::move(image).convertToFormat(
-			QImage::Format_ARGB32_Premultiplied);
-	}
-	// Similar to style::colorizeImage.
-	// But style::colorizeImage takes pattern with all pixels having the
-	// same components value, from (0, 0, 0, 0) to (255, 255, 255, 255).
-	//
-	// While in patterns we have different value ranges, usually they are
-	// from (0, 0, 0, 0) to (0, 0, 0, 255), so we should use only 'alpha'.
-
-	const auto width = image.width();
-	const auto height = image.height();
-	const auto pattern = anim::shifted(color);
-
-	constexpr auto resultIntsPerPixel = 1;
-	const auto resultIntsPerLine = (image.bytesPerLine() >> 2);
-	const auto resultIntsAdded = resultIntsPerLine - width * resultIntsPerPixel;
-	auto resultInts = reinterpret_cast<uint32*>(image.bits());
-	Assert(resultIntsAdded >= 0);
-	Assert(image.depth() == static_cast<int>((resultIntsPerPixel * sizeof(uint32)) << 3));
-	Assert(image.bytesPerLine() == (resultIntsPerLine << 2));
-
-	const auto maskBytesPerPixel = (image.depth() >> 3);
-	const auto maskBytesPerLine = image.bytesPerLine();
-	const auto maskBytesAdded = maskBytesPerLine - width * maskBytesPerPixel;
-
-	// We want to read the last byte of four available.
-	// This is the difference with style::colorizeImage.
-	auto maskBytes = image.constBits() + (maskBytesPerPixel - 1);
-	Assert(maskBytesAdded >= 0);
-	Assert(image.depth() == (maskBytesPerPixel << 3));
-	for (auto y = 0; y != height; ++y) {
-		for (auto x = 0; x != width; ++x) {
-			auto maskOpacity = static_cast<anim::ShiftedMultiplier>(*maskBytes) + 1;
-			*resultInts = anim::unshifted(pattern * maskOpacity);
-			maskBytes += maskBytesPerPixel;
-			resultInts += resultIntsPerPixel;
-		}
-		maskBytes += maskBytesAdded;
-		resultInts += resultIntsAdded;
-	}
-	return image;
-}
-
-QImage PrepareScaledFromFull(
+[[nodiscard]] QImage PrepareScaledFromFull(
 		const QImage &image,
-		std::optional<QColor> patternBackground,
+		bool isPattern,
+		const std::vector<QColor> &background,
+		int gradientRotation,
+		float64 patternOpacity,
 		Images::Option blur = Images::Option(0)) {
 	auto result = PrepareScaledNonPattern(image, blur);
-	if (patternBackground) {
-		result = ColorizePattern(
+	if (isPattern) {
+		result = Data::PreparePatternImage(
 			std::move(result),
-			Data::PatternColor(*patternBackground));
+			background,
+			gradientRotation,
+			patternOpacity);
 	}
 	return std::move(result).convertToFormat(
 		QImage::Format_ARGB32_Premultiplied);
+}
+
+[[nodiscard]] QImage BlackImage(QSize size) {
+	auto result = QImage(size, QImage::Format_ARGB32_Premultiplied);
+	result.fill(Qt::black);
+	return result;
 }
 
 } // namespace
@@ -415,10 +380,26 @@ BackgroundPreviewBox::BackgroundPreviewBox(
 	if (_media) {
 		_media->thumbnailWanted(_paper.fileOrigin());
 	}
+	generateBackground();
 	_controller->session().downloaderTaskFinished(
 	) | rpl::start_with_next([=] {
 		update();
 	}, lifetime());
+}
+
+void BackgroundPreviewBox::generateBackground() {
+	if (_paper.backgroundColors().empty()) {
+		return;
+	}
+	const auto size = QSize(st::boxWideWidth, st::boxWideWidth)
+		* cIntRetinaFactor();
+	_generated = Ui::PixmapFromImage((_paper.patternOpacity() >= 0.)
+		? Data::GenerateWallPaper(
+			size,
+			_paper.backgroundColors(),
+			_paper.gradientRotation())
+		: BlackImage(size));
+	_generated.setDevicePixelRatio(cRetinaFactor());
 }
 
 not_null<HistoryView::ElementDelegate*> BackgroundPreviewBox::delegate() {
@@ -433,7 +414,7 @@ void BackgroundPreviewBox::prepare() {
 	if (_paper.hasShareUrl()) {
 		addLeftButton(tr::lng_background_share(), [=] { share(); });
 	}
-	updateServiceBg(_paper.backgroundColor());
+	updateServiceBg(_paper.backgroundColors());
 
 	_paper.loadDocument();
 	const auto document = _paper.document();
@@ -521,31 +502,29 @@ void BackgroundPreviewBox::paintEvent(QPaintEvent *e) {
 	Painter p(this);
 
 	const auto ms = crl::now();
-	const auto color = _paper.backgroundColor();
-	if (color) {
-		p.fillRect(e->rect(), *color);
+	if (_scaled.isNull()) {
+		setScaledFromThumb();
 	}
-	if (!color || _paper.isPattern()) {
-		if (!_scaled.isNull() || setScaledFromThumb()) {
-			paintImage(p);
-			paintRadial(p);
-		} else if (!color) {
-			p.fillRect(e->rect(), st::boxBg);
-			return;
-		} else {
-			// Progress of pattern loading.
-			paintRadial(p);
-		}
+	if (!_generated.isNull()
+		&& (_scaled.isNull()
+			|| (_fadeOutThumbnail.isNull() && _fadeIn.animating()))) {
+		p.drawPixmap(0, 0, _generated);
+	}
+	if (!_scaled.isNull()) {
+		paintImage(p);
+		paintRadial(p);
+	} else if (_generated.isNull()) {
+		p.fillRect(e->rect(), st::boxBg);
+		return;
+	} else {
+		// Progress of pattern loading.
+		paintRadial(p);
 	}
 	paintTexts(p, ms);
 }
 
 void BackgroundPreviewBox::paintImage(Painter &p) {
 	Expects(!_scaled.isNull());
-
-	const auto master = _paper.isPattern()
-		? std::clamp(_paper.patternIntensity() / 100., 0., 1.)
-		: 1.;
 
 	const auto factor = cIntRetinaFactor();
 	const auto size = st::boxWideWidth;
@@ -563,7 +542,7 @@ void BackgroundPreviewBox::paintImage(Painter &p) {
 	const auto &pixmap = (!_blurred.isNull() && _paper.isBlurred())
 		? _blurred
 		: _scaled;
-	p.setOpacity(master * fade);
+	p.setOpacity(fade);
 	p.drawPixmap(rect(), pixmap, from);
 	checkBlurAnimationStart();
 }
@@ -655,7 +634,10 @@ void BackgroundPreviewBox::radialAnimationCallback(crl::time now) {
 	checkLoadedDocument();
 }
 
-bool BackgroundPreviewBox::setScaledFromThumb() {
+void BackgroundPreviewBox::setScaledFromThumb() {
+	if (!_scaled.isNull()) {
+		return;
+	}
 	const auto localThumbnail = _paper.localThumbnail();
 	const auto thumbnail = localThumbnail
 		? localThumbnail
@@ -663,13 +645,16 @@ bool BackgroundPreviewBox::setScaledFromThumb() {
 		? _media->thumbnail()
 		: nullptr;
 	if (!thumbnail) {
-		return false;
+		return;
 	} else if (_paper.isPattern() && _paper.document() != nullptr) {
-		return false;
+		return;
 	}
 	auto scaled = PrepareScaledFromFull(
 		thumbnail->original(),
-		patternBackgroundColor(),
+		_paper.isPattern(),
+		_paper.backgroundColors(),
+		_paper.gradientRotation(),
+		_paper.patternOpacity(),
 		_paper.document() ? Images::Option::Blurred : Images::Option(0));
 	auto blurred = (_paper.document() || _paper.isPattern())
 		? QImage()
@@ -677,13 +662,12 @@ bool BackgroundPreviewBox::setScaledFromThumb() {
 			Data::PrepareBlurredBackground(thumbnail->original()),
 			Images::Option(0));
 	setScaledFromImage(std::move(scaled), std::move(blurred));
-	return true;
 }
 
 void BackgroundPreviewBox::setScaledFromImage(
 		QImage &&image,
 		QImage &&blurred) {
-	updateServiceBg(Window::Theme::CountAverageColor(image));
+	updateServiceBg({ Window::Theme::CountAverageColor(image) });
 	if (!_full.isNull()) {
 		startFadeInFrom(std::move(_scaled));
 	}
@@ -710,16 +694,20 @@ void BackgroundPreviewBox::checkBlurAnimationStart() {
 	startFadeInFrom(_paper.isBlurred() ? _scaled : _blurred);
 }
 
-void BackgroundPreviewBox::updateServiceBg(std::optional<QColor> background) {
-	if (background) {
-		_serviceBg = Window::Theme::AdjustedColor(
-			st::msgServiceBg->c,
-			*background);
+void BackgroundPreviewBox::updateServiceBg(const std::vector<QColor> &bg) {
+	const auto count = int(bg.size());
+	if (!count) {
+		return;
 	}
-}
-
-std::optional<QColor> BackgroundPreviewBox::patternBackgroundColor() const {
-	return _paper.isPattern() ? _paper.backgroundColor() : std::nullopt;
+	auto red = 0, green = 0, blue = 0;
+	for (const auto &color : bg) {
+		red += color.red();
+		green += color.green();
+		blue += color.blue();
+	}
+	_serviceBg = Window::Theme::AdjustedColor(
+		st::msgServiceBg->c,
+		QColor(red / count, green / count, blue / count));
 }
 
 void BackgroundPreviewBox::checkLoadedDocument() {
@@ -737,15 +725,23 @@ void BackgroundPreviewBox::checkLoadedDocument() {
 		crl::async([
 			this,
 			image = std::move(image),
-			patternBackground = patternBackgroundColor(),
+			isPattern = _paper.isPattern(),
+			background = _paper.backgroundColors(),
+			gradientRotation = _paper.gradientRotation(),
+			patternOpacity = _paper.patternOpacity(),
 			guard = _generating.make_guard()
 		]() mutable {
-			auto scaled = PrepareScaledFromFull(image, patternBackground);
-			auto blurred = patternBackground
-				? QImage()
-				: PrepareScaledNonPattern(
+			auto scaled = PrepareScaledFromFull(
+				image,
+				isPattern,
+				background,
+				gradientRotation,
+				patternOpacity);
+			auto blurred = !isPattern
+				? PrepareScaledNonPattern(
 					Data::PrepareBlurredBackground(image),
-					Images::Option(0));
+					Images::Option(0))
+				: QImage();
 			crl::on_main(std::move(guard), [
 				this,
 				image = std::move(image),
@@ -768,7 +764,7 @@ bool BackgroundPreviewBox::Start(
 		not_null<Window::SessionController*> controller,
 		const QString &slug,
 		const QMap<QString, QString> &params) {
-	if (const auto paper = Data::WallPaper::FromColorSlug(slug)) {
+	if (const auto paper = Data::WallPaper::FromColorsSlug(slug)) {
 		controller->show(Box<BackgroundPreviewBox>(
 			controller,
 			paper->withUrlParams(params)));

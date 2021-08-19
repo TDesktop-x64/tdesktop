@@ -244,6 +244,14 @@ bool Media::forwardedBecomesUnread() const {
 	return false;
 }
 
+bool Media::dropForwardedInfo() const {
+	return false;
+}
+
+bool Media::forceForwardedInfo() const {
+	return false;
+}
+
 QString Media::errorTextForForward(not_null<PeerData*> peer) const {
 	return QString();
 }
@@ -623,6 +631,10 @@ bool MediaFile::forwardedBecomesUnread() const {
 	return _document->isVoiceMessage()
 		//|| _document->isVideoFile()
 		|| _document->isVideoMessage();
+}
+
+bool MediaFile::dropForwardedInfo() const {
+	return _document->isSong();
 }
 
 QString MediaFile::errorTextForForward(not_null<PeerData*> peer) const {
@@ -1007,7 +1019,8 @@ WebPageData *MediaWebPage::webpage() const {
 
 bool MediaWebPage::hasReplyPreview() const {
 	if (const auto document = MediaWebPage::document()) {
-		return document->hasThumbnail() && !document->isPatternWallPaper();
+		return document->hasThumbnail()
+			&& !document->isPatternWallPaper();
 	} else if (const auto photo = MediaWebPage::photo()) {
 		return !photo->isNull();
 	}
@@ -1137,6 +1150,10 @@ QString MediaGame::errorTextForForward(not_null<PeerData*> peer) const {
 		peer,
 		ChatRestriction::SendGames
 	).value_or(QString());
+}
+
+bool MediaGame::dropForwardedInfo() const {
+	return true;
 }
 
 bool MediaGame::consumeMessageText(const TextWithEntities &text) {
@@ -1344,6 +1361,10 @@ QString MediaDice::pinnedTextSubstring() const {
 
 TextForMimeData MediaDice::clipboardText() const {
 	return { notificationText() };
+}
+
+bool MediaDice::forceForwardedInfo() const {
+	return true;
 }
 
 bool MediaDice::updateInlineResultMedia(const MTPMessageMedia &media) {

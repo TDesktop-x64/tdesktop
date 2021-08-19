@@ -45,7 +45,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_channel.h"
 #include "data/data_user.h"
 #include "data/data_histories.h"
-#include "app.h"
 #include "styles/style_dialogs.h"
 #include "styles/style_widgets.h"
 #include "styles/style_chat.h"
@@ -564,8 +563,14 @@ HistoryMessage::HistoryMessage(
 
 	auto config = CreateConfig();
 
-	if (original->Has<HistoryMessageForwarded>() || !original->history()->peer->isSelf()) {
-		// Server doesn't add "fwd_from" to non-forwarded messages from chat with yourself.
+	const auto originalMedia = original->media();
+	const auto dropForwardInfo = (originalMedia
+		&& originalMedia->dropForwardedInfo())
+		|| (original->history()->peer->isSelf()
+			&& !history->peer->isSelf()
+			&& !original->Has<HistoryMessageForwarded>()
+			&& (!originalMedia || !originalMedia->forceForwardedInfo()));
+	if (!dropForwardInfo) {
 		config.originalDate = original->dateOriginal();
 		if (const auto info = original->hiddenForwardedInfo()) {
 			config.senderNameOriginal = info->name;
@@ -597,6 +602,14 @@ HistoryMessage::HistoryMessage(
 	}
 	if (const auto fwdViaBot = original->viaBot()) {
 		config.viaBotId = peerToUser(fwdViaBot->id);
+	} else if (originalMedia && originalMedia->game()) {
+		if (const auto sender = original->senderOriginal()) {
+			if (const auto user = sender->asUser()) {
+				if (user->isBot()) {
+					config.viaBotId = peerToUser(user->id);
+				}
+			}
+		}
 	}
 	const auto fwdViewsCount = original->viewsCount();
 	if (fwdViewsCount > 0) {

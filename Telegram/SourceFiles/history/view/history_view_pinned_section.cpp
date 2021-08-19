@@ -44,7 +44,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "platform/platform_specific.h"
 #include "lang/lang_keys.h"
 #include "facades.h"
-#include "app.h"
 #include "styles/style_chat.h"
 #include "styles/style_window.h"
 #include "styles/style_info.h"
@@ -91,7 +90,7 @@ PinnedWidget::PinnedWidget(
 	QWidget *parent,
 	not_null<Window::SessionController*> controller,
 	not_null<History*> history)
-: Window::SectionWidget(parent, controller)
+: Window::SectionWidget(parent, controller, PaintedBackground::Section)
 , _history(history->migrateToOrMe())
 , _migratedPeer(_history->peer->migrateFrom())
 , _topBar(this, controller)

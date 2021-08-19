@@ -40,7 +40,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
 #include "apiwrap.h"
-#include "app.h"
 
 #include <QtGui/QGuiApplication>
 
@@ -232,15 +231,16 @@ bool ShowWallPaper(
 	const auto params = url_parse_params(
 		match->captured(1),
 		qthelp::UrlParamNameTransform::ToLower);
-	if (!params.value("gradient").isEmpty()) {
-		Ui::show(Box<InformBox>(
-			tr::lng_background_gradient_unsupported(tr::now)));
-		return false;
-	}
+	const auto bg = params.value("bg_color");
 	const auto color = params.value("color");
+	const auto gradient = params.value("gradient");
 	return BackgroundPreviewBox::Start(
 		controller,
-		(color.isEmpty() ? params.value(qsl("slug")) : color),
+		(!color.isEmpty()
+			? color
+			: !gradient.isEmpty()
+			? gradient
+			: params.value(qsl("slug"))),
 		params);
 }
 

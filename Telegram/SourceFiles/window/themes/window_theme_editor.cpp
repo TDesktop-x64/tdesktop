@@ -22,6 +22,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/multi_select.h"
 #include "ui/widgets/dropdown_menu.h"
 #include "ui/toast/toast.h"
+#include "ui/image/image_prepare.h"
 #include "ui/ui_utility.h"
 #include "base/parse_helper.h"
 #include "base/zlib_help.h"
@@ -31,7 +32,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/edit_color_box.h"
 #include "lang/lang_keys.h"
 #include "facades.h"
-#include "app.h"
 #include "styles/style_window.h"
 #include "styles/style_dialogs.h"
 #include "styles/style_layers.h"
@@ -164,6 +164,7 @@ bool isValidColorValue(QLatin1String value) {
 		skipWhitespacesAndComments(data, end);
 		if (data == end) break;
 
+		[[maybe_unused]] auto foundName = base::parse::readName(data, end);
 		skipWhitespacesAndComments(data, end);
 		if (data == end || *data != ':') {
 			return "error";
@@ -789,7 +790,10 @@ void Editor::importTheme() {
 		_inner->applyNewPalette(parsed.palette);
 		_inner->recreateRows();
 		updateControlsGeometry();
-		auto image = App::readImage(parsed.background);
+		auto image = Images::Read({
+			.content = parsed.background,
+			.forceOpaque = true,
+		}).image;
 		if (!image.isNull() && !image.size().isEmpty()) {
 			Background()->set(Data::CustomWallPaper(), std::move(image));
 			Background()->setTile(parsed.tiled);

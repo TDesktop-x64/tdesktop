@@ -513,14 +513,6 @@ QString GetIconName() {
 	return Result;
 }
 
-QImage GetImageFromClipboard() {
-	if (const auto integration = GtkIntegration::Instance()) {
-		return integration->getImageFromClipboard();
-	}
-
-	return {};
-}
-
 std::optional<bool> IsDarkMode() {
 	return Core::App().settings().systemDarkMode();
 }
@@ -788,12 +780,14 @@ bool OpenSystemSettings(SystemSettingsType type) {
 namespace ThirdParty {
 
 void start() {
+	LOG(("Icon theme: %1").arg(QIcon::themeName()));
+	LOG(("Fallback icon theme: %1").arg(QIcon::fallbackThemeName()));
+
 	GtkIntegration::Autorestart(GtkIntegration::Type::Base);
 	GtkIntegration::Autorestart(GtkIntegration::Type::TDesktop);
 
 	if (const auto integration = BaseGtkIntegration::Instance()) {
 		integration->load(GtkIntegration::AllowedBackends());
-		integration->initializeSettings();
 	}
 
 	if (const auto integration = GtkIntegration::Instance()) {

@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "core/application.h"
 
+#include "data/data_abstract_structure.h"
 #include "data/data_photo.h"
 #include "data/data_document.h"
 #include "data/data_session.h"
@@ -65,6 +66,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/text_options.h"
 #include "ui/emoji_config.h"
 #include "ui/effects/animations.h"
+#include "ui/cached_round_corners.h"
 #include "storage/serialize_common.h"
 #include "storage/storage_domain.h"
 #include "storage/storage_databases.h"
@@ -173,7 +175,8 @@ Application::~Application() {
 	Ui::Emoji::Clear();
 	Media::Clip::Finish();
 
-	App::deinitMedia();
+	Ui::FinishCachedCorners();
+	Data::clearGlobalStructures();
 
 	Window::Theme::Uninitialize();
 
@@ -220,6 +223,7 @@ void Application::run() {
 
 	style::startManager(cScale());
 	Ui::InitTextOptions();
+	Ui::StartCachedCorners();
 	Ui::Emoji::Init();
 	startEmojiImageLoader();
 	startSystemDarkModeViewer();
@@ -265,7 +269,6 @@ void Application::run() {
 
 	// Depend on activeWindow() for now :(
 	startShortcuts();
-	App::initMedia();
 	startDomain();
 
 	_window->widget()->show();

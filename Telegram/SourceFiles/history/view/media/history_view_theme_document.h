@@ -13,16 +13,18 @@ class Image;
 
 namespace Data {
 class DocumentMedia;
+class WallPaper;
 } // namespace Data
 
 namespace HistoryView {
 
 class ThemeDocument final : public File {
 public:
+	ThemeDocument(not_null<Element*> parent, DocumentData *document);
 	ThemeDocument(
 		not_null<Element*> parent,
-		not_null<DocumentData*> document,
-		const QString &url = QString());
+		DocumentData *document,
+		const std::optional<Data::WallPaper> &params);
 	~ThemeDocument();
 
 	void draw(
@@ -51,6 +53,9 @@ public:
 	bool hasHeavyPart() const override;
 	void unloadHeavyPart() override;
 
+	[[nodiscard]] static std::optional<Data::WallPaper> ParamsFromUrl(
+		const QString &url);
+
 protected:
 	float64 dataProgress() const override;
 	bool dataFinished() const override;
@@ -61,11 +66,13 @@ private:
 	QSize countCurrentSize(int newWidth) override;
 
 	void fillPatternFieldsFrom(const QString &url);
+	[[nodiscard]] bool checkGoodThumbnail() const;
 	void validateThumbnail() const;
 	void prepareThumbnailFrom(not_null<Image*> image, int good) const;
+	void generateThumbnail() const;
 	void ensureDataMediaCreated() const;
 
-	const not_null<DocumentData*> _data;
+	DocumentData *_data = nullptr;
 	int _pixw = 1;
 	int _pixh = 1;
 	mutable QPixmap _thumbnail;
@@ -73,8 +80,9 @@ private:
 	mutable std::shared_ptr<Data::DocumentMedia> _dataMedia;
 
 	// For wallpaper documents.
-	QColor _background;
-	int _intensity = 0;
+	std::vector<QColor> _background;
+	float64 _patternOpacity = 0.;
+	int _gradientRotation = 0;
 
 };
 

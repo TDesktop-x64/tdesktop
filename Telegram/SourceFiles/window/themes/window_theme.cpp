@@ -31,7 +31,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/confirm_box.h"
 #include "boxes/background_box.h"
 #include "core/application.h"
-#include "app.h"
 #include "styles/style_widgets.h"
 #include "styles/style_chat.h"
 
@@ -59,18 +58,24 @@ inline bool AreTestingTheme() {
 	return !GlobalApplying.paletteForRevert.isEmpty();
 }
 
-bool CalculateIsMonoColorImage(const QImage &image) {
-	if (!image.isNull()) {
-		const auto bits = reinterpret_cast<const uint32*>(image.constBits());
-		const auto first = bits[0];
-		for (auto i = 0; i < image.width() * image.height(); i++) {
-			if (first != bits[i]) {
-				return false;
-			}
-		}
-		return true;
+std::optional<QColor> CalculateImageMonoColor(const QImage &image) {
+	if (image.isNull()) {
+		return std::nullopt;
 	}
-	return false;
+	const auto bits = reinterpret_cast<const uint32*>(image.constBits());
+	const auto first = bits[0];
+	for (auto i = 0; i < image.width() * image.height(); i++) {
+		if (first != bits[i]) {
+			return std::nullopt;
+		}
+	}
+	return image.pixelColor(QPoint());
+}
+
+[[nodiscard]] bool GoodImageFormatAndSize(const QImage &image) {
+	return !image.size().isEmpty()
+		&& (image.format() == QImage::Format_ARGB32_Premultiplied
+			|| image.format() == QImage::Format_RGB32);
 }
 
 QByteArray readThemeContent(const QString &path) {
@@ -323,7 +328,10 @@ bool LoadTheme(
 				LOG(("Theme Error: bad background image size in the theme file."));
 				return false;
 			}
-			auto background = App::readImage(backgroundContent);
+			auto background = Images::Read({
+				.content = backgroundContent,
+				.forceOpaque = true,
+			}).image;
 			if (background.isNull()) {
 				LOG(("Theme Error: could not read background image in the theme file."));
 				return false;
@@ -379,9 +387,7 @@ bool InitializeFromCache(
 	if (!cache.background.isEmpty()) {
 		QDataStream stream(cache.background);
 		QImageReader reader(stream.device());
-#ifndef OS_MAC_OLD
 		reader.setAutoTransform(true);
-#endif // OS_MAC_OLD
 		if (!reader.read(&background) || background.isNull()) {
 			return false;
 		}
@@ -431,77 +437,6 @@ bool InitializeFromSaved(Saved &&saved) {
 	return true;
 }
 
-[[nodiscard]] QImage DitherImage(QImage image) {
-	Expects(image.bytesPerLine() == image.width() * 4);
-
-	const auto width = image.width();
-	const auto height = image.height();
-
-	if (width < 16 || height < 16) {
-		return image;
-	}
-
-	const auto area = width * height;
-	const auto shifts = std::make_unique<uchar[]>(area);
-	memset_rand(shifts.get(), area);
-
-	// shiftx = int(shift & 0x0F) - 8; shifty = int(shift >> 4) - 8;
-	// Clamp shifts close to edges.
-	for (auto y = 0; y != 8; ++y) {
-		const auto min = 8 - y;
-		const auto shifted = (min << 4);
-		auto shift = shifts.get() + y * width;
-		for (const auto till = shift + width; shift != till; ++shift) {
-			if ((*shift >> 4) < min) {
-				*shift = shifted | (*shift & 0x0F);
-			}
-		}
-	}
-	for (auto y = height - 7; y != height; ++y) {
-		const auto max = 8 + (height - y - 1);
-		const auto shifted = (max << 4);
-		auto shift = shifts.get() + y * width;
-		for (const auto till = shift + width; shift != till; ++shift) {
-			if ((*shift >> 4) > max) {
-				*shift = shifted | (*shift & 0x0F);
-			}
-		}
-	}
-	for (auto shift = shifts.get(), ytill = shift + area
-		; shift != ytill
-		; shift += width - 8) {
-		for (const auto till = shift + 8; shift != till; ++shift) {
-			const auto min = (till - shift);
-			if ((*shift & 0x0F) < min) {
-				*shift = (*shift & 0xF0) | min;
-			}
-		}
-	}
-	for (auto shift = shifts.get(), ytill = shift + area; shift != ytill;) {
-		shift += width - 7;
-		for (const auto till = shift + 7; shift != till; ++shift) {
-			const auto max = 8 + (till - shift - 1);
-			if ((*shift & 0x0F) > max) {
-				*shift = (*shift & 0xF0) | max;
-			}
-		}
-	}
-
-	auto result = image;
-	result.detach();
-
-	const auto src = reinterpret_cast<const uint32*>(image.constBits());
-	const auto dst = reinterpret_cast<uint32*>(result.bits());
-	for (auto index = 0; index != area; ++index) {
-		const auto shift = shifts[index];
-		const auto shiftx = int(shift & 0x0F) - 8;
-		const auto shifty = int(shift >> 4) - 8;
-		dst[index] = src[index + (shifty * width) + shiftx];
-	}
-
-	return result;
-}
-
 [[nodiscard]] QImage PostprocessBackgroundImage(
 		QImage image,
 		const Data::WallPaper &paper) {
@@ -512,7 +447,7 @@ bool InitializeFromSaved(Saved &&saved) {
 	image.setDevicePixelRatio(cRetinaFactor());
 	if (Data::IsDefaultWallPaper(paper)
 		|| Data::details::IsTestingDefaultWallPaper(paper)) {
-		return DitherImage(std::move(image));
+		return Images::DitherImage(std::move(image));
 	}
 	return image;
 }
@@ -731,7 +666,7 @@ void ChatBackground::set(const Data::WallPaper &paper, QImage image) {
 	}
 	if (Data::IsThemeWallPaper(_paper)) {
 		(nightMode() ? _tileNightValue : _tileDayValue) = _themeTile;
-		setPreparedImage(_themeImage, _themeImage);
+		setPrepared(_themeImage, _themeImage, QImage());
 	} else if (Data::details::IsTestingThemeWallPaper(_paper)
 		|| Data::details::IsTestingDefaultWallPaper(_paper)
 		|| Data::details::IsTestingEditorWallPaper(_paper)) {
@@ -741,8 +676,9 @@ void ChatBackground::set(const Data::WallPaper &paper, QImage image) {
 			setPaper(Data::details::TestingDefaultWallPaper());
 		}
 		image = postprocessBackgroundImage(std::move(image));
-		setPreparedImage(image, image);
+		setPrepared(image, image, QImage());
 	} else {
+		const auto &bgColors = _paper.backgroundColors();
 		if (Data::IsLegacy1DefaultWallPaper(_paper)) {
 			image.load(qsl(":/gui/art/bg_initial.jpg"));
 			const auto scale = cScale() * cIntRetinaFactor();
@@ -752,7 +688,7 @@ void ChatBackground::set(const Data::WallPaper &paper, QImage image) {
 					Qt::SmoothTransformation);
 			}
 		} else if (Data::IsDefaultWallPaper(_paper)
-			|| (!_paper.backgroundColor() && image.isNull())) {
+			|| (bgColors.empty() && image.isNull())) {
 			setPaper(Data::DefaultWallPaper().withParamsFrom(_paper));
 			image.load(qsl(":/gui/art/background.jpg"));
 		}
@@ -762,32 +698,41 @@ void ChatBackground::set(const Data::WallPaper &paper, QImage image) {
 				|| Data::IsLegacy1DefaultWallPaper(_paper))
 				? QImage()
 				: image));
-		if (const auto fill = _paper.backgroundColor()) {
-			if (_paper.isPattern() && !image.isNull()) {
+		if (_paper.isPattern() && !image.isNull()) {
+			if (bgColors.size() < 2) {
 				auto prepared = postprocessBackgroundImage(
 					Data::PreparePatternImage(
 						image,
-						*fill,
-						Data::PatternColor(*fill),
-						_paper.patternIntensity()));
-				setPreparedImage(std::move(image), std::move(prepared));
+						bgColors,
+						_paper.gradientRotation(),
+						_paper.patternOpacity()));
+				setPrepared(
+					std::move(image),
+					std::move(prepared),
+					QImage());
 			} else {
-				_original = QImage();
-				_pixmap = QPixmap();
-				_pixmapForTiled = QPixmap();
-				if (adjustPaletteRequired()) {
-					adjustPaletteUsingColor(*fill);
-				}
+				setPrepared(
+					image,
+					image,
+					Data::GenerateDitheredGradient(_paper));
 			}
+		} else if (bgColors.size() == 1) {
+			setPrepared(QImage(), QImage(), QImage());
+		} else if (!bgColors.empty()) {
+			setPrepared(
+				QImage(),
+				QImage(),
+				Data::GenerateDitheredGradient(_paper));
 		} else {
 			image = postprocessBackgroundImage(std::move(image));
-			setPreparedImage(image, image);
+			setPrepared(image, image, QImage());
 		}
 	}
 	Assert(colorForFill()
+		|| !_gradient.isNull()
 		|| (!_original.isNull()
-			&& !_pixmap.isNull()
-			&& !_pixmapForTiled.isNull()));
+			&& !_prepared.isNull()
+			&& !_preparedForTiled.isNull()));
 
 	_updates.fire({ BackgroundUpdate::Type::New, tile() }); // delayed?
 	if (needResetAdjustable) {
@@ -797,54 +742,64 @@ void ChatBackground::set(const Data::WallPaper &paper, QImage image) {
 	checkUploadWallPaper();
 }
 
-void ChatBackground::setPreparedImage(QImage original, QImage prepared) {
-	Expects(original.format() == QImage::Format_ARGB32_Premultiplied);
-	Expects(original.width() > 0 && original.height() > 0);
-	Expects(prepared.format() == QImage::Format_ARGB32_Premultiplied);
-	Expects(prepared.width() > 0 && prepared.height() > 0);
+void ChatBackground::setPrepared(
+		QImage original,
+		QImage prepared,
+		QImage gradient) {
+	Expects(original.isNull() || GoodImageFormatAndSize(original));
+	Expects(prepared.isNull() || GoodImageFormatAndSize(prepared));
+	Expects(gradient.isNull() || GoodImageFormatAndSize(gradient));
 
-	_original = std::move(original);
-	if (!_paper.isPattern() && _paper.isBlurred()) {
+	if (!prepared.isNull() && !_paper.isPattern() && _paper.isBlurred()) {
 		prepared = Data::PrepareBlurredBackground(std::move(prepared));
 	}
 	if (adjustPaletteRequired()) {
-		adjustPaletteUsingBackground(prepared);
+		if (!gradient.isNull()) {
+			adjustPaletteUsingBackground(gradient);
+		} else if (!prepared.isNull()) {
+			adjustPaletteUsingBackground(prepared);
+		} else if (!_paper.backgroundColors().empty()) {
+			adjustPaletteUsingColor(_paper.backgroundColors().front());
+		}
 	}
-	preparePixmaps(std::move(prepared));
+
+	_original = std::move(original);
+	_prepared = std::move(prepared);
+	_gradient = std::move(gradient);
+	_imageMonoColor = _gradient.isNull()
+		? CalculateImageMonoColor(_prepared)
+		: std::nullopt;
+	prepareImageForTiled();
 }
 
-void ChatBackground::preparePixmaps(QImage image) {
-	const auto width = image.width();
-	const auto height = image.height();
-	const auto isSmallForTiled = (width < kMinimumTiledSize)
-		|| (height < kMinimumTiledSize);
-	if (isSmallForTiled) {
-		const auto repeatTimesX = qCeil(kMinimumTiledSize / (1. * width));
-		const auto repeatTimesY = qCeil(kMinimumTiledSize / (1. * height));
-		auto imageForTiled = QImage(
-			width * repeatTimesX,
-			height * repeatTimesY,
-			QImage::Format_ARGB32_Premultiplied);
-		imageForTiled.setDevicePixelRatio(image.devicePixelRatio());
-		auto imageForTiledBytes = imageForTiled.bits();
-		auto bytesInLine = width * sizeof(uint32);
-		for (auto timesY = 0; timesY != repeatTimesY; ++timesY) {
-			auto imageBytes = image.constBits();
-			for (auto y = 0; y != height; ++y) {
-				for (auto timesX = 0; timesX != repeatTimesX; ++timesX) {
-					memcpy(imageForTiledBytes, imageBytes, bytesInLine);
-					imageForTiledBytes += bytesInLine;
-				}
-				imageBytes += image.bytesPerLine();
-				imageForTiledBytes += imageForTiled.bytesPerLine() - (repeatTimesX * bytesInLine);
-			}
-		}
-		_pixmapForTiled = Ui::PixmapFromImage(std::move(imageForTiled));
-	}
-	_isMonoColorImage = CalculateIsMonoColorImage(image);
-	_pixmap = Ui::PixmapFromImage(std::move(image));
+void ChatBackground::prepareImageForTiled() {
+	const auto width = _prepared.width();
+	const auto height = _prepared.height();
+	const auto isSmallForTiled = (width > 0 && height > 0)
+		&& (width < kMinimumTiledSize || height < kMinimumTiledSize);
 	if (!isSmallForTiled) {
-		_pixmapForTiled = _pixmap;
+		_preparedForTiled = _prepared;
+		return;
+	}
+	const auto repeatTimesX = qCeil(kMinimumTiledSize / (1. * width));
+	const auto repeatTimesY = qCeil(kMinimumTiledSize / (1. * height));
+	_preparedForTiled = QImage(
+		width * repeatTimesX,
+		height * repeatTimesY,
+		QImage::Format_ARGB32_Premultiplied);
+	_preparedForTiled.setDevicePixelRatio(_prepared.devicePixelRatio());
+	auto imageForTiledBytes = _preparedForTiled.bits();
+	auto bytesInLine = width * sizeof(uint32);
+	for (auto timesY = 0; timesY != repeatTimesY; ++timesY) {
+		auto imageBytes = _prepared.constBits();
+		for (auto y = 0; y != height; ++y) {
+			for (auto timesX = 0; timesX != repeatTimesX; ++timesX) {
+				memcpy(imageForTiledBytes, imageBytes, bytesInLine);
+				imageForTiledBytes += bytesInLine;
+			}
+			imageBytes += _prepared.bytesPerLine();
+			imageForTiledBytes += _preparedForTiled.bytesPerLine() - (repeatTimesX * bytesInLine);
+		}
 	}
 }
 
@@ -910,7 +865,21 @@ void ChatBackground::adjustPaletteUsingColor(QColor color) {
 }
 
 std::optional<QColor> ChatBackground::colorForFill() const {
-	return _pixmap.isNull() ? _paper.backgroundColor() : std::nullopt;
+	return !_prepared.isNull()
+		? imageMonoColor()
+		: !_gradient.isNull()
+		? std::nullopt
+		: _paper.backgroundColor();
+}
+
+QImage ChatBackground::gradientForFill() const {
+	return _gradient;
+}
+
+void ChatBackground::recacheGradientForFill(QImage gradient) {
+	if (_gradient.size() == gradient.size()) {
+		_gradient = std::move(gradient);
+	}
 }
 
 QImage ChatBackground::createCurrentImage() const {
@@ -921,8 +890,33 @@ QImage ChatBackground::createCurrentImage() const {
 			QImage::Format_ARGB32_Premultiplied);
 		result.fill(*fill);
 		return result;
+	} else if (_gradient.isNull()) {
+		return _prepared;
+	} else if (_prepared.isNull()) {
+		return _gradient;
 	}
-	return pixmap().toImage();
+	auto result = _gradient.scaled(
+		_prepared.size(),
+		Qt::IgnoreAspectRatio,
+		Qt::SmoothTransformation);
+	result.setDevicePixelRatio(1.);
+	{
+		auto p = QPainter(&result);
+		const auto patternOpacity = paper().patternOpacity();
+		if (patternOpacity >= 0.) {
+			p.setCompositionMode(QPainter::CompositionMode_SoftLight);
+			p.setOpacity(patternOpacity);
+		} else {
+			p.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+		}
+		p.drawImage(QRect(QPoint(), _prepared.size()), _prepared);
+		if (patternOpacity < 0. && patternOpacity > -1.) {
+			p.setCompositionMode(QPainter::CompositionMode_SourceOver);
+			p.setOpacity(1. + patternOpacity);
+			p.fillRect(QRect(QPoint(), _prepared.size()), Qt::black);
+		}
+	}
+	return result;
 }
 
 bool ChatBackground::tile() const {
@@ -949,8 +943,8 @@ bool ChatBackground::tileNight() const {
 	return _tileNightValue;
 }
 
-bool ChatBackground::isMonoColorImage() const {
-	return _isMonoColorImage;
+std::optional<QColor> ChatBackground::imageMonoColor() const {
+	return _imageMonoColor;
 }
 
 void ChatBackground::setTile(bool tile) {
@@ -1062,7 +1056,7 @@ void ChatBackground::setTestingTheme(Instance &&theme) {
 			saveForRevert();
 			set(
 				Data::details::TestingEditorWallPaper(),
-				std::move(_pixmap).toImage());
+				base::take(_prepared));
 		}
 	} else if (switchToThemeBackground) {
 		saveForRevert();
@@ -1456,7 +1450,8 @@ QString EditingPalettePath() {
 }
 
 QColor CountAverageColor(const QImage &image) {
-	Expects(image.format() == QImage::Format_ARGB32_Premultiplied);
+	Expects(image.format() == QImage::Format_ARGB32_Premultiplied
+		|| image.format() == QImage::Format_RGB32);
 
 	uint64 components[3] = { 0 };
 	const auto w = image.width();
@@ -1512,27 +1507,31 @@ QImage PreprocessBackgroundImage(QImage image) {
 	return image;
 }
 
-void ComputeBackgroundRects(QRect wholeFill, QSize imageSize, QRect &to, QRect &from) {
-	if (uint64(imageSize.width()) * wholeFill.height() > uint64(imageSize.height()) * wholeFill.width()) {
-		float64 pxsize = wholeFill.height() / float64(imageSize.height());
-		int takewidth = qCeil(wholeFill.width() / pxsize);
+BackgroundRects ComputeBackgroundRects(QSize fillSize, QSize imageSize) {
+	if (uint64(imageSize.width()) * fillSize.height() > uint64(imageSize.height()) * fillSize.width()) {
+		float64 pxsize = fillSize.height() / float64(imageSize.height());
+		int takewidth = qCeil(fillSize.width() / pxsize);
 		if (takewidth > imageSize.width()) {
 			takewidth = imageSize.width();
 		} else if ((imageSize.width() % 2) != (takewidth % 2)) {
 			++takewidth;
 		}
-		to = QRect(int((wholeFill.width() - takewidth * pxsize) / 2.), 0, qCeil(takewidth * pxsize), wholeFill.height());
-		from = QRect((imageSize.width() - takewidth) / 2, 0, takewidth, imageSize.height());
+		return {
+			.from = QRect((imageSize.width() - takewidth) / 2, 0, takewidth, imageSize.height()),
+			.to = QRect(int((fillSize.width() - takewidth * pxsize) / 2.), 0, qCeil(takewidth * pxsize), fillSize.height()),
+		};
 	} else {
-		float64 pxsize = wholeFill.width() / float64(imageSize.width());
-		int takeheight = qCeil(wholeFill.height() / pxsize);
+		float64 pxsize = fillSize.width() / float64(imageSize.width());
+		int takeheight = qCeil(fillSize.height() / pxsize);
 		if (takeheight > imageSize.height()) {
 			takeheight = imageSize.height();
 		} else if ((imageSize.height() % 2) != (takeheight % 2)) {
 			++takeheight;
 		}
-		to = QRect(0, int((wholeFill.height() - takeheight * pxsize) / 2.), wholeFill.width(), qCeil(takeheight * pxsize));
-		from = QRect(0, (imageSize.height() - takeheight) / 2, imageSize.width(), takeheight);
+		return {
+			.from = QRect(0, (imageSize.height() - takeheight) / 2, imageSize.width(), takeheight),
+			.to = QRect(0, int((fillSize.height() - takeheight * pxsize) / 2.), fillSize.width(), qCeil(takeheight * pxsize)),
+		};
 	}
 }
 

@@ -7,7 +7,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "boxes/send_files_box.h"
 
-#include "platform/platform_specific.h"
 #include "lang/lang_keys.h"
 #include "storage/localstorage.h"
 #include "storage/storage_media_prepare.h"
@@ -52,7 +51,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "facades.h" // App::LambdaDelayed.
-#include "app.h"
 #include "styles/style_chat.h"
 #include "styles/style_layers.h"
 #include "styles/style_boxes.h"
@@ -800,10 +798,7 @@ bool SendFilesBox::addFiles(not_null<const QMimeData*> data) {
 		if (result.error == Ui::PreparedList::Error::None) {
 			return result;
 		} else if (data->hasImage()) {
-			auto image = Platform::GetImageFromClipboard();
-			if (image.isNull()) {
-				image = qvariant_cast<QImage>(data->imageData());
-			}
+			auto image = qvariant_cast<QImage>(data->imageData());
 			if (!image.isNull()) {
 				return Storage::PrepareMediaFromImage(
 					std::move(image),

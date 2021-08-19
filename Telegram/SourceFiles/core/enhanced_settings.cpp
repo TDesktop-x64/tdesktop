@@ -265,6 +265,10 @@ namespace EnhancedSettings {
 			}
 		});
 
+		ReadBoolOption(settings, "hd_video", [&](auto v) {
+			cSetHDVideo(v);
+		});
+
 		ReadBoolOption(settings, "hide_all_chats", [&](auto v) {
 			cSetHideFilterAllChats(v);
 		});
@@ -300,6 +304,7 @@ namespace EnhancedSettings {
 		settings.insert(qsl("auto_unmute"), false);
 		settings.insert(qsl("bitrate"), 0);
 		settings.insert(qsl("hide_all_chats"), false);
+		settings.insert(qsl("hd_video"), false);
 
 		auto document = QJsonDocument();
 		document.setObject(settings);
@@ -337,6 +342,7 @@ namespace EnhancedSettings {
 		settings.insert(qsl("auto_unmute"), cAutoUnmute());
 		settings.insert(qsl("bitrate"), cVoiceChatBitrate());
 		settings.insert(qsl("hide_all_chats"), cHideFilterAllChats());
+		settings.insert(qsl("hd_video"), cHDVideo());
 
 		auto document = QJsonDocument();
 		document.setObject(settings);

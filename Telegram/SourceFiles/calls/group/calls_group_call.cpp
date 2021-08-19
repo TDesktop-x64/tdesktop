@@ -2311,6 +2311,7 @@ bool GroupCall::tryCreateController() {
 		},
 		.enableStereoMode = cStereoMode(),
 		.customBitrate = getCustomBitrate(),
+		.enableHDVideo = cHDVideo(),
 	};
 	if (Logs::DebugEnabled()) {
 		auto callLogFolder = cWorkingDir() + qsl("DebugLogs");
@@ -2358,6 +2359,7 @@ bool GroupCall::tryCreateScreencast() {
 		.createAudioDeviceModule = Webrtc::LoopbackAudioDeviceModuleCreator(),
 		.videoCapture = _screenCapture,
 		.videoContentType = tgcalls::VideoContentType::Screencast,
+		.enableHDVideo = cHDVideo(),
 	};
 
 	LOG(("Call Info: Creating group screen instance"));

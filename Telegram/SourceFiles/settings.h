@@ -164,6 +164,7 @@ DeclareSetting(bool, HideFilterAllChats);
 DeclareSetting(bool, StereoMode);
 DeclareSetting(bool, AutoUnmute);
 DeclareSetting(bool, VoiceChatPinned);
+DeclareSetting(bool, HDVideo);
 DeclareSetting(QString, RadioController);
 
 DeclareSetting(int, NetSpeedBoost);

@@ -81,6 +81,7 @@ bool gHideFilterAllChats = false;
 bool gStereoMode = false;
 bool gAutoUnmute = false;
 bool gVoiceChatPinned = false;
+bool gHDVideo = false;
 QString gRadioController;
 int gVoiceChatBitrate = 0;
 

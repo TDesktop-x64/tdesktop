@@ -280,6 +280,21 @@ namespace Settings {
 			Ui::show(Box<BitrateController>());
 		});
 
+		AddButton(
+				inner,
+				tr::lng_settings_enable_hd_video(),
+				st::settingsButton
+		)->toggleOn(
+				rpl::single(cHDVideo())
+		)->toggledChanges(
+		) | rpl::filter([=](bool toggled) {
+			return (toggled != cHDVideo());
+		}) | rpl::start_with_next([=](bool toggled) {
+			cSetHDVideo(toggled);
+			Ui::Toast::Show(tr::lng_hd_video_hint(tr::now));
+			EnhancedSettings::Write();
+		}, container->lifetime());
+
 		AddSkip(container);
 	}
 

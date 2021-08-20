@@ -57,6 +57,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "facades.h"
 #include "styles/style_settings.h"
 #include "styles/style_layers.h"
+#include "styles/style_window.h"
 
 namespace Settings {
 namespace {
@@ -581,26 +582,28 @@ void BackgroundRow::updateImage() {
 			}
 			const auto &prepared = background->prepared();
 			if (!prepared.isNull()) {
-				const auto sx = (prepared.width() > prepared.height())
-					? ((prepared.width() - prepared.height()) / 2)
-					: 0;
-				const auto sy = (prepared.height() > prepared.width())
-					? ((prepared.height() - prepared.width()) / 2)
-					: 0;
-				const auto s = (prepared.width() > prepared.height())
-					? prepared.height()
-					: prepared.width();
+				const auto pattern = background->paper().isPattern();
+				const auto w = prepared.width();
+				const auto h = prepared.height();
+				const auto use = [&] {
+					if (!pattern) {
+						return std::min(w, h);
+					}
+					const auto scaledw = w * st::windowMinHeight / h;
+					const auto result = (w * size) / scaledw;
+					return std::min({ result, w, h });
+				}();
 				p.drawImage(
 					QRect(0, 0, size, size),
 					prepared,
-					QRect(sx, sy, s, s));
+					QRect((w - use) / 2, (h - use) / 2, use, use));
 			}
 			if (!gradient.isNull()
 				&& !prepared.isNull()
 				&& patternOpacity < 0.
 				&& patternOpacity > -1.) {
 				p.setCompositionMode(QPainter::CompositionMode_SourceOver);
-				p.setOpacity(patternOpacity);
+				p.setOpacity(1. + patternOpacity);
 				p.fillRect(QRect(0, 0, size, size), Qt::black);
 			}
 		}
@@ -954,13 +957,16 @@ void SetupChatBackground(
 
 	AddSkip(container, st::settingsTileSkip);
 
+	const auto background = Window::Theme::Background();
 	const auto tile = inner->add(
-		object_ptr<Ui::Checkbox>(
+		object_ptr<Ui::SlideWrap<Ui::Checkbox>>(
 			inner,
-			tr::lng_settings_bg_tile(tr::now),
-			Window::Theme::Background()->tile(),
-			st::settingsCheckbox),
-		st::settingsSendTypePadding);
+			object_ptr<Ui::Checkbox>(
+				inner,
+				tr::lng_settings_bg_tile(tr::now),
+				background->tile(),
+				st::settingsCheckbox),
+			st::settingsSendTypePadding));
 	const auto adaptive = inner->add(
 		object_ptr<Ui::SlideWrap<Ui::Checkbox>>(
 			inner,
@@ -971,19 +977,25 @@ void SetupChatBackground(
 				st::settingsCheckbox),
 			st::settingsSendTypePadding));
 
-	tile->checkedChanges(
-	) | rpl::start_with_next([](bool checked) {
-		Window::Theme::Background()->setTile(checked);
+	tile->entity()->checkedChanges(
+	) | rpl::start_with_next([=](bool checked) {
+		background->setTile(checked);
 	}, tile->lifetime());
 
+	const auto shown = [=] {
+		return !background->paper().isPattern()
+			&& !background->colorForFill();
+	};
+	tile->toggle(shown(), anim::type::instant);
+
 	using Update = const Window::Theme::BackgroundUpdate;
-	Window::Theme::Background()->updates(
+	background->updates(
 	) | rpl::filter([](const Update &update) {
-		return (update.type == Update::Type::Changed);
-	}) | rpl::map([] {
-		return Window::Theme::Background()->tile();
-	}) | rpl::start_with_next([=](bool tiled) {
-		tile->setChecked(tiled);
+		return (update.type == Update::Type::Changed)
+			|| (update.type == Update::Type::New);
+	}) | rpl::start_with_next([=] {
+		tile->entity()->setChecked(background->tile());
+		tile->toggle(shown(), anim::type::instant);
 	}, tile->lifetime());
 
 	adaptive->toggleOn(controller->adaptive().chatLayoutValue(

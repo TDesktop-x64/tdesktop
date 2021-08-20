@@ -519,11 +519,7 @@ int Service::marginBottom() const {
 	return st::msgServiceMargin.bottom();
 }
 
-void Service::draw(
-		Painter &p,
-		QRect clip,
-		TextSelection selection,
-		crl::time ms) const {
+void Service::draw(Painter &p, const PaintContext &context) const {
 	const auto item = message();
 	auto g = countGeometry();
 	if (g.width() < 1) {
@@ -533,6 +529,7 @@ void Service::draw(
 	auto height = this->height() - st::msgServiceMargin.top() - st::msgServiceMargin.bottom();
 	auto dateh = 0;
 	auto unreadbarh = 0;
+	auto clip = context.clip;
 	if (auto date = Get<DateBadge>()) {
 		dateh = date->height();
 		p.translate(0, dateh);
@@ -564,7 +561,9 @@ void Service::draw(
 		height -= st::msgServiceMargin.top() + media->height();
 		auto left = st::msgServiceMargin.left() + (g.width() - media->maxWidth()) / 2, top = st::msgServiceMargin.top() + height + st::msgServiceMargin.top();
 		p.translate(left, top);
-		media->draw(p, clip.translated(-left, -top), TextSelection(), ms);
+		auto mediaContext = context.translated(-left, -top);
+		mediaContext.selection = TextSelection();
+		media->draw(p, mediaContext);
 		p.translate(-left, -top);
 	}
 
@@ -575,7 +574,7 @@ void Service::draw(
 	p.setBrush(Qt::NoBrush);
 	p.setPen(st::msgServiceFg);
 	p.setFont(st::msgServiceFont);
-	item->_text.draw(p, trect.x(), trect.y(), trect.width(), Qt::AlignCenter, 0, -1, selection, false);
+	item->_text.draw(p, trect.x(), trect.y(), trect.width(), Qt::AlignCenter, 0, -1, context.selection, false);
 
 	p.restoreTextPalette();
 

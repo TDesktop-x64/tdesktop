@@ -26,6 +26,10 @@ namespace Adaptive {
 enum class WindowLayout;
 } // namespace Adaptive
 
+namespace HistoryView {
+struct PaintContext;
+} // namespace HistoryView
+
 namespace ChatHelpers {
 class TabbedSelector;
 } // namespace ChatHelpers
@@ -46,6 +50,7 @@ class FormController;
 namespace Ui {
 class LayerWidget;
 enum class ReportReason;
+struct BubblePattern;
 } // namespace Ui
 
 namespace Window {
@@ -61,6 +66,7 @@ struct CacheBackgroundRequest {
 	QSize area;
 	int gradientRotation = 0;
 	bool tile = false;
+	bool isPattern = false;
 	bool recreateGradient = false;
 	QImage gradient;
 	std::vector<QColor> gradientColors;
@@ -441,6 +447,19 @@ public:
 	[[nodiscard]] rpl::producer<> filtersMenuChanged() const;
 	void reloadFiltersMenu();
 
+	void setBubblesBackground(QImage image);
+	const Ui::BubblePattern *bubblesBackgroundPattern() const {
+		return _bubblesBackgroundPattern.get();
+	}
+
+	struct BubblesContextArgs {
+		int visibleAreaTop = 0;
+		int visibleAreaTopGlobal = 0;
+		int visibleAreaWidth = 0;
+		QRect clip;
+	};
+	[[nodiscard]] HistoryView::PaintContext bubblesContext(
+		BubblesContextArgs &&args);
 	[[nodiscard]] const BackgroundState &backgroundState(QSize area);
 	[[nodiscard]] rpl::producer<> repaintBackgroundRequests() const;
 	void rotateComplexGradientBackground();
@@ -522,6 +541,10 @@ private:
 	QSize _willCacheForArea;
 	crl::time _lastAreaChangeTime = 0;
 	base::Timer _cacheBackgroundTimer;
+	CachedBackground _bubblesBackground;
+	QImage _bubblesBackgroundPrepared;
+	std::unique_ptr<Ui::BubblePattern> _bubblesBackgroundPattern;
+
 	rpl::event_stream<> _repaintBackgroundRequests;
 
 	rpl::lifetime _lifetime;

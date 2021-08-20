@@ -2833,6 +2833,8 @@ void GroupCall::checkLastSpoke() {
 			|| muted() == MuteState::Active
 			|| muted() == MuteState::PushToTalk) {
 			real->applyLastSpoke(ssrc, when, now);
+		} else {
+			real->applyLastSpoke(ssrc, { crl::time(), crl::time() }, now);
 		}
 	}
 	_lastSpoke = std::move(list);

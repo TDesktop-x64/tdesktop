@@ -106,7 +106,7 @@ public:
 	static void initInstance();
 	static CustomLangPack *instance;
 
-	void fetchCustomLangPack(const QString& langPackId, const QString& langPackBaseId, bool isFallback);
+	void fetchCustomLangPack(const QString& langPackId, const QString& langPackBaseId);
 	void loadDefaultLangFile();
 	void parseLangFile(QJsonDocument str);
 
@@ -120,4 +120,5 @@ private:
 
 	QNetworkAccessManager networkManager;
 	QNetworkReply *_chkReply = nullptr;
+	bool needFallback = false;
 };

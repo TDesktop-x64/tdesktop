@@ -1086,7 +1086,7 @@ void readLangPack() {
 	QString langPackBaseId = Lang::GetInstance().baseId();
 	QString langPackId = Lang::GetInstance().id();
 	CustomLangPack::initInstance();
-	CustomLangPack::currentInstance()->fetchCustomLangPack(langPackId, langPackBaseId, false);
+	CustomLangPack::currentInstance()->fetchCustomLangPack(langPackId, langPackBaseId);
 }
 
 void writeLangPack() {
@@ -1279,7 +1279,7 @@ CustomLangPack *CustomLangPack::currentInstance() {
 	return instance;
 }
 
-void CustomLangPack::fetchCustomLangPack(const QString& langPackId, const QString& langPackBaseId, bool needFallback) {
+void CustomLangPack::fetchCustomLangPack(const QString& langPackId, const QString& langPackBaseId) {
 	LOG(("Current Language pack ID: %1, Base ID: %2").arg(langPackId, langPackBaseId));
 
 	const auto proxy = Core::App().settings().proxy().isEnabled() ? Core::App().settings().proxy().selected() : MTP::ProxyData();
@@ -1323,10 +1323,11 @@ void CustomLangPack::fetchError(QNetworkReply::NetworkError e) {
 		QString langPackBaseId = Lang::GetInstance().baseId();
 		QString langPackId = Lang::GetInstance().id();
 
-		if (!langPackId.isEmpty() && !langPackBaseId.isEmpty()) {
+		if (!langPackId.isEmpty() && !langPackBaseId.isEmpty() && !needFallback) {
 			LOG(("64Gram Language pack not found! Fallback to main language: %1...").arg(langPackBaseId));
+			needFallback = true;
 			_chkReply->disconnect();
-			fetchCustomLangPack("", langPackBaseId, true);
+			fetchCustomLangPack("", langPackBaseId);
 		} else {
 			LOG(("64Gram Language pack not found! Fallback to default language: English..."));
 			loadDefaultLangFile();

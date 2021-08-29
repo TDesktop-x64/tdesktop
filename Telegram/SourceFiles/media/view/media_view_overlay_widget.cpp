@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/file_utilities.h"
 #include "core/mime_type.h"
 #include "core/ui_integration.h"
+#include "core/crash_reports.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/buttons.h"
 #include "ui/image/image.h"
@@ -294,6 +295,8 @@ OverlayWidget::OverlayWidget()
 , _lastAction(-st::mediaviewDeltaFromLastAction, -st::mediaviewDeltaFromLastAction)
 , _stateAnimation([=](crl::time now) { return stateAnimationCallback(now); })
 , _dropdown(_widget, st::mediaviewDropdownMenu) {
+	CrashReports::SetAnnotation("OpenGL Renderer", "[not-initialized]");
+
 	Lang::Updated(
 	) | rpl::start_with_next([=] {
 		refreshLang();
@@ -4514,16 +4517,20 @@ void OverlayWidget::applyHideWindowWorkaround() {
 	// So on next paint we force full backing store repaint.
 	if (_opengl && !isHidden() && !_hideWorkaround) {
 		_hideWorkaround = std::make_unique<Ui::RpWidget>(_widget);
-		_hideWorkaround->setGeometry(_widget->rect());
-		_hideWorkaround->show();
-		_hideWorkaround->paintRequest(
+		const auto raw = _hideWorkaround.get();
+		raw->setGeometry(_widget->rect());
+		raw->show();
+		raw->paintRequest(
 		) | rpl::start_with_next([=] {
-			QPainter(_hideWorkaround.get()).fillRect(_hideWorkaround->rect(), QColor(0, 1, 0, 1));
-			crl::on_main(_hideWorkaround.get(), [=] {
-				_hideWorkaround.reset();
+			if (_hideWorkaround.get() == raw) {
+				_hideWorkaround.release();
+			}
+			QPainter(raw).fillRect(raw->rect(), QColor(0, 1, 0, 1));
+			crl::on_main(raw, [=] {
+				delete raw;
 			});
-		}, _hideWorkaround->lifetime());
-		_hideWorkaround->update();
+		}, raw->lifetime());
+		raw->update();
 
 		if (Platform::IsWindows()) {
 			Ui::Platform::UpdateOverlayed(_widget);

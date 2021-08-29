@@ -1086,7 +1086,7 @@ void readLangPack() {
 	QString langPackBaseId = Lang::GetInstance().baseId();
 	QString langPackId = Lang::GetInstance().id();
 	CustomLangPack::initInstance();
-	CustomLangPack::currentInstance()->fetchCustomLangPack(langPackId, langPackBaseId);
+	CustomLangPack::currentInstance()->fetchCustomLangPack(langPackId, langPackBaseId, false);
 }
 
 void writeLangPack() {
@@ -1279,8 +1279,8 @@ CustomLangPack *CustomLangPack::currentInstance() {
 	return instance;
 }
 
-void CustomLangPack::fetchCustomLangPack(QString langPackId, QString langPackBaseId) {
-	LOG(("Current Language ID: %1, Base ID: %2").arg(langPackId, langPackBaseId));
+void CustomLangPack::fetchCustomLangPack(const QString& langPackId, const QString& langPackBaseId, bool needFallback) {
+	LOG(("Current Language pack ID: %1, Base ID: %2").arg(langPackId, langPackBaseId));
 
 	const auto proxy = Core::App().settings().proxy().isEnabled() ? Core::App().settings().proxy().selected() : MTP::ProxyData();
 	if (proxy.type == MTP::ProxyData::Type::Socks5 || proxy.type == MTP::ProxyData::Type::Http) {
@@ -1289,16 +1289,15 @@ void CustomLangPack::fetchCustomLangPack(QString langPackId, QString langPackBas
 	}
 
 	QUrl url;
-	if (langPackBaseId != "") {
-		url.setUrl(qsl("https://raw.githubusercontent.com/TDesktop-x64/Localization/master/%1.json").arg(langPackBaseId));
-	}
-	else {
+	if (!langPackId.isEmpty() && !langPackBaseId.isEmpty() && !needFallback) {
 		url.setUrl(qsl("https://raw.githubusercontent.com/TDesktop-x64/Localization/master/%1.json").arg(langPackId));
+	} else {
+		url.setUrl(qsl("https://raw.githubusercontent.com/TDesktop-x64/Localization/master/%1.json").arg(needFallback ? langPackBaseId : langPackId));
 	}
 	_chkReply = networkManager.get(QNetworkRequest(url));
 	connect(_chkReply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(fetchError(QNetworkReply::NetworkError)));
 	connect(_chkReply, SIGNAL(finished()), this, SLOT(fetchFinished()));
-	LOG(("Fetching %1 lang pack...").arg(langPackId));
+	LOG(("Fetching %1 lang pack...").arg(needFallback ? (langPackBaseId.isEmpty() ? langPackId : langPackBaseId) : langPackId));
 }
 
 void CustomLangPack::fetchFinished() {
@@ -1308,17 +1307,8 @@ void CustomLangPack::fetchFinished() {
 	QJsonParseError error{};
 	QJsonDocument str = QJsonDocument::fromJson(result, &error);
 	if (error.error == QJsonParseError::NoError) {
-		QJsonObject json = str.object();
-		for (const QString& key : json.keys()) {
-			Lang::GetInstance().applyValue(key.toLocal8Bit(), QByteArray().append(json.value(key).toString()));
-			if (key.contains("#other")) {
-                Lang::GetInstance().applyValue(key.toLocal8Bit().replace("#other", "#few"), QByteArray().append(json.value(key).toString()));
-                Lang::GetInstance().applyValue(key.toLocal8Bit().replace("#other", "#many"), QByteArray().append(json.value(key).toString()));
-			}
-		}
-		Lang::GetInstance().updatePluralRules();
-	}
-	else {
+		parseLangFile(str);
+	} else {
 		LOG(("Incorrect JSON File. Fallback to default language: English..."));
 		loadDefaultLangFile();
 	}
@@ -1328,11 +1318,21 @@ void CustomLangPack::fetchFinished() {
 
 void CustomLangPack::fetchError(QNetworkReply::NetworkError e) {
 	LOG(("Network error: %1").arg(e));
-	LOG(("Fallback to default language: English..."));
 
-	loadDefaultLangFile();
+	if (e == QNetworkReply::NetworkError::ContentNotFoundError) {
+		QString langPackBaseId = Lang::GetInstance().baseId();
+		QString langPackId = Lang::GetInstance().id();
 
-	_chkReply = nullptr;
+		if (!langPackId.isEmpty() && !langPackBaseId.isEmpty()) {
+			LOG(("64Gram Language pack not found! Fallback to main language: %1...").arg(langPackBaseId));
+			_chkReply->disconnect();
+			fetchCustomLangPack("", langPackBaseId, true);
+		} else {
+			LOG(("64Gram Language pack not found! Fallback to default language: English..."));
+			loadDefaultLangFile();
+			_chkReply = nullptr;
+		}
+	}
 }
 
 void CustomLangPack::loadDefaultLangFile() {
@@ -1346,4 +1346,16 @@ void CustomLangPack::loadDefaultLangFile() {
 		Lang::GetInstance().updatePluralRules();
 		file.close();
 	}
+}
+
+void CustomLangPack::parseLangFile(QJsonDocument str) {
+	QJsonObject json = str.object();
+	for (const QString& key : json.keys()) {
+		Lang::GetInstance().applyValue(key.toLocal8Bit(), QByteArray().append(json.value(key).toString()));
+		if (key.contains("#other")) {
+			Lang::GetInstance().applyValue(key.toLocal8Bit().replace("#other", "#few"), QByteArray().append(json.value(key).toString()));
+			Lang::GetInstance().applyValue(key.toLocal8Bit().replace("#other", "#many"), QByteArray().append(json.value(key).toString()));
+		}
+	}
+	Lang::GetInstance().updatePluralRules();
 }

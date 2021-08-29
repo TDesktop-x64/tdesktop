@@ -106,8 +106,9 @@ public:
 	static void initInstance();
 	static CustomLangPack *instance;
 
-	void fetchCustomLangPack(QString langPackId, QString langPackBaseId);
+	void fetchCustomLangPack(const QString& langPackId, const QString& langPackBaseId, bool isFallback);
 	void loadDefaultLangFile();
+	void parseLangFile(QJsonDocument str);
 
 public Q_SLOTS:
 	void fetchFinished();

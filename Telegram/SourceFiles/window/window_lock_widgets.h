@@ -65,7 +65,6 @@ private:
 	void paintContent(Painter &p) override;
 	void changed();
 	void submit();
-	void submitOnChange();
 	void error();
 
 	object_ptr<Ui::PasswordInput> _passcode;

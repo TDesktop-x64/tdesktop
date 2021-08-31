@@ -165,25 +165,6 @@ void PasscodeLockWidget::submit() {
 	Core::App().unlockPasscode(); // Destroys this widget.
 }
 
-void PasscodeLockWidget::submitOnChange() {
-	if (_passcode->text().isEmpty()) {
-		_passcode->showError();
-		return;
-	}
-
-	const auto passcode = _passcode->text().toUtf8();
-	auto &domain = Core::App().domain();
-	const auto correct = domain.started()
-		? domain.local().checkPasscode(passcode)
-		: (domain.start(passcode)
-			!= Storage::StartResult::IncorrectPasscode);
-	if (!correct) {
-		return;
-	}
-
-	Core::App().unlockPasscode(); // Destroys this widget.
-}
-
 void PasscodeLockWidget::error() {
 	_error = tr::lng_passcode_wrong(tr::now);
 	_passcode->selectAll();
@@ -196,7 +177,6 @@ void PasscodeLockWidget::changed() {
 		_error = QString();
 		update();
 	}
-	QTimer::singleShot(100, this, [=] { submitOnChange(); });
 }
 
 void PasscodeLockWidget::resizeEvent(QResizeEvent *e) {

@@ -18,7 +18,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/info_controller.h"
 #include "history/history.h"
 #include "history/history_item.h"
-#include "history/view/history_view_element.h"
 #include "history/view/history_view_replies_section.h"
 #include "media/player/media_player_instance.h"
 #include "media/view/media_view_open_common.h"
@@ -29,6 +28,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_channel.h"
 #include "data/data_chat.h"
 #include "data/data_user.h"
+#include "data/data_document.h"
+#include "data/data_document_media.h"
+#include "data/data_document_resolver.h"
 #include "data/data_changes.h"
 #include "data/data_group_call.h"
 #include "data/data_chat_filters.h"
@@ -43,6 +45,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/text_utilities.h"
 #include "ui/delayed_activation.h"
 #include "ui/chat/message_bubble.h"
+#include "ui/chat/chat_style.h"
+#include "ui/chat/chat_theme.h"
 #include "ui/toast/toast.h"
 #include "ui/toasts/common_toasts.h"
 #include "calls/calls_instance.h" // Core::App().calls().inCall().
@@ -66,101 +70,38 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_layers.h" // st::boxLabel
 #include "styles/style_chat.h" // st::historyMessageRadius
 
-#include <QtGui/QGuiApplication>
-
 namespace Window {
 namespace {
 
 constexpr auto kMaxChatEntryHistorySize = 50;
-constexpr auto kCacheBackgroundTimeout = 3 * crl::time(1000);
-constexpr auto kCacheBackgroundFastTimeout = crl::time(200);
-constexpr auto kBackgroundFadeDuration = crl::time(200);
 
-[[nodiscard]] CacheBackgroundResult CacheBackground(
-		const CacheBackgroundRequest &request) {
-	const auto gradient = request.gradient.isNull()
-		? QImage()
-		: request.recreateGradient
-		? Images::GenerateGradient(
-			request.gradient.size(),
-			request.gradientColors,
-			request.gradientRotation)
-		: request.gradient;
-	if (request.isPattern || request.tile || request.prepared.isNull()) {
-		auto result = gradient.isNull()
-			? QImage(
-				request.area * cIntRetinaFactor(),
-				QImage::Format_ARGB32_Premultiplied)
-			: gradient.scaled(
-				request.area * cIntRetinaFactor(),
-				Qt::IgnoreAspectRatio,
-				Qt::SmoothTransformation);
-		result.setDevicePixelRatio(cRetinaFactor());
-		if (!request.prepared.isNull()) {
-			QPainter p(&result);
-			if (!gradient.isNull()) {
-				if (request.patternOpacity >= 0.) {
-					p.setCompositionMode(QPainter::CompositionMode_SoftLight);
-					p.setOpacity(request.patternOpacity);
-				} else {
-					p.setCompositionMode(
-						QPainter::CompositionMode_DestinationIn);
-				}
-			}
-			const auto tiled = request.isPattern
-				? request.prepared.scaled(
-					request.area.height() * cIntRetinaFactor(),
-					request.area.height() * cIntRetinaFactor(),
-					Qt::KeepAspectRatio,
-					Qt::SmoothTransformation)
-				: request.preparedForTiled;
-			const auto w = tiled.width() / cRetinaFactor();
-			const auto h = tiled.height() / cRetinaFactor();
-			const auto cx = qCeil(request.area.width() / w);
-			const auto cy = qCeil(request.area.height() / h);
-			const auto rows = cy;
-			const auto cols = request.isPattern ? (((cx / 2) * 2) + 1) : cx;
-			const auto xshift = request.isPattern
-				? (request.area.width() - cols * w) / 2
-				: 0;
-			for (auto y = 0; y != rows; ++y) {
-				for (auto x = 0; x != cols; ++x) {
-					p.drawImage(QPointF(xshift + x * w, y * h), tiled);
-				}
-			}
-			if (!gradient.isNull()
-				&& request.patternOpacity < 0.
-				&& request.patternOpacity > -1.) {
-				p.setCompositionMode(QPainter::CompositionMode_SourceOver);
-				p.setOpacity(1. + request.patternOpacity);
-				p.fillRect(QRect(QPoint(), request.area), Qt::black);
-			}
+[[nodiscard]] Fn<void(style::palette&)> PreparePaletteCallback(
+		bool dark,
+		std::optional<QColor> accent) {
+	return [=](style::palette &palette) {
+		using namespace Theme;
+		palette.finalize();
+		if (dark) {
+			const auto &embedded = EmbeddedThemes();
+			const auto i = ranges::find(
+				embedded,
+				EmbeddedType::Night,
+				&EmbeddedScheme::type);
+			Assert(i != end(embedded));
+
+			auto instance = Instance();
+			const auto loaded = LoadFromFile(
+				i->path,
+				&instance,
+				nullptr,
+				nullptr,
+				accent ? ColorizerFrom(*i, *accent) : Colorizer());
+			Assert(loaded);
+			palette = instance.palette;
+		} else {
+			// #TODO themes apply accent color to classic theme
 		}
-		return {
-			.image = std::move(result).convertToFormat(
-				QImage::Format_ARGB32_Premultiplied),
-			.gradient = gradient,
-			.area = request.area,
-		};
-	} else {
-		const auto rects = Window::Theme::ComputeBackgroundRects(
-			request.area,
-			request.prepared.size());
-		auto result = request.prepared.copy(rects.from).scaled(
-			rects.to.width() * cIntRetinaFactor(),
-			rects.to.height() * cIntRetinaFactor(),
-			Qt::IgnoreAspectRatio,
-			Qt::SmoothTransformation);
-		result.setDevicePixelRatio(cRetinaFactor());
-		return {
-			.image = std::move(result).convertToFormat(
-				QImage::Format_ARGB32_Premultiplied),
-			.gradient = gradient,
-			.area = request.area,
-			.x = rects.to.x(),
-			.y = rects.to.y(),
-		};
-	}
+	};
 }
 
 } // namespace
@@ -320,8 +261,9 @@ void SessionNavigation::showPeerByLinkResolved(
 				return;
 			}
 			const auto id = call->id();
+			const auto limit = 3;
 			_resolveRequestId = _session->api().request(
-				MTPphone_GetGroupCall(call->input())
+				MTPphone_GetGroupCall(call->input(), MTP_int(limit))
 			).done([=](const MTPphone_GroupCall &result) {
 				if (const auto now = peer->groupCall()
 					; now && now->id() == id) {
@@ -457,7 +399,8 @@ void SessionNavigation::showRepliesForMessage(
 					item->setRepliesMaxId(maxId->v);
 				}
 				item->setRepliesInboxReadTill(
-					data.vread_inbox_max_id().value_or_empty());
+					data.vread_inbox_max_id().value_or_empty(),
+					data.vunread_count().v);
 				item->setRepliesOutboxReadTill(
 					data.vread_outbox_max_id().value_or_empty());
 				const auto post = _session->data().message(channelId, rootId);
@@ -467,7 +410,8 @@ void SessionNavigation::showRepliesForMessage(
 						post->setRepliesMaxId(maxId->v);
 					}
 					post->setRepliesInboxReadTill(
-						data.vread_inbox_max_id().value_or_empty());
+						data.vread_inbox_max_id().value_or_empty(),
+						data.vunread_count().v);
 					post->setRepliesOutboxReadTill(
 						data.vread_outbox_max_id().value_or_empty());
 				}
@@ -549,31 +493,12 @@ void SessionNavigation::showPollResults(
 	showSection(std::make_shared<Info::Memento>(poll, contextId), params);
 }
 
-bool operator==(
-		const CacheBackgroundRequest &a,
-		const CacheBackgroundRequest &b) {
-	return (a.prepared.cacheKey() == b.prepared.cacheKey())
-		&& (a.area == b.area)
-		&& (a.gradientRotation == b.gradientRotation)
-		&& (a.tile == b.tile)
-		&& (a.recreateGradient == b.recreateGradient)
-		&& (a.gradient.cacheKey() == b.gradient.cacheKey())
-		&& (a.gradientProgress == b.gradientProgress)
-		&& (a.patternOpacity == b.patternOpacity);
-}
-
-bool operator!=(
-		const CacheBackgroundRequest &a,
-		const CacheBackgroundRequest &b) {
-	return !(a == b);
-}
-
-CachedBackground::CachedBackground(CacheBackgroundResult &&result)
-: pixmap(Ui::PixmapFromImage(std::move(result.image)))
-, area(result.area)
-, x(result.x)
-, y(result.y) {
-}
+struct SessionController::CachedTheme {
+	std::shared_ptr<Ui::ChatTheme> theme;
+	std::shared_ptr<Data::DocumentMedia> media;
+	Data::WallPaper paper;
+	rpl::lifetime lifetime;
+};
 
 SessionController::SessionController(
 	not_null<Main::Session*> session,
@@ -585,8 +510,21 @@ SessionController::SessionController(
 		_window->widget(),
 		this))
 , _invitePeekTimer([=] { checkInvitePeek(); })
-, _cacheBackgroundTimer([=] { cacheBackground(); }) {
+, _defaultChatTheme(std::make_shared<Ui::ChatTheme>())
+, _chatStyle(std::make_unique<Ui::ChatStyle>()) {
 	init();
+
+	_chatStyleTheme = _defaultChatTheme;
+	_chatStyle->apply(_defaultChatTheme.get());
+
+	pushDefaultChatBackground();
+	Theme::Background()->updates(
+	) | rpl::start_with_next([=](const Theme::BackgroundUpdate &update) {
+		if (update.type == Theme::BackgroundUpdate::Type::New
+			|| update.type == Theme::BackgroundUpdate::Type::Changed) {
+			pushDefaultChatBackground();
+		}
+	}, _lifetime);
 
 	if (Media::Player::instance()->pauseGifByRoundVideo()) {
 		enableGifPauseReason(GifPauseReason::RoundPlaying);
@@ -627,15 +565,6 @@ SessionController::SessionController(
 			}
 		}));
 	}, _lifetime);
-
-	using Update = Window::Theme::BackgroundUpdate;
-	Window::Theme::Background()->updates(
-	) | rpl::start_with_next([=](const Update &update) {
-		if (update.type == Update::Type::New
-			|| update.type == Update::Type::Changed) {
-			clearCachedBackground();
-		}
-	}, lifetime());
 
 	session->addWindow(this);
 }
@@ -1166,17 +1095,26 @@ void SessionController::startOrJoinGroupCall(
 		// Do you want to leave your active voice chat
 		// to join a voice chat in this group?
 		askConfirmation(
-			tr::lng_call_leave_to_other_sure(tr::now),
+			(peer->isBroadcast()
+				? tr::lng_call_leave_to_other_sure_channel
+				: tr::lng_call_leave_to_other_sure)(tr::now),
 			tr::lng_call_bar_hangup(tr::now));
 	} else if (confirm != GroupCallJoinConfirm::None
 		&& calls.inGroupCall()) {
-		if (calls.currentGroupCall()->peer() == peer) {
+		const auto now = calls.currentGroupCall()->peer();
+		if (now == peer) {
 			calls.activateCurrentCall(joinHash);
 		} else if (calls.currentGroupCall()->scheduleDate()) {
 			calls.startOrJoinGroupCall(peer, joinHash);
 		} else {
 			askConfirmation(
-				tr::lng_group_call_leave_to_other_sure(tr::now),
+				((peer->isBroadcast() && now->isBroadcast())
+					? tr::lng_group_call_leave_channel_to_other_sure_channel
+					: now->isBroadcast()
+					? tr::lng_group_call_leave_channel_to_other_sure
+					: peer->isBroadcast()
+					? tr::lng_group_call_leave_to_other_sure_channel
+					: tr::lng_group_call_leave_to_other_sure)(tr::now),
 				tr::lng_group_call_leave(tr::now));
 		}
 	} else {
@@ -1469,23 +1407,173 @@ void SessionController::openDocument(
 		session().data().message(contextId));
 }
 
-void SessionController::setBubblesBackground(QImage image) {
-	_bubblesBackgroundPrepared = std::move(image);
-	if (!_bubblesBackground.area.isEmpty()) {
-		_bubblesBackground = CacheBackground({
-			.prepared = _bubblesBackgroundPrepared,
-			.area = _bubblesBackground.area,
-		});
+auto SessionController::cachedChatThemeValue(
+	const Data::CloudTheme &data)
+-> rpl::producer<std::shared_ptr<Ui::ChatTheme>> {
+	const auto key = data.id;
+	if (!key || !data.paper || data.paper->backgroundColors().empty()) {
+		return rpl::single(_defaultChatTheme);
 	}
-	if (!_bubblesBackgroundPattern) {
-		_bubblesBackgroundPattern = Ui::PrepareBubblePattern();
+	const auto i = _customChatThemes.find(key);
+	if (i != end(_customChatThemes) && i->second.theme) {
+		return rpl::single(i->second.theme);
 	}
-	_bubblesBackgroundPattern->pixmap = _bubblesBackground.pixmap;
-	_repaintBackgroundRequests.fire({});
+	if (i == end(_customChatThemes)) {
+		cacheChatTheme(data);
+	}
+	using namespace rpl::mappers;
+	return rpl::single(
+		_defaultChatTheme
+	) | rpl::then(_cachedThemesStream.events(
+	) | rpl::filter([=](const std::shared_ptr<Ui::ChatTheme> &theme) {
+		return (theme->key() == key);
+	}) | rpl::take(1));
 }
 
-HistoryView::PaintContext SessionController::bubblesContext(
-		BubblesContextArgs &&args) {
+void SessionController::setChatStyleTheme(
+		const std::shared_ptr<Ui::ChatTheme> &theme) {
+	if (_chatStyleTheme.lock() == theme) {
+		return;
+	}
+	_chatStyleTheme = theme;
+	_chatStyle->apply(theme.get());
+}
+
+void SessionController::pushDefaultChatBackground() {
+	const auto background = Theme::Background();
+	const auto &paper = background->paper();
+	_defaultChatTheme->setBackground({
+		.prepared = background->prepared(),
+		.preparedForTiled = background->preparedForTiled(),
+		.gradientForFill = background->gradientForFill(),
+		.colorForFill = background->colorForFill(),
+		.colors = paper.backgroundColors(),
+		.patternOpacity = paper.patternOpacity(),
+		.gradientRotation = paper.gradientRotation(),
+		.isPattern = paper.isPattern(),
+		.tile = background->tile(),
+	});
+}
+
+void SessionController::cacheChatTheme(const Data::CloudTheme &data) {
+	Expects(data.id != 0);
+	Expects(data.paper.has_value());
+	Expects(!data.paper->backgroundColors().empty());
+
+	const auto key = data.id;
+	const auto document = data.paper->document();
+	const auto media = document ? document->createMediaView() : nullptr;
+	data.paper->loadDocument();
+	auto &theme = _customChatThemes.emplace(
+		key,
+		CachedTheme{ .media = media, .paper = *data.paper }).first->second;
+	auto descriptor = Ui::ChatThemeDescriptor{
+		.id = key,
+		.preparePalette = PreparePaletteCallback(
+			data.basedOnDark,
+			data.accentColor),
+		.prepareBackground = backgroundGenerator(theme),
+	};
+	crl::async([
+		this,
+		descriptor = std::move(descriptor),
+		weak = base::make_weak(this)
+	]() mutable {
+		crl::on_main(weak,[
+			this,
+			result = std::make_shared<Ui::ChatTheme>(std::move(descriptor))
+		]() mutable {
+			cacheChatThemeDone(std::move(result));
+		});
+	});
+	if (media && media->loaded(true)) {
+		theme.media = nullptr;
+	}
+}
+
+void SessionController::cacheChatThemeDone(
+		std::shared_ptr<Ui::ChatTheme> result) {
+	Expects(result != nullptr);
+
+	const auto key = result->key();
+	const auto i = _customChatThemes.find(key);
+	if (i == end(_customChatThemes)) {
+		return;
+	}
+	i->second.theme = result;
+	if (i->second.media) {
+		if (i->second.media->loaded(true)) {
+			updateCustomThemeBackground(i->second);
+		} else {
+			session().downloaderTaskFinished(
+			) | rpl::filter([=] {
+				const auto i = _customChatThemes.find(key);
+				Assert(i != end(_customChatThemes));
+				return !i->second.media || i->second.media->loaded(true);
+			}) | rpl::start_with_next([=] {
+				const auto i = _customChatThemes.find(key);
+				Assert(i != end(_customChatThemes));
+				updateCustomThemeBackground(i->second);
+			}, i->second.lifetime);
+		}
+	}
+	_cachedThemesStream.fire(std::move(result));
+}
+
+void SessionController::updateCustomThemeBackground(CachedTheme &theme) {
+	const auto guard = gsl::finally([&] {
+		theme.lifetime.destroy();
+		theme.media = nullptr;
+	});
+	if (!theme.media || !theme.theme || !theme.media->loaded(true)) {
+		return;
+	}
+	const auto key = theme.theme->key();
+	const auto weak = base::make_weak(this);
+	crl::async([=, generator = backgroundGenerator(theme, false)] {
+		crl::on_main(weak, [=, result = generator()]() mutable {
+			const auto i = _customChatThemes.find(key);
+			if (i != end(_customChatThemes)) {
+				i->second.theme->updateBackgroundImageFrom(std::move(result));
+			}
+		});
+	});
+}
+
+Fn<Ui::ChatThemeBackground()> SessionController::backgroundGenerator(
+		CachedTheme &theme,
+		bool generateGradient) {
+	const auto &paper = theme.paper;
+	const auto &media = theme.media;
+	const auto paperPath = media ? media->owner()->filepath() : QString();
+	const auto paperBytes = media ? media->bytes() : QByteArray();
+	const auto gzipSvg = media && media->owner()->isPatternWallPaperSVG();
+	const auto &colors = paper.backgroundColors();
+	const auto isPattern = paper.isPattern();
+	const auto patternOpacity = paper.patternOpacity();
+	const auto isBlurred = paper.isBlurred();
+	const auto gradientRotation = paper.gradientRotation();
+	return [=] {
+		auto result = Ui::PrepareBackgroundImage(
+			paperPath,
+			paperBytes,
+			gzipSvg,
+			colors,
+			isPattern,
+			patternOpacity,
+			isBlurred);
+		if (generateGradient) {
+			result.gradientForFill = (colors.size() > 1)
+				? Ui::GenerateDitheredGradient(colors, gradientRotation)
+				: QImage();
+			result.gradientRotation = gradientRotation;
+		}
+		return result;
+	};
+}
+
+HistoryView::PaintContext SessionController::preparePaintContext(
+		PaintContextArgs &&args) {
 	const auto visibleAreaTopLocal = content()->mapFromGlobal(
 		QPoint(0, args.visibleAreaTopGlobal)).y();
 	const auto viewport = QRect(
@@ -1493,205 +1581,10 @@ HistoryView::PaintContext SessionController::bubblesContext(
 		args.visibleAreaTop - visibleAreaTopLocal,
 		args.visibleAreaWidth,
 		content()->height());
-	_bubblesBackground.area = viewport.size();
-	//if (!_bubblesBackgroundPrepared.isNull()
-	//	&& _bubblesBackground.area != viewport.size()
-	//	&& !viewport.isEmpty()) {
-	//	// #TODO bubbles delayed caching
-	//	_bubblesBackground = CacheBackground({
-	//		.prepared = _bubblesBackgroundPrepared,
-	//		.area = viewport.size(),
-	//	});
-	//	_bubblesBackgroundPattern->pixmap = _bubblesBackground.pixmap;
-	//}
-	return {
-		.bubblesPattern = _bubblesBackgroundPattern.get(),
-		.viewport = viewport,
-		.clip = args.clip,
-		.now = crl::now(),
-	};
-}
-
-const BackgroundState &SessionController::backgroundState(QSize area) {
-	_backgroundState.shown = _backgroundFade.value(1.);
-	if (_backgroundState.now.pixmap.isNull()
-		&& !Window::Theme::Background()->gradientForFill().isNull()) {
-		// We don't support direct painting of patterned gradients.
-		// So we need to sync-generate cache image here.
-		setCachedBackground(CacheBackground(currentCacheRequest(area)));
-		_cacheBackgroundTimer.cancel();
-	} else if (_backgroundState.now.area != area) {
-		if (_willCacheForArea != area
-			|| (!_cacheBackgroundTimer.isActive()
-				&& !_backgroundCachingRequest)) {
-			_willCacheForArea = area;
-			_lastAreaChangeTime = crl::now();
-			_cacheBackgroundTimer.callOnce(kCacheBackgroundFastTimeout);
-		}
-	}
-	generateNextBackgroundRotation();
-	return _backgroundState;
-}
-
-bool SessionController::readyForBackgroundRotation() const {
-	return !anim::Disabled()
-		&& !_backgroundFade.animating()
-		&& !_cacheBackgroundTimer.isActive()
-		&& !_backgroundState.now.pixmap.isNull();
-}
-
-void SessionController::generateNextBackgroundRotation() {
-	if (_backgroundCachingRequest
-		|| !_backgroundNext.image.isNull()
-		|| !readyForBackgroundRotation()) {
-		return;
-	}
-	const auto background = Window::Theme::Background();
-	if (background->paper().backgroundColors().size() < 3) {
-		return;
-	}
-	constexpr auto kAddRotation = 315;
-	const auto request = currentCacheRequest(
-		_backgroundState.now.area,
-		kAddRotation);
-	if (!request) {
-		return;
-	}
-	cacheBackgroundAsync(request, [=](CacheBackgroundResult &&result) {
-		const auto forRequest = base::take(_backgroundCachingRequest);
-		if (!readyForBackgroundRotation()) {
-			return;
-		}
-		const auto request = currentCacheRequest(
-			_backgroundState.now.area,
-			kAddRotation);
-		if (forRequest == request) {
-			_backgroundAddRotation
-				= (_backgroundAddRotation + kAddRotation) % 360;
-			_backgroundNext = std::move(result);
-		}
-	});
-}
-
-auto SessionController::currentCacheRequest(QSize area, int addRotation) const
--> CacheBackgroundRequest {
-	const auto background = Window::Theme::Background();
-	if (background->colorForFill()) {
-		return {};
-	}
-	const auto rotation = background->paper().gradientRotation();
-	const auto gradient = background->gradientForFill();
-	return {
-		.prepared = background->prepared(),
-		.preparedForTiled = background->preparedForTiled(),
-		.area = area,
-		.gradientRotation = (rotation
-			+ _backgroundAddRotation
-			+ addRotation) % 360,
-		.tile = background->tile(),
-		.isPattern = background->paper().isPattern(),
-		.recreateGradient = (addRotation != 0),
-		.gradient = gradient,
-		.gradientColors = (gradient.isNull()
-			? std::vector<QColor>()
-			: background->paper().backgroundColors()),
-		.gradientProgress = 1.,
-		.patternOpacity = background->paper().patternOpacity(),
-	};
-}
-
-void SessionController::cacheBackground() {
-	const auto now = crl::now();
-	if (now - _lastAreaChangeTime < kCacheBackgroundTimeout
-		&& QGuiApplication::mouseButtons() != 0) {
-		_cacheBackgroundTimer.callOnce(kCacheBackgroundFastTimeout);
-		return;
-	}
-	cacheBackgroundNow();
-}
-
-void SessionController::cacheBackgroundNow() {
-	if (!_backgroundCachingRequest) {
-		if (const auto request = currentCacheRequest(_willCacheForArea)) {
-			cacheBackgroundAsync(request);
-		}
-	}
-}
-
-void SessionController::cacheBackgroundAsync(
-		const CacheBackgroundRequest &request,
-		Fn<void(CacheBackgroundResult&&)> done) {
-	_backgroundCachingRequest = request;
-	const auto weak = base::make_weak(this);
-	crl::async([=] {
-		if (!weak) {
-			return;
-		}
-		crl::on_main(weak, [=, result = CacheBackground(request)]() mutable {
-			if (done) {
-				done(std::move(result));
-			} else if (const auto request = currentCacheRequest(
-					_willCacheForArea)) {
-				if (_backgroundCachingRequest != request) {
-					cacheBackgroundAsync(request);
-				} else {
-					_backgroundCachingRequest = {};
-					setCachedBackground(std::move(result));
-				}
-			}
-		});
-	});
-}
-
-void SessionController::setCachedBackground(CacheBackgroundResult &&cached) {
-	_backgroundNext = {};
-
-	const auto background = Window::Theme::Background();
-	if (background->gradientForFill().isNull()
-		|| _backgroundState.now.pixmap.isNull()
-		|| anim::Disabled()) {
-		_backgroundFade.stop();
-		_backgroundState.shown = 1.;
-		_backgroundState.now = std::move(cached);
-		return;
-	}
-	// #TODO themes compose several transitions.
-	_backgroundState.was = std::move(_backgroundState.now);
-	_backgroundState.now = std::move(cached);
-	_backgroundState.shown = 0.;
-	const auto callback = [=] {
-		if (!_backgroundFade.animating()) {
-			_backgroundState.was = {};
-			_backgroundState.shown = 1.;
-		}
-		_repaintBackgroundRequests.fire({});
-	};
-	_backgroundFade.start(
-		callback,
-		0.,
-		1.,
-		kBackgroundFadeDuration);
-}
-
-void SessionController::clearCachedBackground() {
-	_backgroundState = {};
-	_backgroundAddRotation = 0;
-	_backgroundNext = {};
-	_backgroundFade.stop();
-	_cacheBackgroundTimer.cancel();
-	_repaintBackgroundRequests.fire({});
-}
-
-rpl::producer<> SessionController::repaintBackgroundRequests() const {
-	return _repaintBackgroundRequests.events();
-}
-
-void SessionController::rotateComplexGradientBackground() {
-	if (!_backgroundFade.animating() && !_backgroundNext.image.isNull()) {
-		Window::Theme::Background()->recacheGradientForFill(
-			std::move(_backgroundNext.gradient));
-		setCachedBackground(base::take(_backgroundNext));
-	}
+	return args.theme->preparePaintContext(
+		_chatStyle.get(),
+		viewport,
+		args.clip);
 }
 
 SessionController::~SessionController() {

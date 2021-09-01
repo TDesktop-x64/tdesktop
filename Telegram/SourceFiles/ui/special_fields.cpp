@@ -8,8 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/special_fields.h"
 
 #include "lang/lang_keys.h"
-#include "data/data_countries.h" // Data::ValidPhoneCode
-#include "numbers.h"
+#include "countries/countries_instance.h" // Countries::ValidPhoneCode
 
 #include <QtCore/QRegularExpression>
 
@@ -83,7 +82,7 @@ void CountryCodeInput::correctValue(
 		}
 	}
 	if (!addToNumber.isEmpty()) {
-		auto validCode = Data::ValidPhoneCode(newText.mid(1));
+		auto validCode = Countries::Instance().validPhoneCode(newText.mid(1));
 		addToNumber = newText.mid(1 + validCode.length()) + addToNumber;
 		newText = '+' + validCode;
 	}
@@ -205,7 +204,11 @@ void PhonePartInput::addedToNumber(const QString &added) {
 }
 
 void PhonePartInput::chooseCode(const QString &code) {
-	_pattern = phoneNumberParse(code);
+	_pattern = Countries::Instance().format({
+		.phone = code,
+		.onlyGroups = true,
+		.incomplete = true,
+	}).groups;
 	if (!_pattern.isEmpty() && _pattern.at(0) == code.size()) {
 		_pattern.pop_front();
 	} else {
@@ -228,6 +231,8 @@ void PhonePartInput::chooseCode(const QString &code) {
 	correctValue(wasText, wasCursor, newText, newCursor);
 
 	startPlaceholderAnimation();
+
+	update();
 }
 
 UsernameInput::UsernameInput(
@@ -283,14 +288,6 @@ void UsernameInput::correctValue(
 	setCorrectedText(now, nowCursor, now.mid(from, len), newPos);
 }
 
-QString ExtractPhonePrefix(const QString &phone) {
-	const auto pattern = phoneNumberParse(phone);
-	if (!pattern.isEmpty()) {
-		return phone.mid(0, pattern[0]);
-	}
-	return QString();
-}
-
 PhoneInput::PhoneInput(
 	QWidget *parent,
 	const style::InputField &st,
@@ -343,7 +340,11 @@ void PhoneInput::correctValue(
 		int &nowCursor) {
 	auto digits = now;
 	digits.replace(QRegularExpression("[^\\d]"), QString());
-	_pattern = phoneNumberParse(digits);
+	_pattern = Countries::Instance().format({
+		.phone = digits,
+		.onlyGroups = true,
+		.incomplete = true,
+	}).groups;
 
 	QString newPlaceholder;
 	if (_pattern.isEmpty()) {

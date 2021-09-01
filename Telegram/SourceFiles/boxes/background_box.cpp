@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "ui/effects/round_checkbox.h"
 #include "ui/image/image.h"
+#include "ui/chat/chat_theme.h"
 #include "ui/ui_utility.h"
 #include "main/main_session.h"
 #include "apiwrap.h"
@@ -241,6 +242,7 @@ void BackgroundBox::Inner::sortPapers() {
 			night ? data.isDark() : !data.isDark(),
 			Data::IsDefaultWallPaper(data),
 			!data.isDefault() && !Data::IsLegacy1DefaultWallPaper(data),
+			Data::IsLegacy3DefaultWallPaper(data),
 			Data::IsLegacy2DefaultWallPaper(data),
 			Data::IsLegacy1DefaultWallPaper(data));
 	});
@@ -331,7 +333,7 @@ void BackgroundBox::Inner::validatePaperThumbnail(
 			}
 		} else if (!paper.data.backgroundColors().empty()) {
 			paper.thumbnail = Ui::PixmapFromImage(
-				Data::GenerateWallPaper(
+				Ui::GenerateBackgroundImage(
 					st::backgroundSize * cIntRetinaFactor(),
 					paper.data.backgroundColors(),
 					paper.data.gradientRotation()));
@@ -346,7 +348,7 @@ void BackgroundBox::Inner::validatePaperThumbnail(
 		: paper.dataMedia->thumbnail();
 	auto original = thumbnail->original();
 	if (paper.data.isPattern()) {
-		original = Data::PreparePatternImage(
+		original = Ui::PreparePatternImage(
 			std::move(original),
 			paper.data.backgroundColors(),
 			paper.data.gradientRotation(),
@@ -378,6 +380,7 @@ void BackgroundBox::Inner::paintPaper(
 	} else if (Data::IsCloudWallPaper(paper.data)
 		&& !Data::IsDefaultWallPaper(paper.data)
 		&& !Data::IsLegacy2DefaultWallPaper(paper.data)
+		&& !Data::IsLegacy3DefaultWallPaper(paper.data)
 		&& !v::is_null(over)
 		&& (&paper == &_papers[getSelectionIndex(over)])) {
 		const auto deleteSelected = v::is<DeleteSelected>(over);
@@ -418,6 +421,7 @@ void BackgroundBox::Inner::mouseMoveEvent(QMouseEvent *e) {
 			&& Data::IsCloudWallPaper(data)
 			&& !Data::IsDefaultWallPaper(data)
 			&& !Data::IsLegacy2DefaultWallPaper(data)
+			&& !Data::IsLegacy3DefaultWallPaper(data)
 			&& (currentId != data.id());
 		return (result >= _papers.size())
 			? Selection()

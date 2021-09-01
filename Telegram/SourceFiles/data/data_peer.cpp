@@ -16,6 +16,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_session.h"
 #include "data/data_file_origin.h"
 #include "data/data_histories.h"
+#include "data/data_cloud_themes.h"
 #include "base/unixtime.h"
 #include "base/crc32hash.h"
 #include "lang/lang_keys.h"
@@ -527,15 +528,6 @@ bool PeerData::canEditMessagesIndefinitely() const {
 	Unexpected("Peer type in PeerData::canEditMessagesIndefinitely.");
 }
 
-bool PeerData::hasPinnedMessages() const {
-	return _hasPinnedMessages;
-}
-
-void PeerData::setHasPinnedMessages(bool has) {
-	_hasPinnedMessages = has;
-	session().changes().peerUpdated(this, UpdateFlag::PinnedMessages);
-}
-
 bool PeerData::canExportChatHistory() const {
 	if (isRepliesChat()) {
 		return false;
@@ -1012,6 +1004,21 @@ PeerId PeerData::groupCallDefaultJoinAs() const {
 	return 0;
 }
 
+void PeerData::setThemeEmoji(const QString &emoji) {
+	if (true || _themeEmoji == emoji) {
+		return;
+	}
+	_themeEmoji = emoji;
+	if (!emoji.isEmpty() && !owner().cloudThemes().themeForEmoji(emoji)) {
+		owner().cloudThemes().refreshChatThemes();
+	}
+	session().changes().peerUpdated(this, UpdateFlag::ChatThemeEmoji);
+}
+
+const QString &PeerData::themeEmoji() const {
+	return _themeEmoji;
+}
+
 void PeerData::setIsBlocked(bool is) {
 	const auto status = is
 		? BlockStatus::Blocked
@@ -1154,7 +1161,7 @@ void SetTopPinnedMessageId(not_null<PeerData*> peer, MsgId messageId) {
 		Storage::SharedMediaType::Pinned,
 		messageId,
 		{ messageId, ServerMaxMsgId }));
-	peer->setHasPinnedMessages(true);
+	peer->owner().history(peer)->setHasPinnedMessages(true);
 }
 
 FullMsgId ResolveTopPinnedId(

@@ -30,6 +30,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_session_controller.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
+#include "ui/chat/chat_theme.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/image/image.h"
 #include "ui/text/text_utilities.h"
@@ -242,6 +243,14 @@ InnerWidget::InnerWidget(
 		st::historyAdminLogEmptyWidth
 		- st::historyAdminLogEmptyPadding.left()
 		- st::historyAdminLogEmptyPadding.left()) {
+	Window::ChatThemeValueFromPeer(
+		controller,
+		channel
+	) | rpl::start_with_next([=](std::shared_ptr<Ui::ChatTheme> &&theme) {
+		_theme = std::move(theme);
+		controller->setChatStyleTheme(_theme);
+	}, lifetime());
+
 	setMouseTracking(true);
 	_scrollDateHideTimer.setCallback([=] { scrollDateHideByTimer(); });
 	session().data().viewRepaintRequest(
@@ -913,14 +922,13 @@ void InnerWidget::paintEvent(QPaintEvent *e) {
 			return this->itemTop(elem) < bottom;
 		});
 		if (from != end) {
-			auto viewport = QRect(); // #TODO bubbles
 			auto top = itemTop(from->get());
-			auto context = HistoryView::PaintContext{
-				.bubblesPattern = nullptr,
-				.viewport = viewport.translated(0, -top),
-				.clip = clip.translated(0, -top),
-				.now = crl::now(),
-			};
+			auto context = _controller->preparePaintContext({
+				.theme = _theme.get(),
+				.visibleAreaTop = _visibleTop,
+				.visibleAreaTopGlobal = mapToGlobal(QPoint(0, _visibleTop)).y(),
+				.clip = clip,
+			}).translated(0, -top);
 			p.translate(0, top);
 			for (auto i = from; i != to; ++i) {
 				const auto view = i->get();

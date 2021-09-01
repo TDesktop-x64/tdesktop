@@ -41,7 +41,6 @@ set(dependent_style_files
 )
 
 generate_styles(td_ui ${src_loc} "${style_files}" "${dependent_style_files}")
-generate_numbers(td_ui ${res_loc}/numbers.txt)
 
 target_precompile_headers(td_ui PRIVATE ${src_loc}/ui/ui_pch.h)
 nice_target_sources(td_ui ${src_loc}
@@ -58,8 +57,8 @@ PRIVATE
     core/mime_type.cpp
     core/mime_type.h
 
-    data/data_countries.cpp
-    data/data_countries.h
+    countries/countries_instance.cpp
+    countries/countries_instance.h
 
     layout/abstract_layout_item.cpp
     layout/abstract_layout_item.h
@@ -136,6 +135,12 @@ PRIVATE
     ui/chat/attach/attach_single_file_preview.h
     ui/chat/attach/attach_single_media_preview.cpp
     ui/chat/attach/attach_single_media_preview.h
+    ui/chat/chat_style.cpp
+    ui/chat/chat_style.h
+    ui/chat/chat_theme.cpp
+    ui/chat/chat_theme.h
+    ui/chat/forward_options_box.cpp
+    ui/chat/forward_options_box.h
     ui/chat/group_call_bar.cpp
     ui/chat/group_call_bar.h
     ui/chat/group_call_userpics.cpp

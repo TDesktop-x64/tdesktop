@@ -10,6 +10,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "mainwidget.h"
 #include "window/themes/window_theme.h"
+#include "ui/chat/chat_theme.h"
+#include "ui/chat/chat_style.h"
 #include "ui/toast/toast.h"
 #include "ui/image/image.h"
 #include "ui/widgets/checkbox.h"
@@ -340,7 +342,7 @@ bool ServiceCheck::checkRippleStartPosition(QPoint position) const {
 		Images::Option blur = Images::Option(0)) {
 	auto result = PrepareScaledNonPattern(image, blur);
 	if (isPattern) {
-		result = Data::PreparePatternImage(
+		result = Ui::PreparePatternImage(
 			std::move(result),
 			background,
 			gradientRotation,
@@ -364,6 +366,7 @@ BackgroundPreviewBox::BackgroundPreviewBox(
 	const Data::WallPaper &paper)
 : SimpleElementDelegate(controller, [=] { update(); })
 , _controller(controller)
+, _chatStyle(std::make_unique<Ui::ChatStyle>())
 , _text1(GenerateTextItem(
 	delegate(),
 	_controller->session().data().history(PeerData::kServiceNotificationsId),
@@ -377,6 +380,8 @@ BackgroundPreviewBox::BackgroundPreviewBox(
 , _paper(paper)
 , _media(_paper.document() ? _paper.document()->createMediaView() : nullptr)
 , _radial([=](crl::time now) { radialAnimationCallback(now); }) {
+	_chatStyle->apply(controller->defaultChatTheme().get());
+
 	if (_media) {
 		_media->thumbnailWanted(_paper.fileOrigin());
 	}
@@ -394,7 +399,7 @@ void BackgroundPreviewBox::generateBackground() {
 	const auto size = QSize(st::boxWideWidth, st::boxWideWidth)
 		* cIntRetinaFactor();
 	_generated = Ui::PixmapFromImage((_paper.patternOpacity() >= 0.)
-		? Data::GenerateWallPaper(
+		? Ui::GenerateBackgroundImage(
 			size,
 			_paper.backgroundColors(),
 			_paper.gradientRotation())
@@ -589,13 +594,10 @@ QRect BackgroundPreviewBox::radialRect() const {
 void BackgroundPreviewBox::paintTexts(Painter &p, crl::time ms) {
 	const auto height1 = _text1->height();
 	const auto height2 = _text2->height();
-	const auto context = HistoryView::PaintContext{
-		.bubblesPattern = nullptr, // #TODO bubbles
-		.viewport = rect(),
-		.clip = rect(),
-		.selection = TextSelection(),
-		.now = ms,
-	};
+	const auto context = _controller->defaultChatTheme()->preparePaintContext(
+		_chatStyle.get(),
+		rect(),
+		rect());
 	p.translate(0, textsTop());
 	paintDate(p);
 	_text1->draw(p, context);
@@ -666,7 +668,7 @@ void BackgroundPreviewBox::setScaledFromThumb() {
 	auto blurred = (_paper.document() || _paper.isPattern())
 		? QImage()
 		: PrepareScaledNonPattern(
-			Data::PrepareBlurredBackground(thumbnail->original()),
+			Ui::PrepareBlurredBackground(thumbnail->original()),
 			Images::Option(0));
 	setScaledFromImage(std::move(scaled), std::move(blurred));
 }
@@ -674,7 +676,7 @@ void BackgroundPreviewBox::setScaledFromThumb() {
 void BackgroundPreviewBox::setScaledFromImage(
 		QImage &&image,
 		QImage &&blurred) {
-	updateServiceBg({ Window::Theme::CountAverageColor(image) });
+	updateServiceBg({ Ui::CountAverageColor(image) });
 	if (!_full.isNull()) {
 		startFadeInFrom(std::move(_scaled));
 	}
@@ -712,7 +714,7 @@ void BackgroundPreviewBox::updateServiceBg(const std::vector<QColor> &bg) {
 		green += color.green();
 		blue += color.blue();
 	}
-	_serviceBg = Window::Theme::AdjustedColor(
+	_serviceBg = Ui::ThemeAdjustedColor(
 		st::msgServiceBg->c,
 		QColor(red / count, green / count, blue / count));
 }
@@ -746,7 +748,7 @@ void BackgroundPreviewBox::checkLoadedDocument() {
 				patternOpacity);
 			auto blurred = !isPattern
 				? PrepareScaledNonPattern(
-					Data::PrepareBlurredBackground(image),
+					Ui::PrepareBlurredBackground(image),
 					Images::Option(0))
 				: QImage();
 			crl::on_main(std::move(guard), [
@@ -761,9 +763,9 @@ void BackgroundPreviewBox::checkLoadedDocument() {
 			});
 		});
 	};
-	_generating = Data::ReadImageAsync(
+	_generating = Data::ReadBackgroundImageAsync(
 		_media.get(),
-		Window::Theme::PreprocessBackgroundImage,
+		Ui::PreprocessBackgroundImage,
 		generateCallback);
 }
 

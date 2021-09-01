@@ -30,6 +30,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_histories.h"
 #include "data/stickers/data_stickers.h"
 #include "api/api_text_entities.h"
+#include "ui/chat/chat_theme.h"
 #include "ui/special_buttons.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/shadow.h"
@@ -501,20 +502,20 @@ void MainWidget::floatPlayerDoubleClickEvent(
 	_controller->showPeerHistoryAtItem(item);
 }
 
-bool MainWidget::setForwardDraft(PeerId peerId, MessageIdsList &&items) {
+bool MainWidget::setForwardDraft(PeerId peerId, Data::ForwardDraft &&draft) {
 	Expects(peerId != 0);
 
 	const auto peer = session().data().peer(peerId);
 	const auto error = GetErrorTextForSending(
 		peer,
-		session().data().idsToItems(items),
+		session().data().idsToItems(draft.ids),
 		true);
 	if (!error.isEmpty()) {
 		Ui::show(Box<InformBox>(error), Ui::LayerOption::KeepOther);
 		return false;
 	}
 
-	peer->owner().history(peer)->setForwardDraft(std::move(items));
+	peer->owner().history(peer)->setForwardDraft(std::move(draft));
 	_controller->showPeerHistory(
 		peer,
 		SectionShow::Way::Forward,
@@ -602,7 +603,10 @@ void MainWidget::onFilesOrForwardDrop(
 	Expects(peerId != 0);
 
 	if (data->hasFormat(qsl("application/x-td-forward"))) {
-		if (!setForwardDraft(peerId, session().data().takeMimeForwardIds())) {
+		auto draft = Data::ForwardDraft{
+			.ids = session().data().takeMimeForwardIds(),
+		};
+		if (!setForwardDraft(peerId, std::move(draft))) {
 			// We've already released the mouse button, so the forwarding is cancelled.
 			if (_hider) {
 				_hider->startHide();
@@ -703,9 +707,9 @@ void MainWidget::hiderLayer(base::unique_qptr<Window::HistoryHider> hider) {
 	floatPlayerCheckVisibility();
 }
 
-void MainWidget::showForwardLayer(MessageIdsList &&items) {
-	auto callback = [=, items = std::move(items)](PeerId peer) mutable {
-		return setForwardDraft(peer, std::move(items));
+void MainWidget::showForwardLayer(Data::ForwardDraft &&draft) {
+	auto callback = [=, draft = std::move(draft)](PeerId peer) mutable {
+		return setForwardDraft(peer, std::move(draft));
 	};
 	hiderLayer(base::make_unique_q<Window::HistoryHider>(
 		this,
@@ -1183,9 +1187,9 @@ void MainWidget::checkChatBackground() {
 			: background->data;
 		setReadyChatBackground(ready, std::move(image));
 	};
-	_background->generating = Data::ReadImageAsync(
+	_background->generating = Data::ReadBackgroundImageAsync(
 		media.get(),
-		Window::Theme::PreprocessBackgroundImage,
+		Ui::PreprocessBackgroundImage,
 		generateCallback);
 }
 

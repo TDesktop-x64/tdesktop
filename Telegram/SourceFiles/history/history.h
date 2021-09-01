@@ -33,6 +33,23 @@ struct Draft;
 class Session;
 class Folder;
 class ChatFilter;
+
+enum class ForwardOptions {
+	PreserveInfo,
+	NoSenderNames,
+	NoNamesAndCaptions,
+};
+
+struct ForwardDraft {
+	MessageIdsList ids;
+	ForwardOptions options = ForwardOptions::PreserveInfo;
+};
+
+struct ResolvedForwardDraft {
+	HistoryItemsList items;
+	ForwardOptions options = ForwardOptions::PreserveInfo;
+};
+
 } // namespace Data
 
 namespace Dialogs {
@@ -354,11 +371,13 @@ public:
 	void applyCloudDraft();
 	void draftSavedToCloud();
 
-	const MessageIdsList &forwardDraft() const {
+	[[nodiscard]] const Data::ForwardDraft &forwardDraft() const {
 		return _forwardDraft;
 	}
-	HistoryItemsList validateForwardDraft();
-	void setForwardDraft(MessageIdsList &&items);
+	[[nodiscard]] Data::ResolvedForwardDraft resolveForwardDraft(
+		const Data::ForwardDraft &draft) const;
+	[[nodiscard]] Data::ResolvedForwardDraft resolveForwardDraft();
+	void setForwardDraft(Data::ForwardDraft &&draft);
 
 	History *migrateSibling() const;
 	[[nodiscard]] bool useTopPromotion() const;
@@ -411,6 +430,9 @@ public:
 	// Interface for Data::Histories.
 	void setInboxReadTill(MsgId upTo);
 	std::optional<int> countStillUnreadLocal(MsgId readTillId) const;
+
+	[[nodiscard]] bool hasPinnedMessages() const;
+	void setHasPinnedMessages(bool has);
 
 	// Still public data.
 	std::deque<std::unique_ptr<HistoryBlock>> blocks;
@@ -581,6 +603,7 @@ private:
 
 	bool _unreadMark = false;
 	bool _fakeUnreadWhileOpened = false;
+	bool _hasPinnedMessages = false;
 
 	// A pointer to the block that is currently being built.
 	// We hold this pointer so we can destroy it while building
@@ -594,7 +617,7 @@ private:
 	Data::HistoryDrafts _drafts;
 	TimeId _acceptCloudDraftsAfter = 0;
 	int _savingCloudDraftRequests = 0;
-	MessageIdsList _forwardDraft;
+	Data::ForwardDraft _forwardDraft;
 
 	QString _topPromotedMessage;
 	QString _topPromotedType;

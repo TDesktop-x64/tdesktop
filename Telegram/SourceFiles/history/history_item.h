@@ -52,6 +52,11 @@ enum class CursorState : char;
 enum class PointState : char;
 enum class Context : char;
 class ElementDelegate;
+enum class DrawInDialog {
+	Normal,
+	WithoutSender,
+	WithoutSenderAndCaption,
+};
 } // namespace HistoryView
 
 struct HiddenSenderInfo;
@@ -223,7 +228,9 @@ public:
 	[[nodiscard]] virtual MsgId repliesInboxReadTill() const {
 		return MsgId(0);
 	}
-	virtual void setRepliesInboxReadTill(MsgId readTillId) {
+	virtual void setRepliesInboxReadTill(
+		MsgId readTillId,
+		std::optional<int> unreadCount) {
 	}
 	[[nodiscard]] virtual MsgId computeRepliesInboxReadTillFull() const {
 		return MsgId(0);
@@ -289,10 +296,7 @@ public:
 	}
 	[[nodiscard]] virtual QString notificationText() const;
 
-	enum class DrawInDialog {
-		Normal,
-		WithoutSender,
-	};
+	using DrawInDialog = HistoryView::DrawInDialog;
 
 	// Returns text with link-start and link-end commands for service-color highlighting.
 	// Example: "[link1-start]You:[link1-end] [link1-start]Photo,[link1-end] caption text"
@@ -316,7 +320,10 @@ public:
 	}
 	virtual void clearReplies() {
 	}
-	virtual void changeRepliesCount(int delta, PeerId replier) {
+	virtual void changeRepliesCount(
+		int delta,
+		PeerId replier,
+		std::optional<bool> unread) {
 	}
 	virtual void setReplyToTop(MsgId replyToTop) {
 	}

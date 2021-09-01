@@ -148,8 +148,9 @@ Widget::Widget(QWidget *parent, not_null<Main::Session*> session)
 
 	updatePlaybackSpeedIcon();
 	_playbackSpeed->setClickedCallback([=] {
-		const auto doubled = !Core::App().settings().voiceMsgPlaybackDoubled();
-		Core::App().settings().setVoiceMsgPlaybackDoubled(doubled);
+		const auto doubled = (Core::App().settings().voicePlaybackSpeed()
+			== 2.);
+		Core::App().settings().setVoicePlaybackSpeed(doubled ? 1. : 2.);
 		instance()->updateVoicePlaybackSpeed();
 		updatePlaybackSpeedIcon();
 		Core::App().saveSettingsDelayed();
@@ -163,6 +164,8 @@ Widget::Widget(QWidget *parent, not_null<Main::Session*> session)
 	subscribe(instance()->trackChangedNotifier(), [this](AudioMsgId::Type type) {
 		if (type == _type) {
 			handleSongChange();
+			updateControlsVisibility();
+			updateLabelsGeometry();
 		}
 	});
 	subscribe(instance()->tracksFinishedNotifier(), [this](AudioMsgId::Type type) {
@@ -277,6 +280,10 @@ void Widget::handleSeekFinished(float64 progress) {
 }
 
 void Widget::resizeEvent(QResizeEvent *e) {
+	updateControlsGeometry();
+}
+
+void Widget::updateControlsGeometry() {
 	auto right = st::mediaPlayerCloseRight;
 	_close->moveToRight(right, st::mediaPlayerPlayTop); right += _close->width();
 	if (hasPlaybackSpeedControl()) {
@@ -370,7 +377,8 @@ int Widget::getLabelsRight() const {
 	auto result = st::mediaPlayerCloseRight + _close->width();
 	if (_type == AudioMsgId::Type::Song) {
 		result += _repeatTrack->width() + _volumeToggle->width();
-	} else if (hasPlaybackSpeedControl()) {
+	}
+	if (hasPlaybackSpeedControl()) {
 		result += _playbackSpeed->width();
 	}
 	result += st::mediaPlayerPadding;
@@ -396,8 +404,8 @@ void Widget::updateRepeatTrackIcon() {
 }
 
 void Widget::updatePlaybackSpeedIcon() {
-	const auto doubled = Core::App().settings().voiceMsgPlaybackDoubled();
-	const auto isDefaultSpeed = !doubled;
+	const auto speed = Core::App().settings().voicePlaybackSpeed();
+	const auto isDefaultSpeed = (speed == 1.);
 	_playbackSpeed->setIconOverride(
 		isDefaultSpeed ? &st::mediaPlayerSpeedDisabledIcon : nullptr,
 		isDefaultSpeed ? &st::mediaPlayerSpeedDisabledIconOver : nullptr);
@@ -420,21 +428,26 @@ void Widget::checkForTypeChange() {
 }
 
 bool Widget::hasPlaybackSpeedControl() const {
-	return (_type == AudioMsgId::Type::Voice)
+	return _lastSongId.changeablePlaybackSpeed()
 		&& Media::Audio::SupportsSpeedControl();
+}
+
+void Widget::updateControlsVisibility() {
+	_repeatTrack->setVisible(_type == AudioMsgId::Type::Song);
+	_volumeToggle->setVisible(_type == AudioMsgId::Type::Song);
+	_playbackSpeed->setVisible(hasPlaybackSpeedControl());
+	if (!_shadow->isHidden()) {
+		_playbackSlider->setVisible(_type == AudioMsgId::Type::Song);
+	}
+	updateControlsGeometry();
 }
 
 void Widget::setType(AudioMsgId::Type type) {
 	if (_type != type) {
 		_type = type;
-		_repeatTrack->setVisible(_type == AudioMsgId::Type::Song);
-		_volumeToggle->setVisible(_type == AudioMsgId::Type::Song);
-		_playbackSpeed->setVisible(hasPlaybackSpeedControl());
-		if (!_shadow->isHidden()) {
-			_playbackSlider->setVisible(_type == AudioMsgId::Type::Song);
-		}
-		updateLabelsGeometry();
 		handleSongChange();
+		updateControlsVisibility();
+		updateLabelsGeometry();
 		handleSongUpdate(instance()->getState(_type));
 		updateOverLabelsState(_labelsOver);
 		_playlistChangesLifetime = instance()->playlistChanges(

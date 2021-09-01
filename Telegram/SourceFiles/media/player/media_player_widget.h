@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "data/data_audio_msg_id.h"
 #include "ui/rp_widget.h"
 #include "base/object_ptr.h"
 
@@ -74,6 +75,8 @@ private:
 	void updatePlayPrevNextPositions();
 	void updateLabelsGeometry();
 	void updateRepeatTrackIcon();
+	void updateControlsVisibility();
+	void updateControlsGeometry();
 	void updatePlaybackSpeedIcon();
 	void createPrevNextButtons();
 	void destroyPrevNextButtons();

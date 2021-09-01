@@ -137,6 +137,7 @@ public:
 		const QString &command,
 		const FullMsgId &context) override;
 	void listHandleViaClick(not_null<UserData*> bot) override;
+	not_null<Ui::ChatTheme*> listChatTheme() override;
 
 protected:
 	void resizeEvent(QResizeEvent *e) override;
@@ -172,6 +173,8 @@ private:
 	void setupDragArea();
 	void sendReadTillRequest();
 	void readTill(not_null<HistoryItem*> item);
+	[[nodiscard]] std::optional<int> computeUnreadCountLocally(
+		MsgId afterId) const;
 
 	void setupScrollDownButton();
 	void scrollDownClicked();
@@ -199,6 +202,7 @@ private:
 	[[nodiscard]] MsgId replyToId() const;
 	[[nodiscard]] HistoryItem *lookupRoot() const;
 	[[nodiscard]] bool computeAreComments() const;
+	[[nodiscard]] std::optional<int> computeUnreadCount() const;
 	void orderWidgets();
 
 	void pushReplyReturn(not_null<HistoryItem*> item);
@@ -209,6 +213,8 @@ private:
 	void recountChatWidth();
 	void replyToMessage(FullMsgId itemId);
 	void refreshTopBarActiveChat();
+	void refreshUnreadCountBadge();
+	void reloadUnreadCountIfNeeded();
 
 	void uploadFile(const QByteArray &fileContent, SendMediaType type);
 	bool confirmSendingFiles(
@@ -252,6 +258,7 @@ private:
 
 	const not_null<History*> _history;
 	const MsgId _rootId = 0;
+	std::shared_ptr<Ui::ChatTheme> _theme;
 	HistoryItem *_root = nullptr;
 	std::shared_ptr<Data::RepliesList> _replies;
 	rpl::variable<bool> _areComments = false;
@@ -276,13 +283,13 @@ private:
 	bool _scrollDownIsShown = false;
 	object_ptr<Ui::HistoryDownButton> _scrollDown;
 
-	Data::MessagesSlice _lastSlice;
 	bool _choosingAttach = false;
 
 	base::Timer _readRequestTimer;
 	bool _readRequestPending = false;
 	mtpRequestId _readRequestId = 0;
 
+	mtpRequestId _reloadUnreadCountRequestId = 0;
 	bool _loaded = false;
 
 };

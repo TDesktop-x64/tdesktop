@@ -18,6 +18,10 @@ namespace Window {
 class Controller;
 } // namespace Window
 
+namespace Ui {
+struct ChatThemeBackground;
+} // namespace Ui
+
 namespace Window {
 namespace Theme {
 
@@ -25,6 +29,7 @@ inline constexpr auto kThemeSchemeSizeLimit = 1024 * 1024;
 inline constexpr auto kThemeBackgroundSizeLimit = 4 * 1024 * 1024;
 
 struct ParsedTheme;
+struct Colorizer;
 
 [[nodiscard]] bool IsEmbeddedTheme(const QString &path);
 
@@ -78,6 +83,7 @@ void KeepFromEditor(
 QString NightThemePath();
 [[nodiscard]] bool IsNightMode();
 void SetNightModeValue(bool nightMode);
+[[nodiscard]] rpl::producer<bool> IsNightModeValue();
 void ToggleNightMode();
 void ToggleNightMode(const QString &themePath);
 void ToggleNightModeWithConfirmation(
@@ -89,18 +95,22 @@ void Revert();
 
 [[nodiscard]] QString EditingPalettePath();
 
+// NB! This method looks to Core::App().settings() to get colorizer by 'file'.
 bool LoadFromFile(
-	const QString &file,
+	const QString &path,
 	not_null<Instance*> out,
 	Cached *outCache,
-	not_null<QByteArray*> outContent);
+	QByteArray *outContent);
+bool LoadFromFile(
+	const QString &path,
+	not_null<Instance*> out,
+	Cached *outCache,
+	QByteArray *outContent,
+	const Colorizer &colorizer);
 bool LoadFromContent(
 	const QByteArray &content,
 	not_null<Instance*> out,
 	Cached *outCache);
-[[nodiscard]] QColor CountAverageColor(const QImage &image);
-[[nodiscard]] QColor AdjustedColor(QColor original, QColor background);
-[[nodiscard]] QImage PreprocessBackgroundImage(QImage image);
 
 struct BackgroundUpdate {
 	enum class Type {
@@ -197,6 +207,7 @@ private:
 	[[nodiscard]] bool started() const;
 	void initialRead();
 	void saveForRevert();
+	void setPreparedAfterPaper(QImage image);
 	void setPrepared(QImage original, QImage prepared, QImage gradient);
 	void prepareImageForTiled();
 	void writeNewBackgroundSettings();
@@ -271,15 +282,9 @@ private:
 
 [[nodiscard]] ChatBackground *Background();
 
-struct BackgroundRects {
-	QRect from;
-	QRect to;
-};
-[[nodiscard]] BackgroundRects ComputeBackgroundRects(
-	QSize fillSize,
-	QSize imageSize);
-
-bool ReadPaletteValues(const QByteArray &content, Fn<bool(QLatin1String name, QLatin1String value)> callback);
+bool ReadPaletteValues(
+	const QByteArray &content,
+	Fn<bool(QLatin1String name, QLatin1String value)> callback);
 
 } // namespace Theme
 } // namespace Window

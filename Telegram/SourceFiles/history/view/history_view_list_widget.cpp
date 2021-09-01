@@ -34,6 +34,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/toast/toast.h"
 #include "ui/inactive_press.h"
 #include "ui/effects/path_shift_gradient.h"
+#include "ui/chat/chat_theme.h"
 #include "lang/lang_keys.h"
 #include "boxes/peers/edit_participant_box.h"
 #include "data/data_session.h"
@@ -563,10 +564,12 @@ void ListWidget::checkUnreadBarCreation() {
 		if (auto data = _delegate->listMessagesBar(_items); data.bar.element) {
 			_bar = std::move(data.bar);
 			_barText = std::move(data.text);
-			_bar.element->createUnreadBar(_barText.value());
-			const auto i = ranges::find(_items, not_null{ _bar.element });
-			Assert(i != end(_items));
-			refreshAttachmentsAtIndex(i - begin(_items));
+			if (!_bar.hidden) {
+				_bar.element->createUnreadBar(_barText.value());
+				const auto i = ranges::find(_items, not_null{ _bar.element });
+				Assert(i != end(_items));
+				refreshAttachmentsAtIndex(i - begin(_items));
+			}
 		}
 	}
 }
@@ -583,10 +586,11 @@ void ListWidget::restoreScrollState() {
 	} else if (_overrideInitialScroll
 		&& base::take(_overrideInitialScroll)()) {
 		_scrollTopState = ScrollTopState();
+		_scrollInited = true;
 		return;
 	}
 	if (!_scrollTopState.item) {
-		if (!_bar.element || !_bar.focus || _scrollInited) {
+		if (!_bar.element || _bar.hidden || !_bar.focus || _scrollInited) {
 			return;
 		}
 		_scrollInited = true;
@@ -1446,7 +1450,7 @@ void ListWidget::startItemRevealAnimations() {
 					kItemRevealDuration,
 					anim::easeOutCirc);
 				if (view->data()->out()) {
-					controller()->rotateComplexGradientBackground();
+					_delegate->listChatTheme()->rotateComplexGradientBackground();
 				}
 			}
 		}
@@ -1611,15 +1615,15 @@ void ListWidget::paintEvent(QPaintEvent *e) {
 	auto to = std::lower_bound(begin(_items), end(_items), clip.top() + clip.height(), [this](auto &elem, int bottom) {
 		return this->itemTop(elem) < bottom;
 	});
+
 	if (from != end(_items)) {
-		auto viewport = QRect(); // #TODO bubbles
 		auto top = itemTop(from->get());
-		auto context = HistoryView::PaintContext{
-			.bubblesPattern = nullptr,
-			.viewport = viewport.translated(0, -top),
-			.clip = clip.translated(0, -top),
-			.now = crl::now(),
-		};
+		auto context = controller()->preparePaintContext({
+			.theme = _delegate->listChatTheme(),
+			.visibleAreaTop = _visibleTop,
+			.visibleAreaTopGlobal = mapToGlobal(QPoint(0, _visibleTop)).y(),
+			.clip = clip,
+		}).translated(0, -top);
 		p.translate(0, top);
 		for (auto i = from; i != to; ++i) {
 			const auto view = *i;

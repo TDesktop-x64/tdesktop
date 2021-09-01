@@ -1123,6 +1123,10 @@ ServiceAction ParseServiceAction(
 		result.content = ActionGroupCallScheduled{
 			.date = data.vschedule_date().v,
 		};
+	}, [&](const MTPDmessageActionSetChatTheme &data) {
+		result.content = ActionSetChatTheme{
+			.emoji = qs(data.vemoticon()),
+		};
 	}, [](const MTPDmessageActionEmpty &data) {});
 	return result;
 }

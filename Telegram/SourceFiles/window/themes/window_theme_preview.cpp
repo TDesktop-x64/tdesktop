@@ -12,6 +12,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/text_options.h"
 #include "ui/image/image_prepare.h"
 #include "ui/emoji_config.h"
+#include "ui/chat/chat_theme.h"
+#include "ui/image/image_prepare.h"
 #include "styles/style_widgets.h"
 #include "styles/style_window.h"
 #include "styles/style_media_view.h"
@@ -416,7 +418,16 @@ void Generator::paintHistoryBackground() {
 	if (background.isNull()) {
 		const auto fakePaper = Data::WallPaper(_current.backgroundId);
 		if (Data::IsThemeWallPaper(fakePaper)) {
-			background.load(qsl(":/gui/art/background.jpg"));
+			background = Ui::ReadBackgroundImage(
+				u":/gui/art/background.tgv"_q,
+				QByteArray(),
+				true);
+			const auto paper = Data::DefaultWallPaper();
+			background = Ui::PreparePatternImage(
+				std::move(background),
+				paper.backgroundColors(),
+				paper.gradientRotation(),
+				paper.patternOpacity());
 			tiled = false;
 		} else {
 			background = std::move(_current.backgroundImage);
@@ -456,7 +467,9 @@ void Generator::paintHistoryBackground() {
 		PainterHighQualityEnabler hq(*_p);
 
 		auto fill = QSize(_topBar.width(), _body.height());
-		const auto rects = ComputeBackgroundRects(fill, background.size());
+		const auto rects = Ui::ComputeChatBackgroundRects(
+			fill,
+			background.size());
 		auto to = rects.to;
 		to.moveTop(to.top() + fromy);
 		to.moveTopLeft(to.topLeft() + _history.topLeft());

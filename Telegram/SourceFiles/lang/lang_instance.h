@@ -13,6 +13,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace Lang {
 
+inline constexpr auto kChoosingStickerReplacement = "oo"_cs;
+
 struct Language {
 	QString id;
 	QString pluralId;
@@ -74,6 +76,9 @@ public:
 	QByteArray serialize() const;
 	void fillFromSerialized(const QByteArray &data, int dataAppVersion);
 	void applyValue(const QByteArray &key, const QByteArray &value);
+	bool supportChoosingStickerReplacement() const;
+	int rightIndexChoosingStickerReplacement(bool named) const;
+
 	void applyDifference(
 		Pack pack,
 		const MTPDlangPackDifference &difference);
@@ -119,6 +124,7 @@ private:
 		const QString &absolutePath,
 		const QString &relativePath,
 		const QByteArray &content);
+	void updateChoosingStickerReplacement();
 
 	Instance *_derived = nullptr;
 
@@ -130,6 +136,12 @@ private:
 	QByteArray _customFileContent;
 	int _version = 0;
 	rpl::event_stream<> _updated;
+
+	struct {
+		bool support = false;
+		int rightIndex = 0;
+		int rightIndexNamed = 0;
+	} _choosingStickerReplacement;
 
 	mutable QString _systemLanguage;
 

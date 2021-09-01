@@ -21,6 +21,7 @@ class GenericBox;
 namespace Data {
 class Folder;
 class Session;
+struct ForwardDraft;
 } // namespace Data
 
 namespace Dialogs {
@@ -107,6 +108,10 @@ QPointer<Ui::RpWidget> ShowNewForwardMessagesBox(
 	FnMut<void()> &&successCallback = nullptr);
 
 QPointer<Ui::RpWidget> ShowForwardNoQuoteMessagesBox(
+	not_null<Window::SessionNavigation*> navigation,
+	Data::ForwardDraft &&draft,
+	FnMut<void()> &&successCallback = nullptr);
+QPointer<Ui::RpWidget> ShowForwardMessagesBox(
 	not_null<Window::SessionNavigation*> navigation,
 	MessageIdsList &&items,
 	FnMut<void()> &&successCallback = nullptr);

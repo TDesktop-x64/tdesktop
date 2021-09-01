@@ -12,7 +12,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/weak_ptr.h"
 #include "base/timer.h"
 #include "dialogs/dialogs_key.h"
-#include "ui/effects/animations.h"
 #include "ui/layers/layer_widget.h"
 #include "window/window_adaptive.h"
 
@@ -25,10 +24,6 @@ class HistoryService;
 namespace Adaptive {
 enum class WindowLayout;
 } // namespace Adaptive
-
-namespace HistoryView {
-struct PaintContext;
-} // namespace HistoryView
 
 namespace ChatHelpers {
 class TabbedSelector;
@@ -50,8 +45,15 @@ class FormController;
 namespace Ui {
 class LayerWidget;
 enum class ReportReason;
-struct BubblePattern;
+class ChatStyle;
+class ChatTheme;
+struct ChatPaintContext;
+struct ChatThemeBackground;
 } // namespace Ui
+
+namespace Data {
+struct CloudTheme;
+} // namespace Data
 
 namespace Window {
 
@@ -59,55 +61,6 @@ class MainWindow;
 class SectionMemento;
 class Controller;
 class FiltersMenu;
-
-struct CacheBackgroundRequest {
-	QImage prepared;
-	QImage preparedForTiled;
-	QSize area;
-	int gradientRotation = 0;
-	bool tile = false;
-	bool isPattern = false;
-	bool recreateGradient = false;
-	QImage gradient;
-	std::vector<QColor> gradientColors;
-	float64 gradientProgress = 1.;
-	float64 patternOpacity = 1.;
-
-	explicit operator bool() const {
-		return !prepared.isNull() || !gradient.isNull();
-	}
-};
-
-bool operator==(
-	const CacheBackgroundRequest &a,
-	const CacheBackgroundRequest &b);
-bool operator!=(
-	const CacheBackgroundRequest &a,
-	const CacheBackgroundRequest &b);
-
-struct CacheBackgroundResult {
-	QImage image;
-	QImage gradient;
-	QSize area;
-	int x = 0;
-	int y = 0;
-};
-
-struct CachedBackground {
-	CachedBackground() = default;
-	CachedBackground(CacheBackgroundResult &&result);
-
-	QPixmap pixmap;
-	QSize area;
-	int x = 0;
-	int y = 0;
-};
-
-struct BackgroundState {
-	CachedBackground was;
-	CachedBackground now;
-	float64 shown = 1.;
-};
 
 enum class GifPauseReason {
 	Any           = 0,
@@ -447,28 +400,32 @@ public:
 	[[nodiscard]] rpl::producer<> filtersMenuChanged() const;
 	void reloadFiltersMenu();
 
-	void setBubblesBackground(QImage image);
-	const Ui::BubblePattern *bubblesBackgroundPattern() const {
-		return _bubblesBackgroundPattern.get();
+	[[nodiscard]] auto defaultChatTheme() const
+	-> const std::shared_ptr<Ui::ChatTheme> & {
+		return _defaultChatTheme;
 	}
+	[[nodiscard]] auto cachedChatThemeValue(
+		const Data::CloudTheme &data)
+	-> rpl::producer<std::shared_ptr<Ui::ChatTheme>>;
+	void setChatStyleTheme(const std::shared_ptr<Ui::ChatTheme> &theme);
 
-	struct BubblesContextArgs {
+	struct PaintContextArgs {
+		not_null<Ui::ChatTheme*> theme;
 		int visibleAreaTop = 0;
 		int visibleAreaTopGlobal = 0;
 		int visibleAreaWidth = 0;
 		QRect clip;
 	};
-	[[nodiscard]] HistoryView::PaintContext bubblesContext(
-		BubblesContextArgs &&args);
-	[[nodiscard]] const BackgroundState &backgroundState(QSize area);
-	[[nodiscard]] rpl::producer<> repaintBackgroundRequests() const;
-	void rotateComplexGradientBackground();
+	[[nodiscard]] Ui::ChatPaintContext preparePaintContext(
+		PaintContextArgs &&args);
 
 	rpl::lifetime &lifetime() {
 		return _lifetime;
 	}
 
 private:
+	struct CachedTheme;
+
 	void init();
 	void initSupportMode();
 	void refreshFiltersMenu();
@@ -493,18 +450,13 @@ private:
 
 	void checkInvitePeek();
 
-	void cacheBackground();
-	void cacheBackgroundNow();
-	void cacheBackgroundAsync(
-		const CacheBackgroundRequest &request,
-		Fn<void(CacheBackgroundResult&&)> done = nullptr);
-	void clearCachedBackground();
-	void setCachedBackground(CacheBackgroundResult &&cached);
-	[[nodiscard]] CacheBackgroundRequest currentCacheRequest(
-		QSize area,
-		int addRotation = 0) const;
-	[[nodiscard]] bool readyForBackgroundRotation() const;
-	void generateNextBackgroundRotation();
+	void pushDefaultChatBackground();
+	void cacheChatTheme(const Data::CloudTheme &data);
+	void cacheChatThemeDone(std::shared_ptr<Ui::ChatTheme> result);
+	void updateCustomThemeBackground(CachedTheme &theme);
+	[[nodiscard]] Fn<Ui::ChatThemeBackground()> backgroundGenerator(
+		CachedTheme &theme,
+		bool generateGradient = true);
 
 	const not_null<Controller*> _window;
 
@@ -533,19 +485,11 @@ private:
 
 	rpl::event_stream<> _filtersMenuChanged;
 
-	BackgroundState _backgroundState;
-	Ui::Animations::Simple _backgroundFade;
-	CacheBackgroundRequest _backgroundCachingRequest;
-	CacheBackgroundResult _backgroundNext;
-	int _backgroundAddRotation = 0;
-	QSize _willCacheForArea;
-	crl::time _lastAreaChangeTime = 0;
-	base::Timer _cacheBackgroundTimer;
-	CachedBackground _bubblesBackground;
-	QImage _bubblesBackgroundPrepared;
-	std::unique_ptr<Ui::BubblePattern> _bubblesBackgroundPattern;
-
-	rpl::event_stream<> _repaintBackgroundRequests;
+	std::shared_ptr<Ui::ChatTheme> _defaultChatTheme;
+	base::flat_map<uint64, CachedTheme> _customChatThemes;
+	rpl::event_stream<std::shared_ptr<Ui::ChatTheme>> _cachedThemesStream;
+	std::unique_ptr<Ui::ChatStyle> _chatStyle;
+	std::weak_ptr<Ui::ChatTheme> _chatStyleTheme;
 
 	rpl::lifetime _lifetime;
 

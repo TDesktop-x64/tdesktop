@@ -23,6 +23,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_service_message.h"
 #include "history/view/history_view_cursor_state.h"
 #include "history/view/history_view_context_menu.h"
+#include "ui/chat/chat_theme.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/image/image.h"
 #include "ui/toast/toast.h"
@@ -163,6 +164,14 @@ HistoryInner::HistoryInner(
 , _scrollDateCheck([this] { scrollDateCheck(); })
 , _scrollDateHideTimer([this] { scrollDateHideByTimer(); }) {
 	Instance = this;
+
+	Window::ChatThemeValueFromPeer(
+		controller,
+		_peer
+	) | rpl::start_with_next([=](std::shared_ptr<Ui::ChatTheme> &&theme) {
+		_theme = std::move(theme);
+		controller->setChatStyleTheme(_theme);
+	}, lifetime());
 
 	_touchSelectTimer.setSingleShot(true);
 	connect(&_touchSelectTimer, SIGNAL(timeout()), this, SLOT(onTouchSelect()));
@@ -619,7 +628,8 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 			auto item = view->data();
 
 			auto top = mtop + block->y() + view->y();
-			auto context = _controller->bubblesContext({
+			auto context = _controller->preparePaintContext({
+				.theme = _theme.get(),
 				.visibleAreaTop = _visibleAreaTop,
 				.visibleAreaTopGlobal = visibleAreaTopGlobal,
 				.clip = clip,
@@ -667,7 +677,8 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 			auto item = view->data();
 			auto readTill = (HistoryItem*)nullptr;
 			auto top = htop + block->y() + view->y();
-			auto context = _controller->bubblesContext({
+			auto context = _controller->preparePaintContext({
+				.theme = _theme.get(),
 				.visibleAreaTop = _visibleAreaTop,
 				.visibleAreaTopGlobal = visibleAreaTopGlobal,
 				.visibleAreaWidth = width(),

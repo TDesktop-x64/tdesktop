@@ -8,9 +8,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_send_action.h"
 
 #include "data/data_user.h"
+#include "data/data_send_action.h"
 #include "data/data_session.h"
 #include "main/main_session.h"
 #include "history/history.h"
+#include "lang/lang_instance.h" // Instance::supportChoosingStickerReplacement
 #include "lang/lang_keys.h"
 #include "ui/effects/animations.h"
 #include "ui/text/text_options.h"
@@ -30,6 +32,7 @@ constexpr auto kStatusShowClientsideUploadPhoto = 6 * crl::time(1000);
 constexpr auto kStatusShowClientsideUploadFile = 6 * crl::time(1000);
 constexpr auto kStatusShowClientsideChooseLocation = 6 * crl::time(1000);
 constexpr auto kStatusShowClientsideChooseContact = 6 * crl::time(1000);
+constexpr auto kStatusShowClientsideChooseSticker = 6 * crl::time(1000);
 constexpr auto kStatusShowClientsidePlayGame = 10 * crl::time(1000);
 constexpr auto kStatusShowClientsideSpeaking = 6 * crl::time(1000);
 
@@ -38,6 +41,7 @@ constexpr auto kStatusShowClientsideSpeaking = 6 * crl::time(1000);
 SendActionPainter::SendActionPainter(not_null<History*> history)
 : _history(history)
 , _weak(&_history->session())
+, _st(st::dialogsTextStyle)
 , _sendActionText(st::dialogsTextWidthMin) {
 }
 
@@ -66,9 +70,13 @@ bool SendActionPainter::updateNeedsAnimating(
 	}, [&](const MTPDsendMessageRecordRoundAction &) {
 		emplaceAction(Type::RecordRound, kStatusShowClientsideRecordRound);
 	}, [&](const MTPDsendMessageGeoLocationAction &) {
-		emplaceAction(Type::ChooseLocation, kStatusShowClientsideChooseLocation);
+		emplaceAction(
+			Type::ChooseLocation,
+			kStatusShowClientsideChooseLocation);
 	}, [&](const MTPDsendMessageChooseContactAction &) {
-		emplaceAction(Type::ChooseContact, kStatusShowClientsideChooseContact);
+		emplaceAction(
+			Type::ChooseContact,
+			kStatusShowClientsideChooseContact);
 	}, [&](const MTPDsendMessageUploadVideoAction &data) {
 		emplaceAction(
 			Type::UploadVideo,
@@ -106,6 +114,10 @@ bool SendActionPainter::updateNeedsAnimating(
 			user,
 			now + kStatusShowClientsideSpeaking);
 	}, [&](const MTPDsendMessageHistoryImportAction &) {
+	}, [&](const MTPDsendMessageChooseStickerAction &) {
+		emplaceAction(
+			Type::ChooseSticker,
+			kStatusShowClientsideChooseSticker);
 	}, [&](const MTPDsendMessageCancelAction &) {
 		Unexpected("CancelAction here.");
 	});
@@ -121,16 +133,29 @@ bool SendActionPainter::paint(
 		style::color color,
 		crl::time ms) {
 	if (_sendActionAnimation) {
+		const auto animationWidth = _sendActionAnimation.width();
+		const auto extraAnimationWidth = _animationLeft
+			? animationWidth * 2
+			: 0;
+		const auto left =
+			(availableWidth < _animationLeft + extraAnimationWidth)
+				? 0
+				: _animationLeft;
 		_sendActionAnimation.paint(
 			p,
 			color,
-			x,
+			left + x,
 			y + st::normalFont->ascent,
 			outerWidth,
 			ms);
-		auto animationWidth = _sendActionAnimation.width();
-		x += animationWidth;
-		availableWidth -= animationWidth;
+		// availableWidth should be the same
+		// if an animation is in the middle of text.
+		if (!left) {
+			x += animationWidth;
+			availableWidth -= _animationLeft
+				? extraAnimationWidth
+				: animationWidth;
+		}
 		p.setPen(color);
 		_sendActionText.drawElided(p, x, y, availableWidth);
 		return true;
@@ -196,6 +221,7 @@ bool SendActionPainter::updateNeedsAnimating(crl::time now, bool force) {
 	const auto wasSpeakingAnimation = !!_speakingAnimation;
 	if (force || sendActionChanged || speakingChanged) {
 		QString newTypingString;
+		auto animationLeft = 0;
 		auto typingCount = _typing.size();
 		if (typingCount > 2) {
 			newTypingString = tr::lng_many_typing(tr::now, lt_count, typingCount);
@@ -216,28 +242,77 @@ bool SendActionPainter::updateNeedsAnimating(crl::time now, bool force) {
 		} else if (!_sendActions.empty()) {
 			// Handles all actions except game playing.
 			using Type = Api::SendProgressType;
-			auto sendActionString = [](Type type, const QString &name) -> QString {
+			const auto sendActionString = [](
+					Type type,
+					const QString &name) -> QString {
 				switch (type) {
-				case Type::RecordVideo: return name.isEmpty() ? tr::lng_send_action_record_video(tr::now) : tr::lng_user_action_record_video(tr::now, lt_user, name);
-				case Type::UploadVideo: return name.isEmpty() ? tr::lng_send_action_upload_video(tr::now) : tr::lng_user_action_upload_video(tr::now, lt_user, name);
-				case Type::RecordVoice: return name.isEmpty() ? tr::lng_send_action_record_audio(tr::now) : tr::lng_user_action_record_audio(tr::now, lt_user, name);
-				case Type::UploadVoice: return name.isEmpty() ? tr::lng_send_action_upload_audio(tr::now) : tr::lng_user_action_upload_audio(tr::now, lt_user, name);
-				case Type::RecordRound: return name.isEmpty() ? tr::lng_send_action_record_round(tr::now) : tr::lng_user_action_record_round(tr::now, lt_user, name);
-				case Type::UploadRound: return name.isEmpty() ? tr::lng_send_action_upload_round(tr::now) : tr::lng_user_action_upload_round(tr::now, lt_user, name);
-				case Type::UploadPhoto: return name.isEmpty() ? tr::lng_send_action_upload_photo(tr::now) : tr::lng_user_action_upload_photo(tr::now, lt_user, name);
-				case Type::UploadFile: return name.isEmpty() ? tr::lng_send_action_upload_file(tr::now) : tr::lng_user_action_upload_file(tr::now, lt_user, name);
+				case Type::RecordVideo: return name.isEmpty()
+					? tr::lng_send_action_record_video({})
+					: tr::lng_user_action_record_video({}, lt_user, name);
+				case Type::UploadVideo: return name.isEmpty()
+					? tr::lng_send_action_upload_video({})
+					: tr::lng_user_action_upload_video({}, lt_user, name);
+				case Type::RecordVoice: return name.isEmpty()
+					? tr::lng_send_action_record_audio({})
+					: tr::lng_user_action_record_audio({}, lt_user, name);
+				case Type::UploadVoice: return name.isEmpty()
+					? tr::lng_send_action_upload_audio({})
+					: tr::lng_user_action_upload_audio({}, lt_user, name);
+				case Type::RecordRound: return name.isEmpty()
+					? tr::lng_send_action_record_round({})
+					: tr::lng_user_action_record_round({}, lt_user, name);
+				case Type::UploadRound: return name.isEmpty()
+					? tr::lng_send_action_upload_round({})
+					: tr::lng_user_action_upload_round({}, lt_user, name);
+				case Type::UploadPhoto: return name.isEmpty()
+					? tr::lng_send_action_upload_photo({})
+					: tr::lng_user_action_upload_photo({}, lt_user, name);
+				case Type::UploadFile: return name.isEmpty()
+					? tr::lng_send_action_upload_file({})
+					: tr::lng_user_action_upload_file({}, lt_user, name);
 				case Type::ChooseLocation:
-				case Type::ChooseContact: return name.isEmpty() ? tr::lng_typing(tr::now) : tr::lng_user_typing(tr::now, lt_user, name);
+				case Type::ChooseContact: return name.isEmpty()
+					? tr::lng_typing({})
+					: tr::lng_user_typing({}, lt_user, name);
+				case Type::ChooseSticker: return name.isEmpty()
+					? tr::lng_send_action_choose_sticker({})
+					: tr::lng_user_action_choose_sticker({}, lt_user, name);
 				default: break;
 				};
 				return QString();
 			};
 			for (const auto &[user, action] : _sendActions) {
+				const auto isNamed = !_history->peer->isUser();
 				newTypingString = sendActionString(
 					action.type,
-					_history->peer->isUser() ? QString() : user->firstName);
+					isNamed ? user->firstName : QString());
 				if (!newTypingString.isEmpty()) {
 					_sendActionAnimation.start(action.type);
+
+					// Add an animation to the middle of text.
+					const auto &lang = Lang::GetInstance();
+					if (lang.supportChoosingStickerReplacement()
+							&& (action.type == Type::ChooseSticker)) {
+						const auto index = newTypingString.size()
+							- lang.rightIndexChoosingStickerReplacement(
+								isNamed);
+						animationLeft = _st.font->width(
+							newTypingString,
+							0,
+							index);
+
+						if (!_spacesCount) {
+							_spacesCount = std::ceil(
+								_sendActionAnimation.width()
+									/ _st.font->spacew);
+						}
+						newTypingString = newTypingString.replace(
+							index,
+							Lang::kChoosingStickerReplacement.utf8().size(),
+							QString().fill(' ', _spacesCount).constData(),
+							_spacesCount);
+					}
+
 					break;
 				}
 			}
@@ -280,6 +355,9 @@ bool SendActionPainter::updateNeedsAnimating(crl::time now, bool force) {
 				_sendActionString,
 				Ui::NameTextOptions());
 		}
+		if (_animationLeft != animationLeft) {
+			_animationLeft = animationLeft;
+		}
 		if (_speaking.empty()) {
 			_speakingAnimation.tryToFinish();
 		} else {
@@ -293,8 +371,9 @@ bool SendActionPainter::updateNeedsAnimating(crl::time now, bool force) {
 	if (force
 		|| sendActionChanged
 		|| (sendActionResult && !anim::Disabled())) {
-		_history->peer->owner().updateSendActionAnimation({
+		_history->peer->owner().sendActionManager().updateAnimation({
 			_history,
+			_animationLeft,
 			_sendActionAnimation.width(),
 			st::normalFont->height,
 			(force || sendActionChanged)
@@ -303,7 +382,7 @@ bool SendActionPainter::updateNeedsAnimating(crl::time now, bool force) {
 	if (force
 		|| speakingChanged
 		|| (speakingResult && !anim::Disabled())) {
-		_history->peer->owner().updateSpeakingAnimation({
+		_history->peer->owner().sendActionManager().updateSpeakingAnimation({
 			_history
 		});
 	}

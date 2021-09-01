@@ -28,6 +28,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_histories.h"
 #include "data/data_folder.h"
 #include "data/data_scheduled_messages.h"
+#include "data/data_send_action.h"
 #include "lang/lang_cloud_manager.h"
 #include "history/history.h"
 #include "history/history_item.h"
@@ -1017,7 +1018,7 @@ void Updates::handleSendActionUpdate(
 	const auto when = requestingDifference()
 		? 0
 		: base::unixtime::now();
-	session().data().registerSendAction(
+	session().data().sendActionManager().registerFor(
 		history,
 		rootId,
 		from->asUser(),
@@ -2094,17 +2095,20 @@ void Updates::feedUpdate(const MTPUpdate &update) {
 		const auto msgId = d.vtop_msg_id().v;
 		const auto readTillId = d.vread_max_id().v;
 		const auto item = session().data().message(channelId, msgId);
+		const auto unreadCount = item
+			? session().data().countUnreadRepliesLocally(item, readTillId)
+			: std::nullopt;
 		if (item) {
-			item->setRepliesInboxReadTill(readTillId);
+			item->setRepliesInboxReadTill(readTillId, unreadCount);
 			if (const auto post = item->lookupDiscussionPostOriginal()) {
-				post->setRepliesInboxReadTill(readTillId);
+				post->setRepliesInboxReadTill(readTillId, unreadCount);
 			}
 		}
 		if (const auto broadcastId = d.vbroadcast_id()) {
 			if (const auto post = session().data().message(
 					broadcastId->v,
 					d.vbroadcast_post()->v)) {
-				post->setRepliesInboxReadTill(readTillId);
+				post->setRepliesInboxReadTill(readTillId, unreadCount);
 			}
 		}
 	} break;

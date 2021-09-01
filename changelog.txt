@@ -1,3 +1,24 @@
+3.0.1 (01.09.21)
+
+- Crash fixes.
+
+3.0 (31.08.21)
+
+- Broadcast video and share your screen to an unlimited number of viewers.
+- To begin, tap the Live Stream button in the title bar of a community where you are an admin.
+- Tap the "Forward Message" label above the input field to change how messages will be sent.
+- Hide or show the original sender's name.
+- Remove or keep captions from media messages.
+- See how many unread comments there are when opening a channel's comments.
+
+2.9.14 beta (31.08.21)
+
+- Fix crash in authorization after logout.
+
+2.9.13 beta (31.08.21)
+
+- See unread comments count when scrolling discussions in channels.
+
 2.9.12 beta (24.08.21)
 
 - Disable floating point exceptions in 32 bit Windows version.

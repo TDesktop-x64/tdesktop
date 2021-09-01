@@ -25,6 +25,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "calls/calls_instance.h"
 #include "base/unixtime.h"
+#include "ui/chat/chat_theme.h"
+#include "ui/chat/chat_style.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/wrap/padding_wrap.h"
 #include "ui/wrap/vertical_layout.h"
@@ -632,7 +634,9 @@ rpl::producer<QString> CallsPeer2PeerPrivacyController::exceptionsDescription() 
 ForwardsPrivacyController::ForwardsPrivacyController(
 	not_null<Window::SessionController*> controller)
 : SimpleElementDelegate(controller, [] {})
-, _controller(controller) {
+, _controller(controller)
+, _chatStyle(std::make_unique<Ui::ChatStyle>()) {
+	_chatStyle->apply(controller->defaultChatTheme().get());
 }
 
 UserPrivacy::Key ForwardsPrivacyController::key() {
@@ -706,15 +710,19 @@ object_ptr<Ui::RpWidget> ForwardsPrivacyController::setupAboveWidget(
 
 	widget->paintRequest(
 	) | rpl::start_with_next([=](QRect rect) {
-		Window::SectionWidget::PaintBackground(_controller, widget, rect);
+		// #TODO themes
+		Window::SectionWidget::PaintBackground(
+			_controller,
+			_controller->defaultChatTheme().get(), // #TODO themes
+			widget,
+			rect);
 
 		Painter p(widget);
-		const auto context = HistoryView::PaintContext{
-			.bubblesPattern = nullptr, // #TODO bubbles
-			.viewport = widget->rect(),
-			.clip = widget->rect(),
-			.now = crl::now(),
-		};
+		const auto theme = _controller->defaultChatTheme().get();
+		const auto context = theme->preparePaintContext(
+			_chatStyle.get(),
+			widget->rect(),
+			widget->rect());
 		p.translate(0, padding + view->marginBottom());
 		view->draw(p, context);
 

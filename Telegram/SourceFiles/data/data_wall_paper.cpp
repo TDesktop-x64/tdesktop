@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_file_origin.h"
 #include "data/data_session.h"
 #include "storage/serialize_common.h"
+#include "ui/chat/chat_theme.h"
 #include "core/application.h"
 #include "main/main_session.h"
 
@@ -29,7 +30,9 @@ constexpr auto kThemeBackground = FromLegacyBackgroundId(-2);
 constexpr auto kCustomBackground = FromLegacyBackgroundId(-1);
 constexpr auto kLegacy1DefaultBackground = FromLegacyBackgroundId(0);
 constexpr auto kLegacy2DefaultBackground = 5947530738516623361;
-constexpr auto kDefaultBackground = 5778236420632084488;
+constexpr auto kLegacy3DefaultBackground = 5778236420632084488;
+constexpr auto kLegacy4DefaultBackground = 5945087215657811969;
+constexpr auto kDefaultBackground = 5933856211186221059;
 constexpr auto kIncorrectDefaultBackground = FromLegacyBackgroundId(105);
 
 constexpr auto kVersionTag = qint32(0x7FFFFFFF);
@@ -43,25 +46,6 @@ constexpr auto kVersion = 1;
 
 [[nodiscard]] quint32 SerializeMaybeColor(std::optional<QColor> color) {
 	return color ? SerializeColor(*color) : quint32(-1);
-}
-
-[[nodiscard]] std::optional<QColor> MaybeColorFromSerialized(
-		quint32 serialized) {
-	return (serialized == quint32(-1))
-		? std::nullopt
-		: std::make_optional(QColor(
-			int((serialized >> 16) & 0xFFU),
-			int((serialized >> 8) & 0xFFU),
-			int(serialized & 0xFFU)));
-}
-
-[[nodiscard]] QColor DefaultBackgroundColor() {
-	return QColor(213, 223, 233);
-}
-
-[[nodiscard]] std::optional<QColor> MaybeColorFromSerialized(
-		const tl::conditional<MTPint> &mtp) {
-	return mtp ? MaybeColorFromSerialized(mtp->v) : std::nullopt;
 }
 
 [[nodiscard]] std::vector<QColor> ColorsFromMTP(
@@ -194,12 +178,6 @@ void WallPaper::setLocalImageAsThumbnail(std::shared_ptr<Image> image) {
 
 WallPaperId WallPaper::id() const {
 	return _id;
-}
-
-std::optional<QColor> WallPaper::backgroundColor() const {
-	return _backgroundColors.empty()
-		? std::nullopt
-		: std::make_optional(_backgroundColors.front());
 }
 
 const std::vector<QColor> WallPaper::backgroundColors() const {
@@ -412,13 +390,16 @@ WallPaper WallPaper::withBackgroundColors(std::vector<QColor> colors) const {
 WallPaper WallPaper::withParamsFrom(const WallPaper &other) const {
 	auto result = *this;
 	result._blurred = other._blurred;
-	if (!other._backgroundColors.empty() || ColorsFromString(_slug).empty()) {
+	if (!other._backgroundColors.empty()) {
 		result._backgroundColors = other._backgroundColors;
 		if (!ColorsFromString(_slug).empty()) {
 			result._slug = StringFromColors(result._backgroundColors);
 		}
 	}
 	result._intensity = other._intensity;
+	if (other.isPattern()) {
+		result._flags |= WallPaperFlag::Pattern;
+	}
 	return result;
 }
 
@@ -656,6 +637,19 @@ std::optional<WallPaper> WallPaper::FromColorsSlug(const QString &slug) {
 	return result;
 }
 
+WallPaper WallPaper::ConstructDefault() {
+	auto result = WallPaper(
+		kDefaultBackground
+	).withPatternIntensity(50).withBackgroundColors({
+		QColor(219, 221, 187),
+		QColor(107, 165, 135),
+		QColor(213, 216, 141),
+		QColor(136, 184, 132),
+	});
+	result._flags |= WallPaperFlag::Default | WallPaperFlag::Pattern;
+	return result;
+}
+
 WallPaper ThemeWallPaper() {
 	return WallPaper(kThemeBackground);
 }
@@ -685,8 +679,16 @@ bool IsLegacy2DefaultWallPaper(const WallPaper &paper) {
 		|| (paper.id() == kIncorrectDefaultBackground);
 }
 
+bool IsLegacy3DefaultWallPaper(const WallPaper &paper) {
+	return (paper.id() == kLegacy3DefaultBackground);
+}
+
+bool IsLegacy4DefaultWallPaper(const WallPaper &paper) {
+	return (paper.id() == kLegacy4DefaultBackground);
+}
+
 WallPaper DefaultWallPaper() {
-	return WallPaper(kDefaultBackground);
+	return WallPaper::ConstructDefault();
 }
 
 bool IsDefaultWallPaper(const WallPaper &paper) {
@@ -704,91 +706,33 @@ bool IsCloudWallPaper(const WallPaper &paper) {
 		&& !details::IsTestingEditorWallPaper(paper);
 }
 
-QImage GenerateWallPaper(
-		QSize size,
-		const std::vector<QColor> &bg,
-		int gradientRotation,
-		float64 patternOpacity,
-		Fn<void(QPainter&)> drawPattern) {
-	auto result = bg.empty()
-		? Images::GenerateGradient(size, { DefaultBackgroundColor() })
-		: Images::GenerateGradient(size, bg, gradientRotation);
-	if (bg.size() > 1 && (!drawPattern || patternOpacity >= 0.)) {
-		result = Images::DitherImage(std::move(result));
-	}
-	if (drawPattern) {
-		auto p = QPainter(&result);
-		if (patternOpacity >= 0.) {
-			p.setCompositionMode(QPainter::CompositionMode_SoftLight);
-			p.setOpacity(patternOpacity);
-		} else {
-			p.setCompositionMode(QPainter::CompositionMode_DestinationIn);
-		}
-		drawPattern(p);
-		if (patternOpacity < 0. && patternOpacity > -1.) {
-			p.setCompositionMode(QPainter::CompositionMode_SourceOver);
-			p.setOpacity(1. + patternOpacity);
-			p.fillRect(QRect{ QPoint(), size }, Qt::black);
-		}
-	}
-
-	return std::move(result).convertToFormat(
-		QImage::Format_ARGB32_Premultiplied);
-}
-
-QImage PreparePatternImage(
-		QImage pattern,
-		const std::vector<QColor> &bg,
-		int gradientRotation,
-		float64 patternOpacity) {
-	auto result = GenerateWallPaper(
-		pattern.size(),
-		bg,
-		gradientRotation,
-		patternOpacity,
-		[&](QPainter &p) {
-			p.drawImage(QRect(QPoint(), pattern.size()), pattern);
-		});
-
-	pattern = QImage();
-	return result;
-}
-
-QImage PrepareBlurredBackground(QImage image) {
-	constexpr auto kSize = 900;
-	constexpr auto kRadius = 24;
-	if (image.width() > kSize || image.height() > kSize) {
-		image = image.scaled(
-			kSize,
-			kSize,
-			Qt::KeepAspectRatio,
-			Qt::SmoothTransformation);
-	}
-	return Images::BlurLargeImage(image, kRadius);
-}
-
-QImage GenerateDitheredGradient(
-		const std::vector<QColor> &colors,
-		int rotation) {
-	constexpr auto kSize = 512;
-	const auto size = QSize(kSize, kSize);
-	if (colors.empty()) {
-		return Images::GenerateGradient(size, { DefaultBackgroundColor() });
-	}
-	auto result = Images::GenerateGradient(size, colors, rotation);
-	if (colors.size() > 1) {
-		result = Images::DitherImage(std::move(result));
-	}
-	return result;
-}
-
 QImage GenerateDitheredGradient(const Data::WallPaper &paper) {
-	if (paper.backgroundColors().empty()) {
-		return GenerateDitheredGradient({ DefaultBackgroundColor() }, 0);
-	}
-	return GenerateDitheredGradient(
+	return Ui::GenerateDitheredGradient(
 		paper.backgroundColors(),
 		paper.gradientRotation());
+}
+
+QColor ColorFromSerialized(quint32 serialized) {
+	return QColor(
+		int((serialized >> 16) & 0xFFU),
+		int((serialized >> 8) & 0xFFU),
+		int(serialized & 0xFFU));
+}
+
+QColor ColorFromSerialized(MTPint serialized) {
+	return ColorFromSerialized(serialized.v);
+}
+
+std::optional<QColor> MaybeColorFromSerialized(
+		quint32 serialized) {
+	return (serialized == quint32(-1))
+		? std::nullopt
+		: std::make_optional(ColorFromSerialized(serialized));
+}
+
+std::optional<QColor> MaybeColorFromSerialized(
+		const tl::conditional<MTPint> &mtp) {
+	return mtp ? std::make_optional(ColorFromSerialized(*mtp)) : std::nullopt;
 }
 
 namespace details {
@@ -810,7 +754,9 @@ bool IsTestingThemeWallPaper(const WallPaper &paper) {
 }
 
 WallPaper TestingDefaultWallPaper() {
-	return WallPaper(kTestingDefaultBackground);
+	return WallPaper(
+		kTestingDefaultBackground
+	).withParamsFrom(DefaultWallPaper());
 }
 
 bool IsTestingDefaultWallPaper(const WallPaper &paper) {

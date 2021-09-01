@@ -52,6 +52,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_channel.h"
 #include "data/data_replies_list.h"
 #include "data/data_changes.h"
+#include "data/data_send_action.h"
 #include "storage/storage_media_prepare.h"
 #include "storage/storage_account.h"
 #include "inline_bots/inline_bot_result.h"
@@ -146,12 +147,14 @@ RepliesWidget::RepliesWidget(
 	not_null<Window::SessionController*> controller,
 	not_null<History*> history,
 	MsgId rootId)
-: Window::SectionWidget(parent, controller, PaintedBackground::Section)
+: Window::SectionWidget(parent, controller, history->peer)
 , _history(history)
 , _rootId(rootId)
 , _root(lookupRoot())
 , _areComments(computeAreComments())
-, _sendAction(history->owner().repliesSendActionPainter(history, rootId))
+, _sendAction(history->owner().sendActionManager().repliesPainter(
+	history,
+	rootId))
 , _topBar(this, controller)
 , _topBarShadow(this)
 , _composeControls(std::make_unique<ComposeControls>(
@@ -162,6 +165,14 @@ RepliesWidget::RepliesWidget(
 , _scroll(std::make_unique<Ui::ScrollArea>(this, st::historyScroll, false))
 , _scrollDown(_scroll.get(), st::historyToDown)
 , _readRequestTimer([=] { sendReadTillRequest(); }) {
+	Window::ChatThemeValueFromPeer(
+		controller,
+		history->peer
+	) | rpl::start_with_next([=](std::shared_ptr<Ui::ChatTheme> &&theme) {
+		_theme = std::move(theme);
+		controller->setChatStyleTheme(_theme);
+	}, lifetime());
+
 	setupRoot();
 	setupRootView();
 
@@ -240,23 +251,38 @@ RepliesWidget::RepliesWidget(
 
 	_composeControls->sendActionUpdates(
 	) | rpl::start_with_next([=](ComposeControls::SendActionUpdate &&data) {
-		session().sendProgressManager().update(
-			_history,
-			_rootId,
-			data.type,
-			data.progress);
+		if (!data.cancel) {
+			session().sendProgressManager().update(
+				_history,
+				_rootId,
+				data.type,
+				data.progress);
+		} else {
+			session().sendProgressManager().cancel(
+				_history,
+				_rootId,
+				data.type);
+		}
 	}, lifetime());
 
+	using MessageUpdateFlag = Data::MessageUpdate::Flag;
 	_history->session().changes().messageUpdates(
-		Data::MessageUpdate::Flag::Destroyed
+		MessageUpdateFlag::Destroyed
+		| MessageUpdateFlag::RepliesUnreadCount
 	) | rpl::start_with_next([=](const Data::MessageUpdate &update) {
-		if (update.item == _root) {
-			_root = nullptr;
-			updatePinnedVisibility();
-			controller->showBackFromStack();
-		}
-		while (update.item == _replyReturn) {
-			calculateNextReplyReturn();
+		if (update.flags & MessageUpdateFlag::Destroyed) {
+			if (update.item == _root) {
+				_root = nullptr;
+				updatePinnedVisibility();
+				controller->showBackFromStack();
+			}
+			while (update.item == _replyReturn) {
+				calculateNextReplyReturn();
+			}
+			return;
+		} else if ((update.item == _root)
+			&& (update.flags & MessageUpdateFlag::RepliesUnreadCount)) {
+			refreshUnreadCountBadge();
 		}
 	}, lifetime());
 
@@ -265,6 +291,17 @@ RepliesWidget::RepliesWidget(
 		Data::HistoryUpdate::Flag::OutboxRead
 	) | rpl::start_with_next([=] {
 		_inner->update();
+	}, lifetime());
+
+	_history->session().data().unreadRepliesCountRequests(
+	) | rpl::filter([=](
+			const Data::Session::UnreadRepliesCountRequest &request) {
+		return (request.root.get() == _root);
+	}) | rpl::start_with_next([=](
+			const Data::Session::UnreadRepliesCountRequest &request) {
+		if (const auto result = computeUnreadCountLocally(request.afterId)) {
+			*request.result = result;
+		}
 	}, lifetime());
 
 	setupScrollDownButton();
@@ -277,7 +314,9 @@ RepliesWidget::~RepliesWidget() {
 		sendReadTillRequest();
 	}
 	base::take(_sendAction);
-	_history->owner().repliesSendActionPainterRemoved(_history, _rootId);
+	_history->owner().sendActionManager().repliesPainterRemoved(
+		_history,
+		_rootId);
 }
 
 void RepliesWidget::orderWidgets() {
@@ -302,12 +341,15 @@ void RepliesWidget::sendReadTillRequest() {
 	_readRequestPending = false;
 	const auto api = &_history->session().api();
 	api->request(base::take(_readRequestId)).cancel();
+
 	_readRequestId = api->request(MTPmessages_ReadDiscussion(
 		_root->history()->peer->input,
 		MTP_int(_root->id),
 		MTP_int(_root->computeRepliesInboxReadTillFull())
-	)).done([=](const MTPBool &) {
-	}).send();
+	)).done(crl::guard(this, [=](const MTPBool &) {
+		_readRequestId = 0;
+		reloadUnreadCountIfNeeded();
+	})).send();
 }
 
 void RepliesWidget::setupRoot() {
@@ -317,6 +359,7 @@ void RepliesWidget::setupRoot() {
 			_root = lookupRoot();
 			if (_root) {
 				_areComments = computeAreComments();
+				refreshUnreadCountBadge();
 				if (_readRequestPending) {
 					sendReadTillRequest();
 				}
@@ -368,6 +411,19 @@ HistoryItem *RepliesWidget::lookupRoot() const {
 
 bool RepliesWidget::computeAreComments() const {
 	return _root && _root->isDiscussionPost();
+}
+
+std::optional<int> RepliesWidget::computeUnreadCount() const {
+	if (!_root) {
+		return std::nullopt;
+	}
+	const auto views = _root->Get<HistoryMessageViews>();
+	if (!views) {
+		return std::nullopt;
+	}
+	return (views->repliesUnreadCount >= 0)
+		? std::make_optional(views->repliesUnreadCount)
+		: std::nullopt;
 }
 
 void RepliesWidget::setupComposeControls() {
@@ -1143,6 +1199,7 @@ void RepliesWidget::setupScrollDownButton() {
 	_scrollDown->setClickedCallback([=] {
 		scrollDownClicked();
 	});
+	refreshUnreadCountBadge();
 	base::install_event_filter(_scrollDown, [=](not_null<QEvent*> event) {
 		if (event->type() != QEvent::Wheel) {
 			return base::EventFilterResult::Continue;
@@ -1152,6 +1209,56 @@ void RepliesWidget::setupScrollDownButton() {
 			: base::EventFilterResult::Continue;
 	});
 	updateScrollDownVisibility();
+}
+
+void RepliesWidget::refreshUnreadCountBadge() {
+	if (!_root) {
+		return;
+	} else if (const auto count = computeUnreadCount()) {
+		_scrollDown->setUnreadCount(*count);
+	} else if (!_readRequestPending
+		&& !_readRequestTimer.isActive()
+		&& !_readRequestId) {
+		reloadUnreadCountIfNeeded();
+	}
+}
+
+void RepliesWidget::reloadUnreadCountIfNeeded() {
+	const auto views = _root ? _root->Get<HistoryMessageViews>() : nullptr;
+	if (!views || views->repliesUnreadCount >= 0) {
+		return;
+	} else if (views->repliesInboxReadTillId
+		< _root->computeRepliesInboxReadTillFull()) {
+		_readRequestTimer.callOnce(0);
+	} else if (!_reloadUnreadCountRequestId) {
+		const auto session = &_history->session();
+		const auto fullId = _root->fullId();
+		const auto apply = [session, fullId](int readTill, int unreadCount) {
+			if (const auto root = session->data().message(fullId)) {
+				root->setRepliesInboxReadTill(readTill, unreadCount);
+				if (const auto post = root->lookupDiscussionPostOriginal()) {
+					post->setRepliesInboxReadTill(readTill, unreadCount);
+				}
+			}
+		};
+		const auto weak = Ui::MakeWeak(this);
+		_reloadUnreadCountRequestId = session->api().request(
+			MTPmessages_GetDiscussionMessage(
+				_history->peer->input,
+				MTP_int(_rootId))
+		).done([=](const MTPmessages_DiscussionMessage &result) {
+			if (weak) {
+				_reloadUnreadCountRequestId = 0;
+			}
+			result.match([&](const MTPDmessages_discussionMessage &data) {
+				session->data().processUsers(data.vusers());
+				session->data().processChats(data.vchats());
+				apply(
+					data.vread_inbox_max_id().value_or_empty(),
+					data.vunread_count().v);
+			});
+		}).send();
+	}
 }
 
 void RepliesWidget::scrollDownClicked() {
@@ -1519,7 +1626,7 @@ void RepliesWidget::paintEvent(QPaintEvent *e) {
 	const auto aboveHeight = _topBar->height();
 	const auto bg = e->rect().intersected(
 		QRect(0, aboveHeight, width(), height() - aboveHeight));
-	SectionWidget::PaintBackground(controller(), this, bg);
+	SectionWidget::PaintBackground(controller(), _theme.get(), this, bg);
 }
 
 void RepliesWidget::onScroll() {
@@ -1686,17 +1793,35 @@ void RepliesWidget::listSelectionChanged(SelectedItems &&items) {
 	_topBar->showSelected(state);
 }
 
+std::optional<int> RepliesWidget::computeUnreadCountLocally(
+		MsgId afterId) const {
+	const auto views = _root ? _root->Get<HistoryMessageViews>() : nullptr;
+	if (!views) {
+		return std::nullopt;
+	}
+	const auto wasReadTillId = views->repliesInboxReadTillId;
+	const auto wasUnreadCount = views->repliesUnreadCount;
+	return _replies->fullUnreadCountAfter(
+		afterId,
+		wasReadTillId,
+		wasUnreadCount);
+}
+
 void RepliesWidget::readTill(not_null<HistoryItem*> item) {
 	if (!_root) {
 		return;
 	}
 	const auto was = _root->computeRepliesInboxReadTillFull();
 	const auto now = item->id;
-	const auto fast = item->out();
-	if (was < now) {
-		_root->setRepliesInboxReadTill(now);
+	if (now < was) {
+		return;
+	}
+	const auto unreadCount = computeUnreadCountLocally(now);
+	const auto fast = item->out() || !unreadCount.has_value();
+	if (was < now || (fast && now == was)) {
+		_root->setRepliesInboxReadTill(now, unreadCount);
 		if (const auto post = _root->lookupDiscussionPostOriginal()) {
-			post->setRepliesInboxReadTill(now);
+			post->setRepliesInboxReadTill(now, unreadCount);
 		}
 		if (!_readRequestTimer.isActive()) {
 			_readRequestTimer.callOnce(fast ? 0 : kReadRequestTimeout);
@@ -1722,22 +1847,20 @@ MessagesBarData RepliesWidget::listMessagesBar(
 		return {};
 	}
 	const auto till = _root->computeRepliesInboxReadTillFull();
-	if (till < 2) {
-		return {};
-	}
+	const auto hidden = (till < 2);
 	for (auto i = 0, count = int(elements.size()); i != count; ++i) {
 		const auto item = elements[i]->data();
 		if (IsServerMsgId(item->id) && item->id > till) {
 			if (item->out() || !item->replyToId()) {
 				readTill(item);
 			} else {
-				return MessagesBarData{
-					// Designated initializers here crash MSVC 16.7.3.
-					MessagesBar{
+				return {
+					.bar = {
 						.element = elements[i],
+						.hidden = hidden,
 						.focus = true,
 					},
-					tr::lng_unread_bar_some(),
+					.text = tr::lng_unread_bar_some(),
 				};
 			}
 		}
@@ -1788,6 +1911,10 @@ void RepliesWidget::listSendBotCommand(
 
 void RepliesWidget::listHandleViaClick(not_null<UserData*> bot) {
 	_composeControls->setText({ '@' + bot->username + ' ' });
+}
+
+not_null<Ui::ChatTheme*> RepliesWidget::listChatTheme() {
+	return _theme.get();
 }
 
 void RepliesWidget::confirmDeleteSelected() {

@@ -15,6 +15,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/media/history_view_web_page.h"
 #include "history/view/history_view_group_call_tracker.h" // UserpicInRow.
 #include "history/history.h"
+#include "ui/chat/chat_theme.h"
 #include "ui/effects/ripple_animation.h"
 #include "base/unixtime.h"
 #include "ui/chat/message_bubble.h"
@@ -558,6 +559,7 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 			p,
 			Ui::ComplexBubble{
 				.simple = Ui::SimpleBubble{
+					.st = context.st,
 					.geometry = g,
 					.pattern = context.bubblesPattern,
 					.patternViewport = context.viewport,

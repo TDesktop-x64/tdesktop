@@ -11,7 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/scroll_area.h"
 #include "ui/widgets/multi_select.h"
 #include "ui/effects/ripple_animation.h"
-#include "data/data_countries.h"
+#include "countries/countries_instance.h"
 #include "base/qt_adapters.h"
 #include "styles/style_layers.h"
 #include "styles/style_boxes.h"
@@ -64,7 +64,7 @@ private:
 	void updateSelectedRow();
 	void updateRow(int index);
 	void setPressed(int pressed);
-	const std::vector<not_null<const Data::CountryInfo*>> &current() const;
+	const std::vector<not_null<const Countries::Info*>> &current() const;
 
 	Type _type = Type::Phones;
 	int _rowHeight = 0;
@@ -76,8 +76,8 @@ private:
 
 	std::vector<std::unique_ptr<RippleAnimation>> _ripples;
 
-	std::vector<not_null<const Data::CountryInfo*>> _list;
-	std::vector<not_null<const Data::CountryInfo*>> _filtered;
+	std::vector<not_null<const Countries::Info*>> _list;
+	std::vector<not_null<const Countries::Info*>> _filtered;
 	base::flat_map<QChar, std::vector<int>> _byLetter;
 	std::vector<std::vector<QString>> _namesList;
 
@@ -174,7 +174,7 @@ CountrySelectBox::Inner::Inner(
 , _rowHeight(st::countryRowHeight) {
 	setAttribute(Qt::WA_OpaquePaintEvent);
 
-	const auto &byISO2 = Data::CountriesByISO2();
+	const auto &byISO2 = Countries::Instance().byISO2();
 
 	if (byISO2.contains(iso)) {
 		LastValidISO = iso;
@@ -188,17 +188,17 @@ CountrySelectBox::Inner::Inner(
 	if (lastValid) {
 		_list.emplace_back(lastValid);
 	}
-	for (const auto &entry : Data::Countries()) {
+	for (const auto &entry : Countries::Instance().list()) {
 		if (&entry != lastValid) {
 			_list.emplace_back(&entry);
 		}
 	}
 	auto index = 0;
 	for (const auto info : _list) {
-		auto full = QString::fromUtf8(info->name)
+		auto full = info->name
 			+ ' '
-			+ (info->alternativeName
-				? QString::fromUtf8(info->alternativeName)
+			+ (!info->alternativeName.isEmpty()
+				? info->alternativeName
 				: QString());
 		const auto namesList = std::move(full).toLower().split(
 			QRegularExpression("[\\s\\-]"),
@@ -256,10 +256,10 @@ void CountrySelectBox::Inner::paintEvent(QPaintEvent *e) {
 			}
 		}
 
-		auto code = QString("+") + list[i]->code;
+		auto code = QString("+") + list[i]->codes.front().callingCode;
 		auto codeWidth = st::countryRowCodeFont->width(code);
 
-		auto name = QString::fromUtf8(list[i]->name);
+		auto name = list[i]->name;
 		auto nameWidth = st::countryRowNameFont->width(name);
 		auto availWidth = width() - st::countryRowPadding.left() - st::countryRowPadding.right() - codeWidth - st::boxScroll.width;
 		if (nameWidth > availWidth) {
@@ -424,7 +424,7 @@ void CountrySelectBox::Inner::updateSelected(QPoint localPos) {
 }
 
 auto CountrySelectBox::Inner::current() const
--> const std::vector<not_null<const Data::CountryInfo*>> & {
+-> const std::vector<not_null<const Countries::Info*>> & {
 	return _filter.isEmpty() ? _list : _filtered;
 }
 

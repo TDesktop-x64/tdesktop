@@ -101,7 +101,7 @@ QPointer<Ui::RpWidget> ShowOldForwardMessagesBox(
 	MessageIdsList &&items,
 	FnMut<void()> &&successCallback = nullptr);
 
-QPointer<Ui::RpWidget> ShowForwardMessagesBox(
+QPointer<Ui::RpWidget> ShowNewForwardMessagesBox(
 	not_null<Window::SessionNavigation*> navigation,
 	MessageIdsList &&items,
 	FnMut<void()> &&successCallback = nullptr);

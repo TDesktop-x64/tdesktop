@@ -5434,7 +5434,7 @@ void HistoryWidget::mousePressEvent(QMouseEvent *e) {
 			) | ranges::views::transform(
 				&HistoryItem::fullId
 			) | ranges::to_vector;
-			Window::ShowForwardMessagesBox(controller(), std::move(list));
+			Window::ShowNewForwardMessagesBox(controller(), std::move(list));
 		} else {
 			Ui::showPeerHistory(_peer, _editMsgId ? _editMsgId : replyToId());
 		}
@@ -6614,7 +6614,7 @@ void HistoryWidget::forwardSelected() {
 		return;
 	}
 	const auto weak = Ui::MakeWeak(this);
-	Window::ShowForwardMessagesBox(controller(), getSelectedItems(), [=] {
+	Window::ShowNewForwardMessagesBox(controller(), getSelectedItems(), [=] {
 		if (const auto strong = weak.data()) {
 			strong->clearSelected();
 		}

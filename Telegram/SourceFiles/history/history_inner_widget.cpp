@@ -3385,12 +3385,12 @@ void HistoryInner::oldForwardAsGroup(FullMsgId itemId) {
 }
 
 void HistoryInner::forwardItem(FullMsgId itemId) {
-	Window::ShowForwardMessagesBox(_controller, { 1, itemId });
+	Window::ShowNewForwardMessagesBox(_controller, { 1, itemId });
 }
 
 void HistoryInner::forwardAsGroup(FullMsgId itemId) {
 	if (const auto item = session().data().message(itemId)) {
-		Window::ShowForwardMessagesBox(
+		Window::ShowNewForwardMessagesBox(
 			_controller,
 			session().data().itemOrItsGroup(item));
 	}

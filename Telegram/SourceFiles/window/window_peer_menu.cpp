@@ -1084,7 +1084,7 @@ QPointer<Ui::RpWidget> ShowOldForwardMessagesBox(
 }
 
 // Source from kotatogram
-QPointer<Ui::RpWidget> ShowForwardMessagesBox(
+QPointer<Ui::RpWidget> ShowNewForwardMessagesBox(
 		not_null<Window::SessionNavigation*> navigation,
 		MessageIdsList &&items,
 		FnMut<void()> &&successCallback) {

@@ -526,7 +526,7 @@ void TopBar::performForward() {
 		_cancelSelectionClicks.fire({});
 		return;
 	}
-	Window::ShowForwardMessagesBox(
+	Window::ShowNewForwardMessagesBox(
 		_navigation,
 		std::move(items),
 		[weak = Ui::MakeWeak(this)] {

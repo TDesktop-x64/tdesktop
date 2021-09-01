@@ -1692,7 +1692,7 @@ void OverlayWidget::forwardMedia() {
 	}
 
 	close();
-	Window::ShowForwardMessagesBox(
+	Window::ShowNewForwardMessagesBox(
 		active.front(),
 		{ 1, item->fullId() });
 }

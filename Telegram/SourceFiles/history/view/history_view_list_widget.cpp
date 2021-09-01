@@ -2996,7 +2996,7 @@ void ConfirmForwardSelectedItems(not_null<ListWidget*> widget) {
 	}
 	auto ids = widget->getSelectedIds();
 	const auto weak = Ui::MakeWeak(widget);
-	Window::ShowForwardMessagesBox(widget->controller(), std::move(ids), [=] {
+	Window::ShowNewForwardMessagesBox(widget->controller(), std::move(ids), [=] {
 		if (const auto strong = weak.data()) {
 			strong->cancelSelection();
 		}

@@ -328,7 +328,7 @@ bool AddForwardSelectedAction(
 				strong->cancelSelection();
 			}
 		};
-		Window::ShowForwardMessagesBox(
+		Window::ShowNewForwardMessagesBox(
 			request.navigation,
 			ExtractIdsList(request.selectedItems),
 			callback);
@@ -391,7 +391,7 @@ bool AddForwardMessageAction(
 	const auto itemId = item->fullId();
 	menu->addAction(tr::lng_context_forward_msg(tr::now), [=] {
 		if (const auto item = owner->message(itemId)) {
-			Window::ShowForwardMessagesBox(
+			Window::ShowNewForwardMessagesBox(
 				request.navigation,
 				(asGroup
 					? owner->itemOrItsGroup(item)

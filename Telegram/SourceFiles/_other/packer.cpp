@@ -159,7 +159,7 @@ int main(int argc, char *argv[])
 	QString workDir;
 
 	QString remove;
-	int version = 0;
+	long long version = 0;
 	[[maybe_unused]] bool targetwin64 = false;
 	QFileInfoList files;
 	for (int i = 0; i < argc; ++i) {
@@ -171,7 +171,7 @@ int main(int argc, char *argv[])
 		} else if (string("-target") == argv[i] && i + 1 < argc) {
 			targetwin64 = (string("win64") == argv[i + 1]);
 		} else if (string("-version") == argv[i] && i + 1 < argc) {
-			version = QString(argv[i + 1]).toInt();
+			version = QString(argv[i + 1]).toLongLong();
 		} else if (string("-beta") == argv[i]) {
 			BetaChannel = true;
 		} else if (string("-alphakey") == argv[i]) {
@@ -194,7 +194,8 @@ int main(int argc, char *argv[])
 		return writeAlphaKey();
 	}
 
-	if (files.isEmpty() || remove.isEmpty() || version <= 1016 || version > INT32_MAX) {
+	if (files.isEmpty() || remove.isEmpty() || version <= 1016 || version > INT64_MAX) {
+		cout << version;
 #ifdef Q_OS_WIN
 		cout << "Usage: Packer.exe -path {file} -version {version} OR Packer.exe -path {dir} -version {version}\n";
 #elif defined Q_OS_MAC
@@ -248,7 +249,7 @@ int main(int argc, char *argv[])
 			stream << quint32(0x7FFFFFFF);
 			stream << quint64(AlphaVersion);
 		} else {
-			stream << quint32(version);
+			stream << quint64(version);
 		}
 
 		stream << quint32(files.size());

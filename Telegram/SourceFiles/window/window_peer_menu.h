@@ -99,7 +99,7 @@ Fn<void()> DeleteAndLeaveHandler(not_null<PeerData*> peer);
 
 QPointer<Ui::RpWidget> ShowOldForwardMessagesBox(
 	not_null<Window::SessionNavigation*> navigation,
-	MessageIdsList &&items,
+	Data::ForwardDraft &&draft,
 	FnMut<void()> &&successCallback = nullptr);
 
 QPointer<Ui::RpWidget> ShowNewForwardMessagesBox(
@@ -107,11 +107,12 @@ QPointer<Ui::RpWidget> ShowNewForwardMessagesBox(
 	MessageIdsList &&items,
 	FnMut<void()> &&successCallback = nullptr);
 
-QPointer<Ui::RpWidget> ShowForwardNoQuoteMessagesBox(
-	not_null<Window::SessionNavigation*> navigation,
-	Data::ForwardDraft &&draft,
-	FnMut<void()> &&successCallback = nullptr);
 QPointer<Ui::RpWidget> ShowForwardMessagesBox(
+	not_null<Window::SessionNavigation*> navigation,
+	MessageIdsList &&items,
+	FnMut<void()> &&successCallback = nullptr);
+
+QPointer<Ui::RpWidget> ShowForwardNoQuoteMessagesBox(
 	not_null<Window::SessionNavigation*> navigation,
 	MessageIdsList &&items,
 	FnMut<void()> &&successCallback = nullptr);

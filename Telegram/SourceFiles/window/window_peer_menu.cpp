@@ -470,7 +470,7 @@ void Filler::addUserActions(not_null<UserData*> user) {
 				user->session().supportHelper().editInfo(controller, user);
 			});
 		}
-		if (user->hasPinnedMessages()) {
+		if (user->owner().history(user)->hasPinnedMessages()) {
 			auto hasHidden = HistoryWidget::hasHiddenPinnedMessage(user);
 			if (hasHidden) {
 				_addAction(
@@ -544,7 +544,7 @@ void Filler::addChatActions(not_null<ChatData*> chat) {
 				navigation->showEditPeerBox(chat);
 			});
 		}
-		if (chat->hasPinnedMessages()) {
+		if (chat->owner().history(chat)->hasPinnedMessages()) {
 			auto hasHidden = HistoryWidget::hasHiddenPinnedMessage(chat);
 			if (hasHidden) {
 				_addAction(
@@ -615,7 +615,7 @@ void Filler::addChannelActions(not_null<ChannelData*> channel) {
 				navigation->showEditPeerBox(channel);
 			});
 		}
-		if (channel->hasPinnedMessages()) {
+		if (channel->owner().history(channel)->hasPinnedMessages()) {
 			auto hasHidden = HistoryWidget::hasHiddenPinnedMessage(channel);
 			if (hasHidden) {
 				_addAction(
@@ -784,14 +784,14 @@ void Filler::addTogglesForArchive() {
 void PeerMenuHidePinnedMessage(not_null<PeerData*> peer) {
 	auto hidden = HistoryWidget::switchPinnedHidden(peer, true);
 	if (hidden) {
-		peer->session().changes().peerUpdated(peer, Data::PeerUpdate::Flag::PinnedMessages);
+		peer->session().changes().historyUpdated(peer->owner().history(peer), Data::HistoryUpdate::Flag::PinnedMessages);
 	}
 }
 
 void PeerMenuUnhidePinnedMessage(not_null<PeerData*> peer) {
 	auto unhidden = HistoryWidget::switchPinnedHidden(peer, false);
 	if (unhidden) {
-		peer->session().changes().peerUpdated(peer, Data::PeerUpdate::Flag::PinnedMessages);
+		peer->session().changes().historyUpdated(peer->owner().history(peer), Data::HistoryUpdate::Flag::PinnedMessages);
 	}
 }
 
@@ -1047,7 +1047,8 @@ QPointer<Ui::RpWidget> ShowOldForwardMessagesBox(
 	auto callback = [
 		draft = std::move(draft),
 		callback = std::move(successCallback),
-		weak
+		weak,
+		navigation
 	](not_null<PeerData*> peer) mutable {
 		const auto content = navigation->parentController()->content();
 		if (peer->isSelf()) {
@@ -1411,7 +1412,7 @@ QPointer<Ui::RpWidget> ShowForwardMessagesBox(
 		not_null<Window::SessionNavigation*> navigation,
 		MessageIdsList &&items,
 		FnMut<void()> &&successCallback) {
-	return ShowForwardMessagesBox(
+	return ShowOldForwardMessagesBox(
 		navigation,
 		Data::ForwardDraft{ .ids = std::move(items) },
 		std::move(successCallback));

@@ -5543,8 +5543,7 @@ void HistoryWidget::mousePressEvent(QMouseEvent *e) {
 				session().data().cancelForwarding(_history);
 				auto list = session().data().itemsToIds(draft.items);
 				Window::ShowForwardMessagesBox(controller(), {
-					.ids = session().data().itemsToIds(draft.items),
-					.options = draft.options,
+					session().data().itemsToIds(draft.items)
 				});
 			});
 			const auto optionsChanged = crl::guard(weak, [=](
@@ -6741,7 +6740,7 @@ void HistoryWidget::oldForwardSelected() {
 		return;
 	}
 	const auto weak = Ui::MakeWeak(this);
-	Window::ShowOldForwardMessagesBox(controller(), getSelectedItems(), [=] {
+	Window::ShowForwardMessagesBox(controller(), getSelectedItems(), [=] {
 		if (const auto strong = weak.data()) {
 			strong->clearSelected();
 		}
@@ -6788,13 +6787,17 @@ void HistoryWidget::forwardSelectedToSavedMessages() {
 	auto action = Api::SendAction(item->history()->peer->owner().history(self));
 	action.clearDraft = false;
 	action.generateLocal = false;
-	api->forwardMessages(std::move(msgItems), action, [] {
-		Ui::Toast::Show(tr::lng_share_done(tr::now));
-	});
 
-	if (const auto strong = weak.data()) {
-		strong->clearSelected();
-	}
+	const auto history = item->history()->peer->owner().history(self);
+	auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = std::move(items) });
+
+	api->forwardMessages(std::move(resolved), action, [=] {
+		Ui::Toast::Show(tr::lng_share_done(tr::now));
+
+		if (const auto strong = weak.data()) {
+			strong->clearSelected();
+		}
+	});
 }
 
 void HistoryWidget::confirmDeleteSelected() {

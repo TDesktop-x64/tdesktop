@@ -3056,7 +3056,11 @@ void ConfirmForwardSelectedToSavedMessagesItems(not_null<ListWidget*> widget) {
 	auto action = Api::SendAction(item->history()->peer->owner().history(self));
 	action.clearDraft = false;
 	action.generateLocal = false;
-	api->forwardMessages(std::move(msgItems), action, [=] {
+
+	const auto history = item->history()->peer->owner().history(self);
+	auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = std::move(itemsList) });
+
+	api->forwardMessages(std::move(resolved), action, [=] {
 		Ui::Toast::Show(tr::lng_share_done(tr::now));
 
 		if (const auto strong = weak.data()) {

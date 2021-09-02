@@ -347,11 +347,6 @@ bool AddForwardSelectedAction(
 	});
 	menu->addAction(tr::lng_forward_to_saved_message(tr::now), [=] {
 		const auto weak = Ui::MakeWeak(list);
-		const auto callback = [=] {
-			if (const auto strong = weak.data()) {
-				strong->cancelSelection();
-			}
-		};
 		const auto items = ExtractIdsList(request.selectedItems);
 		const auto item = App::wnd()->sessionController()->session().data().message(items[0]);
 		const auto api = &item->history()->peer->session().api();
@@ -362,8 +357,16 @@ bool AddForwardSelectedAction(
 		auto action = Api::SendAction(item->history()->peer->owner().history(self));
 		action.clearDraft = false;
 		action.generateLocal = false;
-		api->forwardMessages(std::move(msgItems), action, [] {
+
+		const auto history = item->history()->peer->owner().history(self);
+		auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = std::move(items) });
+
+		api->forwardMessages(std::move(resolved), action, [=] {
 			Ui::Toast::Show(tr::lng_share_done(tr::now));
+
+			if (const auto strong = weak.data()) {
+				strong->cancelSelection();
+			}
 		});
 	});
 	return true;

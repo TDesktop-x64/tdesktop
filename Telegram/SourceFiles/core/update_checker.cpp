@@ -648,7 +648,7 @@ void HttpChecker::start() {
 	DEBUG_LOG(("Update Info: requesting update state"));
 	QNetworkRequest request(url);
 	request.setRawHeader("td-version", AppVersionReleaseStr);
-	request.setRawHeader("beta", AppBetaVersion ? "1" : "0");
+	request.setRawHeader("beta", cInstallBetaVersion() ? "1" : "0");
 	_manager = std::make_unique<QNetworkAccessManager>();
 	_reply = _manager->get(request);
 	_reply->connect(_reply, &QNetworkReply::finished, [=] {

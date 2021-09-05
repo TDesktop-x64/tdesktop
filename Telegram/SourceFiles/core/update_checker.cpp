@@ -398,7 +398,7 @@ bool UnpackUpdate(const QString &filepath) {
 
 	tempDir.mkdir(tempDir.absolutePath());
 
-	quint32 version;
+	quint64 version;
 	{
 		QDataStream stream(uncompressed);
 		stream.setVersion(QDataStream::Qt_5_1);

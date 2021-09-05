@@ -1086,6 +1086,10 @@ void readLangPack() {
 	}
 	QString langPackBaseId = Lang::GetInstance().baseId();
 	QString langPackId = Lang::GetInstance().id();
+	if (langPackId.isEmpty()) {
+		LOG(("Lang ID not found! Re-use old language pack..."));
+		return;
+	}
 	CustomLangPack::initInstance();
 	CustomLangPack::currentInstance()->fetchCustomLangPack(langPackId, langPackBaseId);
 }

@@ -35,6 +35,7 @@ struct CloudTheme {
 
 	std::optional<WallPaper> paper;
 	std::optional<QColor> accentColor;
+	std::optional<QColor> outgoingAccentColor;
 	std::vector<QColor> outgoingMessagesColors;
 	bool basedOnDark = false;
 
@@ -73,6 +74,13 @@ public:
 		const QString &emoji) const;
 	[[nodiscard]] rpl::producer<std::optional<ChatTheme>> themeForEmojiValue(
 		const QString &emoji);
+
+	[[nodiscard]] static bool TestingColors();
+	static void SetTestingColors(bool testing);
+	[[nodiscard]] QString prepareTestingLink(const CloudTheme &theme) const;
+	[[nodiscard]] std::optional<CloudTheme> updateThemeFromLink(
+		const QString &emoji,
+		const QMap<QString, QString> &params);
 
 	void applyUpdate(const MTPTheme &theme);
 
@@ -118,7 +126,7 @@ private:
 	void parseChatThemes(const QVector<MTPChatTheme> &list);
 
 	const not_null<Main::Session*> _session;
-	int32 _hash = 0;
+	uint64 _hash = 0;
 	mtpRequestId _refreshRequestId = 0;
 	mtpRequestId _resolveRequestId = 0;
 	std::vector<CloudTheme> _list;

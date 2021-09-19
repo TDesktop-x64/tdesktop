@@ -7,7 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "boxes/peer_list_controllers.h"
 
-#include "base/openssl_help.h"
+#include "base/random.h"
 #include "boxes/confirm_box.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/ui_utility.h"
@@ -36,7 +36,7 @@ void ShareBotGame(not_null<UserData*> bot, not_null<PeerData*> chat) {
 	auto &histories = history->owner().histories();
 	const auto requestType = Data::Histories::RequestType::Send;
 	histories.sendRequest(history, requestType, [=](Fn<void()> finish) {
-		const auto randomId = openssl::RandomValue<uint64>();
+		const auto randomId = base::RandomValue<uint64>();
 		const auto api = &chat->session().api();
 		history->sendRequestId = api->request(MTPmessages_SendMedia(
 			MTP_flags(0),
@@ -288,7 +288,7 @@ void ChatsListBoxController::rebuildRows() {
 	auto wasEmpty = !delegate()->peerListFullRowsCount();
 	auto appendList = [this](auto chats) {
 		auto count = 0;
-		for (const auto row : chats->all()) {
+		for (const auto &row : chats->all()) {
 			if (const auto history = row->history()) {
 				if (appendRow(history)) {
 					++count;
@@ -389,7 +389,7 @@ void ContactsBoxController::prepare() {
 void ContactsBoxController::rebuildRows() {
 	const auto appendList = [&](auto chats) {
 		auto count = 0;
-		for (const auto row : chats->all()) {
+		for (const auto &row : chats->all()) {
 			if (const auto history = row->history()) {
 				if (const auto user = history->peer->asUser()) {
 					if (appendRow(user)) {

@@ -75,33 +75,19 @@ void CreateMaskCorners() {
 void CreatePaletteCorners() {
 	PrepareCorners(MenuCorners, st::roundRadiusSmall, st::menuBg);
 	PrepareCorners(BoxCorners, st::boxRadius, st::boxBg);
-	PrepareCorners(BotKbOverCorners, st::dateRadius, st::msgBotKbOverBgAdd);
-	PrepareCorners(StickerCorners, st::dateRadius, st::msgServiceBg);
-	PrepareCorners(StickerSelectedCorners, st::dateRadius, st::msgServiceBgSelected);
-	PrepareCorners(SelectedOverlaySmallCorners, st::roundRadiusSmall, st::msgSelectOverlay);
-	PrepareCorners(SelectedOverlayLargeCorners, st::historyMessageRadius, st::msgSelectOverlay);
 	PrepareCorners(DateCorners, st::dateRadius, st::msgDateImgBg);
-	PrepareCorners(DateSelectedCorners, st::dateRadius, st::msgDateImgBgSelected);
 	PrepareCorners(OverviewVideoCorners, st::overviewVideoStatusRadius, st::msgDateImgBg);
 	PrepareCorners(OverviewVideoSelectedCorners, st::overviewVideoStatusRadius, st::msgDateImgBgSelected);
-	PrepareCorners(InShadowCorners, st::historyMessageRadius, st::msgInShadow);
-	PrepareCorners(InSelectedShadowCorners, st::historyMessageRadius, st::msgInShadowSelected);
 	PrepareCorners(ForwardCorners, st::historyMessageRadius, st::historyForwardChooseBg);
 	PrepareCorners(MediaviewSaveCorners, st::mediaviewControllerRadius, st::mediaviewSaveMsgBg);
 	PrepareCorners(EmojiHoverCorners, st::roundRadiusSmall, st::emojiPanHover);
 	PrepareCorners(StickerHoverCorners, st::roundRadiusSmall, st::emojiPanHover);
 	PrepareCorners(BotKeyboardCorners, st::roundRadiusSmall, st::botKbBg);
-	PrepareCorners(PhotoSelectOverlayCorners, st::roundRadiusSmall, st::overviewPhotoSelectOverlay);
 
 	PrepareCorners(Doc1Corners, st::roundRadiusSmall, st::msgFile1Bg);
 	PrepareCorners(Doc2Corners, st::roundRadiusSmall, st::msgFile2Bg);
 	PrepareCorners(Doc3Corners, st::roundRadiusSmall, st::msgFile3Bg);
 	PrepareCorners(Doc4Corners, st::roundRadiusSmall, st::msgFile4Bg);
-
-	PrepareCorners(MessageInCorners, st::historyMessageRadius, st::msgInBg, &st::msgInShadow);
-	PrepareCorners(MessageInSelectedCorners, st::historyMessageRadius, st::msgInBgSelected, &st::msgInShadowSelected);
-	PrepareCorners(MessageOutCorners, st::historyMessageRadius, st::msgOutBg, &st::msgOutShadow);
-	PrepareCorners(MessageOutSelectedCorners, st::historyMessageRadius, st::msgOutBgSelected, &st::msgOutShadowSelected);
 }
 
 } // namespace
@@ -121,48 +107,6 @@ void FinishCachedCorners() {
 	Corners.clear();
 	CornersMap.clear();
 	PaletteChangedLifetime.destroy();
-}
-
-void RectWithCorners(Painter &p, QRect rect, const style::color &bg, CachedRoundCorners index, RectParts corners) {
-	auto parts = RectPart::Top
-		| RectPart::NoTopBottom
-		| RectPart::Bottom
-		| corners;
-	FillRoundRect(p, rect, bg, index, nullptr, parts);
-	if ((corners & RectPart::AllCorners) != RectPart::AllCorners) {
-		const auto size = Corners[index].p[0].width() / style::DevicePixelRatio();
-		if (!(corners & RectPart::TopLeft)) {
-			p.fillRect(rect.x(), rect.y(), size, size, bg);
-		}
-		if (!(corners & RectPart::TopRight)) {
-			p.fillRect(rect.x() + rect.width() - size, rect.y(), size, size, bg);
-		}
-		if (!(corners & RectPart::BottomLeft)) {
-			p.fillRect(rect.x(), rect.y() + rect.height() - size, size, size, bg);
-		}
-		if (!(corners & RectPart::BottomRight)) {
-			p.fillRect(rect.x() + rect.width() - size, rect.y() + rect.height() - size, size, size, bg);
-		}
-	}
-}
-
-void FillComplexOverlayRect(Painter &p, QRect rect, ImageRoundRadius radius, RectParts corners) {
-	if (radius == ImageRoundRadius::Ellipse) {
-		PainterHighQualityEnabler hq(p);
-		p.setPen(Qt::NoPen);
-		p.setBrush(p.textPalette().selectOverlay);
-		p.drawEllipse(rect);
-	} else {
-		auto overlayCorners = (radius == ImageRoundRadius::Small)
-			? SelectedOverlaySmallCorners
-			: SelectedOverlayLargeCorners;
-		const auto bg = p.textPalette().selectOverlay;
-		RectWithCorners(p, rect, bg, overlayCorners, corners);
-	}
-}
-
-void FillComplexLocationRect(Painter &p, QRect rect, ImageRoundRadius radius, RectParts corners) {
-	RectWithCorners(p, rect, st::msgInBg, MessageInCorners, corners);
 }
 
 void FillRoundRect(Painter &p, int32 x, int32 y, int32 w, int32 h, style::color bg, const CornersPixmaps &corner, const style::color *shadow, RectParts parts) {
@@ -214,7 +158,10 @@ void FillRoundRect(Painter &p, int32 x, int32 y, int32 w, int32 h, style::color 
 }
 
 void FillRoundShadow(Painter &p, int32 x, int32 y, int32 w, int32 h, style::color shadow, CachedRoundCorners index, RectParts parts) {
-	auto &corner = Corners[index];
+	FillRoundShadow(p, x, y, w, h, shadow, Corners[index], parts);
+}
+
+void FillRoundShadow(Painter &p, int32 x, int32 y, int32 w, int32 h, style::color shadow, const CornersPixmaps &corner, RectParts parts) {
 	auto cornerWidth = corner.p[0].width() / style::DevicePixelRatio();
 	auto cornerHeight = corner.p[0].height() / style::DevicePixelRatio();
 	if (parts & RectPart::Bottom) {

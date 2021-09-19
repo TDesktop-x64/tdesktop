@@ -151,7 +151,7 @@ AdminLog::OwnedItem GenerateForwardedItem(
 			MTPPeer(), // saved_from_peer
 			MTPint(), // saved_from_msg_id
 			MTPstring()), // psa_type
-		MTPint(), // via_bot_id
+		MTPlong(), // via_bot_id
 		MTPMessageReplyHeader(),
 		MTP_int(base::unixtime::now()), // date
 		MTP_string(text),
@@ -719,11 +719,12 @@ object_ptr<Ui::RpWidget> ForwardsPrivacyController::setupAboveWidget(
 
 		Painter p(widget);
 		const auto theme = _controller->defaultChatTheme().get();
-		const auto context = theme->preparePaintContext(
+		auto context = theme->preparePaintContext(
 			_chatStyle.get(),
 			widget->rect(),
 			widget->rect());
 		p.translate(0, padding + view->marginBottom());
+		context.outbg = view->hasOutLayout();
 		view->draw(p, context);
 
 		PaintForwardedTooltip(p, view, *option);

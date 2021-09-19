@@ -47,6 +47,8 @@ nice_target_sources(td_ui ${src_loc}
 PRIVATE
     ${style_files}
 
+    calls/group/ui/calls_group_recording_box.cpp
+    calls/group/ui/calls_group_recording_box.h
     calls/group/ui/calls_group_scheduled_labels.cpp
     calls/group/ui/calls_group_scheduled_labels.h
     calls/group/ui/desktop_capture_choose_source.cpp
@@ -163,6 +165,8 @@ PRIVATE
     ui/controls/invite_link_label.h
     ui/controls/send_button.cpp
     ui/controls/send_button.h
+    ui/controls/who_read_context_action.cpp
+    ui/controls/who_read_context_action.h
     ui/text/format_song_name.cpp
     ui/text/format_song_name.h
     ui/text/format_values.cpp

@@ -1,3 +1,35 @@
+3.1 (19.09.21)
+
+- Some animated emoji now have extra effects.
+- Send :fireworks: :tada:, :balloon:, :like:, :poop: or :heart: to any private chat, then click on the animated emoji to launch the effect.
+- If your chat partner also has the chat open, you will both see the effects.
+- See the "Watching" status when your chat partner is enjoying emoji effects with you.
+- More interactive emoji coming soon.
+- Right click one of your outgoing messages in small groups to see who recently viewed it.
+- To protect privacy, read receipts are only stored for 7 days after the message was sent.
+- Record video and audio from live broadcasts in your group or channel.
+- Admins can start recording from the '...' menu.
+- Choose between recording in portrait or landscape orientation.
+- Finished recordings are sent to the admin's Saved Messages and can be easily shared.
+
+3.0.5 beta (17.09.21)
+
+- Add support for Emoji 13.1.
+
+3.0.4 beta (13.09.21)
+
+- Fix a crash when joining video chat or live broadcast.
+- Add a "Close to Taskbar" option when tray icon is disabled (Windows and Linux).
+
+3.0.3 beta (12.09.21)
+
+- Try fixing crashes in allocator on Linux.
+
+3.0.2 beta (10.09.21)
+
+- Check who've seen your message in small groups from the context menu.
+- Enable recording with video in live streams and video chats.
+
 3.0.1 (01.09.21)
 
 - Crash fixes.

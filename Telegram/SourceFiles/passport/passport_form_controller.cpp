@@ -14,7 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/passcode_box.h"
 #include "lang/lang_keys.h"
 #include "lang/lang_hardcoded.h"
-#include "base/openssl_help.h"
+#include "base/random.h"
 #include "base/qthelp_url.h"
 #include "base/unixtime.h"
 #include "base/call_delayed.h"
@@ -752,7 +752,7 @@ std::vector<not_null<const Value*>> FormController::submitGetErrors() {
 		bytes::make_span(_request.publicKey.toUtf8()));
 
 	_submitRequestId = _api.request(MTPaccount_AcceptAuthorization(
-		MTP_int(_request.botId.bare), // #TODO ids
+		MTP_long(_request.botId.bare),
 		MTP_string(_request.scope),
 		MTP_string(_request.publicKey),
 		MTP_vector<MTPSecureValueHash>(prepared.hashes),
@@ -1431,7 +1431,7 @@ void FormController::restoreScan(
 void FormController::prepareFile(
 		EditFile &file,
 		const QByteArray &content) {
-	const auto fileId = openssl::RandomValue<uint64>();
+	const auto fileId = base::RandomValue<uint64>();
 	file.fields.size = content.size();
 	file.fields.id = fileId;
 	file.fields.dcId = _controller->session().mainDcId();
@@ -2302,7 +2302,7 @@ void FormController::requestForm() {
 		return;
 	}
 	_formRequestId = _api.request(MTPaccount_GetAuthorizationForm(
-		MTP_int(_request.botId.bare), // #TODO ids
+		MTP_long(_request.botId.bare),
 		MTP_string(_request.scope),
 		MTP_string(_request.publicKey)
 	)).done([=](const MTPaccount_AuthorizationForm &result) {
@@ -2544,7 +2544,7 @@ bool FormController::parseForm(const MTPaccount_AuthorizationForm &result) {
 	}
 	for (const auto &required : data.vrequired_types().v) {
 		const auto row = CollectRequestedRow(required);
-		for (const auto requested : row.values) {
+		for (const auto &requested : row.values) {
 			const auto type = requested.type;
 			const auto [i, ok] = _form.values.emplace(type, Value(type));
 			auto &value = i->second;
@@ -2652,7 +2652,7 @@ bool FormController::applyPassword(const MTPDaccount_password &result) {
 	settings.newSecureAlgo = Core::ValidateNewSecureSecretAlgo(
 		Core::ParseSecureSecretAlgo(result.vnew_secure_algo()));
 	settings.pendingResetDate = result.vpending_reset_date().value_or_empty();
-	openssl::AddRandomSeed(bytes::make_span(result.vsecure_random().v));
+	base::RandomAddSeed(bytes::make_span(result.vsecure_random().v));
 	return applyPassword(std::move(settings));
 }
 

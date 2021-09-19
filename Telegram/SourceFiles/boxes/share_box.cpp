@@ -561,7 +561,7 @@ ShareBox::Inner::Inner(QWidget *parent, const Descriptor &descriptor)
 		_chatsIndexed->addToEnd(self->owner().history(self));
 	}
 	const auto addList = [&](not_null<Dialogs::IndexedList*> list) {
-		for (const auto row : list->all()) {
+		for (const auto &row : list->all()) {
 			if (const auto history = row->history()) {
 				if (!history->peer->isSelf()
 					&& _descriptor.filterCallback(history->peer)) {
@@ -704,7 +704,7 @@ void ShareBox::Inner::repaintChat(not_null<PeerData*> peer) {
 int ShareBox::Inner::chatIndex(not_null<PeerData*> peer) const {
 	int index = 0;
 	if (_filter.isEmpty()) {
-		for (const auto row : _chatsIndexed->all()) {
+		for (const auto &row : _chatsIndexed->all()) {
 			if (const auto history = row->history()) {
 				if (history->peer == peer) {
 					return index;
@@ -713,7 +713,7 @@ int ShareBox::Inner::chatIndex(not_null<PeerData*> peer) const {
 			++index;
 		}
 	} else {
-		for (const auto row : _filtered) {
+		for (const auto &row : _filtered) {
 			if (const auto history = row->history()) {
 				if (history->peer == peer) {
 					return index;
@@ -1235,7 +1235,7 @@ void ShareGameScoreByHash(
 				MTP_vector<MTPInputChannel>(
 					1,
 					MTP_inputChannel(
-						MTP_int(channelId.bare), // #TODO ids
+						MTP_long(channelId.bare),
 						MTP_long(channelAccessHash)))
 			)).done([=](const MTPmessages_Chats &result) {
 				result.match([&](const auto &data) {

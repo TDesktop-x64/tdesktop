@@ -25,6 +25,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Window {
 namespace {
 
+constexpr auto kDarkValueThreshold = 0.5;
+
 [[nodiscard]] rpl::producer<QString> PeerThemeEmojiValue(
 		not_null<PeerData*> peer) {
 	return peer->session().changes().peerFlagsValue(
@@ -49,9 +51,17 @@ namespace {
 [[nodiscard]] auto MaybeCloudThemeValueFromPeer(
 	not_null<PeerData*> peer)
 -> rpl::producer<std::optional<Data::CloudTheme>> {
+	auto isThemeDarkValue = rpl::single(
+		rpl::empty_value()
+	) | rpl::then(
+		style::PaletteChanged()
+	) | rpl::map([] {
+		return (st::dialogsBg->c.valueF() < kDarkValueThreshold);
+	}) | rpl::distinct_until_changed();
+
 	return rpl::combine(
 		MaybeChatThemeDataValueFromPeer(peer),
-		Theme::IsNightModeValue()
+		std::move(isThemeDarkValue)
 	) | rpl::map([](std::optional<Data::ChatTheme> theme, bool night) {
 		return !theme
 			? std::nullopt
@@ -191,7 +201,11 @@ void SectionWidget::PaintBackground(
 		const auto to = QRect(
 			QPoint(cache.x, fromy + cache.y),
 			cache.pixmap.size() / cIntRetinaFactor());
-		if (cache.area == fill) {
+		if (cache.waitingForNegativePattern) {
+			// While we wait for pattern being loaded we paint just gradient.
+			// But in case of negative patter opacity we just fill-black.
+			p.fillRect(to, Qt::black);
+		} else if (cache.area == fill) {
 			p.drawPixmap(to, cache.pixmap);
 		} else {
 			const auto sx = fill.width() / float64(cache.area.width());

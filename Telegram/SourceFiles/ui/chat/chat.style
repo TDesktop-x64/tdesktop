@@ -38,6 +38,7 @@ minPhotoSize: 100px;
 minVideoSize: 160px;
 maxMediaSize: 430px;
 maxStickerSize: 256px;
+maxAnimatedEmojiSize: 112px;
 maxGifSize: 320px;
 maxVideoMessageSize: 240px;
 maxSignatureSize: 144px;
@@ -68,16 +69,16 @@ historyResizeWidth: 6px;
 historyPaddingBottom: 8px;
 
 historyToDownPosition: point(12px, 10px);
-historyToDownAbove: icon {{ "history_down_arrow", historyToDownFg, point(17px, 23px) }};
-historyToDownAboveOver: icon {{ "history_down_arrow", historyToDownFgOver, point(17px, 23px) }};
+historyToDownAbove: icon {{ "history_down_arrow", historyToDownFg }};
+historyToDownAboveOver: icon {{ "history_down_arrow", historyToDownFgOver }};
 historyToDownPaddingTop: 10px;
 historyToDownBelow: icon {
 	{ "history_down_shadow", historyToDownShadow },
-	{ "history_down_circle", historyToDownBg, point(4px, 4px) },
+	{ "history_down_circle", historyToDownBg },
 };
 historyToDownBelowOver: icon {
 	{ "history_down_shadow", historyToDownShadow },
-	{ "history_down_circle", historyToDownBgOver, point(4px, 4px) },
+	{ "history_down_circle", historyToDownBgOver },
 };
 historyToDown: TwoIconButton {
 	width: 52px;
@@ -101,8 +102,8 @@ historyToDownBadgeSize: 22px;
 historyToDownShownAfter: 480px;
 historyToDownDuration: 150;
 
-dialogsToUpAbove: icon {{ "history_down_arrow-flip_vertical", historyToDownFg, point(17px, 20px) }};
-dialogsToUpAboveOver: icon {{ "history_down_arrow-flip_vertical", historyToDownFgOver, point(17px, 20px) }};
+dialogsToUpAbove: icon {{ "history_down_arrow-flip_vertical", historyToDownFg, point(0px, 1px) }};
+dialogsToUpAboveOver: icon {{ "history_down_arrow-flip_vertical", historyToDownFgOver, point(0px, 1px) }};
 
 dialogsToUp: TwoIconButton(historyToDown) {
 	iconAbove: dialogsToUpAbove;
@@ -159,17 +160,8 @@ historyFileOutWaitingSelected: icon {{ "mediaview_save_check", historyFileOutIco
 historyFileInWaiting: icon {{ "mediaview_save_check", historyFileInIconFg }};
 historyFileInWaitingSelected: icon {{ "mediaview_save_check", historyFileInIconFgSelected }};
 
-historyFileSongPause: icon {{ "history_file_pause", historyFileThumbIconFg }};
-historyFileSongPauseSelected: icon {{ "history_file_pause", historyFileThumbIconFgSelected }};
-historyFileSongPlay: icon {{ "history_file_play", historyFileThumbIconFg }};
-historyFileSongPlaySelected: icon {{ "history_file_play", historyFileThumbIconFgSelected }};
-historyFileSongCancel: icon {{ "history_file_cancel", historyFileThumbIconFg }};
-historyFileSongCancelSelected: icon {{ "history_file_cancel", historyFileThumbIconFgSelected }};
-historyFileSongDownload: icon {{ "history_file_download", historyFileThumbIconFg }};
-historyFileSongDownloadSelected: icon {{ "history_file_download", historyFileThumbIconFgSelected }};
-historyFileSongWaiting: icon {{ "mediaview_save_check", historyFileThumbIconFg }};
-historyFileSongWaitingSelected: icon {{ "mediaview_save_check", historyFileThumbIconFgSelected }};
-
+historyFileThumbPause: icon {{ "history_file_pause", historyFileThumbIconFg }};
+historyFileThumbPauseSelected: icon {{ "history_file_pause", historyFileThumbIconFgSelected }};
 historyFileThumbDownload: icon {{ "history_file_download", historyFileThumbIconFg }};
 historyFileThumbDownloadSelected: icon {{ "history_file_download", historyFileThumbIconFgSelected }};
 historyFileThumbCancel: icon {{ "history_file_cancel", historyFileThumbIconFg }};
@@ -470,9 +462,7 @@ msgBotKbButton: BotKeyboardButton {
 	padding: 10px;
 	height: 36px;
 	textTop: 8px;
-	ripple: RippleAnimation(defaultRippleAnimation) {
-		color: msgBotKbRippleBg;
-	}
+	ripple: defaultRippleAnimation;
 }
 
 botKbDuration: 200;
@@ -701,10 +691,6 @@ webPageLeft: 10px;
 webPageBar: 2px;
 webPageTitleFont: semiboldFont;
 webPageTitleStyle: semiboldTextStyle;
-webPageTitleOutFg: historyTextOutFg;
-webPageTitleInFg: historyTextInFg;
-webPageDescriptionOutFg: historyTextOutFg;
-webPageDescriptionInFg: historyTextInFg;
 webPageDescriptionFont: normalFont;
 webPageDescriptionStyle: defaultTextStyle;
 webPagePhotoSize: 100px;
@@ -747,12 +733,6 @@ historyPollRadialAnimation: InfiniteRadialAnimation(defaultInfiniteRadialAnimati
 	thickness: 2px;
 	size: size(18px, 18px);
 }
-historyPollRippleIn: RippleAnimation(defaultRippleAnimation) {
-	color: msgWaveformInInactive;
-}
-historyPollRippleOut: RippleAnimation(defaultRippleAnimation) {
-	color: msgWaveformOutInactive;
-}
 historyPollRippleOpacity: 0.3;
 historyPollRecentVotersSkip: 4px;
 historyPollRecentVoterSize: 18px;
@@ -761,6 +741,10 @@ historyPollBottomButtonSkip: 15px;
 historyPollBottomButtonTop: 4px;
 historyPollChoiceRight: icon {{ "poll_choice_right", activeButtonFg }};
 historyPollChoiceWrong: icon {{ "poll_choice_wrong", activeButtonFg }};
+historyPollOutChoiceRight: icon {{ "poll_choice_right", historyFileOutIconFg }};
+historyPollOutChoiceRightSelected: icon {{ "poll_choice_right", historyFileOutIconFgSelected }};
+historyPollInChoiceRight: icon {{ "poll_choice_right", historyFileInIconFg }};
+historyPollInChoiceRightSelected: icon {{ "poll_choice_right", historyFileInIconFgSelected }};
 historyPollOutChosen: icon {{ "poll_select_check", historyFileOutIconFg }};
 historyPollOutChosenSelected: icon {{ "poll_select_check", historyFileOutIconFgSelected }};
 historyPollInChosen: icon {{ "poll_select_check", historyFileInIconFg }};
@@ -883,3 +867,40 @@ ttlDividerLabelPadding: margins(22px, 10px, 22px, 19px);
 
 ttlItemPadding: margins(0px, 4px, 0px, 4px);
 ttlItemTimerFont: font(12px);
+
+WhoRead {
+	userpics: GroupCallUserpics;
+	photoLeft: pixels;
+	photoSize: pixels;
+	photoSkip: pixels;
+	nameLeft: pixels;
+	iconPosition: point;
+	itemPadding: margins;
+}
+defaultWhoRead: WhoRead {
+	userpics: GroupCallUserpics {
+		size: 22px;
+		shift: 8px;
+		stroke: 4px;
+		align: align(right);
+	}
+	photoLeft: 13px;
+	photoSize: 30px;
+	photoSkip: 5px;
+	nameLeft: 57px;
+	iconPosition: point(14px, 9px);
+	itemPadding: margins(38px, 8px, 17px, 6px);
+}
+whoReadMenu: PopupMenu(defaultPopupMenu) {
+	scrollPadding: margins(0px, 6px, 0px, 6px);
+	maxHeight: 387px;
+	menu: Menu(defaultMenu) {
+		separatorPadding: margins(0px, 6px, 0px, 8px);
+	}
+}
+whoReadChecks: icon{{ "chat/seen_checks", windowFg }};
+whoReadChecksOver: icon{{ "chat/seen_checks", windowFgOver }};
+whoReadChecksDisabled: icon{{ "chat/seen_checks", menuFgDisabled }};
+whoReadPlayed: icon{{ "chat/seen_played", windowFg }};
+whoReadPlayedOver: icon{{ "chat/seen_played", windowFgOver }};
+whoReadPlayedDisabled: icon {{ "chat/seen_played", menuFgDisabled }};

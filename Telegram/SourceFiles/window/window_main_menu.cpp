@@ -1011,26 +1011,21 @@ void MainMenu::refreshMenu() {
 }
 
 void MainMenu::refreshBackground() {
+	if (IsFilledCover()) {
+		return;
+	}
 	const auto fill = QSize(st::mainMenuWidth, st::mainMenuCoverHeight);
 	const auto intensityText = IntensityOfColor(st::mainMenuCoverFg->c);
 	const auto background = Window::Theme::Background();
-	const auto &paper = background->paper();
 	const auto &prepared = background->prepared();
 
 	const auto rects = Ui::ComputeChatBackgroundRects(
 		fill,
 		prepared.size());
 
-	auto backgroundImage = paper.isPattern()
-		? Ui::GenerateBackgroundImage(
-			fill * cIntRetinaFactor(),
-			paper.backgroundColors(),
-			paper.gradientRotation(),
-			paper.patternOpacity(),
-			[&](QPainter &p) { p.drawImage(rects.to, prepared, rects.from); })
-		: QImage(
-			fill * cIntRetinaFactor(),
-			QImage::Format_ARGB32_Premultiplied);
+	auto backgroundImage = QImage(
+		fill * cIntRetinaFactor(),
+		QImage::Format_ARGB32_Premultiplied);
 	QPainter p(&backgroundImage);
 
 	const auto drawShadow = [](QPainter &p) {
@@ -1044,21 +1039,8 @@ void MainMenu::refreshBackground() {
 				: Qt::black);
 	};
 
-	// Solid color.
-	if (const auto color = background->colorForFill()) {
-		const auto intensity = IntensityOfColor(*color);
-		p.fillRect(QRect(QPoint(), fill), *color);
-		if (std::abs(intensity - intensityText) < kMinDiffIntensity) {
-			drawShadow(p);
-		}
-		_background = backgroundImage;
-		return;
-	}
-
 	// Background image.
-	if (!paper.isPattern()) {
-		p.drawImage(rects.to, prepared, rects.from);
-	}
+	p.drawImage(rects.to, prepared, rects.from);
 
 	// Cut off the part of the background that is under text.
 	const QRect underText(

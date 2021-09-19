@@ -333,7 +333,7 @@ void Histories::sendDialogRequests() {
 	}
 
 	const auto finalize = [=] {
-		for (const auto history : histories) {
+		for (const auto &history : histories) {
 			const auto state = lookup(history);
 			if (!state || !state->postponedRequestEntry) {
 				dialogEntryApplied(history);
@@ -415,13 +415,13 @@ void Histories::requestFakeChatListMessage(
 	sendRequest(history, RequestType::History, [=](Fn<void()> finish) {
 		return session().api().request(MTPmessages_GetHistory(
 			history->peer->input,
-			MTP_int(0),  // offset_id
-			MTP_int(0),  // offset_date
-			MTP_int(0),  // add_offset
-			MTP_int(2),  // limit
-			MTP_int(0),  // max_id
-			MTP_int(0),  // min_id
-			MTP_int(0)
+			MTP_int(0), // offset_id
+			MTP_int(0), // offset_date
+			MTP_int(0), // add_offset
+			MTP_int(2), // limit
+			MTP_int(0), // max_id
+			MTP_int(0), // min_id
+			MTP_long(0) // hash
 		)).done([=](const MTPmessages_Messages &result) {
 			_fakeChatListRequests.erase(history);
 			history->setFakeChatListMessageFrom(result);
@@ -667,7 +667,7 @@ void Histories::deleteMessages(const MessageIdsList &ids, bool revoke) {
 	remove.reserve(ids.size());
 	base::flat_map<not_null<History*>, QVector<MTPint>> idsByPeer;
 	base::flat_map<not_null<PeerData*>, QVector<MTPint>> scheduledIdsByPeer;
-	for (const auto itemId : ids) {
+	for (const auto &itemId : ids) {
 		if (const auto item = _owner->message(itemId)) {
 			const auto history = item->history();
 			if (item->isScheduled()) {

@@ -20,9 +20,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/image/image.h"
 #include "ui/text/text_options.h"
 #include "ui/text/format_values.h"
-#include "ui/chat/chat_theme.h"
+#include "ui/chat/chat_style.h"
 #include "ui/cached_round_corners.h"
-#include "layout/layout_selection.h" // FullSelection
 #include "data/data_session.h"
 #include "data/data_wall_paper.h"
 #include "data/data_media_types.h"
@@ -57,7 +56,7 @@ std::vector<std::unique_ptr<Data::Media>> PrepareCollageMedia(
 		const WebPageCollage &data) {
 	auto result = std::vector<std::unique_ptr<Data::Media>>();
 	result.reserve(data.items.size());
-	for (const auto item : data.items) {
+	for (const auto &item : data.items) {
 		if (const auto document = std::get_if<DocumentData*>(&item)) {
 			result.push_back(std::make_unique<Data::MediaFile>(
 				parent,
@@ -453,11 +452,12 @@ void WebPage::draw(Painter &p, const PaintContext &context) const {
 	if (width() < st::msgPadding.left() + st::msgPadding.right() + 1) return;
 	auto paintw = width();
 
-	auto outbg = _parent->hasOutLayout();
-	bool selected = (context.selection == FullSelection);
+	const auto st = context.st;
+	const auto sti = context.imageStyle();
+	const auto stm = context.messageStyle();
 
-	auto &barfg = selected ? (outbg ? st::msgOutReplyBarSelColor : st::msgInReplyBarSelColor) : (outbg ? st::msgOutReplyBarColor : st::msgInReplyBarColor);
-	auto &semibold = selected ? (outbg ? st::msgOutServiceFgSelected : st::msgInServiceFgSelected) : (outbg ? st::msgOutServiceFg : st::msgInServiceFg);
+	const auto &barfg = stm->msgReplyBarColor;
+	const auto &semibold = stm->msgServiceFg;
 
 	QMargins bubble(_attach ? _attach->bubbleMargins() : QMargins());
 	auto padding = inBubblePadding();
@@ -502,22 +502,31 @@ void WebPage::draw(Painter &p, const PaintContext &context) const {
 			pix = blurred->pixBlurredSingle(pixw, pixh, pw, ph, ImageRoundRadius::Small);
 		}
 		p.drawPixmapLeft(padding.left() + paintw - pw, tshift, width(), pix);
-		if (selected) {
-			Ui::FillRoundRect(p, style::rtlrect(padding.left() + paintw - pw, tshift, pw, _pixh, width()), p.textPalette().selectOverlay, Ui::SelectedOverlaySmallCorners);
+		if (context.selected()) {
+			const auto st = context.st;
+			Ui::FillRoundRect(
+				p,
+				style::rtlrect(padding.left() + paintw - pw, tshift, pw, _pixh, width()),
+				st->msgSelectOverlay(),
+				st->msgSelectOverlayCornersSmall());
 		}
 		paintw -= pw + st::webPagePhotoDelta;
 	}
 	if (_siteNameLines) {
 		p.setPen(semibold);
+		p.setTextPalette(stm->semiboldPalette);
+
 		auto endskip = 0;
 		if (_siteName.hasSkipBlock()) {
 			endskip = _parent->skipBlockWidth();
 		}
 		_siteName.drawLeftElided(p, padding.left(), tshift, paintw, width(), _siteNameLines, style::al_left, 0, -1, endskip, false, context.selection);
 		tshift += lineHeight;
+
+		p.setTextPalette(stm->textPalette);
 	}
+	p.setPen(stm->historyTextFg);
 	if (_titleLines) {
-		p.setPen(outbg ? st::webPageTitleOutFg : st::webPageTitleInFg);
 		auto endskip = 0;
 		if (_title.hasSkipBlock()) {
 			endskip = _parent->skipBlockWidth();
@@ -526,7 +535,6 @@ void WebPage::draw(Painter &p, const PaintContext &context) const {
 		tshift += _titleLines * lineHeight;
 	}
 	if (_descriptionLines) {
-		p.setPen(outbg ? st::webPageDescriptionOutFg : st::webPageDescriptionInFg);
 		auto endskip = 0;
 		if (_description.hasSkipBlock()) {
 			endskip = _parent->skipBlockWidth();
@@ -549,9 +557,12 @@ void WebPage::draw(Painter &p, const PaintContext &context) const {
 
 		p.translate(attachLeft, attachTop);
 
-		auto attachContext = context.translated(-attachLeft, -attachTop);
-		attachContext.selection = selected ? FullSelection : TextSelection { 0, 0 };
-		_attach->draw(p, attachContext);
+		_attach->draw(p, context.translated(
+			-attachLeft,
+			-attachTop
+		).withSelection(context.selected()
+			? FullSelection
+			: TextSelection()));
 		auto pixwidth = _attach->width();
 		auto pixheight = _attach->height();
 
@@ -561,9 +572,9 @@ void WebPage::draw(Painter &p, const PaintContext &context) const {
 			&& !_data->document) {
 			if (_attach->isReadyForOpen()) {
 				if (_data->siteName == qstr("YouTube")) {
-					st::youtubeIcon.paint(p, (pixwidth - st::youtubeIcon.width()) / 2, (pixheight - st::youtubeIcon.height()) / 2, width());
+					st->youtubeIcon().paint(p, (pixwidth - st::youtubeIcon.width()) / 2, (pixheight - st::youtubeIcon.height()) / 2, width());
 				} else {
-					st::videoIcon.paint(p, (pixwidth - st::videoIcon.width()) / 2, (pixheight - st::videoIcon.height()) / 2, width());
+					st->videoIcon().paint(p, (pixwidth - st::videoIcon.width()) / 2, (pixheight - st::videoIcon.height()) / 2, width());
 				}
 			}
 			if (_durationWidth) {
@@ -572,10 +583,10 @@ void WebPage::draw(Painter &p, const PaintContext &context) const {
 				auto dateW = pixwidth - dateX - st::msgDateImgDelta;
 				auto dateH = pixheight - dateY - st::msgDateImgDelta;
 
-				Ui::FillRoundRect(p, dateX, dateY, dateW, dateH, selected ? st::msgDateImgBgSelected : st::msgDateImgBg, selected ? Ui::DateSelectedCorners : Ui::DateCorners);
+				Ui::FillRoundRect(p, dateX, dateY, dateW, dateH, sti->msgDateImgBg, sti->msgDateImgBgCorners);
 
 				p.setFont(st::msgDateFont);
-				p.setPen(st::msgDateImgFg);
+				p.setPen(st->msgDateImgFg());
 				p.drawTextLeft(dateX + st::msgDateImgPadding.x(), dateY + st::msgDateImgPadding.y(), pixwidth, _duration);
 			}
 		}
@@ -584,7 +595,7 @@ void WebPage::draw(Painter &p, const PaintContext &context) const {
 
 		if (!attachAdditionalInfoText.isEmpty()) {
 			p.setFont(st::msgDateFont);
-			p.setPen(selected ? (outbg ? st::msgOutDateFgSelected : st::msgInDateFgSelected) : (outbg ? st::msgOutDateFg : st::msgInDateFg));
+			p.setPen(stm->msgDateFg);
 			p.drawTextLeft(st::msgPadding.left(), bar.y() + bar.height() + st::mediaInBubbleSkip, width(), attachAdditionalInfoText);
 		}
 	}

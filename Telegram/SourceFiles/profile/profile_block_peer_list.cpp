@@ -63,8 +63,9 @@ void PeerListWidget::paintContents(Painter &p) {
 	auto left = getListLeft();
 	auto top = getListTop();
 
-	auto from = floorclamp(_visibleTop - top, _st.height, 0, _items.size());
-	auto to = ceilclamp(_visibleBottom - top, _st.height, 0, _items.size());
+	const auto count = int(_items.size());
+	auto from = floorclamp(_visibleTop - top, _st.height, 0, count);
+	auto to = ceilclamp(_visibleBottom - top, _st.height, 0, count);
 	for (auto i = from; i < to; ++i) {
 		auto y = top + i * _st.height;
 		auto selected = (_pressed >= 0) ? (i == _pressed) : (i == _selected);
@@ -145,7 +146,7 @@ void PeerListWidget::mousePressEvent(QMouseEvent *e) {
 	_pressed = _selected;
 	_pressedRemove = _selectedRemove;
 	if (_pressed >= 0 && !_pressedRemove) {
-		auto item = _items[_pressed];
+		const auto item = _items[_pressed];
 		if (!item->ripple) {
 			auto memberRowWidth = rowWidth();
 			auto mask = Ui::RippleAnimation::rectMask(QSize(memberRowWidth, _st.height));
@@ -168,7 +169,7 @@ void PeerListWidget::mousePressReleased(Qt::MouseButton button) {
 	auto pressed = std::exchange(_pressed, -1);
 	auto pressedRemove = base::take(_pressedRemove);
 	if (pressed >= 0 && pressed < _items.size()) {
-		if (auto &ripple = _items[pressed]->ripple) {
+		if (const auto &ripple = _items[pressed]->ripple) {
 			ripple->lastStop();
 		}
 		if (pressed == _selected && pressedRemove == _selectedRemove && button == Qt::LeftButton) {
@@ -272,7 +273,7 @@ void PeerListWidget::preloadPhotos() {
 }
 
 void PeerListWidget::refreshVisibility() {
-	setVisible(!_items.isEmpty());
+	setVisible(!_items.empty());
 }
 
 } // namespace Profile

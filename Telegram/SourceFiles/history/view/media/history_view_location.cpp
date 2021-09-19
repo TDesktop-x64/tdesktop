@@ -7,14 +7,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/media/history_view_location.h"
 
-#include "layout/layout_selection.h"
 #include "history/history.h"
 #include "history/history_item_components.h"
 #include "history/history_item.h"
 #include "history/history_location_manager.h"
 #include "history/view/history_view_element.h"
 #include "history/view/history_view_cursor_state.h"
-#include "ui/chat/chat_theme.h"
+#include "ui/chat/chat_style.h"
 #include "ui/image/image.h"
 #include "ui/text/text_options.h"
 #include "ui/cached_round_corners.h"
@@ -153,8 +152,9 @@ void Location::draw(Painter &p, const PaintContext &context) const {
 	if (width() < st::msgPadding.left() + st::msgPadding.right() + 1) return;
 	auto paintx = 0, painty = 0, paintw = width(), painth = height();
 	bool bubble = _parent->hasBubble();
-	auto outbg = _parent->hasOutLayout();
-	bool selected = (context.selection == FullSelection);
+	const auto st = context.st;
+	const auto sti = context.imageStyle();
+	const auto stm = context.messageStyle();
 
 	if (bubble) {
 		if (!_title.isEmpty() || !_description.isEmpty()) {
@@ -165,13 +165,12 @@ void Location::draw(Painter &p, const PaintContext &context) const {
 
 		auto textw = width() - st::msgPadding.left() - st::msgPadding.right();
 
+		p.setPen(stm->historyTextFg);
 		if (!_title.isEmpty()) {
-			p.setPen(outbg ? st::webPageTitleOutFg : st::webPageTitleInFg);
 			_title.drawLeftElided(p, paintx + st::msgPadding.left(), painty, textw, width(), 2, style::al_left, 0, -1, 0, false, context.selection);
 			painty += qMin(_title.countHeight(textw), 2 * st::webPageTitleFont->height);
 		}
 		if (!_description.isEmpty()) {
-			p.setPen(outbg ? st::webPageDescriptionOutFg : st::webPageDescriptionInFg);
 			_description.drawLeftElided(p, paintx + st::msgPadding.left(), painty, textw, width(), 3, style::al_left, 0, -1, 0, false, toDescriptionSelection(context.selection));
 			painty += qMin(_description.countHeight(textw), 3 * st::webPageDescriptionFont->height);
 		}
@@ -180,7 +179,7 @@ void Location::draw(Painter &p, const PaintContext &context) const {
 		}
 		painth -= painty;
 	} else {
-		Ui::FillRoundShadow(p, 0, 0, paintw, painth, selected ? st::msgInShadowSelected : st::msgInShadow, selected ? Ui::InSelectedShadowCorners : Ui::InShadowCorners);
+		Ui::FillRoundShadow(p, 0, 0, paintw, painth, sti->msgShadow, sti->msgShadowCorners);
 	}
 
 	auto roundRadius = ImageRoundRadius::Large;
@@ -192,7 +191,7 @@ void Location::draw(Painter &p, const PaintContext &context) const {
 		const auto &pix = thumbnail->pixSingle(paintw, painth, paintw, painth, roundRadius, roundCorners);
 		p.drawPixmap(rthumb.topLeft(), pix);
 	} else {
-		Ui::FillComplexLocationRect(p, rthumb, roundRadius, roundCorners);
+		Ui::FillComplexLocationRect(p, st, rthumb, roundRadius, roundCorners);
 	}
 	const auto paintMarker = [&](const style::icon &icon) {
 		icon.paint(
@@ -201,20 +200,26 @@ void Location::draw(Painter &p, const PaintContext &context) const {
 			rthumb.y() + (rthumb.height() / 2) - icon.height(),
 			width());
 	};
-	paintMarker(st::historyMapPoint);
-	paintMarker(st::historyMapPointInner);
-	if (selected) {
-		Ui::FillComplexOverlayRect(p, rthumb, roundRadius, roundCorners);
+	paintMarker(st->historyMapPoint());
+	paintMarker(st->historyMapPointInner());
+	if (context.selected()) {
+		Ui::FillComplexOverlayRect(p, st, rthumb, roundRadius, roundCorners);
 	}
 
 	if (_parent->media() == this) {
 		auto fullRight = paintx + paintw;
 		auto fullBottom = height();
-		_parent->drawInfo(p, fullRight, fullBottom, paintx * 2 + paintw, selected, InfoDisplayType::Image);
+		_parent->drawInfo(
+			p,
+			context,
+			fullRight,
+			fullBottom,
+			paintx * 2 + paintw,
+			InfoDisplayType::Image);
 		if (const auto size = bubble ? std::nullopt : _parent->rightActionSize()) {
 			auto fastShareLeft = (fullRight + st::historyFastShareLeft);
 			auto fastShareTop = (fullBottom - st::historyFastShareBottom - size->height());
-			_parent->drawRightAction(p, fastShareLeft, fastShareTop, 2 * paintx + paintw);
+			_parent->drawRightAction(p, context, fastShareLeft, fastShareTop, 2 * paintx + paintw);
 		}
 	}
 }

@@ -16,6 +16,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_document.h"
 #include "data/data_document_media.h"
 #include "base/platform/base_platform_info.h"
+#include "base/random.h"
 #include "ui/effects/animation_value.h"
 #include "core/update_checker.h"
 #include "core/file_location.h"
@@ -130,6 +131,10 @@ bool CheckStreamStatus(QDataStream &stream) {
 void applyReadContext(ReadSettingsContext &&context) {
 	ApplyReadFallbackConfig(context);
 
+	DEBUG_LOG(("Theme: applying context, legacy: %1, day: %2, night: %3"
+		).arg(context.themeKeyLegacy
+		).arg(context.themeKeyDay
+		).arg(context.themeKeyNight));
 	_themeKeyLegacy = context.themeKeyLegacy;
 	_themeKeyDay = context.themeKeyDay;
 	_themeKeyNight = context.themeKeyNight;
@@ -446,7 +451,7 @@ void writeSettings() {
 	FileWriteDescriptor settings(name, _basePath);
 	if (_settingsSalt.isEmpty() || !SettingsKey) {
 		_settingsSalt.resize(LocalEncryptSaltSize);
-		memset_rand(_settingsSalt.data(), _settingsSalt.size());
+		base::RandomFill(_settingsSalt.data(), _settingsSalt.size());
 		SettingsKey = CreateLegacyLocalKey(QByteArray(), _settingsSalt);
 	}
 	settings.writeData(_settingsSalt);
@@ -874,6 +879,7 @@ Window::Theme::Saved readThemeUsingKey(FileKey key) {
 
 	FileReadDescriptor theme;
 	if (!ReadEncryptedFile(theme, key, _basePath, SettingsKey)) {
+		DEBUG_LOG(("Theme: Could not read file for key: %1").arg(key));
 		return {};
 	}
 
@@ -898,6 +904,9 @@ Window::Theme::Saved readThemeUsingKey(FileKey key) {
 		object.pathRelative = tag;
 	}
 	if (theme.stream.status() != QDataStream::Ok) {
+		DEBUG_LOG(("Theme: Bad status for key: %1, tag: %2"
+			).arg(key
+			).arg(tag));
 		return {};
 	}
 
@@ -937,6 +946,9 @@ Window::Theme::Saved readThemeUsingKey(FileKey key) {
 		>> field2;
 	if (!ignoreCache) {
 		if (theme.stream.status() != QDataStream::Ok) {
+			DEBUG_LOG(("Theme: Bad status for cache, key: %1, tag: %2"
+				).arg(key
+				).arg(tag));
 			return {};
 		}
 		cache.paletteChecksum = cachePaletteChecksum;
@@ -955,8 +967,12 @@ Window::Theme::Saved readThemeUsingKey(FileKey key) {
 std::optional<QString> InitialLoadThemeUsingKey(FileKey key) {
 	auto read = readThemeUsingKey(key);
 	const auto result = read.object.pathAbsolute;
+	if (read.object.content.isEmpty()) {
+		DEBUG_LOG(("Theme: Could not read content for key: %1").arg(key));
+	}
 	if (read.object.content.isEmpty()
 		|| !Window::Theme::Initialize(std::move(read))) {
+		DEBUG_LOG(("Theme: Could not initialized for key: %1").arg(key));
 		return std::nullopt;
 	}
 	return result;
@@ -966,13 +982,23 @@ void writeTheme(const Window::Theme::Saved &saved) {
 	using namespace Window::Theme;
 
 	if (_themeKeyLegacy) {
+		DEBUG_LOG(("Theme: skipping write, because legacy: %1"
+			).arg(_themeKeyLegacy));
 		return;
 	}
 	auto &themeKey = IsNightMode()
 		? _themeKeyNight
 		: _themeKeyDay;
+	DEBUG_LOG(("Theme: writing (night: %1), key_day: %2, key_night: %3"
+		).arg(Logs::b(IsNightMode())
+		).arg(_themeKeyDay
+		).arg(_themeKeyNight));
 	if (saved.object.content.isEmpty()) {
 		if (themeKey) {
+			if (IsNightMode()) {
+				DEBUG_LOG(("Theme: cleared for night mode."));
+				SetNightModeValue(false);
+			}
 			ClearKey(themeKey, _basePath);
 			themeKey = 0;
 			writeSettings();
@@ -1037,17 +1063,36 @@ void InitialLoadTheme() {
 		: (Window::Theme::IsNightMode()
 			? _themeKeyNight
 			: _themeKeyDay);
+	DEBUG_LOG(("Theme: initial load (night: %1), "
+		"key_legacy: %2, key_day: %3, key_night: %4"
+		).arg(Logs::b(Window::Theme::IsNightMode())
+		).arg(_themeKeyLegacy
+		).arg(_themeKeyDay
+		).arg(_themeKeyNight));
 	if (!key) {
+		if (Window::Theme::IsNightMode()) {
+			DEBUG_LOG(("Theme: zero key for night mode."));
+			Window::Theme::SetNightModeValue(false);
+		}
 		return;
 	} else if (const auto path = InitialLoadThemeUsingKey(key)) {
+		DEBUG_LOG(("Theme: loaded with result: %1").arg(*path));
 		if (_themeKeyLegacy) {
 			Window::Theme::SetNightModeValue(*path
 				== Window::Theme::NightThemePath());
 			(Window::Theme::IsNightMode()
 				? _themeKeyNight
 				: _themeKeyDay) = base::take(_themeKeyLegacy);
+			DEBUG_LOG(("Theme: now (night: %1), "
+				"key_legacy: %2, key_day: %3, key_night: %4 (path: %5)"
+				).arg(Logs::b(Window::Theme::IsNightMode())
+				).arg(_themeKeyLegacy
+				).arg(_themeKeyDay
+				).arg(_themeKeyNight
+				).arg(*path));
 		}
 	} else {
+		DEBUG_LOG(("Theme: could not load, clearing.."));
 		clearTheme();
 	}
 }

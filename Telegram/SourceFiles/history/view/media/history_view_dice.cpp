@@ -46,16 +46,14 @@ Dice::Dice(not_null<Element*> parent, not_null<Data::MediaDice*> dice)
 Dice::~Dice() = default;
 
 QSize Dice::size() {
-	return _start
-		? _start->size()
-		: Sticker::GetAnimatedEmojiSize(&_parent->history()->session());
+	return _start ? _start->size() : Sticker::EmojiSize();
 }
 
 ClickHandlerPtr Dice::link() {
 	return _link;
 }
 
-void Dice::draw(Painter &p, const QRect &r, bool selected) {
+void Dice::draw(Painter &p, const PaintContext &context, const QRect &r) {
 	if (!_start) {
 		if (const auto document = Lookup(_parent, _dice->emoji(), 0)) {
 			_start.emplace(_parent, document);
@@ -74,9 +72,9 @@ void Dice::draw(Painter &p, const QRect &r, bool selected) {
 		_drawingEnd = false;
 	}
 	if (_drawingEnd) {
-		_end->draw(p, r, selected);
+		_end->draw(p, context, r);
 	} else if (_start) {
-		_start->draw(p, r, selected);
+		_start->draw(p, context, r);
 		if (_end && _end->readyToDrawLottie() && _start->atTheEnd()) {
 			_drawingEnd = true;
 		}

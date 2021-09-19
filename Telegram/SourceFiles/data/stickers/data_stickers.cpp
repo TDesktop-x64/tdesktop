@@ -24,7 +24,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mtproto/mtproto_config.h"
 #include "ui/toast/toast.h"
 #include "ui/image/image_location_factory.h"
-#include "base/openssl_help.h"
 #include "base/unixtime.h"
 #include "styles/style_chat_helpers.h"
 
@@ -126,11 +125,11 @@ void Stickers::incrementSticker(not_null<DocumentData*> document) {
 				std::make_unique<Data::StickersSet>(
 					&session().data(),
 					Data::Stickers::CloudRecentSetId,
-					uint64(0),
+					uint64(0), // accessHash
+					uint64(0), // hash
 					tr::lng_recent_stickers(tr::now),
 					QString(),
 					0, // count
-					0, // hash
 					SetFlag::Special,
 					TimeId(0))).first;
 		} else {
@@ -166,7 +165,7 @@ void Stickers::incrementSticker(not_null<DocumentData*> document) {
 		}
 		set->stickers.push_front(document);
 		if (const auto emojiList = getEmojiListFromSet(document)) {
-			for (const auto emoji : *emojiList) {
+			for (const auto &emoji : *emojiList) {
 				set->emoji[emoji].push_front(document);
 			}
 		} else if (!removedFromEmoji.empty()) {
@@ -287,7 +286,7 @@ void Stickers::applyArchivedResult(
 		if (setData) {
 			auto set = feedSet(*setData);
 			if (set->stickers.isEmpty()) {
-				setsToRequest.insert(set->id, set->access);
+				setsToRequest.insert(set->id, set->accessHash);
 			}
 			const auto masks = !!(set->flags & SetFlag::Masks);
 			(masks ? masksCount : stickersCount)++;
@@ -479,11 +478,11 @@ void Stickers::setIsFaved(
 		it = sets.emplace(FavedSetId, std::make_unique<StickersSet>(
 			&document->owner(),
 			FavedSetId,
-			uint64(0),
+			uint64(0), // accessHash
+			uint64(0), // hash
 			Lang::Hard::FavedSetTitle(),
 			QString(),
 			0, // count
-			0, // hash
 			SetFlag::Special,
 			TimeId(0))).first;
 	}
@@ -564,23 +563,31 @@ void Stickers::setFaved(not_null<DocumentData*> document, bool faved) {
 	}
 }
 
-void Stickers::setsReceived(const QVector<MTPStickerSet> &data, int32 hash) {
-	const auto masksReceived = ranges::all_of(
-		data,
-		[](const MTPStickerSet &set) {
-			return set.c_stickerSet().is_masks();
-		});
-	auto &setsOrder = masksReceived
-		? maskSetsOrderRef()
-		: setsOrderRef();
+void Stickers::setsReceived(
+		const QVector<MTPStickerSet> &data,
+		uint64 hash) {
+	setsOrMasksReceived(data, hash, false);
+}
+
+void Stickers::masksReceived(
+		const QVector<MTPStickerSet> &data,
+		uint64 hash) {
+	setsOrMasksReceived(data, hash, true);
+}
+
+void Stickers::setsOrMasksReceived(
+		const QVector<MTPStickerSet> &data,
+		uint64 hash,
+		bool masks) {
+	auto &setsOrder = masks ? maskSetsOrderRef() : setsOrderRef();
 	setsOrder.clear();
 
 	auto &sets = setsRef();
 	QMap<uint64, uint64> setsToRequest;
 	for (auto &[id, set] : sets) {
 		const auto archived = !!(set->flags & SetFlag::Archived);
-		const auto masks = !!(set->flags & SetFlag::Masks);
-		if (!archived && (masksReceived == masks)) {
+		const auto maskset = !!(set->flags & SetFlag::Masks);
+		if (!archived && (masks == maskset)) {
 			// Mark for removing.
 			set->flags &= ~SetFlag::Installed;
 			set->installDate = 0;
@@ -596,7 +603,7 @@ void Stickers::setsReceived(const QVector<MTPStickerSet> &data, int32 hash) {
 			setsOrder.push_back(set->id);
 			if (set->stickers.isEmpty()
 				|| (set->flags & SetFlag::NotLoaded)) {
-				setsToRequest.insert(set->id, set->access);
+				setsToRequest.insert(set->id, set->accessHash);
 			}
 		}
 	}
@@ -633,7 +640,7 @@ void Stickers::setsReceived(const QVector<MTPStickerSet> &data, int32 hash) {
 		api.requestStickerSets();
 	}
 
-	if (masksReceived) {
+	if (masks) {
 		session().local().writeInstalledMasks();
 	} else {
 		session().local().writeInstalledStickers();
@@ -642,9 +649,12 @@ void Stickers::setsReceived(const QVector<MTPStickerSet> &data, int32 hash) {
 		session().saveSettings();
 	}
 
-	const auto counted = Api::CountStickersHash(&session());
+	const auto counted = masks
+		? Api::CountMasksHash(&session())
+		: Api::CountStickersHash(&session());
 	if (counted != hash) {
-		LOG(("API Error: received stickers hash %1 while counted hash is %2"
+		LOG(("API Error: received %1 hash %2 while counted hash is %3"
+			).arg(masks ? "masks" : "stickers"
 			).arg(hash
 			).arg(counted));
 	}
@@ -684,7 +694,7 @@ void Stickers::specialSetReceived(
 		uint64 setId,
 		const QString &setTitle,
 		const QVector<MTPDocument> &items,
-		int32 hash,
+		uint64 hash,
 		const QVector<MTPStickerPack> &packs,
 		const QVector<MTPint> &usageDates) {
 	auto &sets = setsRef();
@@ -699,11 +709,11 @@ void Stickers::specialSetReceived(
 			it = sets.emplace(setId, std::make_unique<StickersSet>(
 				&owner(),
 				setId,
-				uint64(0),
+				uint64(0), // accessHash
+				uint64(0), // hash
 				setTitle,
 				QString(),
 				0, // count
-				0, // hash
 				SetFlag::Special,
 				TimeId(0))).first;
 		} else {
@@ -808,7 +818,7 @@ void Stickers::specialSetReceived(
 void Stickers::featuredSetsReceived(
 		const QVector<MTPStickerSetCovered> &list,
 		const QVector<MTPlong> &unread,
-		int32 hash) {
+		uint64 hash) {
 	auto &&unreadIds = ranges::views::all(
 		unread
 	) | ranges::views::transform([](const MTPlong &id) {
@@ -861,16 +871,16 @@ void Stickers::featuredSetsReceived(
 				&owner(),
 				data->vid().v,
 				data->vaccess_hash().v,
+				data->vhash().v,
 				title,
 				qs(data->vshort_name()),
 				data->vcount().v,
-				data->vhash().v,
 				flags | SetFlag::NotLoaded,
 				installDate)).first;
 			it->second->setThumbnail(thumbnail);
 		} else {
 			const auto set = it->second.get();
-			set->access = data->vaccess_hash().v;
+			set->accessHash = data->vaccess_hash().v;
 			set->title = title;
 			set->shortName = qs(data->vshort_name());
 			set->flags = flags
@@ -929,7 +939,7 @@ void Stickers::featuredSetsReceived(
 	notifyUpdated();
 }
 
-void Stickers::gifsReceived(const QVector<MTPDocument> &items, int32 hash) {
+void Stickers::gifsReceived(const QVector<MTPDocument> &items, uint64 hash) {
 	auto &saved = savedGifsRef();
 	saved.clear();
 
@@ -1061,7 +1071,7 @@ std::vector<not_null<DocumentData*>> Stickers::getListByEmoji(
 			}
 			const auto set = it->second.get();
 			if (set->emoji.isEmpty()) {
-				setsToRequest.emplace(set->id, set->access);
+				setsToRequest.emplace(set->id, set->accessHash);
 				set->flags |= SetFlag::NotLoaded;
 				continue;
 			}
@@ -1168,16 +1178,16 @@ StickersSet *Stickers::feedSet(const MTPDstickerSet &data) {
 			&owner(),
 			data.vid().v,
 			data.vaccess_hash().v,
+			data.vhash().v,
 			title,
 			qs(data.vshort_name()),
 			data.vcount().v,
-			data.vhash().v,
 			flags | SetFlag::NotLoaded,
 			data.vinstalled_date().value_or_empty())).first;
 		it->second->setThumbnail(thumbnail);
 	} else {
 		const auto set = it->second.get();
-		set->access = data.vaccess_hash().v;
+		set->accessHash = data.vaccess_hash().v;
 		set->title = title;
 		set->shortName = qs(data.vshort_name());
 		oldFlags = set->flags;

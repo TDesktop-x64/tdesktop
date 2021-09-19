@@ -27,6 +27,7 @@ enum class WindowLayout;
 
 namespace ChatHelpers {
 class TabbedSelector;
+class EmojiInteractions;
 } // namespace ChatHelpers
 
 namespace Main {
@@ -49,6 +50,7 @@ class ChatStyle;
 class ChatTheme;
 struct ChatPaintContext;
 struct ChatThemeBackground;
+struct ChatThemeBackgroundData;
 } // namespace Ui
 
 namespace Data {
@@ -246,6 +248,9 @@ public:
 	[[nodiscard]] not_null<::MainWindow*> widget() const;
 	[[nodiscard]] not_null<MainWidget*> content() const;
 	[[nodiscard]] Adaptive &adaptive() const;
+	[[nodiscard]] ChatHelpers::EmojiInteractions &emojiInteractions() const {
+		return *_emojiInteractions;
+	}
 
 	// We need access to this from MainWidget::MainWidget, where
 	// we can't call content() yet.
@@ -408,6 +413,7 @@ public:
 		const Data::CloudTheme &data)
 	-> rpl::producer<std::shared_ptr<Ui::ChatTheme>>;
 	void setChatStyleTheme(const std::shared_ptr<Ui::ChatTheme> &theme);
+	void clearCachedChatThemes();
 
 	struct PaintContextArgs {
 		not_null<Ui::ChatTheme*> theme;
@@ -418,6 +424,9 @@ public:
 	};
 	[[nodiscard]] Ui::ChatPaintContext preparePaintContext(
 		PaintContextArgs &&args);
+	[[nodiscard]] not_null<const Ui::ChatStyle*> chatStyle() const {
+		return _chatStyle.get();
+	}
 
 	rpl::lifetime &lifetime() {
 		return _lifetime;
@@ -454,11 +463,13 @@ private:
 	void cacheChatTheme(const Data::CloudTheme &data);
 	void cacheChatThemeDone(std::shared_ptr<Ui::ChatTheme> result);
 	void updateCustomThemeBackground(CachedTheme &theme);
-	[[nodiscard]] Fn<Ui::ChatThemeBackground()> backgroundGenerator(
+	[[nodiscard]] Ui::ChatThemeBackgroundData backgroundData(
 		CachedTheme &theme,
-		bool generateGradient = true);
+		bool generateGradient = true) const;
+	void pushToLastUsed(const std::shared_ptr<Ui::ChatTheme> &theme);
 
 	const not_null<Controller*> _window;
+	const std::unique_ptr<ChatHelpers::EmojiInteractions> _emojiInteractions;
 
 	std::unique_ptr<Passport::FormController> _passportForm;
 	std::unique_ptr<FiltersMenu> _filters;
@@ -488,8 +499,9 @@ private:
 	std::shared_ptr<Ui::ChatTheme> _defaultChatTheme;
 	base::flat_map<uint64, CachedTheme> _customChatThemes;
 	rpl::event_stream<std::shared_ptr<Ui::ChatTheme>> _cachedThemesStream;
-	std::unique_ptr<Ui::ChatStyle> _chatStyle;
+	const std::unique_ptr<Ui::ChatStyle> _chatStyle;
 	std::weak_ptr<Ui::ChatTheme> _chatStyleTheme;
+	std::deque<std::shared_ptr<Ui::ChatTheme>> _lastUsedCustomChatThemes;
 
 	rpl::lifetime _lifetime;
 

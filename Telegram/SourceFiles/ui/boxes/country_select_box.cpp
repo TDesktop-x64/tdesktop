@@ -26,7 +26,7 @@ QString LastValidISO;
 
 } // namespace
 
-class CountrySelectBox::Inner : public TWidget {
+class CountrySelectBox::Inner : public RpWidget {
 public:
 	Inner(QWidget *parent, const QString &iso, Type type);
 	~Inner();
@@ -40,7 +40,7 @@ public:
 
 	void refresh();
 
-	[[nodiscard]] rpl::producer<QString> countryChosen() const {
+	[[nodiscard]] rpl::producer<Entry> countryChosen() const {
 		return _countryChosen.events();
 	}
 
@@ -57,6 +57,7 @@ protected:
 	void mouseReleaseEvent(QMouseEvent *e) override;
 
 private:
+	void init();
 	void updateSelected() {
 		updateSelected(mapFromGlobal(QCursor::pos()));
 	}
@@ -64,7 +65,7 @@ private:
 	void updateSelectedRow();
 	void updateRow(int index);
 	void setPressed(int pressed);
-	const std::vector<not_null<const Countries::Info*>> &current() const;
+	const std::vector<Entry> &current() const;
 
 	Type _type = Type::Phones;
 	int _rowHeight = 0;
@@ -76,12 +77,12 @@ private:
 
 	std::vector<std::unique_ptr<RippleAnimation>> _ripples;
 
-	std::vector<not_null<const Countries::Info*>> _list;
-	std::vector<not_null<const Countries::Info*>> _filtered;
+	std::vector<Entry> _list;
+	std::vector<Entry> _filtered;
 	base::flat_map<QChar, std::vector<int>> _byLetter;
 	std::vector<std::vector<QString>> _namesList;
 
-	rpl::event_stream<QString> _countryChosen;
+	rpl::event_stream<Entry> _countryChosen;
 	rpl::event_stream<ScrollToRequest> _mustScrollTo;
 
 };
@@ -96,6 +97,16 @@ CountrySelectBox::CountrySelectBox(QWidget*, const QString &iso, Type type)
 }
 
 rpl::producer<QString> CountrySelectBox::countryChosen() const {
+	Expects(_ownedInner != nullptr || _inner != nullptr);
+
+	return (_ownedInner
+		? _ownedInner.data()
+		: _inner.data())->countryChosen() | rpl::map([](const Entry &e) {
+			return e.iso2;
+		});
+}
+
+rpl::producer<CountrySelectBox::Entry> CountrySelectBox::entryChosen() const {
 	Expects(_ownedInner != nullptr || _inner != nullptr);
 
 	return (_ownedInner
@@ -169,7 +180,7 @@ CountrySelectBox::Inner::Inner(
 	QWidget *parent,
 	const QString &iso,
 	Type type)
-: TWidget(parent)
+: RpWidget(parent)
 , _type(type)
 , _rowHeight(st::countryRowHeight) {
 	setAttribute(Qt::WA_OpaquePaintEvent);
@@ -180,25 +191,53 @@ CountrySelectBox::Inner::Inner(
 		LastValidISO = iso;
 	}
 
+	rpl::single(
+	) | rpl::then(
+		Countries::Instance().updated()
+	) | rpl::start_with_next([=] {
+		_mustScrollTo.fire(ScrollToRequest(0, 0));
+		_list.clear();
+		_namesList.clear();
+		init();
+		const auto filter = _filter;
+		_filter = u"a"_q;
+		updateFilter(filter);
+	}, lifetime());
+}
+
+void CountrySelectBox::Inner::init() {
+	const auto &byISO2 = Countries::Instance().byISO2();
+
+	const auto extractEntries = [&](const Countries::Info &info) {
+		for (const auto &code : info.codes) {
+			_list.push_back(Entry{
+				.country = info.name,
+				.iso2 = info.iso2,
+				.code = code.callingCode,
+				.alternativeName = info.alternativeName,
+			});
+		}
+	};
+
 	_list.reserve(byISO2.size());
 	_namesList.reserve(byISO2.size());
 
 	const auto l = byISO2.constFind(LastValidISO);
 	const auto lastValid = (l != byISO2.cend()) ? (*l) : nullptr;
 	if (lastValid) {
-		_list.emplace_back(lastValid);
+		extractEntries(*lastValid);
 	}
 	for (const auto &entry : Countries::Instance().list()) {
 		if (&entry != lastValid) {
-			_list.emplace_back(&entry);
+			extractEntries(entry);
 		}
 	}
 	auto index = 0;
-	for (const auto info : _list) {
-		auto full = info->name
+	for (const auto &info : _list) {
+		auto full = info.country
 			+ ' '
-			+ (!info->alternativeName.isEmpty()
-				? info->alternativeName
+			+ (!info.alternativeName.isEmpty()
+				? info.alternativeName
 				: QString());
 		const auto namesList = std::move(full).toLower().split(
 			QRegularExpression("[\\s\\-]"),
@@ -220,9 +259,6 @@ CountrySelectBox::Inner::Inner(
 		}
 		++index;
 	}
-
-	_filter = u"a"_q;
-	updateFilter();
 }
 
 void CountrySelectBox::Inner::paintEvent(QPaintEvent *e) {
@@ -256,10 +292,10 @@ void CountrySelectBox::Inner::paintEvent(QPaintEvent *e) {
 			}
 		}
 
-		auto code = QString("+") + list[i]->codes.front().callingCode;
+		auto code = QString("+") + list[i].code;
 		auto codeWidth = st::countryRowCodeFont->width(code);
 
-		auto name = list[i]->name;
+		auto name = list[i].country;
 		auto nameWidth = st::countryRowNameFont->width(name);
 		auto availWidth = width() - st::countryRowPadding.left() - st::countryRowPadding.right() - codeWidth - st::boxScroll.width;
 		if (nameWidth > availWidth) {
@@ -399,9 +435,9 @@ void CountrySelectBox::Inner::selectSkipPage(int32 h, int32 dir) {
 
 void CountrySelectBox::Inner::chooseCountry() {
 	const auto &list = current();
-	_countryChosen.fire((_selected >= 0 && _selected < list.size())
-		? QString(list[_selected]->iso2)
-		: QString());
+	_countryChosen.fire_copy((_selected >= 0 && _selected < list.size())
+		? list[_selected]
+		: Entry());
 }
 
 void CountrySelectBox::Inner::refresh() {
@@ -424,7 +460,7 @@ void CountrySelectBox::Inner::updateSelected(QPoint localPos) {
 }
 
 auto CountrySelectBox::Inner::current() const
--> const std::vector<not_null<const Countries::Info*>> & {
+-> const std::vector<CountrySelectBox::Entry> & {
 	return _filter.isEmpty() ? _list : _filtered;
 }
 

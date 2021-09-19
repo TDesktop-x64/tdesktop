@@ -9,7 +9,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "core/crash_reports.h"
 #include "core/update_checker.h"
-#include "base/platform/linux/base_linux_gtk_integration.h"
 
 #ifndef DESKTOP_APP_DISABLE_WEBKITGTK
 #include "webview/platform/linux/webview_linux_webkit2gtk.h"
@@ -17,8 +16,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtWidgets/QApplication>
 
+#ifndef DESKTOP_APP_DISABLE_DBUS_INTEGRATION
 #include <glibmm.h>
 #include <giomm.h>
+#endif // !DESKTOP_APP_DISABLE_DBUS_INTEGRATION
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -30,8 +31,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace Platform {
 namespace {
-
-using BaseGtkIntegration = base::Platform::GtkIntegration;
 
 class Arguments {
 public:
@@ -60,23 +59,19 @@ Launcher::Launcher(int argc, char *argv[])
 }
 
 int Launcher::exec() {
+#ifndef DESKTOP_APP_DISABLE_DBUS_INTEGRATION
 	Glib::init();
 	Gio::init();
+#endif // !DESKTOP_APP_DISABLE_DBUS_INTEGRATION
 
-	for (auto i = begin(_arguments), e = end(_arguments); i != e; ++i) {
-		if (*i == "-basegtkintegration" && std::distance(i, e) > 2) {
-			BaseGtkIntegration::SetServiceName(QString::fromStdString(*(i + 2)));
-			if (const auto integration = BaseGtkIntegration::Instance()) {
-				return integration->exec(QString::fromStdString(*(i + 1)));
-			}
-			return 1;
 #ifndef DESKTOP_APP_DISABLE_WEBKITGTK
-		} else if (*i == "-webviewhelper" && std::distance(i, e) > 2) {
+	for (auto i = begin(_arguments), e = end(_arguments); i != e; ++i) {
+		if (*i == "-webviewhelper" && std::distance(i, e) > 2) {
 			Webview::WebKit2Gtk::SetServiceName(*(i + 2));
 			return Webview::WebKit2Gtk::Exec(*(i + 1));
-#endif // !DESKTOP_APP_DISABLE_WEBKITGTK
 		}
 	}
+#endif // !DESKTOP_APP_DISABLE_WEBKITGTK
 
 	return Core::Launcher::exec();
 }

@@ -15,6 +15,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_cursor_state.h"
 #include "history/view/media/history_view_media_common.h"
 #include "ui/image/image.h"
+#include "ui/chat/chat_style.h"
 #include "ui/effects/path_shift_gradient.h"
 #include "ui/emoji_config.h"
 #include "core/application.h"
@@ -36,11 +37,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace HistoryView {
 namespace {
 
-[[nodiscard]] double GetEmojiStickerZoom(not_null<Main::Session*> session) {
-	return session->account().appConfig().get<double>(
-		"emojies_animated_zoom",
-		0.625);
-}
+constexpr auto kMaxSizeFixed = 512;
+constexpr auto kMaxEmojiSizeFixed = 256;
 
 [[nodiscard]] QImage CacheDiceImage(
 		const QString &emoji,
@@ -96,16 +94,13 @@ bool Sticker::isEmojiSticker() const {
 }
 
 void Sticker::initSize() {
-	_size = _data->dimensions;
 	if (isEmojiSticker() || _diceIndex >= 0) {
-		_size = GetAnimatedEmojiSize(&_data->session(), _size);
+		_size = Sticker::EmojiSize();
 		if (_diceIndex > 0) {
 			[[maybe_unused]] bool result = readyToDrawLottie();
 		}
 	} else {
-		_size = DownscaledSize(
-			_size,
-			{ st::maxStickerSize, st::maxStickerSize });
+		_size = DownscaledSize(_data->dimensions, Sticker::Size());
 	}
 }
 
@@ -134,36 +129,38 @@ bool Sticker::readyToDrawLottie() {
 	return (_lottie && _lottie->ready());
 }
 
-QSize Sticker::GetAnimatedEmojiSize(not_null<Main::Session*> session) {
-	return GetAnimatedEmojiSize(session, { 512, 512 });
+QSize Sticker::Size() {
+	const auto side = std::min(st::maxStickerSize, kMaxSizeFixed);
+	return { side, side };
 }
 
-QSize Sticker::GetAnimatedEmojiSize(
-		not_null<Main::Session*> session,
-		QSize documentSize) {
-	const auto zoom = GetEmojiStickerZoom(session);
-	const auto convert = [&](int size) {
-		return int(size * st::maxStickerSize * zoom / kStickerSideSize);
-	};
-	return { convert(documentSize.width()), convert(documentSize.height()) };
+QSize Sticker::EmojiSize() {
+	const auto side = std::min(st::maxAnimatedEmojiSize, kMaxEmojiSizeFixed);
+	return { side, side };
 }
 
-void Sticker::draw(Painter &p, const QRect &r, bool selected) {
+void Sticker::draw(
+		Painter &p,
+		const PaintContext &context,
+		const QRect &r) {
 	ensureDataMediaCreated();
 	if (readyToDrawLottie()) {
-		paintLottie(p, r, selected);
+		paintLottie(p, context, r);
 	} else if (!_data->sticker()
 		|| (_data->sticker()->animated && _replacements)
-		|| !paintPixmap(p, r, selected)) {
-		paintPath(p, r, selected);
+		|| !paintPixmap(p, context, r)) {
+		paintPath(p, context, r);
 	}
 }
 
-void Sticker::paintLottie(Painter &p, const QRect &r, bool selected) {
+void Sticker::paintLottie(
+		Painter &p,
+		const PaintContext &context,
+		const QRect &r) {
 	auto request = Lottie::FrameRequest();
 	request.box = _size * cIntRetinaFactor();
-	if (selected && !_nextLastDiceFrame) {
-		request.colored = st::msgStickerOverlay->c;
+	if (context.selected() && !_nextLastDiceFrame) {
+		request.colored = context.st->msgStickerOverlay()->c;
 	}
 	const auto frame = _lottie
 		? _lottie->frameInfo(request)
@@ -175,8 +172,8 @@ void Sticker::paintLottie(Painter &p, const QRect &r, bool selected) {
 	const auto &image = _lastDiceFrame.isNull()
 		? frame.image
 		: _lastDiceFrame;
-	const auto prepared = (!_lastDiceFrame.isNull() && selected)
-		? Images::prepareColored(st::msgStickerOverlay->c, image)
+	const auto prepared = (!_lastDiceFrame.isNull() && context.selected())
+		? Images::prepareColored(context.st->msgStickerOverlay()->c, image)
 		: image;
 	const auto size = prepared.size() / cIntRetinaFactor();
 	p.drawImage(
@@ -216,8 +213,11 @@ void Sticker::paintLottie(Painter &p, const QRect &r, bool selected) {
 	}
 }
 
-bool Sticker::paintPixmap(Painter &p, const QRect &r, bool selected) {
-	const auto pixmap = paintedPixmap(selected);
+bool Sticker::paintPixmap(
+		Painter &p,
+		const PaintContext &context,
+		const QRect &r) {
+	const auto pixmap = paintedPixmap(context);
 	if (pixmap.isNull()) {
 		return false;
 	}
@@ -229,16 +229,19 @@ bool Sticker::paintPixmap(Painter &p, const QRect &r, bool selected) {
 	return true;
 }
 
-void Sticker::paintPath(Painter &p, const QRect &r, bool selected) {
+void Sticker::paintPath(
+		Painter &p,
+		const PaintContext &context,
+		const QRect &r) {
 	const auto pathGradient = _parent->delegate()->elementPathShiftGradient();
-	if (selected) {
+	if (context.selected()) {
 		pathGradient->overrideColors(
-			st::msgServiceBgSelected,
-			st::msgServiceBg);
+			context.st->msgServiceBgSelected(),
+			context.st->msgServiceBg());
 	} else {
 		pathGradient->clearOverridenColors();
 	}
-	p.setBrush(selected ? st::msgServiceBgSelected : st::msgServiceBg);
+	p.setBrush(context.imageStyle()->msgServiceBg);
 	ChatHelpers::PaintStickerThumbnailPath(
 		p,
 		_dataMedia.get(),
@@ -246,28 +249,28 @@ void Sticker::paintPath(Painter &p, const QRect &r, bool selected) {
 		pathGradient);
 }
 
-QPixmap Sticker::paintedPixmap(bool selected) const {
+QPixmap Sticker::paintedPixmap(const PaintContext &context) const {
 	const auto w = _size.width();
 	const auto h = _size.height();
-	const auto &c = st::msgStickerOverlay;
+	const auto &c = context.st->msgStickerOverlay();
 	const auto good = _dataMedia->goodThumbnail();
 	if (const auto image = _dataMedia->getStickerLarge()) {
-		return selected
+		return context.selected()
 			? image->pixColored(c, w, h)
 			: image->pix(w, h);
 	//
 	// Inline thumbnails can't have alpha channel.
 	//
 	//} else if (const auto blurred = _data->thumbnailInline()) {
-	//	return selected
+	//	return context.selected()
 	//		? blurred->pixBlurredColored(c, w, h)
 	//		: blurred->pixBlurred(w, h);
 	} else if (good) {
-		return selected
+		return context.selected()
 			? good->pixColored(c, w, h)
 			: good->pix(w, h);
 	} else if (const auto thumbnail = _dataMedia->thumbnail()) {
-		return selected
+		return context.selected()
 			? thumbnail->pixBlurredColored(c, w, h)
 			: thumbnail->pixBlurred(w, h);
 	}
@@ -282,13 +285,9 @@ void Sticker::refreshLink() {
 	if (isEmojiSticker()) {
 		const auto weak = base::make_weak(this);
 		_link = std::make_shared<LambdaClickHandler>([weak] {
-			const auto that = weak.get();
-			if (!that) {
-				return;
+			if (const auto that = weak.get()) {
+				that->emojiStickerClicked();
 			}
-			that->_lottieOncePlayed = false;
-			that->_parent->history()->owner().requestViewRepaint(
-				that->_parent);
 		});
 	} else if (sticker && sticker->set) {
 		_link = std::make_shared<LambdaClickHandler>([document = _data](ClickContext context) {
@@ -312,6 +311,14 @@ void Sticker::refreshLink() {
 			}),
 			_parent->data()->fullId());
 	}
+}
+
+void Sticker::emojiStickerClicked() {
+	if (_lottie) {
+		_parent->delegate()->elementStartInteraction(_parent);
+	}
+	_lottieOncePlayed = false;
+	_parent->history()->owner().requestViewRepaint(_parent);
 }
 
 void Sticker::ensureDataMediaCreated() const {

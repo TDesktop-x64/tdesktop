@@ -118,6 +118,10 @@ bool SendActionPainter::updateNeedsAnimating(
 		emplaceAction(
 			Type::ChooseSticker,
 			kStatusShowClientsideChooseSticker);
+	}, [&](const MTPDsendMessageEmojiInteraction &) {
+		Unexpected("EmojiInteraction here.");
+	}, [&](const MTPDsendMessageEmojiInteractionSeen &) {
+		// #TODO interaction
 	}, [&](const MTPDsendMessageCancelAction &) {
 		Unexpected("CancelAction here.");
 	});
@@ -296,15 +300,17 @@ bool SendActionPainter::updateNeedsAnimating(crl::time now, bool force) {
 						const auto index = newTypingString.size()
 							- lang.rightIndexChoosingStickerReplacement(
 								isNamed);
-						animationLeft = _st.font->width(
-							newTypingString,
-							0,
-							index);
+						animationLeft = Ui::Text::String(
+							_st,
+							newTypingString.mid(0, index)).maxWidth();
 
 						if (!_spacesCount) {
-							_spacesCount = std::ceil(
-								_sendActionAnimation.width()
-									/ _st.font->spacew);
+							// We have to use QFontMetricsF instead of
+							// FontData::spacew for more precise calculation.
+							const auto mf = QFontMetricsF(_st.font->f);
+							_spacesCount = std::round(
+								_sendActionAnimation.widthNoMargins()
+									/ mf.horizontalAdvance(' '));
 						}
 						newTypingString = newTypingString.replace(
 							index,
@@ -373,8 +379,8 @@ bool SendActionPainter::updateNeedsAnimating(crl::time now, bool force) {
 		|| (sendActionResult && !anim::Disabled())) {
 		_history->peer->owner().sendActionManager().updateAnimation({
 			_history,
-			_animationLeft,
-			_sendActionAnimation.width(),
+			0,
+			_sendActionAnimation.width() + _animationLeft,
 			st::normalFont->height,
 			(force || sendActionChanged)
 		});

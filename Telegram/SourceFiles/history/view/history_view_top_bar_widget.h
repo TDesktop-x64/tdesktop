@@ -104,6 +104,8 @@ protected:
 	int resizeGetHeight(int newWidth) override;
 
 private:
+	struct EmojiInteractionSeenAnimation;
+
 	void refreshInfoButton();
 	void refreshLang();
 	void updateSearchVisibility();
@@ -117,6 +119,16 @@ private:
 	void search();
 	void showMenu();
 	void toggleInfoSection();
+
+	void handleEmojiInteractionSeen(const QString &emoticon);
+	bool paintSendAction(
+		Painter &p,
+		int x,
+		int y,
+		int availableWidth,
+		int outerWidth,
+		style::color fg,
+		crl::time now);
 
 	void updateConnectingState();
 	void updateAdaptiveLayout();
@@ -149,6 +161,7 @@ private:
 	const not_null<Window::SessionController*> _controller;
 	ActiveChat _activeChat;
 	QString _customTitleText;
+	std::unique_ptr<EmojiInteractionSeenAnimation> _emojiInteractionSeen;
 	rpl::lifetime _activeChatLifetime;
 
 	int _selectedCount = 0;

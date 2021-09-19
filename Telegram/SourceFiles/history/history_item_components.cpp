@@ -12,6 +12,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/image/image.h"
 #include "ui/toast/toast.h"
 #include "ui/text/text_options.h"
+#include "ui/chat/chat_style.h"
+#include "ui/chat/chat_theme.h"
 #include "history/history.h"
 #include "history/history_message.h"
 #include "history/view/history_view_service_message.h"
@@ -337,16 +339,17 @@ void HistoryMessageReply::itemRemoved(
 void HistoryMessageReply::paint(
 		Painter &p,
 		not_null<const HistoryView::Element*> holder,
+		const Ui::ChatPaintContext &context,
 		int x,
 		int y,
 		int w,
-		PaintFlags flags) const {
-	bool selected = (flags & PaintFlag::Selected), outbg = holder->hasOutLayout();
+		bool inBubble) const {
+	const auto st = context.st;
+	const auto stm = context.messageStyle();
 
-	style::color bar = st::msgImgReplyBarColor;
-	if (flags & PaintFlag::InBubble) {
-		bar = (flags & PaintFlag::Selected) ? (outbg ? st::msgOutReplyBarSelColor : st::msgInReplyBarSelColor) : (outbg ? st::msgOutReplyBarColor : st::msgInReplyBarColor);
-	}
+	const auto &bar = inBubble
+		? stm->msgReplyBarColor
+		: st->msgImgReplyBarColor();
 	QRect rbar(style::rtlrect(x + st::msgReplyBarPos.x(), y + st::msgReplyPadding.top() + st::msgReplyBarPos.y(), st::msgReplyBarSize.width(), st::msgReplyBarSize.height(), w + 2 * x));
 	p.fillRect(rbar, bar);
 
@@ -363,35 +366,41 @@ void HistoryMessageReply::paint(
 					auto to = style::rtlrect(x + st::msgReplyBarSkip, y + st::msgReplyPadding.top() + st::msgReplyBarPos.y(), st::msgReplyBarSize.height(), st::msgReplyBarSize.height(), w + 2 * x);
 					auto previewWidth = image->width() / cIntRetinaFactor();
 					auto previewHeight = image->height() / cIntRetinaFactor();
-					auto preview = image->pixSingle(previewWidth, previewHeight, to.width(), to.height(), ImageRoundRadius::Small, RectPart::AllCorners, selected ? &st::msgStickerOverlay : nullptr);
+					auto preview = image->pixSingle(
+						previewWidth,
+						previewHeight,
+						to.width(),
+						to.height(),
+						ImageRoundRadius::Small,
+						RectPart::AllCorners,
+						context.selected() ? &st->msgStickerOverlay() : nullptr);
 					p.drawPixmap(to.x(), to.y(), preview);
 				}
 			}
 			if (w > st::msgReplyBarSkip + previewSkip) {
-				if (flags & PaintFlag::InBubble) {
-					p.setPen(selected ? (outbg ? st::msgOutServiceFgSelected : st::msgInServiceFgSelected) : (outbg ? st::msgOutServiceFg : st::msgInServiceFg));
-				} else {
-					p.setPen(st::msgImgReplyBarColor);
-				}
+				p.setPen(inBubble
+					? stm->msgServiceFg
+					: st->msgImgReplyBarColor());
 				replyToName.drawLeftElided(p, x + st::msgReplyBarSkip + previewSkip, y + st::msgReplyPadding.top(), w - st::msgReplyBarSkip - previewSkip, w + 2 * x);
 				if (replyToVia && w > st::msgReplyBarSkip + previewSkip + replyToName.maxWidth() + st::msgServiceFont->spacew) {
 					p.setFont(st::msgServiceFont);
 					p.drawText(x + st::msgReplyBarSkip + previewSkip + replyToName.maxWidth() + st::msgServiceFont->spacew, y + st::msgReplyPadding.top() + st::msgServiceFont->ascent, replyToVia->text);
 				}
 
-				if (flags & PaintFlag::InBubble) {
-					p.setPen(outbg ? (selected ? st::historyTextOutFgSelected : st::historyTextOutFg) : (selected ? st::historyTextInFgSelected : st::historyTextInFg));
-					p.setTextPalette(outbg ? (selected ? st::outReplyTextPaletteSelected : st::outReplyTextPalette) : (selected ? st::inReplyTextPaletteSelected : st::inReplyTextPalette));
-				} else {
-					p.setTextPalette(st::imgReplyTextPalette);
-				}
+				p.setPen(inBubble
+					? stm->historyTextFg
+					: st->msgImgReplyBarColor());
+				p.setTextPalette(inBubble
+					? stm->replyTextPalette
+					: st->imgReplyTextPalette());
 				replyToText.drawLeftElided(p, x + st::msgReplyBarSkip + previewSkip, y + st::msgReplyPadding.top() + st::msgServiceNameFont->height, w - st::msgReplyBarSkip - previewSkip, w + 2 * x);
-				p.setTextPalette(selected ? (outbg ? st::outTextPaletteSelected : st::inTextPaletteSelected) : (outbg ? st::outTextPalette : st::inTextPalette));
+				p.setTextPalette(stm->textPalette);
 			}
 		} else {
 			p.setFont(st::msgDateFont);
-			auto &date = outbg ? (selected ? st::msgOutDateFgSelected : st::msgOutDateFg) : (selected ? st::msgInDateFgSelected : st::msgInDateFg);
-			p.setPen((flags & PaintFlag::InBubble) ? date : st::msgDateImgFg);
+			p.setPen(inBubble
+				? stm->msgDateFg
+				: st->msgDateImgFg());
 			p.drawTextLeft(x + st::msgReplyBarSkip, y + st::msgReplyPadding.top() + (st::msgReplyBarSize.height() - st::msgDateFont->height) / 2, w + 2 * x, st::msgDateFont->elided(replyToMsgId ? tr::lng_profile_loading(tr::now) : tr::lng_deleted_message(tr::now), w - st::msgReplyBarSkip));
 		}
 	}
@@ -554,7 +563,7 @@ void ReplyKeyboard::resize(int width, int height) {
 		int widthForText = widthForButtons;
 		int widthOfText = 0;
 		int maxMinButtonWidth = 0;
-		for_const (auto &button, row) {
+		for (const auto &button : row) {
 			widthOfText += qMax(button.text.maxWidth(), 1);
 			int minButtonWidth = _st->minButtonWidth(button.type);
 			widthForText -= minButtonWidth;
@@ -564,7 +573,7 @@ void ReplyKeyboard::resize(int width, int height) {
 		bool enough = (widthForButtons - s * maxMinButtonWidth) >= widthOfText;
 
 		float64 x = 0;
-		for (Button &button : row) {
+		for (auto &button : row) {
 			int buttonw = qMax(button.text.maxWidth(), 1);
 			float64 textw = buttonw, minw = _st->minButtonWidth(button.type);
 			float64 w = textw;
@@ -592,10 +601,10 @@ void ReplyKeyboard::resize(int width, int height) {
 }
 
 bool ReplyKeyboard::isEnoughSpace(int width, const style::BotKeyboardButton &st) const {
-	for_const (auto &row, _rows) {
+	for (const auto &row : _rows) {
 		int s = row.size();
 		int widthLeft = width - ((s - 1) * st.margin + s * 2 * st.padding);
-		for_const (auto &button, row) {
+		for (const auto &button : row) {
 			widthLeft -= qMax(button.text.maxWidth(), 1);
 			if (widthLeft < 0) {
 				if (row.size() > 3) {
@@ -641,11 +650,15 @@ int ReplyKeyboard::naturalHeight() const {
 	return (_rows.size() - 1) * _st->buttonSkip() + _rows.size() * _st->buttonHeight();
 }
 
-void ReplyKeyboard::paint(Painter &p, int outerWidth, const QRect &clip) const {
+void ReplyKeyboard::paint(
+		Painter &p,
+		const Ui::ChatStyle *st,
+		int outerWidth,
+		const QRect &clip) const {
 	Assert(_st != nullptr);
 	Assert(_width > 0);
 
-	_st->startPaint(p);
+	_st->startPaint(p, st);
 	for (const auto &row : _rows) {
 		for (const auto &button : row) {
 			const auto rect = button.rect;
@@ -655,7 +668,7 @@ void ReplyKeyboard::paint(Painter &p, int outerWidth, const QRect &clip) const {
 			// just ignore the buttons that didn't layout well
 			if (rect.x() + rect.width() > _width) break;
 
-			_st->paintButton(p, outerWidth, button);
+			_st->paintButton(p, st, outerWidth, button);
 		}
 	}
 }
@@ -663,8 +676,8 @@ void ReplyKeyboard::paint(Painter &p, int outerWidth, const QRect &clip) const {
 ClickHandlerPtr ReplyKeyboard::getLink(QPoint point) const {
 	Assert(_width > 0);
 
-	for_const (auto &row, _rows) {
-		for_const (auto &button, row) {
+	for (const auto &row : _rows) {
+		for (const auto &button : row) {
 			QRect rect(button.rect);
 
 			// just ignore the buttons that didn't layout well
@@ -791,23 +804,25 @@ int ReplyKeyboard::Style::buttonHeight() const {
 
 void ReplyKeyboard::Style::paintButton(
 		Painter &p,
+		const Ui::ChatStyle *st,
 		int outerWidth,
 		const ReplyKeyboard::Button &button) const {
 	const QRect &rect = button.rect;
-	paintButtonBg(p, rect, button.howMuchOver);
+	paintButtonBg(p, st, rect, button.howMuchOver);
 	if (button.ripple) {
-		button.ripple->paint(p, rect.x(), rect.y(), outerWidth);
+		const auto color = st ? &st->msgBotKbRippleBg()->c : nullptr;
+		button.ripple->paint(p, rect.x(), rect.y(), outerWidth, color);
 		if (button.ripple->empty()) {
 			button.ripple.reset();
 		}
 	}
-	paintButtonIcon(p, rect, outerWidth, button.type);
+	paintButtonIcon(p, st, rect, outerWidth, button.type);
 	if (button.type == HistoryMessageMarkupButton::Type::CallbackWithPassword
 		|| button.type == HistoryMessageMarkupButton::Type::Callback
 		|| button.type == HistoryMessageMarkupButton::Type::Game) {
-		if (auto data = button.link->getButton()) {
+		if (const auto data = button.link->getButton()) {
 			if (data->requestId) {
-				paintButtonLoading(p, rect);
+				paintButtonLoading(p, st, rect);
 			}
 		}
 	}

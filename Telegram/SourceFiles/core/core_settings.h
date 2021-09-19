@@ -421,11 +421,16 @@ public:
 	void setVideoPlaybackSpeed(float64 speed) {
 		_videoPlaybackSpeed = speed;
 	}
-	[[nodiscard]] float64 voicePlaybackSpeed() const {
-		return _voicePlaybackSpeed;
+	[[nodiscard]] float64 voicePlaybackSpeed(
+			bool lastNonDefault = false) const {
+		return (_nonDefaultVoicePlaybackSpeed || lastNonDefault)
+			? _voicePlaybackSpeed
+			: 1.0;
 	}
 	void setVoicePlaybackSpeed(float64 speed) {
-		_voicePlaybackSpeed = speed;
+		if ((_nonDefaultVoicePlaybackSpeed = (speed != 1.0))) {
+			_voicePlaybackSpeed = speed;
+		}
 	}
 	[[nodiscard]] QByteArray videoPipGeometry() const {
 		return _videoPipGeometry;
@@ -596,6 +601,19 @@ public:
 		_hiddenGroupCallTooltips |= value;
 	}
 
+	void setCloseToTaskbar(bool value) {
+		_closeToTaskbar = value;
+	}
+	[[nodiscard]] bool closeToTaskbar() const {
+		return _closeToTaskbar.current();
+	}
+	[[nodiscard]] rpl::producer<bool> closeToTaskbarValue() const {
+		return _closeToTaskbar.value();
+	}
+	[[nodiscard]] rpl::producer<bool> closeToTaskbarChanges() const {
+		return _closeToTaskbar.changes();
+	}
+
 	[[nodiscard]] static bool ThirdColumnByDefault();
 	[[nodiscard]] static float64 DefaultDialogsWidthRatio();
 	[[nodiscard]] static qint32 SerializePlaybackSpeed(float64 speed) {
@@ -669,7 +687,8 @@ private:
 	bool _suggestStickersByEmoji = true;
 	rpl::variable<bool> _spellcheckerEnabled = true;
 	rpl::variable<float64> _videoPlaybackSpeed = 1.;
-	float64 _voicePlaybackSpeed = 1.;
+	float64 _voicePlaybackSpeed = 2.;
+	bool _nonDefaultVoicePlaybackSpeed = false;
 	QByteArray _videoPipGeometry;
 	rpl::variable<std::vector<int>> _dictionariesEnabled;
 	rpl::variable<bool> _autoDownloadDictionaries = true;
@@ -694,6 +713,7 @@ private:
 	bool _disableOpenGL = false;
 	rpl::variable<WorkMode> _workMode = WorkMode::WindowAndTray;
 	base::flags<Calls::Group::StickedTooltip> _hiddenGroupCallTooltips;
+	rpl::variable<bool> _closeToTaskbar = false;
 
 	bool _tabbedReplacedWithInfo = false; // per-window
 	rpl::event_stream<bool> _tabbedReplacedWithInfoValue; // per-window

@@ -223,7 +223,10 @@ public:
 		return _peer;
 	}
 	[[nodiscard]] not_null<PeerData*> joinAs() const {
-		return _joinAs;
+		return _joinAs.current();
+	}
+	[[nodiscard]] rpl::producer<not_null<PeerData*>> joinAsValue() const {
+		return _joinAs.value();
 	}
 	[[nodiscard]] bool showChooseJoinAs() const;
 	[[nodiscard]] TimeId scheduleDate() const {
@@ -245,7 +248,11 @@ public:
 	void handlePossibleCreateOrJoinResponse(
 		const MTPDupdateGroupCallConnection &data);
 	void changeTitle(const QString &title);
-	void toggleRecording(bool enabled, const QString &title);
+	void toggleRecording(
+		bool enabled,
+		const QString &title,
+		bool video,
+		bool videoPortrait);
 	[[nodiscard]] bool recordingStoppedByMe() const {
 		return _recordingStoppedByMe;
 	}
@@ -403,16 +410,6 @@ public:
 private:
 	class LoadPartTask;
 	class MediaChannelDescriptionsTask;
-
-public:
-	void broadcastPartStart(std::shared_ptr<LoadPartTask> task);
-	void broadcastPartCancel(not_null<LoadPartTask*> task);
-	void mediaChannelDescriptionsStart(
-		std::shared_ptr<MediaChannelDescriptionsTask> task);
-	void mediaChannelDescriptionsCancel(
-		not_null<MediaChannelDescriptionsTask*> task);
-
-private:
 	using GlobalShortcutValue = base::GlobalShortcutValue;
 	using Error = Group::Error;
 	struct SinkPointer;
@@ -460,6 +457,14 @@ private:
 	friend inline constexpr bool is_flag_type(SendUpdateType) {
 		return true;
 	}
+
+	void broadcastPartStart(std::shared_ptr<LoadPartTask> task);
+	void broadcastPartCancel(not_null<LoadPartTask*> task);
+	void mediaChannelDescriptionsStart(
+		std::shared_ptr<MediaChannelDescriptionsTask> task);
+	void mediaChannelDescriptionsCancel(
+		not_null<MediaChannelDescriptionsTask*> task);
+	[[nodiscard]] int64 approximateServerTimeInMs() const;
 
 	[[nodiscard]] bool mediaChannelDescriptionsFill(
 		not_null<MediaChannelDescriptionsTask*> task,
@@ -568,11 +573,14 @@ private:
 	base::flat_set<
 		std::shared_ptr<
 			MediaChannelDescriptionsTask>,
-		base::pointer_comparator<MediaChannelDescriptionsTask>> _mediaChannelDescriptionses;
+		base::pointer_comparator<
+			MediaChannelDescriptionsTask>> _mediaChannelDescriptionses;
 
-	not_null<PeerData*> _joinAs;
+	rpl::variable<not_null<PeerData*>> _joinAs;
 	std::vector<not_null<PeerData*>> _possibleJoinAs;
 	QString _joinHash;
+	int64 _serverTimeMs = 0;
+	crl::time _serverTimeMsGotAt = 0;
 
 	rpl::variable<MuteState> _muted = MuteState::Muted;
 	rpl::variable<bool> _canManage = false;

@@ -44,6 +44,10 @@ enum class StickerLottieSize : uchar {
 	StickersFooter,
 	SetsListThumbnail,
 	InlineResults,
+	EmojiInteraction,
+	EmojiInteractionReserved1,
+	EmojiInteractionReserved2,
+	EmojiInteractionReserved3,
 };
 
 [[nodiscard]] std::unique_ptr<Lottie::SinglePlayer> LottiePlayerFromDocument(

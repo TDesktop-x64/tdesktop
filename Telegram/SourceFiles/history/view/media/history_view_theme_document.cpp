@@ -20,10 +20,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/qthelp_url.h"
 #include "core/local_url_handlers.h"
 #include "ui/text/format_values.h"
+#include "ui/chat/chat_style.h"
 #include "ui/chat/chat_theme.h"
 #include "ui/cached_round_corners.h"
 #include "ui/ui_utility.h"
-#include "layout/layout_selection.h" // FullSelection
 #include "styles/style_chat.h"
 
 namespace HistoryView {
@@ -159,7 +159,8 @@ void ThemeDocument::draw(Painter &p, const PaintContext &context) const {
 	if (_data) {
 		_dataMedia->automaticLoad(_realParent->fullId(), _parent->data());
 	}
-	auto selected = (context.selection == FullSelection);
+	const auto st = context.st;
+	const auto sti = context.imageStyle();
 	auto loaded = dataLoaded();
 	auto displayLoading = _data && _data->displayLoading();
 
@@ -178,8 +179,8 @@ void ThemeDocument::draw(Painter &p, const PaintContext &context) const {
 	auto roundCorners = RectPart::AllCorners;
 	validateThumbnail();
 	p.drawPixmap(rthumb.topLeft(), _thumbnail);
-	if (selected) {
-		Ui::FillComplexOverlayRect(p, rthumb, roundRadius, roundCorners);
+	if (context.selected()) {
+		Ui::FillComplexOverlayRect(p, st, rthumb, roundRadius, roundCorners);
 	}
 
 	if (_data) {
@@ -187,9 +188,9 @@ void ThemeDocument::draw(Painter &p, const PaintContext &context) const {
 		auto statusY = painty + st::msgDateImgDelta + st::msgDateImgPadding.y();
 		auto statusW = st::normalFont->width(_statusText) + 2 * st::msgDateImgPadding.x();
 		auto statusH = st::normalFont->height + 2 * st::msgDateImgPadding.y();
-		Ui::FillRoundRect(p, style::rtlrect(statusX - st::msgDateImgPadding.x(), statusY - st::msgDateImgPadding.y(), statusW, statusH, width()), selected ? st::msgDateImgBgSelected : st::msgDateImgBg, selected ? Ui::DateSelectedCorners : Ui::DateCorners);
+		Ui::FillRoundRect(p, style::rtlrect(statusX - st::msgDateImgPadding.x(), statusY - st::msgDateImgPadding.y(), statusW, statusH, width()), sti->msgDateImgBg, sti->msgDateImgBgCorners);
 		p.setFont(st::normalFont);
-		p.setPen(st::msgDateImgFg);
+		p.setPen(st->msgDateImgFg());
 		p.drawTextLeft(statusX, statusY, width(), _statusText, statusW - 2 * st::msgDateImgPadding.x());
 		if (radial || (!loaded && !_data->loading())) {
 			const auto radialOpacity = (radial && loaded && !_data->uploading())
@@ -198,14 +199,14 @@ void ThemeDocument::draw(Painter &p, const PaintContext &context) const {
 			const auto innerSize = st::msgFileLayout.thumbSize;
 			QRect inner(rthumb.x() + (rthumb.width() - innerSize) / 2, rthumb.y() + (rthumb.height() - innerSize) / 2, innerSize, innerSize);
 			p.setPen(Qt::NoPen);
-			if (selected) {
-				p.setBrush(st::msgDateImgBgSelected);
+			if (context.selected()) {
+				p.setBrush(st->msgDateImgBgSelected());
 			} else if (isThumbAnimation()) {
 				auto over = _animation->a_thumbOver.value(1.);
-				p.setBrush(anim::brush(st::msgDateImgBg, st::msgDateImgBgOver, over));
+				p.setBrush(anim::brush(st->msgDateImgBg(), st->msgDateImgBgOver(), over));
 			} else {
 				auto over = ClickHandler::showAsActive(_data->loading() ? _cancell : _openl);
-				p.setBrush(over ? st::msgDateImgBgOver : st::msgDateImgBg);
+				p.setBrush(over ? st->msgDateImgBgOver() : st->msgDateImgBg());
 			}
 
 			p.setOpacity(radialOpacity * p.opacity());
@@ -216,19 +217,14 @@ void ThemeDocument::draw(Painter &p, const PaintContext &context) const {
 			}
 
 			p.setOpacity(radialOpacity);
-			auto icon = ([radial, this, selected]() -> const style::icon* {
-				if (radial || _data->loading()) {
-					return &(selected ? st::historyFileThumbCancelSelected : st::historyFileThumbCancel);
-				}
-				return &(selected ? st::historyFileThumbDownloadSelected : st::historyFileThumbDownload);
-			})();
-			if (icon) {
-				icon->paintInCenter(p, inner);
-			}
+			const auto &icon = (radial || _data->loading())
+				? sti->historyFileThumbCancel
+				: sti->historyFileThumbDownload;
+			icon.paintInCenter(p, inner);
 			p.setOpacity(1);
 			if (radial) {
 				QRect rinner(inner.marginsRemoved(QMargins(st::msgFileRadialLine, st::msgFileRadialLine, st::msgFileRadialLine, st::msgFileRadialLine)));
-				_animation->radial.draw(p, rinner, st::msgFileRadialLine, selected ? st::historyFileThumbRadialFgSelected : st::historyFileThumbRadialFg);
+				_animation->radial.draw(p, rinner, st::msgFileRadialLine, sti->historyFileThumbRadialFg);
 			}
 		}
 	}

@@ -52,6 +52,14 @@ PRIVATE
     tdesktop::lib_tgcalls_legacy
     tdesktop::lib_tgcalls
     tdesktop::lib_tgvoip
+
+    # Order in this list defines the order of include paths in command line.
+    # We need to place desktop-app::external_minizip this early to have its
+    # include paths (usually ${PREFIX}/include/minizip) before any depend that
+    # would add ${PREFIX}/include. This path may have a different <zip.h>,
+    # for example installed by libzip (https://libzip.org).
+    desktop-app::external_minizip
+
     tdesktop::td_export
     tdesktop::td_mtproto
     tdesktop::td_lang
@@ -71,7 +79,6 @@ PRIVATE
     desktop-app::external_lz4
     desktop-app::external_rlottie
     desktop-app::external_zlib
-    desktop-app::external_minizip
     desktop-app::external_qt_static_plugins
     desktop-app::external_qt
     desktop-app::external_qr_code_generator
@@ -130,6 +137,8 @@ PRIVATE
     api/api_updates.h
     api/api_user_privacy.cpp
     api/api_user_privacy.h
+    api/api_who_read.cpp
+    api/api_who_read.h
     boxes/filters/edit_filter_box.cpp
     boxes/filters/edit_filter_box.h
     boxes/filters/edit_filter_chats_list.cpp
@@ -278,6 +287,8 @@ PRIVATE
     chat_helpers/bot_command.h
     chat_helpers/bot_keyboard.cpp
     chat_helpers/bot_keyboard.h
+    chat_helpers/emoji_interactions.cpp
+    chat_helpers/emoji_interactions.h
     chat_helpers/emoji_keywords.cpp
     chat_helpers/emoji_keywords.h
     chat_helpers/emoji_list_widget.cpp
@@ -583,6 +594,8 @@ PRIVATE
     history/view/history_view_cursor_state.h
     history/view/history_view_element.cpp
     history/view/history_view_element.h
+    history/view/history_view_emoji_interactions.cpp
+    history/view/history_view_emoji_interactions.h
     history/view/history_view_empty_list_bubble.cpp
     history/view/history_view_empty_list_bubble.h
     history/view/history_view_group_call_tracker.cpp
@@ -864,9 +877,6 @@ PRIVATE
     payments/payments_form.h
     platform/linux/linux_desktop_environment.cpp
     platform/linux/linux_desktop_environment.h
-    platform/linux/linux_gtk_integration_dummy.cpp
-    platform/linux/linux_gtk_integration.cpp
-    platform/linux/linux_gtk_integration.h
     platform/linux/linux_wayland_integration_dummy.cpp
     platform/linux/linux_wayland_integration.cpp
     platform/linux/linux_wayland_integration.h
@@ -1171,16 +1181,6 @@ else()
     )
 endif()
 
-if (DESKTOP_APP_DISABLE_GTK_INTEGRATION)
-    remove_target_sources(Telegram ${src_loc}
-        platform/linux/linux_gtk_integration.cpp
-    )
-else()
-    remove_target_sources(Telegram ${src_loc}
-        platform/linux/linux_gtk_integration_dummy.cpp
-    )
-endif()
-
 if (DESKTOP_APP_USE_PACKAGED)
     remove_target_sources(Telegram ${src_loc}
         platform/mac/mac_iconv_helper.c
@@ -1263,17 +1263,13 @@ elseif (APPLE)
         endif()
     endif()
 else()
-    target_link_libraries(Telegram
-    PRIVATE
-        desktop-app::external_glibmm
-        desktop-app::external_glib
-    )
-
     if (NOT DESKTOP_APP_DISABLE_DBUS_INTEGRATION)
         target_link_libraries(Telegram
         PRIVATE
             desktop-app::external_statusnotifieritem
             desktop-app::external_dbusmenu_qt
+            desktop-app::external_glibmm
+            desktop-app::external_glib
         )
     endif()
 

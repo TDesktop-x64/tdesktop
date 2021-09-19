@@ -434,7 +434,7 @@ void StickersBox::showAttachedStickers() {
 					|| (set->flags & SetFlag::NotLoaded)) {
 					session().api().scheduleStickerSetRequest(
 						set->id,
-						set->access);
+						set->accessHash);
 				}
 			}
 		}
@@ -470,7 +470,7 @@ void StickersBox::getArchivedDone(
 
 	auto addedSet = false;
 	auto changedSets = false;
-	for_const (const auto &stickerSet, stickers.vsets().v) {
+	for (const auto &stickerSet : stickers.vsets().v) {
 		const MTPDstickerSet *setData = nullptr;
 		switch (stickerSet.type()) {
 		case mtpc_stickerSetCovered: {
@@ -503,7 +503,7 @@ void StickersBox::getArchivedDone(
 					|| (set->flags & SetFlag::NotLoaded)) {
 					session().api().scheduleStickerSetRequest(
 						set->id,
-						set->access);
+						set->accessHash);
 				}
 			}
 		}
@@ -905,7 +905,9 @@ void StickersBox::requestArchivedSets() {
 			const auto set = it->second.get();
 			if (set->stickers.isEmpty()
 				&& (set->flags & SetFlag::NotLoaded)) {
-				session().api().scheduleStickerSetRequest(setId, set->access);
+				session().api().scheduleStickerSetRequest(
+					setId,
+					set->accessHash);
 			}
 		}
 	}
@@ -1323,7 +1325,7 @@ void StickersBox::Inner::paintRowThumbnail(
 		int left) {
 	const auto origin = Data::FileOriginStickerSet(
 		row->set->id,
-		row->set->access);
+		row->set->accessHash);
 	if (row->set->hasThumbnail()) {
 		if (!row->thumbnailMedia) {
 			row->thumbnailMedia = row->set->createThumbnailView();
@@ -2026,14 +2028,17 @@ void StickersBox::Inner::rebuild(bool masks) {
 
 		if (set->stickers.isEmpty()
 			|| (set->flags & SetFlag::NotLoaded)) {
-			session().api().scheduleStickerSetRequest(set->id, set->access);
+			session().api().scheduleStickerSetRequest(
+				set->id,
+				set->accessHash);
 		}
 	}
 	session().api().requestStickerSets();
 	updateSize();
 }
 
-void StickersBox::Inner::setMegagroupSelectedSet(const StickerSetIdentifier &set) {
+void StickersBox::Inner::setMegagroupSelectedSet(
+		const StickerSetIdentifier &set) {
 	_megagroupSetInput = set;
 	rebuild(false);
 	_scrollsToY.fire(0);
@@ -2291,7 +2296,7 @@ int StickersBox::Inner::getRowIndex(uint64 setId) const {
 }
 
 void StickersBox::Inner::setFullOrder(const StickersSetsOrder &order) {
-	for_const (auto setId, order) {
+	for (const auto setId : order) {
 		auto index = getRowIndex(setId);
 		if (index >= 0) {
 			auto row = std::move(_rows[index]);

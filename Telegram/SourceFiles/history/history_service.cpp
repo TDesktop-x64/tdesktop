@@ -390,7 +390,7 @@ void HistoryService::setMessageByAction(const MTPmessageAction &action) {
 		const auto callId = CallIdFromInput(action.vcall());
 		const auto owner = &history()->owner();
 		const auto peer = history()->peer;
-		for (const auto id : action.vusers().v) {
+		for (const auto &id : action.vusers().v) {
 			const auto user = owner->user(id.v);
 			if (callId) {
 				owner->registerInvitedToCallUser(callId, peer, user);
@@ -626,7 +626,7 @@ bool HistoryService::updateDependent(bool force) {
 }
 
 HistoryService::PreparedText HistoryService::prepareInvitedToCallText(
-		const QVector<MTPint> &users,
+		const QVector<MTPlong> &users,
 		uint64 linkCallId) {
 	const auto owner = &history()->owner();
 	auto chatText = tr::lng_action_invite_user_chat(tr::now);
@@ -959,7 +959,7 @@ void HistoryService::setServiceText(const PreparedText &prepared) {
 		prepared.text + GenerateServiceTime(date()),
 		Ui::ItemTextServiceOptions());
 	auto linkIndex = 0;
-	for_const (auto &link, prepared.links) {
+	for (const auto &link : prepared.links) {
 		// Link indices start with 1.
 		_text.setLink(++linkIndex, link);
 	}

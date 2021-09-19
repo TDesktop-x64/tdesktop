@@ -82,7 +82,7 @@ QByteArray Settings::serialize() const {
 	auto recentEmojiPreloadGenerated = std::vector<RecentEmojiId>();
 	if (_recentEmojiPreload.empty()) {
 		recentEmojiPreloadGenerated.reserve(_recentEmoji.size());
-		for (const auto [emoji, rating] : _recentEmoji) {
+		for (const auto &[emoji, rating] : _recentEmoji) {
 			recentEmojiPreloadGenerated.push_back({ emoji->id(), rating });
 		}
 	}
@@ -140,7 +140,7 @@ QByteArray Settings::serialize() const {
 			<< qint32(_askDownloadPath ? 1 : 0)
 			<< _downloadPath.current()
 			<< _downloadPathBookmark
-			<< qint32(0) // Old double voice playback speed.
+			<< qint32(_nonDefaultVoicePlaybackSpeed ? 1 : 0)
 			<< qint32(_soundNotify ? 1 : 0)
 			<< qint32(_desktopNotify ? 1 : 0)
 			<< qint32(_flashBounceNotify ? 1 : 0)
@@ -220,7 +220,8 @@ QByteArray Settings::serialize() const {
 			<< qint32(_disableOpenGL ? 1 : 0)
 			<< _photoEditorBrush
 			<< qint32(_groupCallNoiseSuppression ? 1 : 0)
-			<< qint32(_voicePlaybackSpeed * 100);
+			<< qint32(_voicePlaybackSpeed * 100)
+			<< qint32(_closeToTaskbar.current() ? 1 : 0);
 	}
 	return result;
 }
@@ -241,7 +242,7 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 	qint32 askDownloadPath = _askDownloadPath ? 1 : 0;
 	QString downloadPath = _downloadPath.current();
 	QByteArray downloadPathBookmark = _downloadPathBookmark;
-	qint32 oldVoiceMsgPlaybackDoubled = 0;
+	qint32 nonDefaultVoicePlaybackSpeed = _nonDefaultVoicePlaybackSpeed ? 1 : 0;
 	qint32 soundNotify = _soundNotify ? 1 : 0;
 	qint32 desktopNotify = _desktopNotify ? 1 : 0;
 	qint32 flashBounceNotify = _flashBounceNotify ? 1 : 0;
@@ -303,6 +304,7 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 	QByteArray proxy;
 	qint32 hiddenGroupCallTooltips = qint32(_hiddenGroupCallTooltips.value());
 	QByteArray photoEditorBrush = _photoEditorBrush;
+	qint32 closeToTaskbar = _closeToTaskbar.current() ? 1 : 0;
 
 	stream >> themesAccentColors;
 	if (!stream.atEnd()) {
@@ -314,7 +316,7 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 			>> askDownloadPath
 			>> downloadPath
 			>> downloadPathBookmark
-			>> oldVoiceMsgPlaybackDoubled
+			>> nonDefaultVoicePlaybackSpeed
 			>> soundNotify
 			>> desktopNotify
 			>> flashBounceNotify
@@ -460,6 +462,9 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 	if (!stream.atEnd()) {
 		stream >> voicePlaybackSpeed;
 	}
+	if (!stream.atEnd()) {
+		stream >> closeToTaskbar;
+	}
 	if (stream.status() != QDataStream::Ok) {
 		LOG(("App Error: "
 			"Bad data for Core::Settings::constructFromSerialized()"));
@@ -529,9 +534,17 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 	_suggestStickersByEmoji = (suggestStickersByEmoji == 1);
 	_spellcheckerEnabled = (spellcheckerEnabled == 1);
 	_videoPlaybackSpeed = DeserializePlaybackSpeed(videoPlaybackSpeed);
-	_voicePlaybackSpeed = oldVoiceMsgPlaybackDoubled
-		? 2.0
-		: voicePlaybackSpeed / 100.;
+	{
+		// Restore settings from 3.0.1 version.
+		if (voicePlaybackSpeed == 100) {
+			_nonDefaultVoicePlaybackSpeed = false;
+			_voicePlaybackSpeed = 2.0;
+		} else {
+			_nonDefaultVoicePlaybackSpeed =
+				(nonDefaultVoicePlaybackSpeed == 1);
+			_voicePlaybackSpeed = voicePlaybackSpeed / 100.;
+		}
+	}
 	_videoPipGeometry = (videoPipGeometry);
 	_dictionariesEnabled = std::move(dictionariesEnabled);
 	_autoDownloadDictionaries = (autoDownloadDictionaries == 1);
@@ -592,6 +605,7 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 				: Tooltip(0));
 	}();
 	_photoEditorBrush = photoEditorBrush;
+	_closeToTaskbar = (closeToTaskbar == 1);
 }
 
 QString Settings::getSoundPath(const QString &key) const {
@@ -705,7 +719,7 @@ EmojiPack Settings::recentEmojiSection() const {
 
 	auto result = EmojiPack();
 	result.reserve(recent.size());
-	for (const auto [emoji, rating] : recent) {
+	for (const auto &[emoji, rating] : recent) {
 		result.push_back(emoji);
 	}
 	return result;
@@ -789,6 +803,7 @@ void Settings::resetOnLastLogout() {
 	_downloadPath = QString();
 	_downloadPathBookmark = QByteArray();
 
+	_nonDefaultVoicePlaybackSpeed = false;
 	_soundNotify = true;
 	_desktopNotify = true;
 	_flashBounceNotify = true;

@@ -17,7 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/storage_shared_media.h"
 #include "lang/lang_keys.h"
 #include "ui/grouped_layout.h"
-#include "ui/chat/chat_theme.h"
+#include "ui/chat/chat_style.h"
 #include "ui/chat/message_bubble.h"
 #include "ui/text/text_options.h"
 #include "layout/layout_selection.h"
@@ -270,7 +270,10 @@ QMargins GroupedMedia::groupedPadding() const {
 		(normal.bottom() - grouped.bottom()) + addToBottom);
 }
 
-void GroupedMedia::drawHighlight(Painter &p, int top) const {
+void GroupedMedia::drawHighlight(
+		Painter &p,
+		const PaintContext &context,
+		int top) const {
 	if (_mode != Mode::Column) {
 		return;
 	}
@@ -278,7 +281,12 @@ void GroupedMedia::drawHighlight(Painter &p, int top) const {
 	for (auto i = 0, count = int(_parts.size()); i != count; ++i) {
 		const auto &part = _parts[i];
 		const auto rect = part.geometry.translated(0, skip);
-		_parent->paintCustomHighlight(p, rect.y(), rect.height(), part.item);
+		_parent->paintCustomHighlight(
+			p,
+			context,
+			rect.y(),
+			rect.height(),
+			part.item);
 	}
 }
 
@@ -293,14 +301,13 @@ void GroupedMedia::draw(Painter &p, const PaintContext &context) const {
 		&& !IsSubGroupSelection(selection);
 	for (auto i = 0, count = int(_parts.size()); i != count; ++i) {
 		const auto &part = _parts[i];
-		auto partContext = context;
-		partContext.selection = fullSelection
+		const auto partContext = context.withSelection(fullSelection
 			? FullSelection
 			: textSelection
 			? selection
 			: IsGroupItemSelection(selection, i)
 			? FullSelection
-			: TextSelection();
+			: TextSelection());
 		if (textSelection) {
 			selection = part.content->skipSelection(selection);
 		}
@@ -328,26 +335,31 @@ void GroupedMedia::draw(Painter &p, const PaintContext &context) const {
 	}
 
 	// date
-	const auto selected = (selection == FullSelection);
 	if (!_caption.isEmpty()) {
 		const auto captionw = width() - st::msgPadding.left() - st::msgPadding.right();
-		const auto outbg = _parent->hasOutLayout();
 		const auto captiony = height()
 			- groupPadding.bottom()
 			- (isBubbleBottom() ? st::msgPadding.bottom() : 0)
 			- _caption.countHeight(captionw);
-		p.setPen(outbg ? (selected ? st::historyTextOutFgSelected : st::historyTextOutFg) : (selected ? st::historyTextInFgSelected : st::historyTextInFg));
+		const auto stm = context.messageStyle();
+		p.setPen(stm->historyTextFg);
 		_caption.draw(p, st::msgPadding.left(), captiony, captionw, style::al_left, 0, -1, selection);
 	} else if (_parent->media() == this) {
 		auto fullRight = width();
 		auto fullBottom = height();
 		if (needInfoDisplay()) {
-			_parent->drawInfo(p, fullRight, fullBottom, width(), selected, InfoDisplayType::Image);
+			_parent->drawInfo(
+				p,
+				context,
+				fullRight,
+				fullBottom,
+				width(),
+				InfoDisplayType::Image);
 		}
 		if (const auto size = _parent->hasBubble() ? std::nullopt : _parent->rightActionSize()) {
 			auto fastShareLeft = (fullRight + st::historyFastShareLeft);
 			auto fastShareTop = (fullBottom - st::historyFastShareBottom - size->height());
-			_parent->drawRightAction(p, fastShareLeft, fastShareTop, width());
+			_parent->drawRightAction(p, context, fastShareLeft, fastShareTop, width());
 		}
 	}
 }

@@ -85,12 +85,11 @@ parts:
     build-environment:
       - LD_LIBRARY_PATH: $SNAPCRAFT_STAGE/usr/lib/$SNAPCRAFT_ARCH_TRIPLET:$LD_LIBRARY_PATH
     build-packages:
+      - clang
       - python
       - libasound2-dev
       - libglib2.0-dev
       - libglibmm-2.4-dev
-      - libgtk-3-dev
-      - liblzma-dev
       - libopus-dev
       - libpulse-dev
       - libssl-dev
@@ -104,8 +103,6 @@ parts:
       - libasound2
       - libglib2.0-0
       - libglibmm-2.4-1v5
-      - libgtk-3-0
-      - liblzma5
       - libopus0
       - libpulse0
       - libssl1.1
@@ -457,7 +454,7 @@ parts:
   webrtc:
     source: https://github.com/desktop-app/tg_owt.git
     source-depth: 1
-    source-commit: 91d836dc84a16584c6ac52b36c04c0de504d9c34
+    source-commit: 575fb17d2853c43329e45f6693370f5e41668055
     plugin: cmake
     build-packages:
       - yasm

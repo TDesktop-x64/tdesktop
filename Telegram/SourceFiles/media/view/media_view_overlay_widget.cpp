@@ -58,7 +58,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_session_controller.h"
 #include "window/window_controller.h"
 #include "base/platform/base_platform_info.h"
-#include "base/openssl_help.h"
+#include "base/random.h"
 #include "base/unixtime.h"
 #include "base/qt_signal_producer.h"
 #include "base/event_filter.h"
@@ -737,6 +737,16 @@ void OverlayWidget::checkForSaveLoaded() {
 
 void OverlayWidget::updateControls() {
 	if (_document && documentBubbleShown()) {
+		_docRect = QRect(
+			(width() - st::mediaviewFileSize.width()) / 2,
+			(height() - st::mediaviewFileSize.height()) / 2,
+			st::mediaviewFileSize.width(),
+			st::mediaviewFileSize.height());
+		_docIconRect = QRect(
+			_docRect.x() + st::mediaviewFilePadding,
+			_docRect.y() + st::mediaviewFilePadding,
+			st::mediaviewFileIconSize,
+			st::mediaviewFileIconSize);
 		if (_document->loading()) {
 			_docDownload->hide();
 			_docSaveAs->hide();
@@ -758,6 +768,11 @@ void OverlayWidget::updateControls() {
 		}
 		updateDocSize();
 	} else {
+		_docIconRect = QRect(
+			(width() - st::mediaviewFileIconSize) / 2,
+			(height() - st::mediaviewFileIconSize) / 2,
+			st::mediaviewFileIconSize,
+			st::mediaviewFileIconSize);
 		_docDownload->hide();
 		_docSaveAs->hide();
 		_docCancel->hide();
@@ -2430,7 +2445,6 @@ void OverlayWidget::displayDocument(
 	}
 	refreshCaption(item);
 
-	_docIconRect = QRect((width() - st::mediaviewFileIconSize) / 2, (height() - st::mediaviewFileIconSize) / 2, st::mediaviewFileIconSize, st::mediaviewFileIconSize);
 	const auto docGeneric = Layout::DocumentGenericPreview::Create(_document);
 	_docExt = docGeneric.ext;
 	_docIconColor = docGeneric.color;
@@ -2478,11 +2492,6 @@ void OverlayWidget::displayDocument(
 			_docName = st::mediaviewFileNameFont->elided(_docName, maxw, Qt::ElideMiddle);
 			_docNameWidth = st::mediaviewFileNameFont->width(_docName);
 		}
-
-		// _docSize is updated in updateControls()
-
-		_docRect = QRect((width() - st::mediaviewFileSize.width()) / 2, (height() - st::mediaviewFileSize.height()) / 2, st::mediaviewFileSize.width(), st::mediaviewFileSize.height());
-		_docIconRect = QRect(_docRect.x() + st::mediaviewFilePadding, _docRect.y() + st::mediaviewFilePadding, st::mediaviewFileIconSize, st::mediaviewFileIconSize);
 	} else if (_themePreviewShown) {
 		updateThemePreviewGeometry();
 	} else if (!_staticContent.isNull()) {
@@ -2838,7 +2847,7 @@ void OverlayWidget::initThemePreview() {
 
 	const auto weakSession = base::make_weak(&_document->session());
 	const auto path = _document->location().name();
-	const auto id = _themePreviewId = openssl::RandomValue<uint64>();
+	const auto id = _themePreviewId = base::RandomValue<uint64>();
 	const auto weak = Ui::MakeWeak(_widget);
 	crl::async([=, data = std::move(current)]() mutable {
 		auto preview = GeneratePreview(
@@ -4589,7 +4598,7 @@ void OverlayWidget::clearBeforeHide() {
 	_groupThumbs = nullptr;
 	_groupThumbsRect = QRect();
 	for (const auto child : _widget->children()) {
-		if (child->isWidgetType()) {
+		if (child->isWidgetType() && _hideWorkaround.get() != child) {
 			static_cast<QWidget*>(child)->hide();
 		}
 	}

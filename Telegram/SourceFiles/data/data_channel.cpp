@@ -60,7 +60,7 @@ bool MegagroupInfo::updateBotCommands(
 ChannelData::ChannelData(not_null<Data::Session*> owner, PeerId id)
 : PeerData(owner, id)
 , inputChannel(
-	MTP_inputChannel(MTP_int(peerToChannel(id).bare), MTP_long(0)))
+	MTP_inputChannel(MTP_long(peerToChannel(id).bare), MTP_long(0)))
 , _ptsWaiter(&owner->session().updates()) {
 	_flags.changes(
 	) | rpl::start_with_next([=](const Flags::Change &change) {
@@ -102,8 +102,8 @@ void ChannelData::setName(const QString &newName, const QString &newUsername) {
 
 void ChannelData::setAccessHash(uint64 accessHash) {
 	access = accessHash;
-	input = MTP_inputPeerChannel(MTP_int(peerToChannel(id).bare), MTP_long(accessHash)); // #TODO ids
-	inputChannel = MTP_inputChannel(MTP_int(peerToChannel(id).bare), MTP_long(accessHash));
+	input = MTP_inputPeerChannel(MTP_long(peerToChannel(id).bare), MTP_long(accessHash));
+	inputChannel = MTP_inputChannel(MTP_long(peerToChannel(id).bare), MTP_long(accessHash));
 }
 
 void ChannelData::setInviteLink(const QString &newInviteLink) {
@@ -353,7 +353,7 @@ void ChannelData::markForbidden() {
 		MTP_flags(isMegagroup()
 			? MTPDchannelForbidden::Flag::f_megagroup
 			: MTPDchannelForbidden::Flag::f_broadcast),
-		MTP_int(peerToChannel(id).bare),
+		MTP_long(peerToChannel(id).bare),
 		MTP_long(access),
 		MTP_string(name),
 		MTPint()));
@@ -615,17 +615,6 @@ void ChannelData::setDefaultRestrictions(ChatRestrictions rights) {
 	session().changes().peerUpdated(this, UpdateFlag::Rights);
 }
 
-auto ChannelData::applyUpdateVersion(int version) -> UpdateStatus {
-	if (_version > version) {
-		return UpdateStatus::TooOld;
-	} else if (_version + 1 < version) {
-		session().api().requestPeer(this);
-		return UpdateStatus::Skipped;
-	}
-	setVersion(version);
-	return UpdateStatus::Good;
-}
-
 ChatData *ChannelData::getMigrateFromChat() const {
 	if (const auto info = mgInfo.get()) {
 		return info->getMigrateFromChat();
@@ -697,7 +686,7 @@ QString ChannelData::invitePeekHash() const {
 void ChannelData::privateErrorReceived() {
 	if (const auto expires = invitePeekExpires()) {
 		const auto hash = invitePeekHash();
-		for (const auto window : session().windows()) {
+		for (const auto &window : session().windows()) {
 			clearInvitePeek();
 			Api::CheckChatInvite(window, hash, this);
 			return;
@@ -777,10 +766,6 @@ void ApplyMigration(
 void ApplyChannelUpdate(
 		not_null<ChannelData*> channel,
 		const MTPDupdateChatDefaultBannedRights &update) {
-	if (channel->applyUpdateVersion(update.vversion().v)
-		!= ChannelData::UpdateStatus::Good) {
-		return;
-	}
 	channel->setDefaultRestrictions(Data::ChatBannedRightsFlags(
 		update.vdefault_banned_rights()));
 }

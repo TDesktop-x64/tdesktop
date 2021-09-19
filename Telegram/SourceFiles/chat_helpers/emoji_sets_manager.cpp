@@ -39,10 +39,10 @@ inline auto PreviewPath(int i) {
 }
 
 const auto kSets = {
-	Set{ {0,   0,         0, "Mac"},       PreviewPath(0) },
-	Set{ {1, 713, 7'313'166, "Android"},   PreviewPath(1) },
-	Set{ {2, 714, 4'690'333, "Twemoji"},   PreviewPath(2) },
-	Set{ {3, 716, 5'968'021, "JoyPixels"}, PreviewPath(3) },
+	Set{ { 0,    0,         0, "Mac" },       PreviewPath(0) },
+	Set{ { 1, 1112, 7'914'459, "Android" },   PreviewPath(1) },
+	Set{ { 2, 1113, 5'287'724, "Twemoji" },   PreviewPath(2) },
+	Set{ { 3, 1114, 6'687'347, "JoyPixels" }, PreviewPath(3) },
 };
 
 using Loading = MTP::DedicatedLoader::Progress;
@@ -247,7 +247,7 @@ void Row::paintPreview(Painter &p) const {
 	const auto width = st::manageEmojiPreviewWidth;
 	const auto height = st::manageEmojiPreviewWidth;
 	auto &&preview = ranges::views::zip(_preview, ranges::views::ints(0, int(_preview.size())));
-	for (const auto &[pixmap, index] : preview) {
+	for (const auto [pixmap, index] : preview) {
 		const auto row = (index / 2);
 		const auto column = (index % 2);
 		const auto left = x + (column ? width - st::manageEmojiPreview : 0);

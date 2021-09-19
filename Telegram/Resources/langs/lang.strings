@@ -357,6 +357,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_update_fail" = "Update check failed :(";
 "lng_settings_workmode_tray" = "Show tray icon";
 "lng_settings_workmode_window" = "Show taskbar icon";
+"lng_settings_close_to_taskbar" = "Close to taskbar";
 "lng_settings_native_frame" = "Use system window frame";
 "lng_settings_auto_start" = "Launch Telegram when system starts";
 "lng_settings_start_min" = "Launch minimized";
@@ -1625,6 +1626,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_user_action_upload_file" = "{user} is sending a file";
 "lng_send_action_choose_sticker" = "choosing a sticker";
 "lng_user_action_choose_sticker" = "{user} is choosing a sticker";
+"lng_user_action_watching_animations" = "watching {emoji}";
 "lng_unread_bar#one" = "{count} unread message";
 "lng_unread_bar#other" = "{count} unread messages";
 "lng_unread_bar_some" = "Unread messages";
@@ -1711,6 +1713,17 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_context_reschedule_selected" = "Reschedule Selected";
 "lng_context_delete_selected" = "Delete Selected";
 "lng_context_clear_selection" = "Clear Selection";
+"lng_context_seen_loading" = "Loading...";
+"lng_context_seen_text#one" = "{count} Seen";
+"lng_context_seen_text#other" = "{count} Seen";
+"lng_context_seen_text_none" = "Nobody Viewed";
+"lng_context_seen_listened#one" = "{count} Listened";
+"lng_context_seen_listened#other" = "{count} Listened";
+"lng_context_seen_listened_none" = "Nobody Listened";
+"lng_context_seen_watched#one" = "{count} Watched";
+"lng_context_seen_watched#other" = "{count} Watched";
+"lng_context_seen_watched_none" = "Nobody Watched";
+
 "lng_send_image_empty" = "Could not send an empty file: {name}";
 "lng_send_image_too_large" = "Could not send a file, because it is larger than 1500 MB: {name}";
 "lng_send_images_selected#one" = "{count} image selected";
@@ -2211,11 +2224,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_group_call_edit_title_channel" = "Edit live stream title";
 "lng_group_call_recording_start" = "Start recording";
 "lng_group_call_recording_stop" = "Stop recording";
-"lng_group_call_recording_started" = "Voice chat recording started.";
+"lng_group_call_recording_started" = "Started recording the audio stream.";
+"lng_group_call_recording_started_video" = "Started recording the video stream.";
 "lng_group_call_recording_started_channel" = "Live stream recording started.";
-"lng_group_call_recording_stopped" = "Voice chat recording stopped.";
+"lng_group_call_recording_stopped" = "Recording stopped.";
 "lng_group_call_recording_stopped_channel" = "Live stream recording stopped.";
 "lng_group_call_recording_saved" = "Audio saved to Saved Messages.";
+"lng_group_call_recording_saved_video" = "Video saved to Saved Messages.";
 "lng_group_call_pinned_camera_me" = "Your video is pinned.";
 "lng_group_call_pinned_screen_me" = "Your screencast is pinned.";
 "lng_group_call_pinned_camera" = "{user}'s video is pinned.";
@@ -2225,11 +2240,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_group_call_unpinned_camera" = "{user}'s video is unpinned.";
 "lng_group_call_unpinned_screen" = "{user}'s screencast is unpinned.";
 "lng_group_call_sure_screencast" = "{user} is screensharing. This action will make your screencast pinned for all participants.";
-"lng_group_call_recording_start_sure" = "Do you want to start recording this chat and save the result into an audio file?\n\nOther members will see the chat is being recorded.";
+"lng_group_call_recording_start_sure" = "Participants will see the chat is being recorded.";
 "lng_group_call_recording_stop_sure" = "Do you want to stop recording this chat?";
 "lng_group_call_recording_start_field" = "Recording Title";
 "lng_group_call_recording_start_button" = "Start";
-"lng_group_call_is_recorded" = "Voice chat is being recorded.";
+"lng_group_call_recording_start_title" = "Add Title";
+"lng_group_call_recording_start_checkbox" = "Also record video";
+"lng_group_call_recording_start_audio_subtitle" = "This chat will be recorded into an audio file";
+"lng_group_call_recording_start_video_subtitle" = "Choose video orientation";
+"lng_group_call_is_recorded" = "The audio stream is being recorded.";
+"lng_group_call_is_recorded_video" = "The video stream is being recorded.";
 "lng_group_call_is_recorded_channel" = "Live stream is being recorded.";
 "lng_group_call_can_speak_here" = "You can now speak.";
 "lng_group_call_can_speak" = "You can now speak in {chat}.";
@@ -2863,6 +2883,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_photo_editor_menu_delete" = "Delete";
 "lng_photo_editor_menu_flip" = "Flip";
 "lng_photo_editor_menu_duplicate" = "Duplicate";
+
+"lng_voice_speed_slow" = "Slow";
+"lng_voice_speed_normal" = "Normal";
+"lng_voice_speed_fast" = "Fast";
+"lng_voice_speed_very_fast" = "Very fast";
 
 // Wnd specific
 

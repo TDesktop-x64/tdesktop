@@ -654,7 +654,7 @@ void DeleteMessagesBox::prepare() {
 						MTP_int(SearchPerPage),
 						MTP_int(0),
 						MTP_int(0),
-						MTP_int(0)
+						MTP_long(0)
 				)).done([=](const MTPmessages_Messages &result) {
 					const auto count = result.c_messages_channelMessages().vcount().v;
 					if (count > 0) {

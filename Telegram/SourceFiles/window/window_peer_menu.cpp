@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "window/window_peer_menu.h"
 
+#include "base/random.h"
 #include "base/openssl_help.h"
 #include "lang/lang_keys.h"
 #include "boxes/confirm_box.h"
@@ -1161,7 +1162,7 @@ QPointer<Ui::RpWidget> ShowNewForwardMessagesBox(
 		auto generateRandom = [&] {
 			auto result = QVector<MTPlong>(data->msgIds.size());
 			for (auto &value : result) {
-				value = openssl::RandomValue<MTPlong>();
+				value = base::RandomValue<MTPlong>();
 			}
 			return result;
 		};
@@ -1310,7 +1311,7 @@ QPointer<Ui::RpWidget> ShowForwardNoQuoteMessagesBox(
 				auto caption = it->originalText();
 				auto entities = Api::EntitiesToMTP(session, caption.entities, Api::ConvertOption::SkipLocal);
 				const auto flags = !entities.v.isEmpty() ? MTPDinputSingleMedia::Flag::f_entities : MTPDinputSingleMedia::Flag(0);
-				auto randomId = openssl::RandomValue<uint64>();
+				auto randomId = base::RandomValue<uint64>();
 
 				mediaAlbums[it->groupId().value].push_back(MTP_inputSingleMedia(
 					MTP_flags(flags),

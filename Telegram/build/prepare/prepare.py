@@ -66,7 +66,7 @@ for singlePrefix in pathPrefixes:
     pathPrefix = pathPrefix + rootDir + dirSep + singlePrefix + pathSep
 
 environment = {
-    'MAKE_THREADS_CNT': '-j%NUMBER_OF_PROCESSORS%',
+    'MAKE_THREADS_CNT': '-j32',
     'MACOSX_DEPLOYMENT_TARGET': '10.12',
     'UNGUARDED': '-Werror=unguarded-availability-new',
     'MIN_VER': '-mmacosx-version-min=10.12',

@@ -49,7 +49,7 @@ if not os.path.isdir(thirdPartyDir + '/' + keysLoc):
 
 pathPrefixes = [
     'ThirdParty\\Strawberry\\perl\\bin',
-    'ThirdParty\\Python27',
+    'ThirdParty\\Python39',
     'ThirdParty\\NASM',
     'ThirdParty\\jom',
     'ThirdParty\\cmake\\bin',
@@ -66,7 +66,7 @@ for singlePrefix in pathPrefixes:
     pathPrefix = pathPrefix + rootDir + dirSep + singlePrefix + pathSep
 
 environment = {
-    'MAKE_THREADS_CNT': '-j8',
+    'MAKE_THREADS_CNT': '-j%NUMBER_OF_PROCESSORS%',
     'MACOSX_DEPLOYMENT_TARGET': '10.12',
     'UNGUARDED': '-Werror=unguarded-availability-new',
     'MIN_VER': '-mmacosx-version-min=10.12',
@@ -470,10 +470,12 @@ stage('openssl', """
     cd openssl
 win32:
     perl Configure no-shared no-tests debug-VC-WIN32
+    sed -i 's/\/W3 \/wd4090 \/nologo \/Od/\/W3 \/wd4090 \/nologo \/Od \/FS \/MP/g' makefile
 win64:
     perl Configure no-shared no-tests debug-VC-WIN64A
+    sed -i 's/\/W3 \/wd4090 \/nologo \/Od/\/W3 \/wd4090 \/nologo \/Od \/FS \/MP/g' makefile
 win:
-    nmake
+    jom -j %NUMBER_OF_PROCESSORS%
     mkdir out.dbg
     move libcrypto.lib out.dbg
     move libssl.lib out.dbg
@@ -484,10 +486,12 @@ release:
     move out.dbg\\ossl_static out.dbg\\ossl_static.pdb
 win32:
     perl Configure no-shared no-tests VC-WIN32
+    sed -i 's/\/W3 \/wd4090 \/nologo \/O2/\/W3 \/wd4090 \/nologo \/O2 \/FS \/MP/g' makefile
 win64:
     perl Configure no-shared no-tests VC-WIN64A
+    sed -i 's/\/W3 \/wd4090 \/nologo \/O2/\/W3 \/wd4090 \/nologo \/O2 \/FS \/MP/g' makefile
 win:
-    nmake
+    jom -j %NUMBER_OF_PROCESSORS%
     mkdir out
     move libcrypto.lib out
     move libssl.lib out
@@ -562,6 +566,7 @@ win:
     set MSYS2_PATH_TYPE=inherit
 
 depends:patches/build_ffmpeg_win.sh
+    sed -i 's/-j4/-j%NUMBER_OF_PROCESSORS%/g' ../patches/build_ffmpeg_win.sh
     bash --login ../patches/build_ffmpeg_win.sh
 
     SET PATH=%PATH_BACKUP_%

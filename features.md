@@ -49,3 +49,5 @@
 45. Hide "All chats" folder option
 46. Hide 1 to 1 call panel window when press X(close window)
 47. Allow pin older message with notify
+48. Allow pin Voice Chat window to top
+49. Higher video bitrate for voice chat option

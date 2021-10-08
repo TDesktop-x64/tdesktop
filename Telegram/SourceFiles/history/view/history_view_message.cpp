@@ -2655,8 +2655,8 @@ void Message::refreshEditedBadge() {
 	const auto edited = displayedEditBadge();
 	const auto editDate = displayedEditDate();
 	QString msgId;
-	if (item->fullId().msg > 0)
-		msgId = " (" + QString::number(item->fullId().msg) + ")";
+	if (item->fullId().msg.bare > 0)
+		msgId = " (" + QString::number(item->fullId().msg.bare) + ")";
 	else
 		msgId = "";
 	const auto dateText = dateTime().toString(cTimeFormat()) + (cShowMessagesID() ? msgId : "");
@@ -2685,8 +2685,8 @@ void Message::initTime() const {
 		item->_timeWidth = edited->maxWidth();
 	} else {
 		QString msgId;
-		if (item->fullId().msg > 0)
-			msgId = " (" + QString::number(item->fullId().msg) + ")";
+		if (item->fullId().msg.bare > 0)
+			msgId = " (" + QString::number(item->fullId().msg.bare) + ")";
 		else
 			msgId = "";
 

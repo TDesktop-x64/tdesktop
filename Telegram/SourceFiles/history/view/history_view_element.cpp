@@ -236,7 +236,7 @@ QString DateTooltipText(not_null<Element*> view) {
 		}
 	}
 	if (const auto msgId = view->data()->fullId().msg) {
-		dateText += '\n' + tr::lng_message_id(tr::now) + QString::number(msgId);
+		dateText += '\n' + tr::lng_message_id(tr::now) + QString::number(msgId.bare);
 	}
 	return dateText;
 }

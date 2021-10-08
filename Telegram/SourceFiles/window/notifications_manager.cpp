@@ -98,18 +98,13 @@ System::SkipState System::skipNotification(
 		not_null<HistoryItem*> item) const {
 	const auto history = item->history();
 	const auto notifyBy = item->specialNotificationPeer();
-	if (App::quitting() || !history->currentNotification()) {
+	if (App::quitting()
+		|| !history->currentNotification()
+		|| item->skipNotification()) {
 		return { SkipState::Skip };
 	} else if (!Core::App().settings().notifyFromAll()
 		&& &history->session().account() != &Core::App().domain().active()) {
 		return { SkipState::Skip };
-	}
-	const auto scheduled = item->out() && item->isFromScheduled();
-
-	if (const auto forwarded = item->Get<HistoryMessageForwarded>()) {
-		if (forwarded->imported) {
-			return { SkipState::Skip };
-		}
 	}
 
 	history->owner().requestNotifySettings(history->peer);
@@ -117,6 +112,7 @@ System::SkipState System::skipNotification(
 		history->owner().requestNotifySettings(notifyBy);
 	}
 
+	const auto scheduled = item->out() && item->isFromScheduled();
 	if (history->owner().notifyMuteUnknown(history->peer)) {
 		return { SkipState::Unknown, item->isSilent() };
 	} else if (!history->owner().notifyIsMuted(history->peer)) {
@@ -597,11 +593,13 @@ Manager::DisplayOptions Manager::getNotificationOptions(
 		|| (view > Core::Settings::NotifyView::ShowName);
 	result.hideMessageText = hideEverything
 		|| (view > Core::Settings::NotifyView::ShowPreview);
-	result.hideReplyButton = result.hideMessageText
+	result.hideMarkAsRead = result.hideMessageText
 		|| !item
 		|| ((item->out() || item->history()->peer->isSelf())
-			&& item->isFromScheduled())
+			&& item->isFromScheduled());
+	result.hideReplyButton = result.hideMarkAsRead
 		|| !item->history()->peer->canWrite()
+		|| item->history()->peer->isBroadcast()
 		|| (item->history()->peer->slowmodeSecondsLeft() > 0);
 	return result;
 }
@@ -632,7 +630,9 @@ QString Manager::accountNameSeparator() {
 	return QString::fromUtf8(" \xE2\x9E\x9C ");
 }
 
-void Manager::notificationActivated(NotificationId id) {
+void Manager::notificationActivated(
+		NotificationId id,
+		const TextWithTags &reply) {
 	onBeforeNotificationActivated(id);
 	if (const auto session = system()->findSession(id.full.sessionId)) {
 		if (session->windows().empty()) {
@@ -641,6 +641,22 @@ void Manager::notificationActivated(NotificationId id) {
 		if (!session->windows().empty()) {
 			const auto window = session->windows().front();
 			const auto history = session->data().history(id.full.peerId);
+			if (!reply.text.isEmpty()) {
+				const auto replyToId = (id.msgId > 0
+					&& !history->peer->isUser())
+					? id.msgId
+					: 0;
+				auto draft = std::make_unique<Data::Draft>(
+					reply,
+					replyToId,
+					MessageCursor{
+						reply.text.size(),
+						reply.text.size(),
+						QFIXED_MAX,
+					},
+					Data::PreviewState::Allowed);
+				history->setLocalDraft(std::move(draft));
+			}
 			window->widget()->showFromTray();
 			window->widget()->reActivateWindow();
 			if (Core::App().passcodeLocked()) {
@@ -741,8 +757,7 @@ void NativeManager::doShowNotification(
 		scheduled ? WrapFromScheduled(fullTitle) : fullTitle,
 		subtitle,
 		text,
-		options.hideNameAndPhoto,
-		options.hideReplyButton);
+		options);
 }
 
 bool NativeManager::forceHideDetails() const {

@@ -32,18 +32,18 @@ constexpr auto kRequestTimeLimit = 60 * crl::time(1000);
 		&& (item->date() > base::unixtime::now());
 }
 
-MTPMessage PrepareMessage(const MTPMessage &message, MsgId id) {
+MTPMessage PrepareMessage(const MTPMessage &message) {
 	return message.match([&](const MTPDmessageEmpty &data) {
 		return MTP_messageEmpty(
 			data.vflags(),
-			MTP_int(id),
+			data.vid(),
 			data.vpeer_id() ? *data.vpeer_id() : MTPPeer());
 	}, [&](const MTPDmessageService &data) {
 		return MTP_messageService(
 			MTP_flags(data.vflags().v
 				| MTPDmessageService::Flag(
 					MTPDmessage::Flag::f_from_scheduled)),
-			MTP_int(id),
+			data.vid(),
 			data.vfrom_id() ? *data.vfrom_id() : MTPPeer(),
 			data.vpeer_id(),
 			data.vreply_to() ? *data.vreply_to() : MTPMessageReplyHeader(),
@@ -53,7 +53,7 @@ MTPMessage PrepareMessage(const MTPMessage &message, MsgId id) {
 	}, [&](const MTPDmessage &data) {
 		return MTP_message(
 			MTP_flags(data.vflags().v | MTPDmessage::Flag::f_from_scheduled),
-			MTP_int(id),
+			data.vid(),
 			data.vfrom_id() ? *data.vfrom_id() : MTPPeer(),
 			data.vpeer_id(),
 			data.vfwd_from() ? *data.vfwd_from() : MTPMessageFwdHeader(),
@@ -192,6 +192,7 @@ void ScheduledMessages::sendNowSimpleMessage(
 	const auto views = 1;
 	const auto forwards = 0;
 	history->addNewMessage(
+		update.vid().v,
 		MTP_message(
 			MTP_flags(flags),
 			update.vid(),
@@ -269,7 +270,8 @@ void ScheduledMessages::checkEntitiesAndUpdate(const MTPDmessage &data) {
 			qs(data.vmessage()),
 			Api::EntitiesFromMTP(_session, data.ventities().value_or_empty())
 		}, data.vmedia());
-		existing->updateReplyMarkup(data.vreply_markup());
+		existing->updateReplyMarkup(
+			HistoryMessageMarkupData(data.vreply_markup()));
 		existing->updateForwardedInfo(data.vfwd_from());
 		_session->data().requestItemTextRefresh(existing);
 
@@ -446,7 +448,7 @@ HistoryItem *ScheduledMessages::append(
 			// so if we receive a flag about it,
 			// probably this message was edited.
 			if (data.is_edit_hide()) {
-				existing->applyEdition(data);
+				existing->applyEdition(HistoryMessageEdition(_session, data));
 			}
 			existing->updateSentContent({
 				qs(data.vmessage()),
@@ -454,7 +456,8 @@ HistoryItem *ScheduledMessages::append(
 					_session,
 					data.ventities().value_or_empty())
 			}, data.vmedia());
-			existing->updateReplyMarkup(data.vreply_markup());
+			existing->updateReplyMarkup(
+				HistoryMessageMarkupData(data.vreply_markup()));
 			existing->updateForwardedInfo(data.vfwd_from());
 			existing->updateDate(data.vdate().v);
 			history->owner().requestItemTextRefresh(existing);
@@ -463,7 +466,8 @@ HistoryItem *ScheduledMessages::append(
 	}
 
 	const auto item = _session->data().addNewMessage(
-		PrepareMessage(message, history->nextNonHistoryEntryId()),
+		history->nextNonHistoryEntryId(),
+		PrepareMessage(message),
 		MessageFlags(), // localFlags
 		NewMessageType::Existing);
 	if (!item || item->history() != history) {
@@ -546,7 +550,7 @@ uint64 ScheduledMessages::countListHash(const List &list) const {
 	}) | ranges::views::reverse;
 	for (const auto &item : serverside) {
 		const auto j = list.idByItem.find(item.get());
-		HashUpdate(hash, j->second);
+		HashUpdate(hash, j->second.bare);
 		if (const auto edited = item->Get<HistoryMessageEdited>()) {
 			HashUpdate(hash, edited->date);
 		} else {

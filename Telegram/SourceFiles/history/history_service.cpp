@@ -1,4 +1,4 @@
-/*
+﻿/*
 This file is part of Telegram Desktop,
 the official desktop application for the Telegram messaging service.
 
@@ -43,6 +43,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace {
 
 constexpr auto kPinnedMessageTextLimit = 16;
+
+using ItemPreview = HistoryView::ItemPreview;
 
 QString GenerateServiceTime(TimeId date) {
 	if (date > 0) {
@@ -562,6 +564,8 @@ void HistoryService::applyAction(const MTPMessageAction &action) {
 		_flags |= MessageFlag::IsGroupEssential;
 	}, [&](const MTPDmessageActionChannelMigrateFrom &) {
 		_flags |= MessageFlag::IsGroupEssential;
+	}, [&](const MTPDmessageActionContactSignUp &) {
+		_flags |= MessageFlag::IsContactSignUp;
 	}, [](const auto &) {
 	});
 }
@@ -872,11 +876,12 @@ HistoryService::PreparedText HistoryService::prepareCallScheduledText(
 
 HistoryService::HistoryService(
 	not_null<History*> history,
+	MsgId id,
 	const MTPDmessage &data,
 	MessageFlags localFlags)
 : HistoryItem(
 		history,
-		data.vid().v,
+		id,
 		FlagsFromMTP(data.vflags().v) | localFlags,
 		data.vdate().v,
 		data.vfrom_id() ? peerFromMTP(*data.vfrom_id()) : PeerId(0)) {
@@ -886,11 +891,12 @@ HistoryService::HistoryService(
 
 HistoryService::HistoryService(
 	not_null<History*> history,
+	MsgId id,
 	const MTPDmessageService &data,
 	MessageFlags localFlags)
 : HistoryItem(
 		history,
-		data.vid().v,
+		id,
 		FlagsFromMTP(data.vflags().v) | localFlags,
 		data.vdate().v,
 		data.vfrom_id() ? peerFromMTP(*data.vfrom_id()) : PeerId(0)) {
@@ -927,14 +933,22 @@ bool HistoryService::needCheck() const {
 	return out() && !isEmpty();
 }
 
-QString HistoryService::inDialogsText(DrawInDialog way) const {
-	return textcmdLink(1, TextUtilities::Clean(notificationText()));
+ItemPreview HistoryService::toPreview(ToPreviewOptions options) const {
+	// Don't show for service messages (chat photo changed).
+	// Because larger version is shown exactly to the left of the preview.
+	//auto media = _media ? _media->toPreview(options) : ItemPreview();
+	return {
+		.text = textcmdLink(1, TextUtilities::Clean(notificationText())),
+		//.images = std::move(media.images),
+		//.loadingContext = std::move(media.loadingContext),
+	};
 }
 
 QString HistoryService::inReplyText() const {
 	const auto result = HistoryService::notificationText();
-	const auto text = result.trimmed().startsWith(author()->name)
-		? result.trimmed().mid(author()->name.size()).trimmed()
+	const auto &name = author()->name;
+	const auto text = result.trimmed().startsWith(name)
+		? result.trimmed().mid(name.size()).trimmed()
 		: result;
 	return textcmdLink(1, text);
 }
@@ -1194,19 +1208,7 @@ void HistoryService::updateDependentText() {
 void HistoryService::updateText(PreparedText &&text) {
 	setServiceText(text);
 	history()->owner().requestItemResize(this);
-	const auto inDialogsHistory = history()->migrateToOrMe();
-	if (inDialogsHistory->textCachedFor == this) {
-		inDialogsHistory->textCachedFor = nullptr;
-	}
-	//if (const auto feed = history()->peer->feed()) { // #TODO archive
-	//	if (feed->textCachedFor == this) {
-	//		feed->textCachedFor = nullptr;
-	//		feed->updateChatListEntry();
-	//	}
-	//}
-	history()->session().changes().messageUpdated(
-		this,
-		Data::MessageUpdate::Flag::DialogRowRepaint);
+	invalidateChatListEntry();
 	history()->owner().updateDependentMessages(this);
 }
 

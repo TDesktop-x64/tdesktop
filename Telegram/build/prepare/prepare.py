@@ -379,7 +379,7 @@ def runStages():
 stage('patches', """
     git clone https://github.com/desktop-app/patches.git
     cd patches
-    git checkout 1a1d9e6d2c
+    git checkout 5210855985
 """)
 
 stage('depot_tools', """
@@ -396,6 +396,7 @@ depends:patches/gyp.diff
     git apply $LIBS_DIR/patches/gyp.diff
 mac:
     python3 -m pip install git+https://github.com/nodejs/gyp-next@v0.10.0
+    mkdir gyp
 """, 'ThirdParty')
 
 stage('yasm', """
@@ -502,13 +503,19 @@ mac:
 """)
 
 stage('opus', """
-    git clone -b td-v1.3.1 https://github.com/telegramdesktop/opus.git
+    git clone -b v1.3.1 https://github.com/xiph/opus.git
     cd opus
+    git cherry-pick 927de8453c
 win:
-    cd win32\\VS2015
-    msbuild opus.sln /property:Configuration=Debug /property:Platform="%WIN32X64%"
+    cmake -B out . ^
+        -A %WIN32X64% ^
+        -DCMAKE_INSTALL_PREFIX=%LIBS_DIR%/local/opus ^
+        -DCMAKE_C_FLAGS_DEBUG="/MTd /Zi /Ob0 /Od /RTC1" ^
+        -DCMAKE_C_FLAGS_RELEASE="/MT /O2 /Ob2 /DNDEBUG"
+    cmake --build out --config Debug
 release:
-    msbuild opus.sln /property:Configuration=Release /property:Platform="%WIN32X64%"
+    cmake --build out --config Release
+    cmake --install out --config Release
 mac:
     ./autogen.sh
     CFLAGS="$MIN_VER $UNGUARDED" CPPFLAGS="$MIN_VER $UNGUARDED" LDFLAGS="$MIN_VER" ./configure --prefix=$USED_PREFIX
@@ -682,6 +689,7 @@ depends:yasm/yasm
 """)
 
 stage('openal-soft', """
+version: 2
     git clone -b wasapi_exact_device_time https://github.com/telegramdesktop/openal-soft.git
     cd openal-soft
     cd build
@@ -811,6 +819,7 @@ win:
 release:
     SET CONFIGURATIONS=-debug-and-release
 win:
+    """ + removeDir("\"%LIBS_DIR%\\Qt-5.15.2\"") + """
     SET ANGLE_DIR=%LIBS_DIR%\\tg_angle
     SET ANGLE_LIBS_DIR=%ANGLE_DIR%\\out
     SET MOZJPEG_DIR=%LIBS_DIR%\\mozjpeg

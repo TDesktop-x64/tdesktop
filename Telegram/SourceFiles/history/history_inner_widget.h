@@ -121,7 +121,6 @@ public:
 	void updateBotInfo(bool recount = true);
 
 	bool wasSelectedText() const;
-	void setFirstLoading(bool loading);
 
 	// updates history->scrollTopItem/scrollTopOffset
 	void visibleAreaUpdated(int top, int bottom);
@@ -151,6 +150,8 @@ public:
 	QPoint tooltipPos() const override;
 	bool tooltipWindowActive() const override;
 
+	void onParentGeometryChanged();
+
 	// HistoryView::ElementDelegate interface.
 	static not_null<HistoryView::ElementDelegate*> ElementDelegate();
 
@@ -172,13 +173,10 @@ protected:
 	void keyPressEvent(QKeyEvent *e) override;
 	void contextMenuEvent(QContextMenuEvent *e) override;
 
-public Q_SLOTS:
-	void onParentGeometryChanged();
-
+private:
 	void onTouchSelect();
 	void onTouchScrollTimer();
 
-private:
 	class BotAbout;
 	using SelectedItems = std::map<HistoryItem*, TextSelection, std::less<>>;
 	enum class MouseAction {
@@ -383,8 +381,6 @@ private:
 	mutable int _curBlock = 0;
 	mutable int _curItem = 0;
 
-	bool _firstLoading = false;
-
 	style::cursor _cursor = style::cur_default;
 	SelectedItems _selected;
 	std::optional<Ui::ReportReason> _chooseForReportReason;
@@ -408,7 +404,7 @@ private:
 	bool _pressWasInactive = false;
 
 	QPoint _trippleClickPoint;
-	QTimer _trippleClickTimer;
+	base::Timer _trippleClickTimer;
 
 	Element *_dragSelFrom = nullptr;
 	Element *_dragSelTo = nullptr;
@@ -420,7 +416,7 @@ private:
 	bool _touchSelect = false;
 	bool _touchInProgress = false;
 	QPoint _touchStart, _touchPrevPos, _touchPos;
-	QTimer _touchSelectTimer;
+	base::Timer _touchSelectTimer;
 
 	Ui::TouchScrollState _touchScrollState = Ui::TouchScrollState::Manual;
 	bool _touchPrevPosValid = false;
@@ -429,7 +425,7 @@ private:
 	crl::time _touchSpeedTime = 0;
 	crl::time _touchAccelerationTime = 0;
 	crl::time _touchTime = 0;
-	QTimer _touchScrollTimer;
+	base::Timer _touchScrollTimer;
 
 	base::unique_qptr<Ui::PopupMenu> _menu;
 

@@ -62,6 +62,7 @@ class SensitiveContent;
 class GlobalPrivacy;
 class UserPrivacy;
 class InviteLinks;
+class ViewsManager;
 
 namespace details {
 
@@ -400,6 +401,7 @@ public:
 	[[nodiscard]] Api::GlobalPrivacy &globalPrivacy();
 	[[nodiscard]] Api::UserPrivacy &userPrivacy();
 	[[nodiscard]] Api::InviteLinks &inviteLinks();
+	[[nodiscard]] Api::ViewsManager &views();
 
 	void createPoll(
 		const PollData &data,
@@ -456,7 +458,6 @@ private:
 	void saveDraftsToCloud();
 
 	void resolveMessageDatas();
-	void gotMessageDatas(ChannelData *channel, const MTPmessages_Messages &result, mtpRequestId requestId);
 	void finalizeMessageDataRequest(
 		ChannelData *channel,
 		mtpRequestId requestId);
@@ -720,6 +721,7 @@ private:
 	const std::unique_ptr<Api::GlobalPrivacy> _globalPrivacy;
 	const std::unique_ptr<Api::UserPrivacy> _userPrivacy;
 	const std::unique_ptr<Api::InviteLinks> _inviteLinks;
+	const std::unique_ptr<Api::ViewsManager> _views;
 
 	base::flat_map<FullMsgId, mtpRequestId> _pollVotesRequestIds;
 	base::flat_map<FullMsgId, mtpRequestId> _pollCloseRequestIds;

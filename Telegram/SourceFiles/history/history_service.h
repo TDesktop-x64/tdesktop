@@ -69,10 +69,12 @@ public:
 
 	HistoryService(
 		not_null<History*> history,
+		MsgId id,
 		const MTPDmessage &data,
 		MessageFlags localFlags);
 	HistoryService(
 		not_null<History*> history,
+		MsgId id,
 		const MTPDmessageService &data,
 		MessageFlags localFlags);
 	HistoryService(
@@ -109,7 +111,7 @@ public:
 	bool serviceMsg() const override {
 		return true;
 	}
-	QString inDialogsText(DrawInDialog way) const override;
+	ItemPreview toPreview(ToPreviewOptions options) const override;
 	QString inReplyText() const override;
 
 	std::unique_ptr<HistoryView::Element> createView(

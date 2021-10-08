@@ -191,12 +191,15 @@ public:
 		doClearFromSession(session);
 	}
 
-	void notificationActivated(NotificationId id);
+	void notificationActivated(
+		NotificationId id,
+		const TextWithTags &draft = {});
 	void notificationReplied(NotificationId id, const TextWithTags &reply);
 
 	struct DisplayOptions {
 		bool hideNameAndPhoto = false;
 		bool hideMessageText = false;
+		bool hideMarkAsRead = false;
 		bool hideReplyButton = false;
 	};
 	[[nodiscard]] DisplayOptions getNotificationOptions(
@@ -287,8 +290,7 @@ protected:
 		const QString &title,
 		const QString &subtitle,
 		const QString &msg,
-		bool hideNameAndPhoto,
-		bool hideReplyButton) = 0;
+		DisplayOptions options) = 0;
 
 };
 
@@ -308,8 +310,7 @@ protected:
 		const QString &title,
 		const QString &subtitle,
 		const QString &msg,
-		bool hideNameAndPhoto,
-		bool hideReplyButton) override {
+		DisplayOptions options) override {
 	}
 	void doClearAllFast() override {
 	}

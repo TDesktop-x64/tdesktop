@@ -18,7 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/emoji_config.h"
 #include "ui/empty_userpic.h"
 #include "ui/ui_utility.h"
-#include "dialogs/dialogs_layout.h"
+#include "dialogs/ui/dialogs_layout.h"
 #include "window/window_controller.h"
 #include "storage/file_download.h"
 #include "main/main_session.h"
@@ -788,7 +788,7 @@ void Notification::updateNotifyDisplay() {
 				Ui::Emoji::Draw(p, emoji, Ui::Emoji::GetSizeNormal(), rectForName.left(), top);
 				rectForName.setLeft(rectForName.left() + size + st::msgNameFont->spacew);
 			}
-			if (const auto chatTypeIcon = Dialogs::Layout::ChatTypeIcon(_history->peer, false, false)) {
+			if (const auto chatTypeIcon = Dialogs::Ui::ChatTypeIcon(_history->peer, false, false)) {
 				chatTypeIcon->paint(p, rectForName.topLeft(), w);
 				rectForName.setLeft(rectForName.left() + st::dialogsChatTypeSkip);
 			}
@@ -805,9 +805,10 @@ void Notification::updateNotifyDisplay() {
 			p.setPen(st::dialogsTextFg);
 			p.setFont(st::dialogsTextFont);
 			const auto text = _item
-				? _item->inDialogsText(reminder
-					? HistoryItem::DrawInDialog::WithoutSender
-					: HistoryItem::DrawInDialog::Normal)
+				? _item->toPreview({
+					.hideSender = reminder,
+					.generateImages = false,
+				}).text
 				: ((!_author.isEmpty()
 					? textcmdLink(1, _author)
 					: QString())

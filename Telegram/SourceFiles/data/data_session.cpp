@@ -53,6 +53,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_chat_filters.h"
 #include "data/data_scheduled_messages.h"
 #include "data/data_send_action.h"
+#include "data/data_sponsored_messages.h"
 #include "data/data_cloud_themes.h"
 #include "data/data_streaming.h"
 #include "data/data_media_rotation.h"
@@ -95,7 +96,7 @@ void CheckForSwitchInlineButton(not_null<HistoryItem*> item) {
 			return;
 		}
 		if (const auto markup = item->Get<HistoryMessageReplyMarkup>()) {
-			for (const auto &row : markup->rows) {
+			for (const auto &row : markup->data.rows) {
 				for (const auto &button : row) {
 					using ButtonType = HistoryMessageMarkupButton::Type;
 					if (button.type == ButtonType::SwitchInline) {
@@ -239,7 +240,8 @@ Session::Session(not_null<Main::Session*> session)
 , _streaming(std::make_unique<Streaming>(this))
 , _mediaRotation(std::make_unique<MediaRotation>())
 , _histories(std::make_unique<Histories>(this))
-, _stickers(std::make_unique<Stickers>(this)) {
+, _stickers(std::make_unique<Stickers>(this))
+, _sponsoredMessages(std::make_unique<SponsoredMessages>(this)) {
 	_cache->open(_session->local().cacheKey());
 	_bigFileCache->open(_session->local().cacheBigFileKey());
 
@@ -280,6 +282,7 @@ void Session::clear() {
 
 	_histories->unloadAll();
 	_scheduledMessages = nullptr;
+	_sponsoredMessages = nullptr;
 	_dependentMessages.clear();
 	base::take(_messages);
 	base::take(_channelMessages);
@@ -1386,6 +1389,10 @@ void Session::requestItemRepaint(not_null<const HistoryItem*> item) {
 			}
 		}
 	}
+	const auto history = item->history();
+	if (history->lastItemDialogsView.dependsOn(item)) {
+		history->updateChatListEntry();
+	}
 }
 
 rpl::producer<not_null<const HistoryItem*>> Session::itemRepaintRequest() const {
@@ -1823,8 +1830,10 @@ void Session::updateEditedMessage(const MTPMessage &data) {
 		checkEntitiesAndViewsUpdate(data.c_message());
 	}
 	data.match([](const MTPDmessageEmpty &) {
-	}, [&](const auto &data) {
+	}, [&](const MTPDmessageService &data) {
 		existing->applyEdition(data);
+	}, [&](const auto &data) {
+		existing->applyEdition(HistoryMessageEdition(_session, data));
 	});
 }
 
@@ -1842,8 +1851,8 @@ void Session::processMessages(
 				continue;
 			}
 		}
-		const auto id = IdFromMessage(message);
-		indices.emplace((uint64(uint32(id)) << 32) | uint64(i), i);
+		const auto id = IdFromMessage(message); // Only 32 bit values here.
+		indices.emplace((uint64(uint32(id.bare)) << 32) | uint64(i), i);
 	}
 	for (const auto &[position, index] : indices) {
 		addNewMessage(
@@ -1857,6 +1866,26 @@ void Session::processMessages(
 		const MTPVector<MTPMessage> &data,
 		NewMessageType type) {
 	processMessages(data.v, type);
+}
+
+void Session::processExistingMessages(
+		ChannelData *channel,
+		const MTPmessages_Messages &data) {
+	data.match([&](const MTPDmessages_channelMessages &data) {
+		if (channel) {
+			channel->ptsReceived(data.vpts().v);
+		} else {
+			LOG(("App Error: received messages.channelMessages!"));
+		}
+	}, [](const auto &) {});
+
+	data.match([&](const MTPDmessages_messagesNotModified&) {
+		LOG(("API Error: received messages.messagesNotModified!"));
+	}, [&](const auto &data) {
+		processUsers(data.vusers());
+		processChats(data.vchats());
+		processMessages(data.vmessages(), NewMessageType::Existing);
+	});
 }
 
 const Session::Messages *Session::messagesList(ChannelId channelId) const {
@@ -2170,12 +2199,21 @@ HistoryItem *Session::addNewMessage(
 		const MTPMessage &data,
 		MessageFlags localFlags,
 		NewMessageType type) {
+	return addNewMessage(IdFromMessage(data), data, localFlags, type);
+}
+
+HistoryItem *Session::addNewMessage(
+		MsgId id,
+		const MTPMessage &data,
+		MessageFlags localFlags,
+		NewMessageType type) {
 	const auto peerId = PeerFromMessage(data);
 	if (!peerId) {
 		return nullptr;
 	}
 
 	const auto result = history(peerId)->addNewMessage(
+		id,
 		data,
 		localFlags,
 		type);
@@ -3952,10 +3990,12 @@ void Session::insertCheckedServiceNotification(
 		| MessageFlag::LocalHistoryEntry;
 	auto sending = TextWithEntities(), left = message;
 	while (TextUtilities::CutPart(sending, left, MaxMessageSize)) {
+		const auto id = nextLocalMessageId();
 		addNewMessage(
+			id,
 			MTP_message(
 				MTP_flags(flags),
-				MTP_int(nextLocalMessageId()),
+				MTP_int(0), // Not used (would've been trimmed to 32 bits).
 				peerToMTP(PeerData::kServiceNotificationsId),
 				peerToMTP(PeerData::kServiceNotificationsId),
 				MTPMessageFwdHeader(),

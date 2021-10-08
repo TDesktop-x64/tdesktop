@@ -10,7 +10,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/platform/win/base_windows_h.h"
 
 #include <shlobj.h>
-#include <roapi.h>
 #include <dwmapi.h>
 #include <RestartManager.h>
 #include <psapi.h>
@@ -23,12 +22,6 @@ namespace Platform {
 namespace Dlls {
 
 void CheckLoadedModules();
-
-// UXTHEME.DLL
-inline HRESULT(__stdcall *SetWindowTheme)(
-	HWND hWnd,
-	LPCWSTR pszSubAppName,
-	LPCWSTR pszSubIdList);
 
 //inline void(__stdcall *RefreshImmersiveColorPolicyState)();
 //
@@ -85,22 +78,10 @@ inline BOOL(__stdcall *WTSUnRegisterSessionNotification)(
 
 // PROPSYS.DLL
 
-inline HRESULT(__stdcall *PropVariantToString)(
-	_In_ REFPROPVARIANT propvar,
-	_Out_writes_(cch) PWSTR psz,
-	_In_ UINT cch);
 inline HRESULT(__stdcall *PSStringFromPropertyKey)(
 	_In_ REFPROPERTYKEY pkey,
 	_Out_writes_(cch) LPWSTR psz,
 	_In_ UINT cch);
-
-// DWMAPI.DLL
-
-inline HRESULT(__stdcall *DwmSetWindowAttribute)(
-	HWND hwnd,
-	DWORD dwAttribute,
-	_In_reads_bytes_(cbAttribute) LPCVOID pvAttribute,
-	DWORD cbAttribute);
 
 // PSAPI.DLL
 

@@ -23,7 +23,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_cursor_state.h"
 #include "history/view/history_view_context_menu.h"
 #include "history/view/history_view_emoji_interactions.h"
-#include "ui/chat/chat_theme.h"
 #include "ui/chat/chat_style.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/image/image.h"
@@ -43,6 +42,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_peer_menu.h"
 #include "window/window_controller.h"
 #include "window/notifications_manager.h"
+#include "boxes/about_sponsored_box.h"
 #include "boxes/confirm_box.h"
 #include "boxes/sticker_set_box.h"
 #include "chat_helpers/message_field.h"
@@ -51,7 +51,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/platform/base_platform_info.h"
 #include "base/unixtime.h"
 #include "mainwindow.h"
-#include "mainwidget.h"
 #include "layout/layout_selection.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
@@ -60,6 +59,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_attached_stickers.h"
 #include "api/api_toggling_media.h"
 #include "api/api_who_read.h"
+#include "api/api_views.h"
 #include "lang/lang_keys.h"
 #include "data/data_session.h"
 #include "data/data_media_types.h"
@@ -170,6 +170,8 @@ HistoryInner::HistoryInner(
 	HistoryView::MakePathShiftGradient(
 		controller->chatStyle(),
 		[=] { update(); }))
+, _touchSelectTimer([=] { onTouchSelect(); })
+, _touchScrollTimer([=] { onTouchScrollTimer(); })
 , _scrollDateCheck([this] { scrollDateCheck(); })
 , _scrollDateHideTimer([this] { scrollDateHideByTimer(); }) {
 	Instance = this;
@@ -182,13 +184,7 @@ HistoryInner::HistoryInner(
 		controller->setChatStyleTheme(_theme);
 	}, lifetime());
 
-	_touchSelectTimer.setSingleShot(true);
-	connect(&_touchSelectTimer, SIGNAL(timeout()), this, SLOT(onTouchSelect()));
-
 	setAttribute(Qt::WA_AcceptTouchEvents);
-	connect(&_touchScrollTimer, SIGNAL(timeout()), this, SLOT(onTouchScrollTimer()));
-
-	_trippleClickTimer.setSingleShot(true);
 
 	notifyIsBotChanged();
 
@@ -618,8 +614,8 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 
 	const auto historyDisplayedEmpty = _history->isDisplayedEmpty()
 		&& (!_migrated || _migrated->isDisplayedEmpty());
-	bool noHistoryDisplayed = _firstLoading || historyDisplayedEmpty;
-	if (!_firstLoading && _botAbout && !_botAbout->info->text.isEmpty() && _botAbout->height > 0) {
+	bool noHistoryDisplayed = historyDisplayedEmpty;
+	if (_botAbout && !_botAbout->info->text.isEmpty() && _botAbout->height > 0) {
 		const auto st = context.st;
 		const auto stm = &st->messageStyle(false, false);
 		if (clip.y() < _botAbout->rect.y() + _botAbout->rect.height() && clip.y() + clip.height() > _botAbout->rect.y()) {
@@ -681,7 +677,7 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 				view->draw(p, context);
 
 				if (item->hasViews()) {
-					_controller->content()->scheduleViewIncrement(item);
+					session().api().views().scheduleIncrement(item);
 				}
 				if (item->isUnreadMention() && !item->isUnreadMedia()) {
 					readMentions.insert(item);
@@ -741,7 +737,7 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 					if (_visibleAreaBottom >= middle
 						&& _visibleAreaTop <= middle) {
 						if (item->hasViews()) {
-							_controller->content()->scheduleViewIncrement(item);
+							session().api().views().scheduleIncrement(item);
 						}
 						if (item->isUnreadMention() && !item->isUnreadMedia()) {
 							readMentions.insert(item);
@@ -895,7 +891,7 @@ void HistoryInner::onTouchScrollTimer() {
 		if (_touchSpeed.isNull() || !hasScrolled) {
 			_touchScrollState = Ui::TouchScrollState::Manual;
 			_touchScroll = false;
-			_touchScrollTimer.stop();
+			_touchScrollTimer.cancel();
 		} else {
 			_touchTime = nowTime;
 		}
@@ -970,7 +966,7 @@ void HistoryInner::touchEvent(QTouchEvent *e) {
 	if (e->type() == QEvent::TouchCancel) { // cancel
 		if (!_touchInProgress) return;
 		_touchInProgress = false;
-		_touchSelectTimer.stop();
+		_touchSelectTimer.cancel();
 		_touchScroll = _touchSelect = false;
 		_touchScrollState = Ui::TouchScrollState::Manual;
 		mouseActionCancel();
@@ -1000,7 +996,7 @@ void HistoryInner::touchEvent(QTouchEvent *e) {
 			_touchStart = _touchPos;
 		} else {
 			_touchScroll = false;
-			_touchSelectTimer.start(QApplication::startDragTime());
+			_touchSelectTimer.callOnce(QApplication::startDragTime());
 		}
 		_touchSelect = false;
 		_touchStart = _touchPrevPos = _touchPos;
@@ -1011,7 +1007,7 @@ void HistoryInner::touchEvent(QTouchEvent *e) {
 		if (_touchSelect) {
 			mouseActionUpdate(_touchPos);
 		} else if (!_touchScroll && (_touchPos - _touchStart).manhattanLength() >= QApplication::startDragDistance()) {
-			_touchSelectTimer.stop();
+			_touchSelectTimer.cancel();
 			_touchScroll = true;
 			touchUpdateSpeed();
 		}
@@ -1041,7 +1037,7 @@ void HistoryInner::touchEvent(QTouchEvent *e) {
 			if (_touchScrollState == Ui::TouchScrollState::Manual) {
 				_touchScrollState = Ui::TouchScrollState::Auto;
 				_touchPrevPosValid = false;
-				_touchScrollTimer.start(15);
+				_touchScrollTimer.callEach(15);
 				_touchTime = crl::now();
 			} else if (_touchScrollState == Ui::TouchScrollState::Auto) {
 				_touchScrollState = Ui::TouchScrollState::Manual;
@@ -1057,7 +1053,7 @@ void HistoryInner::touchEvent(QTouchEvent *e) {
 			mouseActionFinish(_touchPos, Qt::LeftButton);
 		}
 		if (weak) {
-			_touchSelectTimer.stop();
+			_touchSelectTimer.cancel();
 			_touchSelect = false;
 		}
 	} break;
@@ -1165,7 +1161,8 @@ void HistoryInner::mouseActionStart(const QPoint &screenPos, Qt::MouseButton but
 					_mouseAction = MouseAction::Selecting;
 					_mouseSelectType = TextSelectType::Paragraphs;
 					mouseActionUpdate(_mousePosition);
-					_trippleClickTimer.start(QApplication::doubleClickInterval());
+					_trippleClickTimer.callOnce(
+						QApplication::doubleClickInterval());
 				}
 			}
 		} else if (App::pressedItem()) {
@@ -1534,7 +1531,7 @@ void HistoryInner::mouseDoubleClickEvent(QMouseEvent *e) {
 			mouseMoveEvent(e);
 
 			_trippleClickPoint = e->globalPos();
-			_trippleClickTimer.start(QApplication::doubleClickInterval());
+			_trippleClickTimer.callOnce(QApplication::doubleClickInterval());
 		}
 	}
 	if (!ClickHandler::getActive()
@@ -1619,16 +1616,6 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			return;
 		}
 		const auto itemId = item->fullId();
-		if (hasWhoReadItem) {
-			const auto participantChosen = [=](uint64 id) {
-				controller->showPeerInfo(PeerId(id));
-			};
-			_menu->addAction(Ui::WhoReadContextAction(
-				_menu.get(),
-				Api::WhoRead(_dragStateItem, this, st::defaultWhoRead),
-				participantChosen));
-			_menu->addSeparator();
-		}
 		if (canSendMessages) {
 			_menu->addAction(tr::lng_context_reply_msg(tr::now), [=] {
 				_widget->replyToMessage(itemId);
@@ -1750,6 +1737,18 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			});
 		}
 	};
+
+	if (hasWhoReadItem) {
+		const auto participantChosen = [=](uint64 id) {
+			controller->showPeerInfo(PeerId(id));
+		};
+		_menu->addAction(Ui::WhoReadContextAction(
+			_menu.get(),
+			Api::WhoRead(_dragStateItem, this, st::defaultWhoRead),
+			participantChosen));
+		_menu->addSeparator();
+	}
+
 	const auto link = ClickHandler::getActive();
 	auto lnkPhoto = dynamic_cast<PhotoClickHandler*>(link.get());
 	auto lnkDocument = dynamic_cast<DocumentClickHandler*>(link.get());
@@ -1948,6 +1947,11 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					}
 				}
 				if (msg && view && !link && (view->hasVisibleText() || mediaHasTextForCopy)) {
+					if (item->isSponsored()) {
+						_menu->addAction(tr::lng_sponsored_title({}), [=] {
+							_controller->show(Box(Ui::AboutSponsoredBox));
+						});
+					}
 					_menu->addAction(tr::lng_context_copy_text(tr::now), [=] {
 						copyContextText(itemId);
 					});
@@ -2463,11 +2467,6 @@ bool HistoryInner::wasSelectedText() const {
 	return _wasSelectedText;
 }
 
-void HistoryInner::setFirstLoading(bool loading) {
-	_firstLoading = loading;
-	update();
-}
-
 void HistoryInner::visibleAreaUpdated(int top, int bottom) {
 	auto scrolledUp = (top < _visibleAreaTop);
 	_visibleAreaTop = top;
@@ -2792,7 +2791,7 @@ void HistoryInner::elementStartStickerLoop(
 
 crl::time HistoryInner::elementHighlightTime(
 		not_null<const HistoryItem*> item) {
-	const auto fullAnimMs = _controller->content()->highlightStartTime(item);
+	const auto fullAnimMs = _widget->highlightStartTime(item);
 	if (fullAnimMs > 0) {
 		const auto now = crl::now();
 		if (fullAnimMs < now) {

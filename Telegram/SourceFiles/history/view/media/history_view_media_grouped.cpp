@@ -12,6 +12,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "history/view/history_view_element.h"
 #include "history/view/history_view_cursor_state.h"
+#include "data/data_document.h"
 #include "data/data_media_types.h"
 #include "data/data_session.h"
 #include "storage/storage_shared_media.h"
@@ -182,7 +183,7 @@ QSize GroupedMedia::countCurrentSize(int newWidth) {
 		const auto initialSpacing = st::historyGroupSkip;
 		const auto factor = newWidth / float64(maxWidth());
 		const auto scale = [&](int value) {
-			return int(std::round(value * factor));
+			return int(base::SafeRound(value * factor));
 		};
 		const auto spacing = scale(initialSpacing);
 		for (auto &part : _parts) {
@@ -408,10 +409,14 @@ TextState GroupedMedia::textState(QPoint point, StateRequest request) const {
 			- (isBubbleBottom() ? st::msgPadding.bottom() : 0)
 			- _caption.countHeight(captionw);
 		if (QRect(st::msgPadding.left(), captiony, captionw, height() - captiony).contains(point)) {
-			return TextState(_parent->data(), _caption.getState(
-				point - QPoint(st::msgPadding.left(), captiony),
-				captionw,
-				request.forText()));
+			return TextState(
+				_captionItem
+					? _captionItem
+					: _parent->data().get(),
+				_caption.getState(
+					point - QPoint(st::msgPadding.left(), captiony),
+					captionw,
+					request.forText()));
 		}
 	} else if (_parent->media() == this) {
 		auto fullRight = width();
@@ -638,32 +643,62 @@ DocumentData *GroupedMedia::getDocument() const {
 
 HistoryMessageEdited *GroupedMedia::displayedEditBadge() const {
 	for (const auto &part : _parts) {
-		if (const auto edited = part.item->Get<HistoryMessageEdited>()) {
-			return edited;
+		if (!part.item->hideEditedBadge()) {
+			if (const auto edited = part.item->Get<HistoryMessageEdited>()) {
+				return edited;
+			}
 		}
 	}
 	return nullptr;
 }
 
 void GroupedMedia::updateNeedBubbleState() {
-	const auto captionItem = [&]() -> HistoryItem* {
+	using PartPtrOpt = std::optional<const Part*>;
+	const auto captionPart = [&]() -> PartPtrOpt {
 		if (_mode == Mode::Column) {
-			return nullptr;
+			return std::nullopt;
 		}
-		auto result = (HistoryItem*)nullptr;
+		auto result = PartPtrOpt();
 		for (const auto &part : _parts) {
 			if (!part.item->emptyText()) {
 				if (result) {
-					return nullptr;
+					return std::nullopt;
 				} else {
-					result = part.item;
+					result = &part;
 				}
 			}
 		}
 		return result;
 	}();
-	if (captionItem) {
-		_caption = createCaption(captionItem);
+	if (captionPart) {
+		const auto &part = (*captionPart);
+		struct Timestamp {
+			int duration = 0;
+			QString base;
+		};
+		const auto timestamp = [&]() -> Timestamp {
+			const auto &document = part->content->getDocument();
+			if (!document || document->isAnimation()) {
+				return {};
+			}
+			const auto duration = document->getDuration();
+			return {
+				.duration = duration,
+				.base = duration
+					? DocumentTimestampLinkBase(
+						document,
+						part->item->fullId())
+					: QString(),
+			};
+		}();
+		_caption = createCaption(
+			part->item,
+			timestamp.duration,
+			timestamp.base);
+
+		_captionItem = part->item;
+	} else {
+		_captionItem = nullptr;
 	}
 	_needBubble = computeNeedBubble();
 }

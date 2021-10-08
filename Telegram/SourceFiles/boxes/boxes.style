@@ -973,3 +973,21 @@ autolockTimeField: InputField(scheduleTimeField) {
 	heightMin: 20px;
 }
 autolockTimeWidth: 52px;
+
+sponsoredUrlButtonSkip: 11px;
+sponsoredUrlButton: RoundButton(defaultActiveButton) {
+	height: 32px;
+	width: -42px;
+	textBg: transparent;
+	textBgOver: transparent;
+	radius: roundRadiusLarge;
+	padding: margins(2px, 2px, 2px, 2px);
+	textFg: historyLinkInFg;
+	textFgOver: historyLinkInFg;
+	textTop: 7px;
+	font: normalFont;
+
+	ripple: RippleAnimation(defaultRippleAnimation) {
+		color: windowBgOver;
+	}
+}

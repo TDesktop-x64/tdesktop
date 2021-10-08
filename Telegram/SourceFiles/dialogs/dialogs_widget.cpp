@@ -205,7 +205,11 @@ Widget::Widget(
 	) | rpl::to_empty);
 
 	connect(_inner, SIGNAL(draggingScrollDelta(int)), this, SLOT(onDraggingScrollDelta(int)));
-	connect(_inner, SIGNAL(mustScrollTo(int,int)), _scroll, SLOT(scrollToY(int,int)));
+	connect(_inner, &InnerWidget::mustScrollTo, [=](int top, int bottom) {
+		if (_scroll) {
+			_scroll->scrollToY(top, bottom);
+		}
+	});
 	connect(_inner, SIGNAL(dialogMoved(int,int)), this, SLOT(onDialogMoved(int,int)));
 	connect(_inner, SIGNAL(searchMessages()), this, SLOT(onNeedSearchMessages()));
 	connect(_inner, SIGNAL(completeHashtag(QString)), this, SLOT(onCompleteHashtag(QString)));
@@ -234,8 +238,14 @@ Widget::Widget(
 		}
 	}, lifetime());
 
-	connect(_scroll, SIGNAL(geometryChanged()), _inner, SLOT(onParentGeometryChanged()));
-	connect(_scroll, SIGNAL(scrolled()), this, SLOT(onListScroll()));
+	_scroll->geometryChanged(
+	) | rpl::start_with_next(crl::guard(_inner, [=] {
+		_inner->onParentGeometryChanged();
+	}), lifetime());
+	_scroll->scrolls(
+	) | rpl::start_with_next([=] {
+		onListScroll();
+	}, lifetime());
 
 	session().data().chatsListChanges(
 	) | rpl::filter([=](Data::Folder *folder) {

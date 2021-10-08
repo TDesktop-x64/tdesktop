@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/image/image_prepare.h"
 #include "ui/chat/attach/attach_extensions.h"
 #include "ui/chat/attach/attach_prepare.h"
+#include "core/crash_reports.h"
 
 #include <QtCore/QSemaphore>
 #include <QtCore/QMimeData>
@@ -40,6 +41,8 @@ bool HasExtensionFrom(const QString &file, const QStringList &extensions) {
 bool ValidPhotoForAlbum(
 		const Image &image,
 		const QString &mime) {
+	Expects(!image.data.isNull());
+
 	if (image.animated
 		|| Core::IsMimeSticker(mime)
 		|| (!mime.isEmpty() && !mime.startsWith(u"image/"))) {
@@ -228,6 +231,8 @@ PreparedList PrepareMediaFromImage(
 		QImage &&image,
 		QByteArray &&content,
 		int previewWidth) {
+	Expects(!image.isNull());
+
 	auto result = PreparedList();
 	auto file = PreparedFile(QString());
 	file.content = content;
@@ -288,6 +293,7 @@ void PrepareDetails(PreparedFile &file, int previewWidth) {
 	using Song = PreparedFileInformation::Song;
 	if (const auto image = std::get_if<Image>(
 			&file.information->media)) {
+		Assert(!image->data.isNull());
 		if (ValidPhotoForAlbum(*image, file.information->filemime)) {
 			UpdateImageDetails(file, previewWidth);
 			file.type = PreparedFile::Type::Photo;
@@ -317,14 +323,29 @@ void UpdateImageDetails(PreparedFile &file, int previewWidth) {
 	if (!image) {
 		return;
 	}
-	const auto &preview = image->modifications
+	Assert(!image->data.isNull());
+	auto preview = image->modifications
 		? Editor::ImageModified(image->data, image->modifications)
 		: image->data;
+	Assert(!preview.isNull());
 	file.shownDimensions = PrepareShownDimensions(preview);
-	file.preview = Images::prepareOpaque(preview.scaledToWidth(
-		std::min(previewWidth, style::ConvertScale(preview.width()))
-			* cIntRetinaFactor(),
-		Qt::SmoothTransformation));
+	const auto toWidth = std::min(
+		previewWidth,
+		style::ConvertScale(preview.width())
+	) * cIntRetinaFactor();
+	const auto scaled = preview.scaledToWidth(
+		toWidth,
+		Qt::SmoothTransformation);
+	if (scaled.isNull()) {
+		CrashReports::SetAnnotation("Info", QString("%1x%2:%3*%4->%5;%6x%7"
+		).arg(preview.width()).arg(preview.height()
+		).arg(previewWidth).arg(cIntRetinaFactor()
+		).arg(toWidth
+		).arg(scaled.width()).arg(scaled.height()));
+		Unexpected("Scaled is null.");
+	}
+	Assert(!scaled.isNull());
+	file.preview = Images::prepareOpaque(scaled);
 	Assert(!file.preview.isNull());
 	file.preview.setDevicePixelRatio(cRetinaFactor());
 }

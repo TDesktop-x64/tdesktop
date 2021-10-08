@@ -51,6 +51,7 @@ class LocationPoint;
 class WallPaper;
 class ScheduledMessages;
 class SendActionManager;
+class SponsoredMessages;
 class ChatFilters;
 class CloudThemes;
 class Streaming;
@@ -108,6 +109,9 @@ public:
 	}
 	[[nodiscard]] Stickers &stickers() const {
 		return *_stickers;
+	}
+	[[nodiscard]] SponsoredMessages &sponsoredMessages() const {
+		return *_sponsoredMessages;
 	}
 	[[nodiscard]] MsgId nextNonHistoryEntryId() {
 		return ++_nonHistoryEntryId;
@@ -341,6 +345,9 @@ public:
 	void processMessages(
 		const MTPVector<MTPMessage> &data,
 		NewMessageType type);
+	void processExistingMessages(
+		ChannelData *channel,
+		const MTPmessages_Messages &data);
 	void processMessagesDeleted(
 		ChannelId channelId,
 		const QVector<MTPint> &data);
@@ -394,6 +401,11 @@ public:
 	void documentLoadFail(not_null<DocumentData*> document, bool started);
 
 	HistoryItem *addNewMessage(
+		const MTPMessage &data,
+		MessageFlags localFlags,
+		NewMessageType type);
+	HistoryItem *addNewMessage( // Override message id.
+		MsgId id,
 		const MTPMessage &data,
 		MessageFlags localFlags,
 		NewMessageType type);
@@ -955,6 +967,7 @@ private:
 	std::unique_ptr<MediaRotation> _mediaRotation;
 	std::unique_ptr<Histories> _histories;
 	std::unique_ptr<Stickers> _stickers;
+	std::unique_ptr<SponsoredMessages> _sponsoredMessages;
 	MsgId _nonHistoryEntryId = ServerMaxMsgId;
 
 	rpl::lifetime _lifetime;

@@ -9,7 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "styles/style_boxes.h"
 #include "styles/style_chat.h"
-#include "dialogs/dialogs_layout.h"
+#include "dialogs/ui/dialogs_layout.h"
 #include "ui/effects/ripple_animation.h"
 #include "ui/effects/radial_animation.h"
 #include "ui/image/image_prepare.h"
@@ -97,12 +97,12 @@ void HistoryDownButton::paintEvent(QPaintEvent *e) {
 	if (_unreadCount > 0) {
 		auto unreadString = QString::number(_unreadCount);
 
-		Dialogs::Layout::UnreadBadgeStyle st;
+		Dialogs::Ui::UnreadBadgeStyle st;
 		st.align = style::al_center;
 		st.font = st::historyToDownBadgeFont;
 		st.size = st::historyToDownBadgeSize;
-		st.sizeId = Dialogs::Layout::UnreadBadgeInHistoryToDown;
-		Dialogs::Layout::paintUnreadCount(p, unreadString, width(), 0, st, nullptr, 4);
+		st.sizeId = Dialogs::Ui::UnreadBadgeInHistoryToDown;
+		Dialogs::Ui::paintUnreadCount(p, unreadString, width(), 0, st, nullptr, 4);
 	}
 }
 

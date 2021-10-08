@@ -33,6 +33,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/crash_reports.h"
 #include "base/unixtime.h"
 #include "api/api_text_entities.h"
+#include "dialogs/ui/dialogs_message_view.h"
 #include "data/data_scheduled_messages.h" // kScheduledUntilOnlineTimestamp
 #include "data/data_changes.h"
 #include "data/data_session.h"
@@ -48,6 +49,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace {
 
 constexpr auto kNotificationTextLimit = 255;
+
+using ItemPreview = HistoryView::ItemPreview;
 
 enum class MediaCheckResult {
 	Good,
@@ -84,7 +87,7 @@ not_null<HistoryItem*> CreateUnsupportedMessage(
 		QString(),
 		text,
 		MTP_messageMediaEmpty(),
-		MTPReplyMarkup(),
+		HistoryMessageMarkupData(),
 		groupedId);
 }
 
@@ -202,14 +205,14 @@ void HistoryItem::applyServiceDateEdition(const MTPDmessageService &data) {
 }
 
 void HistoryItem::finishEdition(int oldKeyboardTop) {
-	_history->owner().requestItemViewRefresh(this);
-	invalidateChatListEntry();
 	if (const auto group = _history->owner().groups().find(this)) {
-		const auto leader = group->items.front();
-		if (leader != this) {
-			_history->owner().requestItemViewRefresh(leader);
-			leader->invalidateChatListEntry();
+		for (const auto &item : group->items) {
+			_history->owner().requestItemViewRefresh(item);
+			item->invalidateChatListEntry();
 		}
+	} else {
+		_history->owner().requestItemViewRefresh(this);
+		invalidateChatListEntry();
 	}
 
 	// Should be completely redesigned as the oldTop no longer exists.
@@ -231,7 +234,7 @@ void HistoryItem::setGroupId(MessageGroupId groupId) {
 
 HistoryMessageReplyMarkup *HistoryItem::inlineReplyMarkup() {
 	if (const auto markup = Get<HistoryMessageReplyMarkup>()) {
-		if (markup->flags & ReplyMarkupFlag::Inline) {
+		if (markup->data.flags & ReplyMarkupFlag::Inline) {
 			return markup;
 		}
 	}
@@ -292,17 +295,7 @@ void HistoryItem::invalidateChatListEntry() {
 	history()->session().changes().messageUpdated(
 		this,
 		Data::MessageUpdate::Flag::DialogRowRefresh);
-
-	// invalidate cache for drawInDialog
-	if (history()->textCachedFor == this) {
-		history()->textCachedFor = nullptr;
-	}
-	//if (const auto feed = history()->peer->feed()) { // #TODO archive
-	//	if (feed->textCachedFor == this) {
-	//		feed->textCachedFor = nullptr;
-	//		feed->updateChatListEntry();
-	//	}
-	//}
+	history()->lastItemDialogsView.itemInvalidated(this);
 }
 
 void HistoryItem::finishEditionToEmpty() {
@@ -379,7 +372,7 @@ void HistoryItem::setIsPinned(bool pinned) {
 
 bool HistoryItem::definesReplyKeyboard() const {
 	if (const auto markup = Get<HistoryMessageReplyMarkup>()) {
-		if (markup->flags & ReplyMarkupFlag::Inline) {
+		if (markup->data.flags & ReplyMarkupFlag::Inline) {
 			return false;
 		}
 		return true;
@@ -394,7 +387,7 @@ ReplyMarkupFlags HistoryItem::replyKeyboardFlags() const {
 	Expects(definesReplyKeyboard());
 
 	if (const auto markup = Get<HistoryMessageReplyMarkup>()) {
-		return markup->flags;
+		return markup->data.flags;
 	}
 
 	// optimization: don't create markup component for the case
@@ -459,6 +452,21 @@ bool HistoryItem::isScheduled() const {
 		&& (_flags & MessageFlag::IsOrWasScheduled);
 }
 
+bool HistoryItem::isSponsored() const {
+	return (_flags & MessageFlag::IsSponsored);
+}
+
+bool HistoryItem::skipNotification() const {
+	if (isSilent() && (_flags & MessageFlag::IsContactSignUp)) {
+		return true;
+	} else if (const auto forwarded = Get<HistoryMessageForwarded>()) {
+		if (forwarded->imported) {
+			return true;
+		}
+	}
+	return false;
+}
+
 void HistoryItem::destroy() {
 	_history->destroyMessage(this);
 }
@@ -505,11 +513,11 @@ void HistoryItem::applySentMessage(const MTPDmessage &data) {
 			&history()->session(),
 			data.ventities().value_or_empty())
 	}, data.vmedia());
-	updateReplyMarkup(data.vreply_markup());
+	updateReplyMarkup(HistoryMessageMarkupData(data.vreply_markup()));
 	updateForwardedInfo(data.vfwd_from());
 	setViewsCount(data.vviews().value_or(-1));
 	if (const auto replies = data.vreplies()) {
-		setReplies(*replies);
+		setReplies(HistoryMessageRepliesData(replies));
 	} else {
 		clearReplies();
 	}
@@ -745,7 +753,7 @@ MsgId HistoryItem::replyToTop() const {
 }
 
 not_null<PeerData*> HistoryItem::author() const {
-	return isPost() ? history()->peer : from();
+	return (isPost() && !isSponsored()) ? history()->peer : from();
 }
 
 TimeId HistoryItem::dateOriginal() const {
@@ -923,7 +931,7 @@ bool HistoryItem::isEmpty() const {
 
 QString HistoryItem::notificationText() const {
 	const auto result = [&] {
-		if (_media) {
+		if (_media && !serviceMsg()) {
 			return _media->notificationText();
 		} else if (!emptyText()) {
 			return _text.toString();
@@ -935,20 +943,17 @@ QString HistoryItem::notificationText() const {
 		: result.mid(0, kNotificationTextLimit) + qsl("...");
 }
 
-QString HistoryItem::inDialogsText(DrawInDialog way) const {
-	const auto plainText = [&] {
+ItemPreview HistoryItem::toPreview(ToPreviewOptions options) const {
+	auto result = [&]() -> ItemPreview {
 		if (_media) {
-			if (_groupId) {
-				return textcmdLink(1, TextUtilities::Clean(tr::lng_in_dlg_album(tr::now)));
-			}
-			return _media->chatListText(way);
+			return _media->toPreview(options);
 		} else if (!emptyText()) {
-			return TextUtilities::Clean(_text.toString());
+			return { .text = TextUtilities::Clean(_text.toString()) };
 		}
-		return QString();
+		return {};
 	}();
 	const auto sender = [&]() -> PeerData* {
-		if (isPost() || isEmpty() || (way != DrawInDialog::Normal)) {
+		if (options.hideSender || isPost() || isEmpty()) {
 			return nullptr;
 		} else if (!_history->peer->isUser() || out()) {
 			return displayFrom();
@@ -957,38 +962,23 @@ QString HistoryItem::inDialogsText(DrawInDialog way) const {
 		}
 		return nullptr;
 	}();
-	if (sender) {
-		auto fromText = sender->isSelf() ? tr::lng_from_you(tr::now) : sender->shortName();
-		auto fromWrapped = textcmdLink(1, tr::lng_dialogs_text_from_wrapped(tr::now, lt_from, TextUtilities::Clean(fromText)));
-		return tr::lng_dialogs_text_with_from(tr::now, lt_from_part, fromWrapped, lt_message, plainText);
+	if (!sender) {
+		return result;
 	}
-	return plainText;
+	const auto fromText = sender->isSelf()
+		? tr::lng_from_you(tr::now)
+		: sender->shortName();
+	const auto fromWrapped = textcmdLink(
+		1,
+		tr::lng_dialogs_text_from_wrapped(
+			tr::now,
+			lt_from,
+			TextUtilities::Clean(fromText)));
+	return Dialogs::Ui::PreviewWithSender(std::move(result), fromWrapped);
 }
 
 Ui::Text::IsolatedEmoji HistoryItem::isolatedEmoji() const {
 	return Ui::Text::IsolatedEmoji();
-}
-
-void HistoryItem::drawInDialog(
-		Painter &p,
-		const QRect &r,
-		bool active,
-		bool selected,
-		DrawInDialog way,
-		const HistoryItem *&cacheFor,
-		Ui::Text::String &cache) const {
-	if (r.isEmpty()) {
-		return;
-	}
-	if (cacheFor != this) {
-		cacheFor = this;
-		cache.setText(st::dialogsTextStyle, inDialogsText(way), Ui::DialogTextOptions());
-	}
-	p.setTextPalette(active ? st::dialogsTextPaletteActive : (selected ? st::dialogsTextPaletteOver : st::dialogsTextPalette));
-	p.setFont(st::dialogsTextFont);
-	p.setPen(active ? st::dialogsTextFgActive : (selected ? st::dialogsTextFgOver : st::dialogsTextFg));
-	cache.drawElided(p, r.left(), r.top(), r.width(), r.height() / st::dialogsTextFont->height);
-	p.restoreTextPalette();
 }
 
 HistoryItem::~HistoryItem() {
@@ -1078,6 +1068,7 @@ MessageFlags FlagsFromMTP(MTPDmessageService::Flags flags) {
 
 not_null<HistoryItem*> HistoryItem::Create(
 		not_null<History*> history,
+		MsgId id,
 		const MTPMessage &message,
 		MessageFlags localFlags) {
 	return message.match([&](const MTPDmessage &data) -> HistoryItem* {
@@ -1088,7 +1079,7 @@ not_null<HistoryItem*> HistoryItem::Create(
 		if (checked == MediaCheckResult::Unsupported) {
 			return CreateUnsupportedMessage(
 				history,
-				data.vid().v,
+				id,
 				FlagsFromMTP(data.vflags().v) | localFlags,
 				MsgId(0), // No need to pass reply_to data here.
 				data.vvia_bot_id().value_or_empty(),
@@ -1099,28 +1090,24 @@ not_null<HistoryItem*> HistoryItem::Create(
 				tr::lng_message_empty(tr::now)
 			};
 			return history->makeServiceMessage(
-				data.vid().v,
+				id,
 				FlagsFromMTP(data.vflags().v) | localFlags,
 				data.vdate().v,
 				text,
 				data.vfrom_id() ? peerFromMTP(*data.vfrom_id()) : PeerId(0));
 		} else if (checked == MediaCheckResult::HasTimeToLive) {
-			return history->makeServiceMessage(data, localFlags);
+			return history->makeServiceMessage(id, data, localFlags);
 		}
-		return history->makeMessage(data, localFlags);
+		return history->makeMessage(id, data, localFlags);
 	}, [&](const MTPDmessageService &data) -> HistoryItem* {
 		if (data.vaction().type() == mtpc_messageActionPhoneCall) {
-			return history->makeMessage(data, localFlags);
+			return history->makeMessage(id, data, localFlags);
 		}
-		return history->makeServiceMessage(data, localFlags);
+		return history->makeServiceMessage(id, data, localFlags);
 	}, [&](const MTPDmessageEmpty &data) -> HistoryItem* {
 		const auto text = HistoryService::PreparedText{
 			tr::lng_message_empty(tr::now)
 		};
-		return history->makeServiceMessage(
-			data.vid().v,
-			localFlags,
-			TimeId(0),
-			text);
+		return history->makeServiceMessage(id, localFlags, TimeId(0), text);
 	});
 }

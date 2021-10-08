@@ -42,7 +42,12 @@ include(cmake/generate_appdata_changelog.cmake)
 
 if (WIN32)
     include(cmake/generate_midl.cmake)
-    generate_midl(Telegram ${src_loc}/platform/win/windows_quiethours.idl)
+    generate_midl(Telegram ${src_loc}
+        platform/win/windows_quiethours.idl
+        platform/win/windows_toastactivator.idl
+    )
+
+    nuget_add_winrt(Telegram)
 endif()
 
 set_target_properties(Telegram PROPERTIES AUTOMOC ON AUTORCC ON)
@@ -137,6 +142,8 @@ PRIVATE
     api/api_updates.h
     api/api_user_privacy.cpp
     api/api_user_privacy.h
+    api/api_views.cpp
+    api/api_views.h
     api/api_who_read.cpp
     api/api_who_read.h
     boxes/filters/edit_filter_box.cpp
@@ -167,6 +174,8 @@ PRIVATE
     boxes/peers/edit_peer_permissions_box.h
     boxes/about_box.cpp
     boxes/about_box.h
+    boxes/about_sponsored_box.cpp
+    boxes/about_sponsored_box.h
     boxes/abstract_box.cpp
     boxes/abstract_box.h
     boxes/add_contact_box.cpp
@@ -417,6 +426,7 @@ PRIVATE
     data/data_media_types.h
     data/data_messages.cpp
     data/data_messages.h
+    data/data_msg_id.h
     data/data_notify_settings.cpp
     data/data_notify_settings.h
     data/data_peer.cpp
@@ -449,6 +459,8 @@ PRIVATE
     data/data_shared_media.h
     data/data_sparse_ids.cpp
     data/data_sparse_ids.h
+    data/data_sponsored_messages.cpp
+    data/data_sponsored_messages.h
     data/data_streaming.cpp
     data/data_streaming.h
     data/data_types.cpp
@@ -469,8 +481,6 @@ PRIVATE
     dialogs/dialogs_inner_widget.h
     dialogs/dialogs_key.cpp
     dialogs/dialogs_key.h
-    dialogs/dialogs_layout.cpp
-    dialogs/dialogs_layout.h
     dialogs/dialogs_list.cpp
     dialogs/dialogs_list.h
     dialogs/dialogs_main_list.cpp
@@ -483,6 +493,10 @@ PRIVATE
     dialogs/dialogs_search_from_controllers.h
     dialogs/dialogs_widget.cpp
     dialogs/dialogs_widget.h
+    dialogs/ui/dialogs_layout.cpp
+    dialogs/ui/dialogs_layout.h
+    dialogs/ui/dialogs_message_view.cpp
+    dialogs/ui/dialogs_message_view.h
     editor/color_picker.cpp
     editor/color_picker.h
     editor/controllers/controllers.h
@@ -623,6 +637,8 @@ PRIVATE
     history/view/history_view_service_message.h
     history/view/history_view_top_bar_widget.cpp
     history/view/history_view_top_bar_widget.h
+    history/view/history_view_view_button.cpp
+    history/view/history_view_view_button.h
     history/view/history_view_webpage_preview.cpp
     history/view/history_view_webpage_preview.h
     history/history.cpp
@@ -633,6 +649,10 @@ PRIVATE
     history/history_item.h
     history/history_item_components.cpp
     history/history_item_components.h
+    history/history_item_edition.cpp
+    history/history_item_edition.h
+    history/history_item_reply_markup.cpp
+    history/history_item_reply_markup.h
     history/history_item_text.cpp
     history/history_item_text.h
     history/history_inner_widget.cpp
@@ -945,6 +965,8 @@ PRIVATE
     platform/win/windows_dlls.h
     platform/win/windows_event_filter.cpp
     platform/win/windows_event_filter.h
+    platform/win/windows_toast_activator.cpp
+    platform/win/windows_toast_activator.h
     platform/platform_audio.h
     platform/platform_file_utilities.h
     platform/platform_launcher.h
@@ -1044,6 +1066,8 @@ PRIVATE
     ui/chat/attach/attach_item_single_file_preview.h
     ui/chat/attach/attach_item_single_media_preview.cpp
     ui/chat/attach/attach_item_single_media_preview.h
+    ui/chat/choose_theme_controller.cpp
+    ui/chat/choose_theme_controller.h
     ui/effects/fireworks_animation.cpp
     ui/effects/fireworks_animation.h
     ui/effects/round_checkbox.cpp
@@ -1373,12 +1397,14 @@ if (WIN32)
         /DELAYLOAD:gdiplus.dll
         /DELAYLOAD:version.dll
         /DELAYLOAD:dwmapi.dll
+        /DELAYLOAD:uxtheme.dll
         /DELAYLOAD:crypt32.dll
         /DELAYLOAD:bcrypt.dll
         /DELAYLOAD:imm32.dll
         /DELAYLOAD:netapi32.dll
         /DELAYLOAD:userenv.dll
         /DELAYLOAD:wtsapi32.dll
+        /DELAYLOAD:propsys.dll
     )
 endif()
 

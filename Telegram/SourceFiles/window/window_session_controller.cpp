@@ -125,6 +125,14 @@ void ActivateWindow(not_null<SessionController*> controller) {
 	Ui::ActivateWindowDelayed(window);
 }
 
+bool operator==(const PeerThemeOverride &a, const PeerThemeOverride &b) {
+	return (a.peer == b.peer) && (a.theme == b.theme);
+}
+
+bool operator!=(const PeerThemeOverride &a, const PeerThemeOverride &b) {
+	return !(a == b);
+}
+
 DateClickHandler::DateClickHandler(Dialogs::Key chat, QDate date)
 : _chat(chat)
 , _date(date) {
@@ -1095,6 +1103,30 @@ void SessionController::closeThirdSection() {
 	}
 }
 
+void SessionController::showPeer(not_null<PeerData*> peer, MsgId msgId) {
+	const auto currentPeer = activeChatCurrent().peer();
+	if (peer && peer->isChannel() && currentPeer != peer) {
+		const auto clickedChannel = peer->asChannel();
+		if (!clickedChannel->isPublic()
+			&& !clickedChannel->amIn()
+			&& (!currentPeer->isChannel()
+				|| currentPeer->asChannel()->linkedChat()
+					!= clickedChannel)) {
+			Ui::ShowMultilineToast({
+				.text = {
+					.text = peer->isMegagroup()
+						? tr::lng_group_not_accessible(tr::now)
+						: tr::lng_channel_not_accessible(tr::now)
+				},
+			});
+		} else {
+			showPeerHistory(peer->id, SectionShow(), msgId);
+		}
+	} else {
+		showPeerInfo(peer, SectionShow());
+	}
+}
+
 void SessionController::startOrJoinGroupCall(
 		not_null<PeerData*> peer,
 		QString joinHash,
@@ -1235,6 +1267,10 @@ void SessionController::showChooseReportMessages(
 
 void SessionController::clearChooseReportMessages() {
 	content()->clearChooseReportMessages();
+}
+
+void SessionController::toggleChooseChatTheme(not_null<PeerData*> peer) {
+	content()->toggleChooseChatTheme(peer);
 }
 
 void SessionController::updateColumnLayout() {
@@ -1432,7 +1468,7 @@ auto SessionController::cachedChatThemeValue(
 	const auto i = _customChatThemes.find(key);
 	if (i != end(_customChatThemes)) {
 		if (auto strong = i->second.theme.lock()) {
-			pushToLastUsed(strong);
+			pushLastUsedChatTheme(strong);
 			return rpl::single(std::move(strong));
 		}
 	}
@@ -1448,12 +1484,12 @@ auto SessionController::cachedChatThemeValue(
 		if (theme->key() != key) {
 			return false;
 		}
-		pushToLastUsed(theme);
+		pushLastUsedChatTheme(theme);
 		return true;
 	}) | rpl::take(limit));
 }
 
-void SessionController::pushToLastUsed(
+void SessionController::pushLastUsedChatTheme(
 		const std::shared_ptr<Ui::ChatTheme> &theme) {
 	const auto i = ranges::find(_lastUsedCustomChatThemes, theme);
 	if (i == end(_lastUsedCustomChatThemes)) {
@@ -1477,6 +1513,21 @@ void SessionController::setChatStyleTheme(
 
 void SessionController::clearCachedChatThemes() {
 	_customChatThemes.clear();
+}
+
+void SessionController::overridePeerTheme(
+		not_null<PeerData*> peer,
+		std::shared_ptr<Ui::ChatTheme> theme) {
+	_peerThemeOverride = PeerThemeOverride{
+		peer,
+		theme ? theme : _defaultChatTheme,
+	};
+}
+
+void SessionController::clearPeerThemeOverride(not_null<PeerData*> peer) {
+	if (_peerThemeOverride.current().peer == peer.get()) {
+		_peerThemeOverride = PeerThemeOverride();
+	}
 }
 
 void SessionController::pushDefaultChatBackground() {

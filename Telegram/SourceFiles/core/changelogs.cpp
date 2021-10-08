@@ -58,6 +58,44 @@ std::map<int, const char*> BetaLogs() {
 	{
 		3000005,
 		"- Add support for Emoji 13.1."
+	},
+	{
+		3001002,
+		"- Control video in fullscreen mode using arrows and numbers.\n"
+
+		"- Open locations in browser if default Bing Maps is not installed.\n"
+
+		"- Reconnect without timeout when network availability changes.\n"
+
+		"- Crash fixes."
+	},
+	{
+		3001005,
+		"- Choose one of 8 new preset themes for any individual private chat.\n"
+
+		"- Click on '...' menu > 'Change Colors' to pick a theme.\n"
+
+		"- Both chat participants will see the same theme in that chat "
+		"– on all their devices.\n"
+
+		"- Each new theme features colorful gradient message bubbles, "
+		"beautifully animated backgrounds and unique background patterns.\n"
+
+		"- All chat themes have day and night versions and will follow "
+		"your overall dark mode settings.\n"
+
+		"- Implement main window rounded corners on Windows 11.\n"
+
+		"- Fix audio capture from AirPods on macOS.\n"
+	},
+	{
+		3001006,
+		"- Show small media previews in chats list.\n"
+
+		"- Show media album previews and caption text in chats list.\n"
+
+		"- Add \"Quick Reply\" and \"Mark as Read\" "
+		"to native Windows notifications.\n"
 	}
 	};
 };

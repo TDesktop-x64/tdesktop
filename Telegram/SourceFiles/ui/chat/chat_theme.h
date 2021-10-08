@@ -32,6 +32,10 @@ struct ChatThemeBackground {
 	int gradientRotation = 0;
 	bool isPattern = false;
 	bool tile = false;
+
+	[[nodiscard]] bool waitingForNegativePattern() const {
+		return isPattern && prepared.isNull() && (patternOpacity < 0.);
+	}
 };
 
 bool operator==(const ChatThemeBackground &a, const ChatThemeBackground &b);
@@ -137,6 +141,7 @@ public:
 		QRect viewport,
 		QRect clip);
 	[[nodiscard]] const BackgroundState &backgroundState(QSize area);
+	void clearBackgroundState();
 	[[nodiscard]] rpl::producer<> repaintBackgroundRequests() const;
 	void rotateComplexGradientBackground();
 
@@ -157,7 +162,6 @@ private:
 	void cacheBubblesNow();
 	void cacheBubblesAsync(
 		const CacheBackgroundRequest &request);
-	void setCachedBubbles(CacheBackgroundResult &&cached);
 	[[nodiscard]] CacheBackgroundRequest cacheBubblesRequest(
 		QSize area) const;
 

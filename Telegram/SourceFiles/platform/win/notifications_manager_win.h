@@ -9,6 +9,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "platform/platform_notifications_manager.h"
 
+struct ToastActivation;
+
 namespace Platform {
 namespace Notifications {
 
@@ -22,6 +24,8 @@ public:
 	bool init();
 	void clearNotification(NotificationId id);
 
+	void handleActivation(const ToastActivation &activation);
+
 protected:
 	void doShowNativeNotification(
 		not_null<PeerData*> peer,
@@ -30,8 +34,7 @@ protected:
 		const QString &title,
 		const QString &subtitle,
 		const QString &msg,
-		bool hideNameAndPhoto,
-		bool hideReplyButton) override;
+		DisplayOptions options) override;
 	void doClearAllFast() override;
 	void doClearFromHistory(not_null<History*> history) override;
 	void doClearFromSession(not_null<Main::Session*> session) override;

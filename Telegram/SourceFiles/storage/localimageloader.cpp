@@ -64,11 +64,11 @@ PreparedFileThumbnail PrepareFileThumbnail(QImage &&original) {
 	const auto scaledWidth = [&] {
 		return (width > height)
 			? kThumbnailSize
-			: int(std::round(kThumbnailSize * width / float64(height)));
+			: int(base::SafeRound(kThumbnailSize * width / float64(height)));
 	};
 	const auto scaledHeight = [&] {
 		return (width > height)
-			? int(std::round(kThumbnailSize * height / float64(width)))
+			? int(base::SafeRound(kThumbnailSize * height / float64(width)))
 			: kThumbnailSize;
 	};
 	result.image = scaled
@@ -1007,8 +1007,11 @@ void FileLoadTask::process(Args &&args) {
 		if (auto image = std::get_if<Ui::PreparedFileInformation::Image>(
 				&_information->media)) {
 			if (image->modifications.paint) {
-				_result->attachedStickers =
-					image->modifications.paint->attachedStickers();
+				const auto documents
+					= image->modifications.paint->attachedStickers();
+				_result->attachedStickers = documents
+					| ranges::view::transform(&DocumentData::mtpInput)
+					| ranges::to_vector;
 			}
 		}
 	}

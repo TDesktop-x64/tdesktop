@@ -210,7 +210,7 @@ void ServiceCheck::Generator::paintFrame(
 	const auto frames = framesForStyle(st);
 	auto &image = frames->image;
 	const auto count = int(frames->ready.size());
-	const auto index = int(std::round(toggled * (count - 1)));
+	const auto index = int(base::SafeRound(toggled * (count - 1)));
 	Assert(index >= 0 && index < count);
 	if (!frames->ready[index]) {
 		frames->ready[index] = true;
@@ -288,7 +288,6 @@ bool ServiceCheck::checkRippleStartPosition(QPoint position) const {
 		bool out) {
 	Expects(history->peer->isUser());
 
-	static auto id = ServerMaxMsgId + (ServerMaxMsgId / 3);
 	const auto flags = MessageFlag::FakeHistoryItem
 		| MessageFlag::HasFromId
 		| (out ? MessageFlag::Outgoing : MessageFlag(0));
@@ -296,7 +295,7 @@ bool ServiceCheck::checkRippleStartPosition(QPoint position) const {
 	const auto viaBotId = UserId();
 	const auto groupedId = uint64();
 	const auto item = history->makeMessage(
-		++id,
+		history->nextNonHistoryEntryId(),
 		flags,
 		replyTo,
 		viaBotId,
@@ -305,7 +304,7 @@ bool ServiceCheck::checkRippleStartPosition(QPoint position) const {
 		QString(),
 		TextWithEntities{ TextUtilities::Clean(text) },
 		MTP_messageMediaEmpty(),
-		MTPReplyMarkup(),
+		HistoryMessageMarkupData(),
 		groupedId);
 	return AdminLog::OwnedItem(delegate, item);
 }

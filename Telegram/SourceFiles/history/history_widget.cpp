@@ -1,4 +1,4 @@
-/*
+﻿/*
 This file is part of Telegram Desktop,
 the official desktop application for the Telegram messaging service.
 
@@ -23,6 +23,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/special_buttons.h"
 #include "ui/emoji_config.h"
 #include "ui/chat/attach/attach_prepare.h"
+#include "ui/chat/choose_theme_controller.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/inner_dropdown.h"
 #include "ui/widgets/dropdown_menu.h"
@@ -55,6 +56,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_user.h"
 #include "data/data_chat_filters.h"
 #include "data/data_scheduled_messages.h"
+#include "data/data_sponsored_messages.h"
 #include "data/data_file_origin.h"
 #include "data/data_histories.h"
 #include "data/data_group_call.h"
@@ -108,6 +110,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/chat/group_call_bar.h"
 #include "ui/chat/chat_theme.h"
 #include "ui/chat/chat_style.h"
+#include "ui/chat/continuous_scroll.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/item_text_options.h"
 #include "ui/unread_badge.h"
@@ -347,9 +350,23 @@ HistoryWidget::HistoryWidget(
 		update();
 	}, lifetime());
 
-	connect(_scroll, &Ui::ScrollArea::scrolled, [=] {
+	_scroll->scrolls(
+	) | rpl::start_with_next([=] {
 		handleScroll();
-	});
+	}, lifetime());
+	_scroll->geometryChanged(
+	) | rpl::start_with_next(crl::guard(_list, [=] {
+		_list->onParentGeometryChanged();
+	}), lifetime());
+	_scroll->addContentRequests(
+	) | rpl::start_with_next([=] {
+		if (_history
+			&& _history->loadedAtBottom()
+			&& session().data().sponsoredMessages().append(_history)) {
+			_scroll->contentAdded();
+		}
+	}, lifetime());
+
 	_historyDown->addClickHandler([=] { historyDownClicked(); });
 	_unreadMentions->addClickHandler([=] { showNextUnreadMention(); });
 	_fieldBarCancel->addClickHandler([=] { cancelFieldAreaState(); });
@@ -1284,7 +1301,7 @@ void HistoryWidget::checkNextHighlight() {
 				return msgId;
 			}
 		}
-		return 0;
+		return MsgId();
 	}();
 	if (!nextHighlight) {
 		return;
@@ -1395,11 +1412,39 @@ void HistoryWidget::insertHashtagOrBotCommand(
 	}
 }
 
+
+InlineBotQuery HistoryWidget::parseInlineBotQuery() const {
+	return (isChoosingTheme() || _editMsgId)
+		? InlineBotQuery()
+		: ParseInlineBotQuery(&session(), _field);
+}
+
+AutocompleteQuery HistoryWidget::parseMentionHashtagBotCommandQuery() const {
+	const auto result = (isChoosingTheme()
+		|| (_inlineBot && !_inlineLookingUpBot))
+		? AutocompleteQuery()
+		: ParseMentionHashtagBotCommandQuery(_field);
+	if (result.query.isEmpty()) {
+		return result;
+	} else if (result.query[0] == '#'
+		&& cRecentWriteHashtags().isEmpty()
+		&& cRecentSearchHashtags().isEmpty()) {
+		session().local().readRecentHashtagsAndBots();
+	} else if (result.query[0] == '@'
+		&& cRecentInlineBots().isEmpty()) {
+		session().local().readRecentHashtagsAndBots();
+	} else if (result.query[0] == '/'
+		&& ((_peer->isUser() && !_peer->asUser()->isBot()) || _editMsgId)) {
+		return AutocompleteQuery();
+	}
+	return result;
+}
+
 void HistoryWidget::updateInlineBotQuery() {
 	if (!_history) {
 		return;
 	}
-	const auto query = ParseInlineBotQuery(&session(), _field);
+	const auto query = parseInlineBotQuery();
 	if (_inlineBotUsername != query.username) {
 		_inlineBotUsername = query.username;
 		if (_inlineBotResolveRequestId) {
@@ -1482,10 +1527,11 @@ void HistoryWidget::orderWidgets() {
 	if (_groupCallBar) {
 		_groupCallBar->raise();
 	}
-	_topShadow->raise();
-	if (_fieldAutocomplete) {
-		_fieldAutocomplete->raise();
+	if (_chooseTheme) {
+		_chooseTheme->raise();
 	}
+	_topShadow->raise();
+	_fieldAutocomplete->raise();
 	if (_membersDropdown) {
 		_membersDropdown->raise();
 	}
@@ -1523,16 +1569,48 @@ bool HistoryWidget::updateStickersByEmoji() {
 	return (emoji != nullptr);
 }
 
+void HistoryWidget::toggleChooseChatTheme(not_null<PeerData*> peer) {
+	const auto update = [=] {
+		updateInlineBotQuery();
+		updateControlsGeometry();
+		updateControlsVisibility();
+	};
+	if (peer.get() != _peer) {
+		return;
+	} else if (_chooseTheme) {
+		if (isChoosingTheme()) {
+			const auto was = base::take(_chooseTheme);
+			if (Ui::InFocusChain(this)) {
+				setInnerFocus();
+			}
+			update();
+		}
+		return;
+	} else if (_voiceRecordBar->isActive()) {
+		Ui::ShowMultilineToast({
+			.text = { tr::lng_chat_theme_cant_voice(tr::now) },
+		});
+		return;
+	}
+	_chooseTheme = std::make_unique<Ui::ChooseThemeController>(
+		this,
+		controller(),
+		peer);
+	_chooseTheme->shouldBeShownValue(
+	) | rpl::start_with_next(update, _chooseTheme->lifetime());
+}
+
 void HistoryWidget::fieldChanged() {
-	const auto typing = (_history
-		&& !_inlineBot
-		&& !_editMsgId
-		&& (_textUpdateEvents & TextUpdateEvent::SendTyping));
+	const auto updateTyping = (_textUpdateEvents & TextUpdateEvent::SendTyping);
 
 	InvokeQueued(this, [=] {
 		updateInlineBotQuery();
 		const auto choosingSticker = updateStickersByEmoji();
-		if (!choosingSticker && typing) {
+		if (_history
+			&& !_inlineBot
+			&& !_editMsgId
+			&& !choosingSticker
+			&& updateTyping) {
 			session().sendProgressManager().update(
 				_history,
 				Api::SendProgressType::Typing);
@@ -1668,7 +1746,9 @@ void HistoryWidget::setInnerFocus() {
 	if (_scroll->isHidden()) {
 		setFocus();
 	} else if (_list) {
-		if (_nonEmptySelection
+		if (_chooseTheme && _chooseTheme->shouldBeShown()) {
+			_chooseTheme->setFocus();
+		} else if (_nonEmptySelection
 			|| (_list && _list->wasSelectedText())
 			|| isRecording()
 			|| isBotStart()
@@ -2010,6 +2090,8 @@ void HistoryWidget::showHistory(
 				}
 			}
 			return;
+		} else {
+			session().data().sponsoredMessages().clearItems(_history);
 		}
 		session().sendProgressManager().update(
 			_history,
@@ -2037,6 +2119,7 @@ void HistoryWidget::showHistory(
 		_pinnedTracker = nullptr;
 		_groupCallBar = nullptr;
 		_groupCallTracker = nullptr;
+		_chooseTheme = nullptr;
 		_membersDropdown.destroy();
 		_scrollToAnimation.stop();
 
@@ -2181,8 +2264,6 @@ void HistoryWidget::showHistory(
 
 		updateControlsGeometry();
 
-		connect(_scroll, SIGNAL(geometryChanged()), _list, SLOT(onParentGeometryChanged()));
-
 		if (const auto user = _peer->asUser()) {
 			if (const auto &info = user->botInfo) {
 				if (startBot) {
@@ -2214,6 +2295,14 @@ void HistoryWidget::showHistory(
 		}
 		unreadCountUpdated(); // set _historyDown badge.
 		showAboutTopPromotion();
+
+		{
+			const auto hasSponsored = _history->canHaveSponsoredMessages();
+			_scroll->setTrackingContent(hasSponsored);
+			if (hasSponsored) {
+				session().data().sponsoredMessages().request(_history);
+			}
+		}
 	} else {
 		_chooseForReport = nullptr;
 		refreshTopBarActiveChat();
@@ -2435,36 +2524,40 @@ void HistoryWidget::updateControlsVisibility() {
 	if (_contactStatus) {
 		_contactStatus->show();
 	}
-	if (!editingMessage() && (isBlocked() || isJoinChannel() || isMuteUnmute() || isBotStart() || isReportMessages())) {
-		if (isReportMessages()) {
-			_unblock->hide();
-			_joinChannel->hide();
-			_muteUnmute->hide();
-			_botStart->hide();
-			if (_reportMessages->isHidden()) {
-				_reportMessages->clearState();
-				_reportMessages->show();
-			}
+	if (isChoosingTheme()
+		|| (!editingMessage()
+			&& (isBlocked()
+				|| isJoinChannel()
+				|| isMuteUnmute()
+				|| isBotStart()
+				|| isReportMessages()))) {
+		const auto toggle = [&](Ui::FlatButton *shown) {
+			const auto toggleOne = [&](not_null<Ui::FlatButton*> button) {
+				if (button.get() != shown) {
+					button->hide();
+				} else if (button->isHidden()) {
+					button->clearState();
+					button->show();
+				}
+			};
+			toggleOne(_reportMessages);
+			toggleOne(_joinChannel);
+			toggleOne(_muteUnmute);
+			toggleOne(_botStart);
+			toggleOne(_unblock);
+		};
+		if (isChoosingTheme()) {
+			_chooseTheme->show();
+			setInnerFocus();
+			toggle(nullptr);
+		} else if (isReportMessages()) {
+			toggle(_reportMessages);
 		} else if (isBlocked()) {
-			_reportMessages->hide();
-			_joinChannel->hide();
-			_muteUnmute->hide();
+			toggle(_unblock);
 			_discuss->hide();
-			_botStart->hide();
-			if (_unblock->isHidden()) {
-				_unblock->clearState();
-				_unblock->show();
-			}
 		} else if (isJoinChannel()) {
-			_reportMessages->hide();
-			_unblock->hide();
-			_muteUnmute->hide();
+			toggle(_joinChannel);
 			_discuss->hide();
-			_botStart->hide();
-			if (_joinChannel->isHidden()) {
-				_joinChannel->clearState();
-				_joinChannel->show();
-			}
 			if (hasDiscussionGroup()) {
 				if (_discuss->isHidden()) {
 					_discuss->clearState();
@@ -2479,14 +2572,7 @@ void HistoryWidget::updateControlsVisibility() {
 				}
 			}
 		} else if (isMuteUnmute()) {
-			_reportMessages->hide();
-			_unblock->hide();
-			_joinChannel->hide();
-			_botStart->hide();
-			if (_muteUnmute->isHidden()) {
-				_muteUnmute->clearState();
-				_muteUnmute->show();
-			}
+			toggle(_muteUnmute);
 			if (hasDiscussionGroup()) {
 				if (_discuss->isHidden()) {
 					_discuss->clearState();
@@ -2496,15 +2582,8 @@ void HistoryWidget::updateControlsVisibility() {
 				_discuss->hide();
 			}
 		} else if (isBotStart()) {
-			_reportMessages->hide();
-			_unblock->hide();
-			_joinChannel->hide();
-			_muteUnmute->hide();
+			toggle(_botStart);
 			_discuss->hide();
-			if (_botStart->isHidden()) {
-				_botStart->clearState();
-				_botStart->show();
-			}
 		}
 		_kbShown = false;
 		_fieldAutocomplete->hide();
@@ -2696,6 +2775,16 @@ void HistoryWidget::newItemAdded(not_null<HistoryItem*> item) {
 	if (_history != item->history()
 		|| !_historyInited
 		|| item->isScheduled()) {
+		return;
+	}
+	if (item->isSponsored()) {
+		if (const auto view = item->mainView()) {
+			view->resizeGetHeight(width());
+			updateHistoryGeometry(
+				false,
+				true,
+				{ ScrollChangeNoJumpToBottom, 0 });
+		}
 		return;
 	}
 
@@ -2929,7 +3018,7 @@ void HistoryWidget::firstLoadMessages() {
 	}
 
 	auto from = _history;
-	auto offsetId = 0;
+	auto offsetId = MsgId();
 	auto offset = 0;
 	auto loadCount = kMessagesPerPage;
 	if (_showAtMsgId == ShowAtUnreadMsgId) {
@@ -3103,7 +3192,7 @@ void HistoryWidget::delayedShowAt(MsgId showAtMsgId) {
 	_delayedShowAtMsgId = showAtMsgId;
 
 	auto from = _history;
-	auto offsetId = 0;
+	auto offsetId = MsgId();
 	auto offset = 0;
 	auto loadCount = kMessagesPerPage;
 	if (_delayedShowAtMsgId == ShowAtUnreadMsgId) {
@@ -3427,6 +3516,9 @@ void HistoryWidget::hideChildWidgets() {
 	}
 	if (_voiceRecordBar) {
 		_voiceRecordBar->hideFast();
+	}
+	if (_chooseTheme) {
+		_chooseTheme->hide();
 	}
 	hideChildren();
 }
@@ -4063,7 +4155,7 @@ void HistoryWidget::inlineBotResolveDone(
 	}();
 	session().data().processChats(data.vchats());
 
-	const auto query = ParseInlineBotQuery(&session(), _field);
+	const auto query = parseInlineBotQuery();
 	if (_inlineBotUsername == query.username) {
 		applyInlineBotQuery(
 			query.lookingUpBot ? resolvedBot : query.bot,
@@ -4106,6 +4198,10 @@ bool HistoryWidget::isBlocked() const {
 
 bool HistoryWidget::isJoinChannel() const {
 	return _peer && _peer->isChannel() && !_peer->asChannel()->amIn();
+}
+
+bool HistoryWidget::isChoosingTheme() const {
+	return _chooseTheme && _chooseTheme->shouldBeShown();
 }
 
 bool HistoryWidget::isMuteUnmute() const {
@@ -4510,24 +4606,7 @@ void HistoryWidget::checkFieldAutocomplete() {
 		return;
 	}
 
-	const auto isInlineBot = _inlineBot && !_inlineLookingUpBot;
-	const auto autocomplete = isInlineBot
-		? AutocompleteQuery()
-		: ParseMentionHashtagBotCommandQuery(_field);
-	if (!autocomplete.query.isEmpty()) {
-		if (autocomplete.query[0] == '#'
-			&& cRecentWriteHashtags().isEmpty()
-			&& cRecentSearchHashtags().isEmpty()) {
-			session().local().readRecentHashtagsAndBots();
-		} else if (autocomplete.query[0] == '@'
-			&& cRecentInlineBots().isEmpty()) {
-			session().local().readRecentHashtagsAndBots();
-		} else if (autocomplete.query[0] == '/'
-			&& ((_peer->isUser() && !_peer->asUser()->isBot())
-				|| _editMsgId)) {
-			return;
-		}
-	}
+	const auto autocomplete = parseMentionHashtagBotCommandQuery();
 	_fieldAutocomplete->showFiltered(
 		_peer,
 		autocomplete.query,
@@ -5097,7 +5176,14 @@ void HistoryWidget::updateHistoryGeometry(
 	if (_contactStatus) {
 		newScrollHeight -= _contactStatus->height();
 	}
-	if (!editingMessage() && (isBlocked() || isBotStart() || isJoinChannel() || isMuteUnmute() || isReportMessages())) {
+	if (isChoosingTheme()) {
+		newScrollHeight -= _chooseTheme->height();
+	} else if (!editingMessage()
+		&& (isBlocked()
+			|| isBotStart()
+			|| isJoinChannel()
+			|| isMuteUnmute()
+			|| isReportMessages())) {
 		newScrollHeight -= _unblock->height();
 	} else {
 		if (editingMessage() || _canSendMessages) {
@@ -6359,16 +6445,17 @@ void HistoryWidget::editMessage(FullMsgId itemId) {
 }
 
 void HistoryWidget::editMessage(not_null<HistoryItem*> item) {
-	if (_voiceRecordBar->isActive()) {
-		controller()->show(
-			Box<InformBox>(tr::lng_edit_caption_voice(tr::now)));
-		return;
-	}
 	if (const auto media = item->media()) {
 		if (media->allowsEditCaption()) {
 			controller()->show(Box<EditCaptionBox>(controller(), item));
 			return;
 		}
+	} else if (_chooseTheme) {
+		toggleChooseChatTheme(_peer);
+	} else if (_voiceRecordBar->isActive()) {
+		controller()->show(
+			Box<InformBox>(tr::lng_edit_caption_voice(tr::now)));
+		return;
 	}
 
 	if (isRecording()) {
@@ -7075,11 +7162,15 @@ void HistoryWidget::updateForwardingTexts() {
 		}
 
 		if (count < 2) {
-			text = _toForward.items.front()->inDialogsText(keepCaptions
-				? HistoryItem::DrawInDialog::WithoutSender
-				: HistoryItem::DrawInDialog::WithoutSenderAndCaption);
+			text = _toForward.items.front()->toPreview({
+				.hideSender = true,
+				.hideCaption = !keepCaptions,
+				.generateImages = false,
+			}).text;
 		} else {
-			text = textcmdLink(1, tr::lng_forward_messages(tr::now, lt_count, count));
+			text = textcmdLink(
+				1,
+				tr::lng_forward_messages(tr::now, lt_count, count));
 		}
 	}
 	_toForwardFrom.setText(st::msgNameStyle, from, Ui::NameTextOptions());

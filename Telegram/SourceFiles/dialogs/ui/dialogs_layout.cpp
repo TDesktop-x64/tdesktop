@@ -5,7 +5,7 @@ the official desktop application for the Telegram messaging service.
 For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
-#include "dialogs/dialogs_layout.h"
+#include "dialogs/ui/dialogs_layout.h"
 
 #include "data/data_abstract_structure.h"
 #include "data/data_drafts.h"
@@ -31,8 +31,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_folder.h"
 #include "data/data_peer_values.h"
 
-namespace Dialogs {
-namespace Layout {
+namespace Dialogs::Ui {
 namespace {
 
 // Show all dates that are in the last 20 hours in time format.
@@ -260,14 +259,14 @@ void paintRow(
 	const auto history = chat.history();
 
 	if (flags & Flag::SavedMessages) {
-		Ui::EmptyUserpic::PaintSavedMessages(
+		EmptyUserpic::PaintSavedMessages(
 			p,
 			st::dialogsPadding.x(),
 			st::dialogsPadding.y(),
 			fullWidth,
 			st::dialogsPhotoSize);
 	} else if (flags & Flag::RepliesMessages) {
-		Ui::EmptyUserpic::PaintRepliesMessages(
+		EmptyUserpic::PaintRepliesMessages(
 			p,
 			st::dialogsPadding.x(),
 			st::dialogsPadding.y(),
@@ -344,7 +343,7 @@ void paintRow(
 			history->cloudDraftTextCache.setText(
 				st::dialogsTextStyle,
 				history->topPromotionMessage(),
-				Ui::DialogTextOptions());
+				DialogTextOptions());
 		}
 		p.setPen(active ? st::dialogsTextFgActive : (selected ? st::dialogsTextFgOver : st::dialogsTextFg));
 		history->cloudDraftTextCache.drawElided(p, nameleft, texttop, availableWidth, 1);
@@ -371,7 +370,7 @@ void paintRow(
 				auto draftText = supportMode
 					? textcmdLink(1, Support::ChatOccupiedString(history))
 					: tr::lng_dialogs_text_with_from(tr::now, lt_from_part, draftWrapped, lt_message, TextUtilities::Clean(draft->textWithTags.text));
-				history->cloudDraftTextCache.setText(st::dialogsTextStyle, draftText, Ui::DialogTextOptions());
+				history->cloudDraftTextCache.setText(st::dialogsTextStyle, draftText, DialogTextOptions());
 			}
 			p.setPen(active ? st::dialogsTextFgActive : (selected ? st::dialogsTextFgOver : st::dialogsTextFg));
 			if (supportMode) {
@@ -462,7 +461,7 @@ void paintRow(
 		p.drawTextLeft(rectForName.left(), rectForName.top(), fullWidth, text);
 	} else if (from) {
 		if (!(flags & Flag::SearchResult)) {
-			const auto badgeStyle = Ui::PeerBadgeStyle{
+			const auto badgeStyle = PeerBadgeStyle{
 				(active
 					? &st::dialogsVerifiedIconActive
 					: selected
@@ -473,7 +472,7 @@ void paintRow(
 					: selected
 					? &st::dialogsScamFgOver
 					: &st::dialogsScamFg) };
-			const auto badgeWidth = Ui::DrawPeerBadgeGetWidth(
+			const auto badgeWidth = DrawPeerBadgeGetWidth(
 				from,
 				p,
 				rectForName,
@@ -601,9 +600,9 @@ void paintUnreadBadge(Painter &p, const QRect &rect, const UnreadBadgeStyle &st)
 	if (badgeData->left[index].isNull()) {
 		int imgsize = size * cIntRetinaFactor(), imgsizehalf = sizehalf * cIntRetinaFactor();
 		createCircleMask(badgeData, size);
-		badgeData->left[index] = Ui::PixmapFromImage(
+		badgeData->left[index] = PixmapFromImage(
 			colorizeCircleHalf(badgeData, imgsize, imgsizehalf, 0, bg));
-		badgeData->right[index] = Ui::PixmapFromImage(colorizeCircleHalf(
+		badgeData->right[index] = PixmapFromImage(colorizeCircleHalf(
 			badgeData,
 			imgsize,
 			imgsizehalf,
@@ -775,15 +774,14 @@ void RowPainter::paint(
 			: false;
 		if (const auto folder = row->folder()) {
 			PaintListEntryText(p, itemRect, active, selected, row);
-		} else if (!actionWasPainted) {
-			item->drawInDialog(
+		} else if (history && !actionWasPainted) {
+			history->lastItemDialogsView.paint(
 				p,
+				item,
 				itemRect,
 				active,
 				selected,
-				HistoryItem::DrawInDialog::Normal,
-				entry->textCachedFor,
-				entry->lastItemTextCache);
+				{});
 		}
 	};
 	const auto paintCounterCallback = [&] {
@@ -846,15 +844,15 @@ void RowPainter::paint(
 		}
 		return nullptr;
 	}();
-	const auto drawInDialogWay = [&] {
+	const auto previewOptions = [&]() -> HistoryView::ToPreviewOptions {
 		if (const auto searchChat = row->searchInChat()) {
 			if (const auto peer = searchChat.peer()) {
 				if (!peer->isChannel() || peer->isMegagroup()) {
-					return HistoryItem::DrawInDialog::WithoutSender;
+					return { .hideSender = true };
 				}
 			}
 		}
-		return HistoryItem::DrawInDialog::Normal;
+		return {};
 	}();
 
 	const auto unreadCount = displayUnreadInfo
@@ -896,14 +894,13 @@ void RowPainter::paint(
 			texttop,
 			availableWidth,
 			st::dialogsTextFont->height);
-		item->drawInDialog(
+		row->itemView().paint(
 			p,
+			item,
 			itemRect,
 			active,
 			selected,
-			drawInDialogWay,
-			row->_cacheFor,
-			row->_cache);
+			previewOptions);
 	};
 	const auto paintCounterCallback = [&] {
 		PaintNarrowCounter(
@@ -1015,5 +1012,4 @@ void PaintCollapsedRow(
 	}
 }
 
-} // namespace Layout
-} // namespace Dialogs
+} // namespace Dialogs::Ui

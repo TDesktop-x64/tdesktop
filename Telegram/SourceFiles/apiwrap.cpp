@@ -21,6 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_global_privacy.h"
 #include "api/api_updates.h"
 #include "api/api_user_privacy.h"
+#include "api/api_views.h"
 #include "data/stickers/data_stickers.h"
 #include "data/data_drafts.h"
 #include "data/data_changes.h"
@@ -141,7 +142,8 @@ ApiWrap::ApiWrap(not_null<Main::Session*> session)
 , _sensitiveContent(std::make_unique<Api::SensitiveContent>(this))
 , _globalPrivacy(std::make_unique<Api::GlobalPrivacy>(this))
 , _userPrivacy(std::make_unique<Api::UserPrivacy>(this))
-, _inviteLinks(std::make_unique<Api::InviteLinks>(this)) {
+, _inviteLinks(std::make_unique<Api::InviteLinks>(this))
+, _views(std::make_unique<Api::ViewsManager>(this)) {
 	crl::on_main(session, [=] {
 		// You can't use _session->lifetime() in the constructor,
 		// only queued, because it is not constructed yet.
@@ -558,7 +560,8 @@ void ApiWrap::resolveMessageDatas() {
 		)).done([=](
 				const MTPmessages_Messages &result,
 				mtpRequestId requestId) {
-			gotMessageDatas(nullptr, result, requestId);
+			_session->data().processExistingMessages(nullptr, result);
+			finalizeMessageDataRequest(nullptr, requestId);
 		}).fail([=](const MTP::Error &error, mtpRequestId requestId) {
 			finalizeMessageDataRequest(nullptr, requestId);
 		}).afterDelay(kSmallDelayMs).send();
@@ -584,7 +587,8 @@ void ApiWrap::resolveMessageDatas() {
 			)).done([=](
 					const MTPmessages_Messages &result,
 					mtpRequestId requestId) {
-				gotMessageDatas(channel, result, requestId);
+				_session->data().processExistingMessages(channel, result);
+				finalizeMessageDataRequest(channel, requestId);
 			}).fail([=](const MTP::Error &error, mtpRequestId requestId) {
 				finalizeMessageDataRequest(channel, requestId);
 			}).afterDelay(kSmallDelayMs).send();
@@ -598,37 +602,6 @@ void ApiWrap::resolveMessageDatas() {
 		}
 		++j;
 	}
-}
-
-void ApiWrap::gotMessageDatas(ChannelData *channel, const MTPmessages_Messages &msgs, mtpRequestId requestId) {
-	const auto handleResult = [&](auto &&result) {
-		_session->data().processUsers(result.vusers());
-		_session->data().processChats(result.vchats());
-		_session->data().processMessages(
-			result.vmessages(),
-			NewMessageType::Existing);
-	};
-	switch (msgs.type()) {
-	case mtpc_messages_messages:
-		handleResult(msgs.c_messages_messages());
-		break;
-	case mtpc_messages_messagesSlice:
-		handleResult(msgs.c_messages_messagesSlice());
-		break;
-	case mtpc_messages_channelMessages: {
-		auto &d = msgs.c_messages_channelMessages();
-		if (channel) {
-			channel->ptsReceived(d.vpts().v);
-		} else {
-			LOG(("App Error: received messages.channelMessages when no channel was passed! (ApiWrap::gotDependencyItem)"));
-		}
-		handleResult(d);
-	} break;
-	case mtpc_messages_messagesNotModified:
-		LOG(("API Error: received messages.messagesNotModified! (ApiWrap::gotDependencyItem)"));
-		break;
-	}
-	finalizeMessageDataRequest(channel, requestId);
 }
 
 void ApiWrap::finalizeMessageDataRequest(
@@ -662,8 +635,8 @@ QString ApiWrap::exportDirectMessageLink(
 	const auto fallback = [&] {
 		auto linkChannel = channel;
 		auto linkItemId = item->id;
-		auto linkCommentId = 0;
-		auto linkThreadId = 0;
+		auto linkCommentId = MsgId();
+		auto linkThreadId = MsgId();
 		if (inRepliesContext) {
 			if (const auto rootId = item->replyToTop()) {
 				const auto root = item->history()->owner().message(
@@ -693,11 +666,11 @@ QString ApiWrap::exportDirectMessageLink(
 			: "c/" + QString::number(peerToChannel(linkChannel->id).bare);
 		const auto query = base
 			+ '/'
-			+ QString::number(linkItemId)
+			+ QString::number(linkItemId.bare)
 			+ (linkCommentId
-				? "?comment=" + QString::number(linkCommentId)
+				? "?comment=" + QString::number(linkCommentId.bare)
 				: linkThreadId
-				? "?thread=" + QString::number(linkThreadId)
+				? "?thread=" + QString::number(linkThreadId.bare)
 				: "");
 		if (linkChannel->hasUsername()
 			&& !linkChannel->isMegagroup()
@@ -1759,7 +1732,7 @@ void ApiWrap::deleteAllFromUser(
 		? history->collectMessagesFromUserToDelete(from)
 		: QVector<MsgId>();
 	const auto channelId = peerToChannel(channel->id);
-	for (const auto msgId : ids) {
+	for (const auto &msgId : ids) {
 		if (const auto item = _session->data().message(channelId, msgId)) {
 			item->destroy();
 		}
@@ -3837,7 +3810,7 @@ void ApiWrap::sendSharedContact(
 			MTP_string(lastName),
 			MTP_string(), // vcard
 			MTP_long(userId.bare)),
-		MTPReplyMarkup());
+		HistoryMessageMarkupData());
 
 	const auto media = MTP_inputMediaContact(
 		MTP_string(phone),
@@ -4101,7 +4074,7 @@ void ApiWrap::sendMessage(MessageToSend &&message) {
 			messagePostAuthor,
 			sending,
 			media,
-			MTPReplyMarkup());
+			HistoryMessageMarkupData());
 		histories.sendRequest(history, requestType, [=](Fn<void()> finish) {
 			history->sendRequestId = request(MTPmessages_SendMessage(
 				MTP_flags(sendFlags),
@@ -4731,6 +4704,10 @@ Api::UserPrivacy &ApiWrap::userPrivacy() {
 
 Api::InviteLinks &ApiWrap::inviteLinks() {
 	return *_inviteLinks;
+}
+
+Api::ViewsManager &ApiWrap::views() {
+	return *_views;
 }
 
 void ApiWrap::createPoll(

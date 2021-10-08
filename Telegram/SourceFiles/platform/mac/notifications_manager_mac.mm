@@ -184,8 +184,7 @@ public:
 		const QString &title,
 		const QString &subtitle,
 		const QString &msg,
-		bool hideNameAndPhoto,
-		bool hideReplyButton);
+		DisplayOptions options);
 	void clearAll();
 	void clearFromHistory(not_null<History*> history);
 	void clearFromSession(not_null<Main::Session*> session);
@@ -250,22 +249,36 @@ void Manager::Private::showNotification(
 		const QString &title,
 		const QString &subtitle,
 		const QString &msg,
-		bool hideNameAndPhoto,
-		bool hideReplyButton) {
+		DisplayOptions options) {
 	@autoreleasepool {
 
 	NSUserNotification *notification = [[[NSUserNotification alloc] init] autorelease];
 	if ([notification respondsToSelector:@selector(setIdentifier:)]) {
-		auto identifier = _managerIdString + '_' + QString::number(peer->id.value) + '_' + QString::number(msgId);
+		auto identifier = _managerIdString
+			+ '_'
+			+ QString::number(peer->id.value)
+			+ '_'
+			+ QString::number(msgId.bare);
 		auto identifierValue = Q2NSString(identifier);
 		[notification setIdentifier:identifierValue];
 	}
-	[notification setUserInfo:[NSDictionary dictionaryWithObjectsAndKeys:[NSNumber numberWithUnsignedLongLong:peer->session().uniqueId()],@"session",[NSNumber numberWithUnsignedLongLong:peer->id.value],@"peer",[NSNumber numberWithInt:msgId],@"msgid",[NSNumber numberWithUnsignedLongLong:_managerId],@"manager",nil]];
+	[notification setUserInfo:
+		[NSDictionary dictionaryWithObjectsAndKeys:
+			[NSNumber numberWithUnsignedLongLong:peer->session().uniqueId()],
+			@"session",
+			[NSNumber numberWithUnsignedLongLong:peer->id.value],
+			@"peer",
+			[NSNumber numberWithInt:msgId.bare],
+			@"msgid",
+			[NSNumber numberWithUnsignedLongLong:_managerId],
+			@"manager",
+			nil]];
 
 	[notification setTitle:Q2NSString(title)];
 	[notification setSubtitle:Q2NSString(subtitle)];
 	[notification setInformativeText:Q2NSString(msg)];
-	if (!hideNameAndPhoto && [notification respondsToSelector:@selector(setContentImage:)]) {
+	if (!options.hideNameAndPhoto
+		&& [notification respondsToSelector:@selector(setContentImage:)]) {
 		auto userpic = peer->isSelf()
 			? Ui::EmptyUserpic::GenerateSavedMessages(st::notifyMacPhotoSize)
 			: peer->isRepliesChat()
@@ -275,7 +288,8 @@ void Manager::Private::showNotification(
 		[notification setContentImage:img];
 	}
 
-	if (!hideReplyButton && [notification respondsToSelector:@selector(setHasReplyButton:)]) {
+	if (!options.hideReplyButton
+		&& [notification respondsToSelector:@selector(setHasReplyButton:)]) {
 		[notification setHasReplyButton:YES];
 	}
 
@@ -405,8 +419,7 @@ void Manager::doShowNativeNotification(
 		const QString &title,
 		const QString &subtitle,
 		const QString &msg,
-		bool hideNameAndPhoto,
-		bool hideReplyButton) {
+		DisplayOptions options) {
 	_private->showNotification(
 		peer,
 		userpicView,
@@ -414,8 +427,7 @@ void Manager::doShowNativeNotification(
 		title,
 		subtitle,
 		msg,
-		hideNameAndPhoto,
-		hideReplyButton);
+		options);
 }
 
 void Manager::doClearAllFast() {

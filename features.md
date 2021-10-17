@@ -44,10 +44,8 @@
 40. Voice chat bitrate option
 41. Show/Hide/View pinned message
 42. Pin to top (Windows only)
-43. Pin older message with notify
+43. Allow pin older message with notify
 44. Remove all proxies
 45. Hide "All chats" folder option
 46. Hide 1 to 1 call panel window when press X(close window)
-47. Allow pin older message with notify
-48. Allow pin Voice Chat window to top
-49. Higher video bitrate for voice chat option
+47. Allow pin Voice Chat window to top

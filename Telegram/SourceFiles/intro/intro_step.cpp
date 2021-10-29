@@ -20,8 +20,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "apiwrap.h"
+#include "api/api_peer_photo.h"
 #include "mainwindow.h"
-#include "boxes/confirm_box.h"
+#include "ui/boxes/confirm_box.h"
 #include "ui/text/text_utilities.h"
 #include "ui/widgets/labels.h"
 #include "ui/wrap/fade_wrap.h"
@@ -141,7 +142,8 @@ void Step::finish(const MTPUser &user, QImage &&photo) {
 		|| !user.c_user().vid().v) {
 		// No idea what to do here.
 		// We could've reset intro and MTP, but this really should not happen.
-		Ui::show(Box<InformBox>("Internal error: bad user.is_self() after sign in."));
+		Ui::show(Box<Ui::InformBox>(
+			"Internal error: bad user.is_self() after sign in."));
 		return;
 	}
 
@@ -196,7 +198,7 @@ void Step::createSession(
 		session.saveSettingsDelayed();
 	}
 	if (!photo.isNull()) {
-		session.api().uploadPeerPhoto(session.user(), std::move(photo));
+		session.api().peerPhoto().upload(session.user(), std::move(photo));
 	}
 	if (session.supportMode()) {
 		PrepareSupportMode(&session);

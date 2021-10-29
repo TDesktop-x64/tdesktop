@@ -73,6 +73,7 @@ class LinkButton;
 class RoundButton;
 class PinnedBar;
 class GroupCallBar;
+class RequestsBar;
 struct PreparedList;
 class SendFilesWay;
 enum class ReportReason;
@@ -102,7 +103,6 @@ class TopBarWidget;
 class ContactStatus;
 class Element;
 class PinnedTracker;
-class GroupCallTracker;
 namespace Controls {
 class RecordLock;
 class VoiceRecordBar;
@@ -386,7 +386,7 @@ private:
 	[[nodiscard]] SendMenu::Type sendMenuType() const;
 	[[nodiscard]] SendMenu::Type sendButtonMenuType() const;
 	void handlePendingHistoryUpdate();
-	void fullPeerUpdated(PeerData *peer);
+	void fullInfoUpdated();
 	void toggleTabbedSelectorMode();
 	void recountChatWidth();
 	void historyDownClicked();
@@ -515,7 +515,8 @@ private:
 		int nowScrollTop);
 
 	void checkMessagesTTL();
-	void setupGroupCallTracker();
+	void setupGroupCallBar();
+	void setupRequestsBar();
 
 	void sendInlineResult(InlineBots::ResultSelected result);
 
@@ -646,9 +647,10 @@ private:
 	FullMsgId _pinnedClickedId;
 	std::optional<FullMsgId> _minPinnedId;
 
-	std::unique_ptr<HistoryView::GroupCallTracker> _groupCallTracker;
 	std::unique_ptr<Ui::GroupCallBar> _groupCallBar;
 	int _groupCallBarHeight = 0;
+	std::unique_ptr<Ui::RequestsBar> _requestsBar;
+	int _requestsBarHeight = 0;
 
 	bool _preserveScrollTop = false;
 

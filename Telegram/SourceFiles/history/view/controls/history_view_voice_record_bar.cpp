@@ -11,7 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/event_filter.h"
 #include "base/random.h"
 #include "base/unixtime.h"
-#include "boxes/confirm_box.h"
+#include "ui/boxes/confirm_box.h"
 #include "core/application.h"
 #include "data/data_document.h"
 #include "data/data_document_media.h"
@@ -1636,7 +1636,7 @@ void VoiceRecordBar::showDiscardBox(
 			callback();
 		}
 	};
-	_controller->show(Box<ConfirmBox>(
+	_controller->show(Box<Ui::ConfirmBox>(
 		(isListenState()
 			? tr::lng_record_listen_cancel_sure
 			: tr::lng_record_lock_cancel_sure)(tr::now),

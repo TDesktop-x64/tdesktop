@@ -22,7 +22,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/passcode_box.h"
 #include "boxes/auto_lock_box.h"
 #include "boxes/sessions_box.h"
-#include "boxes/confirm_box.h"
+#include "ui/boxes/confirm_box.h"
 #include "boxes/self_destruction_box.h"
 #include "core/application.h"
 #include "core/core_settings.h"
@@ -585,7 +585,7 @@ void SetupCloudPassword(
 					*sent = false;
 				}, container->lifetime());
 			};
-			Ui::show(Box<ConfirmBox>(
+			Ui::show(Box<Ui::ConfirmBox>(
 				tr::lng_cloud_password_reset_cancel_sure(tr::now),
 				tr::lng_box_yes(tr::now),
 				tr::lng_box_no(tr::now),
@@ -889,7 +889,7 @@ object_ptr<Ui::BoxContent> CloudPasswordAppOutdatedBox() {
 		Core::UpdateApplication();
 		close();
 	};
-	return Box<ConfirmBox>(
+	return Box<Ui::ConfirmBox>(
 		tr::lng_passport_app_out_of_date(tr::now),
 		tr::lng_menu_update(tr::now),
 		callback);

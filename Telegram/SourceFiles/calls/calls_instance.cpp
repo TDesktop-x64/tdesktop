@@ -17,7 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_account.h"
 #include "apiwrap.h"
 #include "lang/lang_keys.h"
-#include "boxes/confirm_box.h"
+#include "ui/boxes/confirm_box.h"
 #include "calls/group/calls_group_call.h"
 #include "calls/group/calls_group_panel.h"
 #include "calls/calls_call.h"
@@ -31,9 +31,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "platform/platform_specific.h"
 #include "ui/toast/toast.h"
 #include "base/unixtime.h"
-#include "mainwidget.h"
 #include "mtproto/mtproto_config.h"
-#include "boxes/rate_call_box.h"
 #include "app.h" // App::quitting
 
 #include <tgcalls/VideoCaptureInterface.h>
@@ -192,7 +190,7 @@ void Instance::startOutgoingCall(not_null<UserData*> user, bool video) {
 	if (user->callsStatus() == UserData::CallsStatus::Private) {
 		// Request full user once more to refresh the setting in case it was changed.
 		user->session().api().requestFullPeer(user);
-		Ui::show(Box<InformBox>(
+		Ui::show(Box<Ui::InformBox>(
 			tr::lng_call_error_not_available(tr::now, lt_user, user->name)));
 		return;
 	}
@@ -484,6 +482,11 @@ void Instance::handleCallUpdate(
 			LOG(("API Error: User not loaded for phoneCallRequested."));
 		} else if (user->isSelf()) {
 			LOG(("API Error: Self found in phoneCallRequested."));
+		} else if (_currentCall
+			&& _currentCall->user() == user
+			&& _currentCall->id() == phoneCall.vid().v) {
+			// May be a repeated phoneCallRequested update from getDifference.
+			return;
 		}
 		const auto &config = session->serverConfig();
 		if (inCall() || inGroupCall() || !user || user->isSelf()) {
@@ -537,7 +540,7 @@ void Instance::handleGroupCallUpdate(
 		return data.vcall().match([&](const MTPDinputGroupCall &data) {
 			return data.vid().v;
 		});
-	}, [](const auto &) -> uint64 {
+	}, [](const auto &) -> CallId {
 		Unexpected("Type in Instance::handleGroupCallUpdate.");
 	});
 	if (const auto existing = session->data().groupCall(callId)) {
@@ -703,10 +706,13 @@ void Instance::requestPermissionOrFail(Platform::PermissionType type, Fn<void()>
 		if (inGroupCall()) {
 			_currentGroupCall->hangup();
 		}
-		Ui::show(Box<ConfirmBox>(tr::lng_no_mic_permission(tr::now), tr::lng_menu_settings(tr::now), crl::guard(this, [=] {
-			Platform::OpenSystemSettingsForPermission(type);
-			Ui::hideLayer();
-		})));
+		Ui::show(Box<Ui::ConfirmBox>(
+			tr::lng_no_mic_permission(tr::now),
+			tr::lng_menu_settings(tr::now),
+			crl::guard(this, [=] {
+				Platform::OpenSystemSettingsForPermission(type);
+				Ui::hideLayer();
+			})));
 	}
 }
 

@@ -49,6 +49,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/crash_reports.h"
 #include "core/application.h"
 #include "base/unixtime.h"
+#include "base/qt_adapters.h"
 #include "styles/style_dialogs.h"
 
 namespace {
@@ -906,49 +907,45 @@ void History::applyServiceChanges(
 		not_null<HistoryItem*> item,
 		const MTPDmessageService &data) {
 	const auto replyTo = data.vreply_to();
+	const auto processJoinedUser = [&](
+			not_null<ChannelData*> megagroup,
+			not_null<MegagroupInfo*> mgInfo,
+			not_null<UserData*> user) {
+		if (!base::contains(mgInfo->lastParticipants, user)) {
+			mgInfo->lastParticipants.push_front(user);
+			session().changes().peerUpdated(
+				peer,
+				Data::PeerUpdate::Flag::Members);
+			owner().addNewMegagroupParticipant(megagroup, user);
+		}
+		if (user->isBot()) {
+			mgInfo->bots.insert(user);
+			if (mgInfo->botStatus != 0 && mgInfo->botStatus < 2) {
+				mgInfo->botStatus = 2;
+			}
+		}
+	};
+	const auto processJoinedPeer = [&](not_null<PeerData*> joined) {
+		if (const auto megagroup = peer->asMegagroup()) {
+			const auto mgInfo = megagroup->mgInfo.get();
+			Assert(mgInfo != nullptr);
+			if (const auto user = joined->asUser()) {
+				processJoinedUser(megagroup, mgInfo, user);
+			}
+		}
+	};
 	data.vaction().match([&](const MTPDmessageActionChatAddUser &data) {
 		if (const auto megagroup = peer->asMegagroup()) {
 			const auto mgInfo = megagroup->mgInfo.get();
 			Assert(mgInfo != nullptr);
 			for (const auto &userId : data.vusers().v) {
 				if (const auto user = owner().userLoaded(userId.v)) {
-					if (!base::contains(mgInfo->lastParticipants, user)) {
-						mgInfo->lastParticipants.push_front(user);
-						session().changes().peerUpdated(
-							peer,
-							Data::PeerUpdate::Flag::Members);
-						owner().addNewMegagroupParticipant(megagroup, user);
-					}
-					if (user->isBot()) {
-						peer->asChannel()->mgInfo->bots.insert(user);
-						if (peer->asChannel()->mgInfo->botStatus != 0
-							&& peer->asChannel()->mgInfo->botStatus < 2) {
-							peer->asChannel()->mgInfo->botStatus = 2;
-						}
-					}
+					processJoinedUser(megagroup, mgInfo, user);
 				}
 			}
 		}
 	}, [&](const MTPDmessageActionChatJoinedByLink &data) {
-		if (const auto megagroup = peer->asMegagroup()) {
-			const auto mgInfo = megagroup->mgInfo.get();
-			Assert(mgInfo != nullptr);
-			if (const auto user = item->from()->asUser()) {
-				if (!base::contains(mgInfo->lastParticipants, user)) {
-					mgInfo->lastParticipants.push_front(user);
-					session().changes().peerUpdated(
-						peer,
-						Data::PeerUpdate::Flag::Members);
-					owner().addNewMegagroupParticipant(megagroup, user);
-				}
-				if (user->isBot()) {
-					mgInfo->bots.insert(user);
-					if (mgInfo->botStatus != 0 && mgInfo->botStatus < 2) {
-						mgInfo->botStatus = 2;
-					}
-				}
-			}
-		}
+		processJoinedPeer(item->from());
 	}, [&](const MTPDmessageActionChatDeletePhoto &data) {
 		if (const auto chat = peer->asChat()) {
 			chat->setPhoto(MTP_chatPhotoEmpty());
@@ -1093,6 +1090,8 @@ void History::applyServiceChanges(
 		}
 	}, [&](const MTPDmessageActionSetChatTheme &data) {
 		peer->setThemeEmoji(qs(data.vemoticon()));
+	}, [&](const MTPDmessageActionChatJoinedByRequest &data) {
+		processJoinedPeer(item->from());
 	}, [](const auto &) {
 	});
 }
@@ -2655,10 +2654,10 @@ void History::cacheTopPromotion(
 	}
 }
 
-QStringRef History::topPromotionType() const {
+QStringView History::topPromotionType() const {
 	return topPromotionAboutShown()
-		? _topPromotedType.midRef(5)
-		: _topPromotedType.midRef(0);
+		? base::StringViewMid(_topPromotedType, 5)
+		: QStringView(_topPromotedType);
 }
 
 bool History::topPromotionAboutShown() const {
@@ -2880,16 +2879,17 @@ MsgRange History::rangeForDifferenceRequest() const {
 }
 
 HistoryService *History::insertJoinedMessage() {
-	if (!isChannel()
+	const auto channel = peer->asChannel();
+	if (!channel
 		|| _joinedMessage
-		|| !peer->asChannel()->amIn()
+		|| !channel->amIn()
 		|| (peer->isMegagroup()
-			&& peer->asChannel()->mgInfo->joinedMessageFound)) {
+			&& channel->mgInfo->joinedMessageFound)) {
 		return _joinedMessage;
 	}
 
-	const auto inviter = peer->asChannel()->inviter
-		? owner().userLoaded(peer->asChannel()->inviter)
+	const auto inviter = (channel->inviter.bare > 0)
+		? owner().userLoaded(channel->inviter)
 		: nullptr;
 	if (!inviter) {
 		return nullptr;
@@ -2899,12 +2899,15 @@ HistoryService *History::insertJoinedMessage() {
 		&& peer->migrateFrom()
 		&& !blocks.empty()
 		&& blocks.front()->messages.front()->data()->id == 1) {
-		peer->asChannel()->mgInfo->joinedMessageFound = true;
+		channel->mgInfo->joinedMessageFound = true;
 		return nullptr;
 	}
 
-	const auto inviteDate = peer->asChannel()->inviteDate;
-	_joinedMessage = GenerateJoinedMessage(this, inviteDate, inviter);
+	_joinedMessage = GenerateJoinedMessage(
+		this,
+		channel->inviteDate,
+		inviter,
+		channel->inviteViaRequest);
 	insertLocalMessage(_joinedMessage);
 	return _joinedMessage;
 }

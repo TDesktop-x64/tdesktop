@@ -42,7 +42,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/unixtime.h"
 #include "window/window_session_controller.h"
 #include "window/window_controller.h"
-#include "boxes/confirm_box.h"
+#include "ui/boxes/confirm_box.h"
 #include "apiwrap.h"
 #include "ui/text/format_values.h" // Ui::FormatPhone
 #include "app.h" // App::quitting
@@ -239,11 +239,12 @@ Updates::Updates(not_null<Main::Session*> session)
 	}).send();
 
 	using namespace rpl::mappers;
-	base::ObservableViewer(
-		api().fullPeerUpdated()
-	) | rpl::filter([](not_null<PeerData*> peer) {
-		return peer->isChat() || peer->isMegagroup();
-	}) | rpl::start_with_next([=](not_null<PeerData*> peer) {
+	session->changes().peerUpdates(
+		Data::PeerUpdate::Flag::FullInfo
+	) | rpl::filter([](const Data::PeerUpdate &update) {
+		return update.peer->isChat() || update.peer->isMegagroup();
+	}) | rpl::start_with_next([=](const Data::PeerUpdate &update) {
+		const auto peer = update.peer;
 		if (const auto list = _pendingSpeakingCallParticipants.take(peer)) {
 			if (const auto call = peer->groupCall()) {
 				for (const auto &[participantPeerId, when] : *list) {
@@ -1965,6 +1966,19 @@ void Updates::feedUpdate(const MTPUpdate &update) {
 		}
 	} break;
 
+	case mtpc_updatePendingJoinRequests: {
+		const auto &d = update.c_updatePendingJoinRequests();
+		if (const auto peer = session().data().peerLoaded(peerFromMTP(d.vpeer()))) {
+			const auto count = d.vrequests_pending().v;
+			const auto &requesters = d.vrecent_requesters().v;
+			if (const auto chat = peer->asChat()) {
+				chat->setPendingRequestsCount(count, requesters);
+			} else if (const auto channel = peer->asChannel()) {
+				channel->setPendingRequestsCount(count, requesters);
+			}
+		}
+	} break;
+
 	case mtpc_updateServiceNotification: {
 		const auto &d = update.c_updateServiceNotification();
 		const auto text = TextWithEntities {
@@ -1976,7 +1990,7 @@ void Updates::feedUpdate(const MTPUpdate &update) {
 		} else if (d.is_popup()) {
 			const auto &windows = session().windows();
 			if (!windows.empty()) {
-				windows.front()->window().show(Box<InformBox>(text));
+				windows.front()->window().show(Box<Ui::InformBox>(text));
 			}
 		} else {
 			session().data().serviceNotification(text, d.vmedia());
@@ -2100,6 +2114,7 @@ void Updates::feedUpdate(const MTPUpdate &update) {
 		auto &d = update.c_updateChannel();
 		if (const auto channel = session().data().channelLoaded(d.vchannel_id())) {
 			channel->inviter = UserId(0);
+			channel->inviteViaRequest = false;
 			if (channel->amIn()) {
 				if (channel->isMegagroup()
 					&& !channel->amCreator()

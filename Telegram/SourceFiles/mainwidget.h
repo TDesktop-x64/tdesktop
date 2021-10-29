@@ -17,7 +17,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 struct HistoryMessageMarkupButton;
 class MainWindow;
-class ConfirmBox;
 class HistoryWidget;
 class StackItem;
 struct FileLoadResult;
@@ -66,6 +65,7 @@ struct Content;
 } // namespace Export
 
 namespace Ui {
+class ConfirmBox;
 class ResizeArea;
 class PlainShadow;
 class DropdownMenu;
@@ -173,8 +173,6 @@ public:
 	bool sendPaths(PeerId peerId);
 	void onFilesOrForwardDrop(const PeerId &peer, const QMimeData *data);
 	bool selectingPeer() const;
-
-	void deletePhotoLayer(PhotoData *photo);
 
 	void sendBotCommand(Bot::SendCommandRequest request);
 	void hideSingleUseKeyboard(PeerData *peer, MsgId replyTo);
@@ -328,7 +326,6 @@ private:
 	bool isThreeColumn() const;
 
 	const not_null<Window::SessionController*> _controller;
-	MTP::Sender _api;
 
 	Ui::Animations::Simple _a_show;
 	bool _showBack = false;

@@ -164,6 +164,19 @@ public:
 		return _botCommands;
 	}
 
+	[[nodiscard]] int pendingRequestsCount() const {
+		return _pendingRequestsCount;
+	}
+	[[nodiscard]] const std::vector<UserId> &recentRequesters() const {
+		return _recentRequesters;
+	}
+	void setPendingRequestsCount(
+		int count,
+		const QVector<MTPlong> &recentRequesters);
+	void setPendingRequestsCount(
+		int count,
+		std::vector<UserId> recentRequesters);
+
 	// Still public data members.
 	const MTPlong inputChat;
 
@@ -185,6 +198,8 @@ private:
 	RestrictionFlags _defaultRestrictions;
 	AdminRightFlags _adminRights;
 	int _version = 0;
+	int _pendingRequestsCount = 0;
+	std::vector<UserId> _recentRequesters;
 
 	std::unique_ptr<Data::GroupCall> _call;
 	PeerId _callDefaultJoinAs = 0;

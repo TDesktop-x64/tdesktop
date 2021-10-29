@@ -57,6 +57,9 @@ inline auto WebPageToPhrase(not_null<WebPageData*> webpage) {
 		? tr::lng_view_button_background(tr::now)
 		: (type == WebPageType::Channel)
 		? tr::lng_view_button_channel(tr::now)
+		: (type == WebPageType::GroupWithRequest
+			|| type == WebPageType::ChannelWithRequest)
+		? tr::lng_view_button_request_join(tr::now)
 		: (type == WebPageType::VoiceChat)
 		? tr::lng_view_button_voice_chat(tr::now)
 		: (type == WebPageType::Livestream)
@@ -132,7 +135,6 @@ ViewButton::Inner::Inner(
 , link(std::make_shared<LambdaClickHandler>([=](ClickContext context) {
 	const auto my = context.other.value<ClickHandlerContext>();
 	if (const auto controller = my.sessionWindow.get()) {
-		const auto &data = controller->session().data();
 		const auto webpage = media->webpage();
 		if (!webpage) {
 			return;

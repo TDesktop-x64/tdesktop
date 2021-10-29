@@ -646,7 +646,7 @@ void Histories::deleteAllMessages(
 				session().api().applyUpdates(result);
 			//}).fail([=](const MTP::Error &error) {
 			//	if (error.type() == qstr("CHANNEL_TOO_LARGE")) {
-			//		Ui::show(Box<InformBox>(tr::lng_cant_delete_channel(tr::now)));
+			//		Ui::show(Box<Ui::InformBox>(tr::lng_cant_delete_channel(tr::now)));
 			//	}
 			}).send();
 		} else if (channel) {
@@ -688,7 +688,9 @@ void Histories::deleteAllMessages(
 			return session().api().request(MTPmessages_DeleteHistory(
 				MTP_flags(flags),
 				peer->input,
-				MTP_int(0)
+				MTP_int(0),
+				MTPint(), // min_date
+				MTPint() // max_date
 			)).done([=](const MTPmessages_AffectedHistory &result) {
 				const auto offset = session().api().applyAffectedHistory(
 					peer,

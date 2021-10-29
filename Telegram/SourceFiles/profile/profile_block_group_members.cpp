@@ -9,7 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "styles/style_profile.h"
 #include "ui/widgets/labels.h"
-#include "boxes/confirm_box.h"
+#include "ui/boxes/confirm_box.h"
 #include "boxes/peers/edit_participant_box.h"
 #include "boxes/peers/edit_participants_box.h"
 #include "base/unixtime.h"
@@ -98,7 +98,7 @@ void GroupMembersWidget::removePeer(PeerData *selectedPeer) {
 				currentRestrictedRights);
 		}
 	};
-	Ui::show(Box<ConfirmBox>(
+	Ui::show(Box<Ui::ConfirmBox>(
 		text,
 		tr::lng_box_remove(tr::now),
 		crl::guard(&peer->session(), callback)));

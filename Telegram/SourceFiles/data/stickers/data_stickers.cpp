@@ -11,7 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_document.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
-#include "boxes/confirm_box.h"
+#include "ui/boxes/confirm_box.h"
 #include "lang/lang_keys.h"
 #include "history/history.h"
 #include "history/history_item.h"
@@ -402,7 +402,7 @@ void Stickers::undoInstallLocally(uint64 setId) {
 	notifyUpdated();
 
 	Ui::show(
-		Box<InformBox>(tr::lng_stickers_not_found(tr::now)),
+		Box<Ui::InformBox>(tr::lng_stickers_not_found(tr::now)),
 		Ui::LayerOption::KeepOther);
 }
 
@@ -679,7 +679,7 @@ void Stickers::setPackAndEmoji(
 
 			auto p = StickersPack();
 			p.reserve(stickers.size());
-			for (auto j = 0, c = stickers.size(); j != c; ++j) {
+			for (auto j = 0, c = int(stickers.size()); j != c; ++j) {
 				auto document = owner().document(stickers[j].v);
 				if (!document || !document->sticker()) continue;
 
@@ -1302,7 +1302,7 @@ StickersSet *Stickers::feedSetFull(const MTPmessages_StickerSet &data) {
 		set->stickers = pack;
 		set->emoji.clear();
 		auto &v = d.vpacks().v;
-		for (auto i = 0, l = v.size(); i != l; ++i) {
+		for (auto i = 0, l = int(v.size()); i != l; ++i) {
 			if (v[i].type() != mtpc_stickerPack) continue;
 
 			auto &pack = v[i].c_stickerPack();
@@ -1312,7 +1312,7 @@ StickersSet *Stickers::feedSetFull(const MTPmessages_StickerSet &data) {
 
 				StickersPack p;
 				p.reserve(stickers.size());
-				for (auto j = 0, c = stickers.size(); j != c; ++j) {
+				for (auto j = 0, c = int(stickers.size()); j != c; ++j) {
 					auto doc = owner().document(stickers[j].v);
 					if (!doc || !doc->sticker()) continue;
 

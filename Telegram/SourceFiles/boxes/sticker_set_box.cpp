@@ -13,7 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_document_media.h"
 #include "data/stickers/data_stickers.h"
 #include "lang/lang_keys.h"
-#include "boxes/confirm_box.h"
+#include "ui/boxes/confirm_box.h"
 #include "core/application.h"
 #include "mtproto/sender.h"
 #include "storage/storage_account.h"
@@ -257,7 +257,7 @@ void StickerSetBox::handleError(Error error) {
 	switch (error) {
 	case Error::NotFound:
 		_controller->show(
-			Box<InformBox>(tr::lng_stickers_not_found(tr::now)));
+			Box<Ui::InformBox>(tr::lng_stickers_not_found(tr::now)));
 		break;
 	default: Unexpected("Error in StickerSetBox::handleError.");
 	}
@@ -404,7 +404,7 @@ void StickerSetBox::Inner::gotSet(const MTPmessages_StickerSet &set) {
 
 					auto p = StickersPack();
 					p.reserve(stickers.size());
-					for (auto j = 0, c = stickers.size(); j != c; ++j) {
+					for (auto j = 0, c = int(stickers.size()); j != c; ++j) {
 						auto doc = _controller->session().data().document(stickers[j].v);
 						if (!doc || !doc->sticker()) continue;
 
@@ -532,7 +532,7 @@ void StickerSetBox::Inner::installDone(
 	auto &order = isMasks
 		? stickers.maskSetsOrderRef()
 		: stickers.setsOrderRef();
-	const auto insertAtIndex = 0, currentIndex = order.indexOf(_setId);
+	const auto insertAtIndex = 0, currentIndex = int(order.indexOf(_setId));
 	if (currentIndex != insertAtIndex) {
 		if (currentIndex > 0) {
 			order.removeAt(currentIndex);

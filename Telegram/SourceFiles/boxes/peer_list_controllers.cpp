@@ -8,7 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/peer_list_controllers.h"
 
 #include "base/random.h"
-#include "boxes/confirm_box.h"
+#include "ui/boxes/confirm_box.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/ui_utility.h"
 #include "main/main_session.h"
@@ -136,11 +136,11 @@ void PeerListRowWithLink::lazyInitialize(const style::PeerListItem &st) {
 	refreshActionLink();
 }
 
-QSize PeerListRowWithLink::actionSize() const {
+QSize PeerListRowWithLink::rightActionSize() const {
 	return QSize(_actionWidth, st::normalFont->height);
 }
 
-QMargins PeerListRowWithLink::actionMargins() const {
+QMargins PeerListRowWithLink::rightActionMargins() const {
 	return QMargins(
 		st::contactsCheckPosition.x(),
 		(st::contactsPadding.top() + st::contactsPhotoSize + st::contactsPadding.bottom() - st::normalFont->height) / 2,
@@ -148,7 +148,7 @@ QMargins PeerListRowWithLink::actionMargins() const {
 		0);
 }
 
-void PeerListRowWithLink::paintAction(
+void PeerListRowWithLink::rightActionPaint(
 		Painter &p,
 		int x,
 		int y,
@@ -482,7 +482,7 @@ void AddBotToGroupBoxController::shareBotGame(not_null<PeerData*> chat) {
 		return tr::lng_bot_sure_share_game_group(tr::now, lt_group, chat->name);
 	}();
 	Ui::show(
-		Box<ConfirmBox>(confirmText, std::move(send)),
+		Box<Ui::ConfirmBox>(confirmText, std::move(send)),
 		Ui::LayerOption::KeepOther);
 }
 
@@ -490,7 +490,7 @@ void AddBotToGroupBoxController::addBotToGroup(not_null<PeerData*> chat) {
 	if (const auto megagroup = chat->asMegagroup()) {
 		if (!megagroup->canAddMembers()) {
 			Ui::show(
-				Box<InformBox>(tr::lng_error_cant_add_member(tr::now)),
+				Box<Ui::InformBox>(tr::lng_error_cant_add_member(tr::now)),
 				Ui::LayerOption::KeepOther);
 			return;
 		}
@@ -500,7 +500,7 @@ void AddBotToGroupBoxController::addBotToGroup(not_null<PeerData*> chat) {
 	});
 	auto confirmText = tr::lng_bot_sure_invite(tr::now, lt_group, chat->name);
 	Ui::show(
-		Box<ConfirmBox>(confirmText, send),
+		Box<Ui::ConfirmBox>(confirmText, send),
 		Ui::LayerOption::KeepOther);
 }
 

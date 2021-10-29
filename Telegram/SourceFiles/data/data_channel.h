@@ -177,6 +177,19 @@ public:
 	}
 	void setKickedCount(int newKickedCount);
 
+	[[nodiscard]] int pendingRequestsCount() const {
+		return _pendingRequestsCount;
+	}
+	[[nodiscard]] const std::vector<UserId> &recentRequesters() const {
+		return _recentRequesters;
+	}
+	void setPendingRequestsCount(
+		int count,
+		const QVector<MTPlong> &recentRequesters);
+	void setPendingRequestsCount(
+		int count,
+		std::vector<UserId> recentRequesters);
+
 	[[nodiscard]] bool haveLeft() const {
 		return flags() & Flag::Left;
 	}
@@ -408,6 +421,7 @@ public:
 	// > 0 - user who invited me to channel, < 0 - not in channel.
 	UserId inviter = 0;
 	TimeId inviteDate = 0;
+	bool inviteViaRequest = false;
 
 	QString restriction_reason;
 
@@ -429,6 +443,8 @@ private:
 	int _adminsCount = 1;
 	int _restrictedCount = 0;
 	int _kickedCount = 0;
+	int _pendingRequestsCount = 0;
+	std::vector<UserId> _recentRequesters;
 	MsgId _availableMinId = 0;
 
 	RestrictionFlags _defaultRestrictions;

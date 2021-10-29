@@ -32,7 +32,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_domain.h"
 #include "mainwidget.h"
 #include "media/system_media_controls_manager.h"
-#include "boxes/confirm_box.h"
+#include "ui/boxes/confirm_box.h"
 #include "boxes/connection_box.h"
 #include "storage/storage_account.h"
 #include "storage/localstorage.h"
@@ -739,7 +739,7 @@ bool MainWindow::skipTrayClick() const {
 void MainWindow::toggleDisplayNotifyFromTray() {
 	if (controller().locked()) {
 		if (!isActive()) showFromTray();
-		Ui::show(Box<InformBox>(tr::lng_passcode_need_unblock(tr::now)));
+		Ui::show(Box<Ui::InformBox>(tr::lng_passcode_need_unblock(tr::now)));
 		return;
 	}
 	if (!sessionController()) {

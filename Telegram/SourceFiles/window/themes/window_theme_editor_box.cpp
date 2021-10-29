@@ -12,7 +12,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/themes/window_theme_preview.h"
 #include "window/themes/window_themes_generate_name.h"
 #include "window/window_controller.h"
-#include "boxes/confirm_box.h"
+#include "ui/boxes/confirm_box.h"
 #include "ui/text/text_utilities.h"
 #include "ui/widgets/input_fields.h"
 #include "ui/widgets/checkbox.h"
@@ -517,7 +517,7 @@ Fn<void()> SavePreparedTheme(
 			MTP_string(fields.slug),
 			MTP_string(fields.title),
 			document->mtpInput(),
-			MTPInputThemeSettings()
+			MTPVector<MTPInputThemeSettings>()
 		)).done([=](const MTPTheme &result) {
 			finish(result);
 		}).fail([=](const MTP::Error &error) {
@@ -540,7 +540,7 @@ Fn<void()> SavePreparedTheme(
 			MTP_string(fields.slug),
 			MTP_string(fields.title),
 			document->mtpInput(),
-			MTPInputThemeSettings()
+			MTPVector<MTPInputThemeSettings>()
 		)).done([=](const MTPTheme &result) {
 			finish(result);
 		}).fail([=](const MTP::Error &error) {
@@ -607,7 +607,7 @@ Fn<void()> SavePreparedTheme(
 			MTP_string(fields.slug),
 			MTP_string(fields.title),
 			MTP_inputDocumentEmpty(),
-			MTPInputThemeSettings()
+			MTPVector<MTPInputThemeSettings>()
 		)).done([=](const MTPTheme &result) {
 			save();
 		}).fail([=](const MTP::Error &error) {
@@ -655,7 +655,7 @@ void StartEditor(
 		? GenerateDefaultPalette()
 		: ParseTheme(object, true).palette;
 	if (palette.isEmpty() || !CopyColorsToPalette(path, palette, cloud)) {
-		window->show(Box<InformBox>(tr::lng_theme_editor_error(tr::now)));
+		window->show(Box<Ui::InformBox>(tr::lng_theme_editor_error(tr::now)));
 		return;
 	}
 	if (Core::App().settings().systemDarkModeEnabled()) {

@@ -978,6 +978,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_manage_peer_removed_users" = "Removed users";
 "lng_manage_peer_permissions" = "Permissions";
 "lng_manage_peer_invite_links" = "Invite links";
+"lng_manage_peer_requests" = "Member Requests";
+"lng_manage_peer_requests_channel" = "Subscriber Requests";
 
 "lng_manage_peer_group_type" = "Group type";
 "lng_manage_peer_channel_type" = "Channel type";
@@ -1158,6 +1160,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_action_user_left" = "{from} left the group";
 "lng_action_user_joined" = "{from} joined the group";
 "lng_action_user_joined_by_link" = "{from} joined the group via invite link";
+"lng_action_user_joined_by_request" = "{from} was accepted to the group";
+"lng_action_you_joined_by_request" = "Your request to join the group was approved";
+"lng_action_you_joined_by_request_channel" = "Your request to join the channel was approved";
 "lng_action_user_registered" = "{from} just joined Telegram";
 "lng_action_removed_photo" = "{from} removed group photo";
 "lng_action_removed_photo_channel" = "Channel photo removed";
@@ -1276,6 +1281,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_group_invite_joined#other" = "{count} joined";
 "lng_group_invite_remaining#one" = "{count} remaining";
 "lng_group_invite_remaining#other" = "{count} remaining";
+"lng_group_invite_requested#one" = "{count} requested";
+"lng_group_invite_requested#other" = "{count} requested";
+"lng_group_invite_requested_full#one" = "{count} requested to join";
+"lng_group_invite_requested_full#other" = "{count} requested to join";
 "lng_group_invite_can_join#one" = "{count} can join";
 "lng_group_invite_can_join#other" = "{count} can join";
 "lng_group_invite_days_left#one" = "{count} day left";
@@ -1305,6 +1314,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_group_invite_link_expired" = "Expired";
 "lng_group_invite_edit_title" = "Edit Link";
 "lng_group_invite_new_title" = "New Link";
+"lng_group_invite_label_header" = "Link Name (optional)";
+"lng_group_invite_label_about" = "Only admins will see this name.";
 "lng_group_invite_expire_title" = "Limit by time period";
 "lng_group_invite_expire_about" = "You can make the link expire after a certain time.";
 "lng_group_invite_expire_never" = "No limit";
@@ -1327,6 +1338,28 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_group_invite_qr_title" = "Invite by QR Code";
 "lng_group_invite_qr_about" = "Everyone on Telegram can scan this code to join your group.";
 "lng_group_invite_qr_copied" = "QR Code copied to clipboard.";
+"lng_group_invite_request_approve" = "Approve everyone who joins";
+"lng_group_invite_about_approve" = "New users will be able to join the group only after having been approved by the admins.";
+"lng_group_invite_about_no_approve" = "New users will be able to join the group without being approved by the admins.";
+"lng_group_invite_about_approve_channel" = "New users will be able to join the channel only after having been approved by the admins.";
+"lng_group_invite_about_no_approve_channel" = "New users will be able to join the channel without being approved by the admins.";
+
+"lng_group_request_to_join" = "Request to Join";
+"lng_group_request_about" = "This group accepts new members only after they are approved by its admins.";
+"lng_group_request_about_channel" = "This channel accepts new subscribers only after they are approved by its admins.";
+"lng_group_request_sent" = "You will be added to the group once its admins approve your request.";
+"lng_group_request_sent_channel" = "You will be added to the channel once its admins approve your request.";
+"lng_group_requests_pending#one" = "{count} user requested to join";
+"lng_group_requests_pending#other" = "{count} users requested to join";
+"lng_group_requests_pending_user" = "{user} requested to join";
+"lng_group_requests_status" = "requested to join {date}";
+"lng_group_requests_add" = "Add to Group";
+"lng_group_requests_add_channel" = "Add to Channel";
+"lng_group_requests_dismiss" = "Dismiss";
+"lng_group_requests_was_added" = "{user} has been added to the group.";
+"lng_group_requests_was_added_channel" = "{user} has been added to the channel.";
+"lng_group_requests_none" = "You have no pending requests\nto join your group.";
+"lng_group_requests_none_channel" = "You have no pending requests\nto join your channel.";
 
 "lng_channel_public_link_copied" = "Link copied to clipboard.";
 "lng_context_about_private_link" = "This link will only work for members of this chat.";
@@ -2458,6 +2491,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_admin_log_participant_joined_channel" = "{from} joined the channel";
 "lng_admin_log_participant_joined_by_link" = "{from} joined the group via {link}";
 "lng_admin_log_participant_joined_by_link_channel" = "{from} joined the channel via {link}";
+"lng_admin_log_participant_approved_by_link" = "{from} was approved to join the group via {link} by {user}";
+"lng_admin_log_participant_approved_by_link_channel" = "{from} was approved to join the channel via {link} by {user}";
 "lng_admin_log_revoke_invite_link" = "{from} revoked invite link {link}";
 "lng_admin_log_delete_invite_link" = "{from} deleted invite link {link}";
 "lng_admin_log_participant_left" = "{from} left the group";
@@ -2502,6 +2537,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_admin_log_edited_invite_link" = "edited invite link {link}";
 "lng_admin_log_invite_link_expire_date" = "Expire date: {previous} -> {limit}";
 "lng_admin_log_invite_link_usage_limit" = "Usage limit: {previous} -> {limit}";
+"lng_admin_log_invite_link_label" = "Name: {previous} -> {limit}";
+"lng_admin_log_invite_link_request_needed" = "Now admin approval is required to join.";
+"lng_admin_log_invite_link_request_not_needed" = "Now admin approval is not required to join.";
 "lng_admin_log_restricted_forever" = "indefinitely";
 "lng_admin_log_restricted_until" = "until {date}";
 "lng_admin_log_banned_view_messages" = "Read messages";
@@ -2907,6 +2945,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_view_button_message" = "View message";
 "lng_view_button_voice_chat" = "Voice chat";
 "lng_view_button_voice_chat_channel" = "Live stream";
+"lng_view_button_request_join" = "Request to Join";
 
 "lng_sponsored_title" = "What are sponsored messages?";
 "lng_sponsored_info_description1" = "Unlike other apps, Telegram never uses your private data to target ads. Sponsored messages on Telegram are based solely on the topic of the public channels in which they are shown. This means that no user data is mined or analyzed to display ads, and every user viewing a channel on Telegram sees the same sponsored messages.\n\nUnlike other apps, Telegram doesn't track whether you tapped on a sponsored message and doesn't profile you based on your activity. We also prevent external links in sponsored messages to ensure that third parties can’t spy on our users. We believe that everyone has the right to privacy, and technological platforms should respect that.\n\nTelegram offers a free and unlimited service to hundreds of millions of users, which involves significant server and traffic costs. In order to remain independent and stay true to its values, Telegram developed a paid tool to promote messages with user privacy in mind. We welcome responsible advertisers at:";

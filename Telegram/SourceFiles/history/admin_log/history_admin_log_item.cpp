@@ -38,7 +38,7 @@ TextWithEntities PrepareText(const QString &value, const QString &emptyValue) {
 			result.entities.push_back({
 				EntityType::Italic,
 				0,
-				emptyValue.size() });
+				int(emptyValue.size()) });
 		}
 	} else {
 		TextUtilities::ParseEntities(result, TextParseLinks | TextParseMentions | TextParseHashtags | TextParseBotCommands);
@@ -263,13 +263,20 @@ QString ExtractInviteLink(const MTPExportedChatInvite &data) {
 	});
 }
 
+QString ExtractInviteLinkLabel(const MTPExportedChatInvite &data) {
+	return data.match([&](const MTPDchatInviteExported &data) {
+		return qs(data.vtitle().value_or_empty());
+	});
+}
+
 QString InternalInviteLinkUrl(const MTPExportedChatInvite &data) {
 	const auto base64 = ExtractInviteLink(data).toUtf8().toBase64();
 	return "internal:show_invite_link/?link=" + QString::fromLatin1(base64);
 }
 
 QString GenerateInviteLinkText(const MTPExportedChatInvite &data) {
-	return ExtractInviteLink(data).replace(
+	const auto label = ExtractInviteLinkLabel(data);
+	return label.isEmpty() ? ExtractInviteLink(data).replace(
 		qstr("https://"),
 		QString()
 	).replace(
@@ -278,7 +285,7 @@ QString GenerateInviteLinkText(const MTPExportedChatInvite &data) {
 	).replace(
 		qstr("t.me/joinchat/"),
 		QString()
-	);
+	) : label;
 }
 
 QString GenerateInviteLinkLink(const MTPExportedChatInvite &data) {
@@ -296,12 +303,17 @@ TextWithEntities GenerateInviteLinkChangeText(
 		link.entities.push_back({
 			EntityType::CustomUrl,
 			0,
-			link.text.size(),
+			int(link.text.size()),
 			InternalInviteLinkUrl(newLink) });
 	}
 	auto result = tr::lng_admin_log_edited_invite_link(tr::now, lt_link, link, Ui::Text::WithEntities);
 	result.text.append('\n');
 
+	const auto label = [](const MTPExportedChatInvite &link) {
+		return link.match([](const MTPDchatInviteExported &data) {
+			return qs(data.vtitle().value_or_empty());
+		});
+	};
 	const auto expireDate = [](const MTPExportedChatInvite &link) {
 		return link.match([](const MTPDchatInviteExported &data) {
 			return data.vexpire_date().value_or_empty();
@@ -310,6 +322,11 @@ TextWithEntities GenerateInviteLinkChangeText(
 	const auto usageLimit = [](const MTPExportedChatInvite &link) {
 		return link.match([](const MTPDchatInviteExported &data) {
 			return data.vusage_limit().value_or_empty();
+		});
+	};
+	const auto requestApproval = [](const MTPExportedChatInvite &link) {
+		return link.match([](const MTPDchatInviteExported &data) {
+			return data.is_request_needed();
 		});
 	};
 	const auto wrapDate = [](TimeId date) {
@@ -322,15 +339,25 @@ TextWithEntities GenerateInviteLinkChangeText(
 			? QString::number(count)
 			: tr::lng_group_invite_usage_any(tr::now);
 	};
+	const auto wasLabel = label(prevLink);
+	const auto nowLabel = label(newLink);
 	const auto wasExpireDate = expireDate(prevLink);
 	const auto nowExpireDate = expireDate(newLink);
 	const auto wasUsageLimit = usageLimit(prevLink);
 	const auto nowUsageLimit = usageLimit(newLink);
+	const auto wasRequestApproval = requestApproval(prevLink);
+	const auto nowRequestApproval = requestApproval(newLink);
+	if (wasLabel != nowLabel) {
+		result.text.append('\n').append(tr::lng_admin_log_invite_link_label(tr::now, lt_previous, wasLabel, lt_limit, nowLabel));
+	}
 	if (wasExpireDate != nowExpireDate) {
 		result.text.append('\n').append(tr::lng_admin_log_invite_link_expire_date(tr::now, lt_previous, wrapDate(wasExpireDate), lt_limit, wrapDate(nowExpireDate)));
 	}
 	if (wasUsageLimit != nowUsageLimit) {
 		result.text.append('\n').append(tr::lng_admin_log_invite_link_usage_limit(tr::now, lt_previous, wrapUsage(wasUsageLimit), lt_limit, wrapUsage(nowUsageLimit)));
+	}
+	if (wasRequestApproval != nowRequestApproval) {
+		result.text.append('\n').append(nowRequestApproval ? tr::lng_admin_log_invite_link_request_needed(tr::now) : tr::lng_admin_log_invite_link_request_not_needed(tr::now));
 	}
 
 	result.entities.push_front(EntityInText(EntityType::Italic, 0, result.text.size()));
@@ -350,7 +377,7 @@ auto GenerateParticipantString(
 		name.entities.push_back({
 			EntityType::MentionName,
 			0,
-			name.text.size(),
+			int(name.text.size()),
 			entityData });
 	}
 	auto username = peer->userName();
@@ -361,7 +388,7 @@ auto GenerateParticipantString(
 	mention.entities.push_back({
 		EntityType::Mention,
 		0,
-		mention.text.size() });
+		int(mention.text.size()) });
 	return tr::lng_admin_log_user_with_username(
 		tr::now,
 		lt_name,
@@ -967,11 +994,14 @@ void GenerateItems(
 		addSimpleServiceMessage(text);
 	};
 
-	auto addInviteLinkServiceMessage = [&](const QString &text, const MTPExportedChatInvite &data) {
+	auto addInviteLinkServiceMessage = [&](const QString &text, const MTPExportedChatInvite &data, ClickHandlerPtr additional = nullptr) {
 		auto message = HistoryService::PreparedText{ text };
 		message.links.push_back(fromLink);
 		if (!ExtractInviteLink(data).endsWith("...")) {
 			message.links.push_back(std::make_shared<UrlClickHandler>(InternalInviteLinkUrl(data)));
+		}
+		if (additional) {
+			message.links.push_back(std::move(additional));
 		}
 		addPart(history->makeServiceMessage(
 			history->nextNonHistoryEntryId(),
@@ -1065,6 +1095,27 @@ void GenerateItems(
 		addSimpleServiceMessage(text);
 	};
 
+	auto createParticipantJoinByRequest = [&](const MTPDchannelAdminLogEventActionParticipantJoinByRequest &data) {
+		const auto user = channel->owner().user(UserId(data.vapproved_by()));
+		auto text = (channel->isMegagroup()
+			? tr::lng_admin_log_participant_approved_by_link
+			: tr::lng_admin_log_participant_approved_by_link_channel);
+		const auto linkText = GenerateInviteLinkLink(data.vinvite());
+		const auto adminIndex = linkText.endsWith("...") ? 2 : 3;
+		addInviteLinkServiceMessage(
+			text(
+				tr::now,
+				lt_from,
+				fromLinkText,
+				lt_link,
+				linkText,
+				lt_user,
+				textcmdLink(adminIndex, user->name)),
+			data.vinvite(),
+			user->createOpenLink());
+
+	};
+
 	action.match([&](const MTPDchannelAdminLogEventActionChangeTitle &data) {
 		createChangeTitle(data);
 	}, [&](const MTPDchannelAdminLogEventActionChangeAbout &data) {
@@ -1129,6 +1180,8 @@ void GenerateItems(
 		createParticipantVolume(data);
 	}, [&](const MTPDchannelAdminLogEventActionChangeHistoryTTL &data) {
 		createChangeHistoryTTL(data);
+	}, [&](const MTPDchannelAdminLogEventActionParticipantJoinByRequest &data) {
+		createParticipantJoinByRequest(data);
 	});
 }
 

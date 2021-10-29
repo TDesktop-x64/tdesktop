@@ -9,7 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "facades.h"
 #include "base/platform/base_platform_info.h"
-#include "boxes/confirm_box.h"
+#include "ui/boxes/confirm_box.h"
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "core/mime_type.h"
@@ -80,7 +80,7 @@ void LaunchWithWarning(
 			rpl::single(Ui::Text::Bold(extension)),
 			Ui::Text::WithEntities)
 		: tr::lng_launch_svg_warning(Ui::Text::WithEntities);
-	Ui::show(Box<ConfirmDontWarnBox>(
+	Ui::show(Box<Ui::ConfirmDontWarnBox>(
 		std::move(text),
 		tr::lng_launch_exe_dont_ask(tr::now),
 		(isExecutable ? tr::lng_launch_exe_sure : tr::lng_continue)(),
@@ -232,7 +232,7 @@ void ResolveDocument(
 				location.accessDisable();
 			});
 			const auto path = location.name();
-			if (Core::MimeTypeForFile(path).name().startsWith("image/")
+			if (Core::MimeTypeForFile(QFileInfo(path)).name().startsWith("image/")
 				&& QImageReader(path).canRead()) {
 				showDocument();
 				return true;

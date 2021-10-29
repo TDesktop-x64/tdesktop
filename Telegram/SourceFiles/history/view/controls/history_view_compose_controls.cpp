@@ -31,7 +31,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_web_page.h"
 #include "storage/storage_account.h"
 #include "apiwrap.h"
-#include "boxes/confirm_box.h"
+#include "ui/boxes/confirm_box.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/view/controls/history_view_voice_record_bar.h"
@@ -798,7 +798,7 @@ rpl::producer<> ComposeControls::attachRequests() const {
 	) | rpl::filter([=] {
 		if (isEditingMessage()) {
 			_window->show(
-				Box<InformBox>(tr::lng_edit_caption_attach(tr::now)));
+				Box<Ui::InformBox>(tr::lng_edit_caption_attach(tr::now)));
 			return false;
 		}
 		return true;
@@ -1715,7 +1715,7 @@ void ComposeControls::initVoiceRecordBar() {
 				ChatRestriction::SendMedia)
 			: std::nullopt;
 		if (error) {
-			_window->show(Box<InformBox>(*error));
+			_window->show(Box<Ui::InformBox>(*error));
 			return true;
 		} else if (_showSlowmodeError && _showSlowmodeError()) {
 			return true;
@@ -2014,7 +2014,8 @@ void ComposeControls::editMessage(not_null<HistoryItem*> item) {
 	Expects(draftKeyCurrent() != Data::DraftKey::None());
 
 	if (_voiceRecordBar->isActive()) {
-		_window->show(Box<InformBox>(tr::lng_edit_caption_voice(tr::now)));
+		_window->show(Box<Ui::InformBox>(
+			tr::lng_edit_caption_voice(tr::now)));
 		return;
 	}
 
@@ -2023,8 +2024,8 @@ void ComposeControls::editMessage(not_null<HistoryItem*> item) {
 	}
 	const auto editData = PrepareEditText(item);
 	const auto cursor = MessageCursor{
-		editData.text.size(),
-		editData.text.size(),
+		int(editData.text.size()),
+		int(editData.text.size()),
 		QFIXED_MAX
 	};
 	const auto previewPage = [&]() -> WebPageData* {
@@ -2163,7 +2164,7 @@ void ComposeControls::initWebpageProcess() {
 		if (ShowWebPagePreview(*previewData)) {
 			if (const auto till = (*previewData)->pendingTill) {
 				t = tr::lng_preview_loading(tr::now);
-				d = (*previewLinks).splitRef(' ').at(0).toString();
+				d = QStringView(*previewLinks).split(' ').at(0).toString();
 
 				const auto timeout = till - base::unixtime::now();
 				previewTimer->callOnce(
@@ -2271,6 +2272,7 @@ void ComposeControls::initWebpageProcess() {
 		Data::PeerUpdate::Flag::Rights
 		| Data::PeerUpdate::Flag::Notifications
 		| Data::PeerUpdate::Flag::MessagesTTL
+		| Data::PeerUpdate::Flag::FullInfo
 	) | rpl::filter([=](const Data::PeerUpdate &update) {
 		return (update.peer.get() == peer);
 	}) | rpl::map([](const Data::PeerUpdate &update) {
@@ -2287,16 +2289,11 @@ void ComposeControls::initWebpageProcess() {
 		if (flags & Data::PeerUpdate::Flag::MessagesTTL) {
 			updateMessagesTTLShown();
 		}
-	}, lifetime);
-
-	base::ObservableViewer(
-		session().api().fullPeerUpdated()
-	) | rpl::filter([=](PeerData *peer) {
-		return _history && (_history->peer == peer);
-	}) | rpl::start_with_next([=] {
-		if (updateBotCommandShown()) {
-			updateControlsVisibility();
-			updateControlsGeometry(_wrap->size());
+		if (flags & Data::PeerUpdate::Flag::FullInfo) {
+			if (updateBotCommandShown()) {
+				updateControlsVisibility();
+				updateControlsGeometry(_wrap->size());
+			}
 		}
 	}, lifetime);
 

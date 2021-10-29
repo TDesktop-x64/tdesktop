@@ -31,7 +31,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/image/image.h"
 #include "ui/style/style_palette_colorizer.h"
 #include "ui/ui_utility.h"
-#include "boxes/confirm_box.h"
+#include "ui/boxes/confirm_box.h"
 #include "boxes/background_box.h"
 #include "core/application.h"
 #include "styles/style_widgets.h"
@@ -1404,7 +1404,7 @@ void ToggleNightModeWithConfirmation(
 			toggle();
 			close();
 		};
-		window->show(Box<ConfirmBox>(
+		window->show(Box<Ui::ConfirmBox>(
 			tr::lng_settings_auto_night_warning(tr::now),
 			tr::lng_settings_auto_night_disable(tr::now),
 			disableAndToggle));

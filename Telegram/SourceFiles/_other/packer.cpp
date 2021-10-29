@@ -1,4 +1,4 @@
-/*
+﻿/*
 This file is part of Telegram Desktop,
 the official desktop application for the Telegram messaging service.
 
@@ -161,6 +161,7 @@ int main(int argc, char *argv[])
 	QString remove;
 	long long version = 0;
 	[[maybe_unused]] bool targetwin64 = false;
+	[[maybe_unused]] bool targetarmac = false;
 	QFileInfoList files;
 	for (int i = 0; i < argc; ++i) {
 		if (string("-path") == argv[i] && i + 1 < argc) {
@@ -170,6 +171,12 @@ int main(int argc, char *argv[])
 			if (remove.isEmpty()) remove = info.canonicalPath() + "/";
 		} else if (string("-target") == argv[i] && i + 1 < argc) {
 			targetwin64 = (string("win64") == argv[i + 1]);
+		} else if (string("-arch") == argv[i] && i + 1 < argc) {
+			targetarmac = (string("arm64") == argv[i + 1]);
+			if (!targetarmac && string("x86_64") != argv[i + 1]) {
+				cout << "Bad -arch param value passed: " << argv[i + 1] << "\n";
+				return -1;
+			}
 		} else if (string("-version") == argv[i] && i + 1 < argc) {
 			version = QString(argv[i + 1]).toLongLong();
 		} else if (string("-beta") == argv[i]) {
@@ -495,7 +502,7 @@ int main(int argc, char *argv[])
 #ifdef Q_OS_WIN
 	QString outName((targetwin64 ? QString("tx64upd%1") : QString("tupdate%1")).arg(AlphaVersion ? AlphaVersion : version));
 #elif defined Q_OS_MAC
-	QString outName(QString("tmacupd%1").arg(AlphaVersion ? AlphaVersion : version));
+	QString outName((targetarmac ? QString("tarmacupd%1") : QString("tmacupd%1")).arg(AlphaVersion ? AlphaVersion : version));
 #elif defined Q_OS_LINUX
 	QString outName(QString("tlinuxupd%1").arg(AlphaVersion ? AlphaVersion : version));
 #else

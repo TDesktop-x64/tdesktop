@@ -43,7 +43,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_controller.h"
 #include "window/notifications_manager.h"
 #include "boxes/about_sponsored_box.h"
-#include "boxes/confirm_box.h"
+#include "boxes/delete_messages_box.h"
 #include "boxes/sticker_set_box.h"
 #include "chat_helpers/message_field.h"
 #include "chat_helpers/emoji_interactions.h"
@@ -78,6 +78,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "app.h"
 #include "styles/style_chat.h"
 #include "styles/style_window.h" // st::windowMinWidth
+#include "base/qt_adapters.h"
 
 #include <QtGui/QClipboard>
 #include <QtWidgets/QApplication>
@@ -870,7 +871,7 @@ bool HistoryInner::eventHook(QEvent *e) {
 		|| e->type() == QEvent::TouchEnd
 		|| e->type() == QEvent::TouchCancel) {
 		QTouchEvent *ev = static_cast<QTouchEvent*>(e);
-		if (ev->device()->type() == QTouchDevice::TouchScreen) {
+		if (ev->device()->type() == base::TouchDevice::TouchScreen) {
 			touchEvent(ev);
 			return true;
 		}
@@ -1571,19 +1572,19 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			} else {
 				isUponSelected = -2;
 			}
-		} else {
+		} else if (App::mousedItem()
+			&& App::mousedItem() == App::hoveredItem()
+			&& _selected.cbegin()->first == App::mousedItem()->data()) {
 			uint16 selFrom = _selected.cbegin()->second.from, selTo = _selected.cbegin()->second.to;
 			hasSelected = (selTo > selFrom) ? 1 : 0;
-			if (App::mousedItem() && App::mousedItem() == App::hoveredItem()) {
-				auto mousePos = mapPointToItem(mapFromGlobal(_mousePosition), App::mousedItem());
-				StateRequest request;
-				request.flags |= Ui::Text::StateRequest::Flag::LookupSymbol;
-				auto dragState = App::mousedItem()->textState(mousePos, request);
-				if (dragState.cursor == CursorState::Text
-					&& dragState.symbol >= selFrom
-					&& dragState.symbol < selTo) {
-					isUponSelected = 1;
-				}
+			auto mousePos = mapPointToItem(mapFromGlobal(_mousePosition), App::mousedItem());
+			StateRequest request;
+			request.flags |= Ui::Text::StateRequest::Flag::LookupSymbol;
+			auto dragState = App::mousedItem()->textState(mousePos, request);
+			if (dragState.cursor == CursorState::Text
+				&& dragState.symbol >= selFrom
+				&& dragState.symbol < selTo) {
+				isUponSelected = 1;
 			}
 		}
 	}
@@ -2639,7 +2640,7 @@ void HistoryInner::updateSize() {
 	}
 }
 
-void HistoryInner::enterEventHook(QEvent *e) {
+void HistoryInner::enterEventHook(QEnterEvent *e) {
 	mouseActionUpdate(QCursor::pos());
 	return TWidget::enterEventHook(e);
 }

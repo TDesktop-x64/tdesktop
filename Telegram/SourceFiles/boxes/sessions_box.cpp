@@ -11,7 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_authorizations.h"
 #include "base/timer.h"
 #include "base/unixtime.h"
-#include "boxes/confirm_box.h"
+#include "ui/boxes/confirm_box.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "styles/style_boxes.h"
@@ -81,7 +81,7 @@ private:
 	Full _data;
 
 	object_ptr<Inner> _inner;
-	QPointer<ConfirmBox> _terminateBox;
+	QPointer<Ui::ConfirmBox> _terminateBox;
 
 	base::Timer _shortPollTimer;
 
@@ -250,7 +250,7 @@ void SessionsContent::terminate(Fn<void()> terminateRequest, QString message) {
 		terminateRequest();
 	});
 	_terminateBox = Ui::show(
-		Box<ConfirmBox>(
+		Box<Ui::ConfirmBox>(
 			message,
 			tr::lng_settings_reset_button(tr::now),
 			st::attentionBoxButton,

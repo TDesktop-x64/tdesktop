@@ -8,16 +8,19 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/peers/edit_peer_info_box.h"
 
 #include "apiwrap.h"
+#include "api/api_peer_photo.h"
 #include "main/main_session.h"
 #include "boxes/add_contact_box.h"
-#include "boxes/confirm_box.h"
+#include "ui/boxes/confirm_box.h"
 #include "boxes/peer_list_controllers.h"
 #include "boxes/peers/edit_participants_box.h"
+#include "boxes/peers/edit_peer_common.h"
 #include "boxes/peers/edit_peer_type_box.h"
 #include "boxes/peers/edit_peer_history_visibility_box.h"
 #include "boxes/peers/edit_peer_permissions_box.h"
 #include "boxes/peers/edit_peer_invite_links.h"
 #include "boxes/peers/edit_linked_chat_box.h"
+#include "boxes/peers/edit_peer_requests_box.h"
 #include "boxes/stickers_box.h"
 #include "ui/boxes/single_choice_box.h"
 #include "chat_helpers/emoji_suggestions_widget.h"
@@ -249,9 +252,6 @@ void ShowEditPermissions(
 
 namespace {
 
-constexpr auto kMaxGroupChannelTitle = 128; // See also add_contact_box.
-constexpr auto kMaxChannelDescription = 255; // See also add_contact_box.
-
 class Controller : public base::has_weak_ptr {
 public:
 	Controller(
@@ -298,6 +298,7 @@ private:
 	void fillSignaturesButton();
 	void fillHistoryVisibilityButton();
 	void fillManageSection();
+	void fillPendingRequestsButton();
 
 	void submitTitle();
 	void submitDescription();
@@ -476,7 +477,7 @@ object_ptr<Ui::RpWidget> Controller::createTitleEdit() {
 				: tr::lng_dlg_new_channel_name)(),
 			_peer->name),
 		st::editPeerTitleMargins);
-	result->entity()->setMaxLength(kMaxGroupChannelTitle);
+	result->entity()->setMaxLength(Ui::EditPeer::kMaxGroupChannelTitle);
 	result->entity()->setInstantReplaces(Ui::InstantReplaces::Default());
 	result->entity()->setInstantReplacesEnabled(
 		Core::App().settings().replaceEmojiValue());
@@ -510,7 +511,7 @@ object_ptr<Ui::RpWidget> Controller::createDescriptionEdit() {
 			tr::lng_create_group_description(),
 			_peer->about()),
 		st::editPeerDescriptionMargins);
-	result->entity()->setMaxLength(kMaxChannelDescription);
+	result->entity()->setMaxLength(Ui::EditPeer::kMaxChannelDescription);
 	result->entity()->setInstantReplaces(Ui::InstantReplaces::Default());
 	result->entity()->setInstantReplacesEnabled(
 		Core::App().settings().replaceEmojiValue());
@@ -847,6 +848,8 @@ void Controller::fillHistoryVisibilityButton() {
 void Controller::fillManageSection() {
 	Expects(_controls.buttonsLayout != nullptr);
 
+	using namespace rpl::mappers;
+
 	const auto chat = _peer->asChat();
 	const auto channel = _peer->asChannel();
 	const auto isChannel = (!chat);
@@ -1047,6 +1050,9 @@ void Controller::fillManageSection() {
 			},
 			st::infoIconMembers);
 	}
+
+	fillPendingRequestsButton();
+
 	if (canViewKicked) {
 		AddButtonWithCount(
 			_controls.buttonsLayout,
@@ -1100,6 +1106,33 @@ void Controller::fillManageSection() {
 			[=]{ deleteWithConfirmation(); }
 		);
 	}
+}
+
+void Controller::fillPendingRequestsButton() {
+	auto pendingRequestsCount = Info::Profile::MigratedOrMeValue(
+		_peer
+	) | rpl::map(
+		Info::Profile::PendingRequestsCountValue
+	) | rpl::flatten_latest(
+	) | rpl::start_spawning(_controls.buttonsLayout->lifetime());
+	const auto wrap = _controls.buttonsLayout->add(
+		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+			_controls.buttonsLayout,
+			object_ptr<Ui::VerticalLayout>(
+				_controls.buttonsLayout)));
+	AddButtonWithCount(
+		wrap->entity(),
+		(_isGroup
+			? tr::lng_manage_peer_requests()
+			: tr::lng_manage_peer_requests_channel()),
+		rpl::duplicate(pendingRequestsCount) | ToPositiveNumberString(),
+		[=] { RequestsBoxController::Start(_navigation, _peer); },
+		st::infoIconRequests);
+	std::move(
+		pendingRequestsCount
+	) | rpl::start_with_next([=](int count) {
+		wrap->toggle(count > 0, anim::type::instant);
+	}, wrap->lifetime());
 }
 
 void Controller::submitTitle() {
@@ -1483,7 +1516,7 @@ void Controller::savePhoto() {
 		? _controls.photo->takeResultImage()
 		: QImage();
 	if (!image.isNull()) {
-		_peer->session().api().uploadPeerPhoto(_peer, std::move(image));
+		_peer->session().api().peerPhoto().upload(_peer, std::move(image));
 	}
 	_box->closeBox();
 }
@@ -1499,7 +1532,7 @@ void Controller::deleteWithConfirmation() {
 		deleteChannel();
 	});
 	_navigation->parentController()->show(
-		Box<ConfirmBox>(
+		Box<Ui::ConfirmBox>(
 			text,
 			tr::lng_box_delete(tr::now),
 			st::attentionBoxButton,
@@ -1526,7 +1559,7 @@ void Controller::deleteChannel() {
 		session->api().applyUpdates(result);
 	//}).fail([=](const MTP::Error &error) {
 	//	if (error.type() == qstr("CHANNEL_TOO_LARGE")) {
-	//		Ui::show(Box<InformBox>(tr::lng_cant_delete_channel(tr::now)));
+	//		Ui::show(Box<Ui::InformBox>(tr::lng_cant_delete_channel(tr::now)));
 	//	}
 	}).send();
 }

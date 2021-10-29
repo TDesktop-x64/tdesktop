@@ -916,8 +916,8 @@ void MainWindow::psSetupTrayIcon() {
 	const auto counter = Core::App().unreadBadge();
 	const auto muted = Core::App().unreadBadgeMuted();
 
-	if (_sniAvailable) {
 #ifndef DESKTOP_APP_DISABLE_DBUS_INTEGRATION
+	if (_sniAvailable) {
 		LOG(("Using SNI tray icon."));
 		if (!_private->sniTrayIcon) {
 			_private->sniTrayIcon = new StatusNotifierItem(
@@ -932,19 +932,24 @@ void MainWindow::psSetupTrayIcon() {
 			_private->attachToSNITrayIcon();
 		}
 		updateIconCounters();
-#endif // !DESKTOP_APP_DISABLE_DBUS_INTEGRATION
-	} else {
-		LOG(("Using Qt tray icon."));
-		if (!trayIcon) {
-			trayIcon = new QSystemTrayIcon(this);
-			trayIcon->setIcon(TrayIconGen(counter, muted));
 
-			attachToTrayIcon(trayIcon);
-		}
-		updateIconCounters();
-
-		trayIcon->show();
+		return;
 	}
+#endif // !DESKTOP_APP_DISABLE_DBUS_INTEGRATION
+
+	LOG(("Using Qt tray icon."));
+	if (!trayIcon) {
+		trayIcon = new QSystemTrayIcon(this);
+		if (_sniAvailable) {
+			trayIcon->setContextMenu(trayIconMenu);
+		}
+		trayIcon->setIcon(TrayIconGen(counter, muted));
+
+		attachToTrayIcon(trayIcon);
+	}
+	updateIconCounters();
+
+	trayIcon->show();
 }
 
 void MainWindow::workmodeUpdated(Core::Settings::WorkMode mode) {

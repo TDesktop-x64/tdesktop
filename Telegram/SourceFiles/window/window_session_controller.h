@@ -48,6 +48,7 @@ class LayerWidget;
 enum class ReportReason;
 class ChatStyle;
 class ChatTheme;
+struct ChatThemeKey;
 struct ChatPaintContext;
 struct ChatThemeBackground;
 struct ChatThemeBackgroundData;
@@ -55,6 +56,7 @@ struct ChatThemeBackgroundData;
 
 namespace Data {
 struct CloudTheme;
+enum class CloudThemeType;
 } // namespace Data
 
 namespace Window {
@@ -421,7 +423,8 @@ public:
 		return _defaultChatTheme;
 	}
 	[[nodiscard]] auto cachedChatThemeValue(
-		const Data::CloudTheme &data)
+		const Data::CloudTheme &data,
+		Data::CloudThemeType type)
 	-> rpl::producer<std::shared_ptr<Ui::ChatTheme>>;
 	void setChatStyleTheme(const std::shared_ptr<Ui::ChatTheme> &theme);
 	void clearCachedChatThemes();
@@ -481,7 +484,9 @@ private:
 	void checkInvitePeek();
 
 	void pushDefaultChatBackground();
-	void cacheChatTheme(const Data::CloudTheme &data);
+	void cacheChatTheme(
+		const Data::CloudTheme &data,
+		Data::CloudThemeType type);
 	void cacheChatThemeDone(std::shared_ptr<Ui::ChatTheme> result);
 	void updateCustomThemeBackground(CachedTheme &theme);
 	[[nodiscard]] Ui::ChatThemeBackgroundData backgroundData(
@@ -517,7 +522,7 @@ private:
 	rpl::event_stream<> _filtersMenuChanged;
 
 	std::shared_ptr<Ui::ChatTheme> _defaultChatTheme;
-	base::flat_map<uint64, CachedTheme> _customChatThemes;
+	base::flat_map<Ui::ChatThemeKey, CachedTheme> _customChatThemes;
 	rpl::event_stream<std::shared_ptr<Ui::ChatTheme>> _cachedThemesStream;
 	const std::unique_ptr<Ui::ChatStyle> _chatStyle;
 	std::weak_ptr<Ui::ChatTheme> _chatStyleTheme;

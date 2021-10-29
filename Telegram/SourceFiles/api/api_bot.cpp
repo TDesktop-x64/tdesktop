@@ -11,7 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_cloud_password.h"
 #include "core/core_cloud_password.h"
 #include "api/api_send_progress.h"
-#include "boxes/confirm_box.h"
+#include "ui/boxes/confirm_box.h"
 #include "boxes/share_box.h"
 #include "boxes/passcode_box.h"
 #include "lang/lang_keys.h"
@@ -91,7 +91,7 @@ void SendBotCallbackData(
 		result.match([&](const MTPDmessages_botCallbackAnswer &data) {
 			if (const auto message = data.vmessage()) {
 				if (data.is_alert()) {
-					Ui::show(Box<InformBox>(qs(*message)));
+					Ui::show(Box<Ui::InformBox>(qs(*message)));
 				} else {
 					if (withPassword) {
 						Ui::hideLayer();

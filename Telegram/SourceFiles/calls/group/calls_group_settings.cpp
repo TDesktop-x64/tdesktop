@@ -66,7 +66,7 @@ constexpr auto kCheckAccessibilityInterval = crl::time(500);
 
 void SaveCallJoinMuted(
 		not_null<PeerData*> peer,
-		uint64 callId,
+		CallId callId,
 		bool joinMuted) {
 	const auto call = peer->groupCall();
 	if (!call
@@ -604,7 +604,12 @@ void SettingsBox(
 			}
 			return false;
 		};
-		if (!lookupLink().isEmpty() || canCreateLink()) {
+		const auto alreadyHasLink = !lookupLink().isEmpty();
+		if (alreadyHasLink || canCreateLink()) {
+			if (!alreadyHasLink) {
+				// Request invite link.
+				peer->session().api().requestFullPeer(peer);
+			}
 			const auto copyLink = [=] {
 				const auto link = lookupLink();
 				if (link.isEmpty()) {

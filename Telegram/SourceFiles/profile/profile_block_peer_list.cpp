@@ -184,7 +184,7 @@ void PeerListWidget::mousePressReleased(Qt::MouseButton button) {
 	repaintSelectedRow();
 }
 
-void PeerListWidget::enterEventHook(QEvent *e) {
+void PeerListWidget::enterEventHook(QEnterEvent *e) {
 	_mousePosition = QCursor::pos();
 	updateSelection();
 }

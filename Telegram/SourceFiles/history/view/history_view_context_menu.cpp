@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "api/api_attached_stickers.h"
 #include "api/api_editing.h"
+#include "api/api_polls.h"
 #include "api/api_toggling_media.h" // Api::ToggleFavedSticker
 #include "base/unixtime.h"
 #include "history/view/history_view_list_widget.h"
@@ -27,7 +28,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/boxes/report_box.h"
 #include "ui/ui_utility.h"
 #include "chat_helpers/send_context_menu.h"
-#include "boxes/confirm_box.h"
+#include "ui/boxes/confirm_box.h"
+#include "boxes/delete_messages_box.h"
 #include "boxes/sticker_set_box.h"
 #include "data/data_photo.h"
 #include "data/data_photo_media.h"
@@ -1052,10 +1054,10 @@ void StopPoll(not_null<Main::Session*> session, FullMsgId itemId) {
 	const auto stop = [=] {
 		Ui::hideLayer();
 		if (const auto item = session->data().message(itemId)) {
-			session->api().closePoll(item);
+			session->api().polls().close(item);
 		}
 	};
-	Ui::show(Box<ConfirmBox>(
+	Ui::show(Box<Ui::ConfirmBox>(
 		tr::lng_polls_stop_warning(tr::now),
 		tr::lng_polls_stop_sure(tr::now),
 		tr::lng_cancel(tr::now),
@@ -1078,7 +1080,7 @@ void AddPollActions(
 	const auto itemId = item->fullId();
 	if (poll->voted() && !poll->quiz()) {
 		menu->addAction(tr::lng_polls_retract(tr::now), [=] {
-			poll->session().api().sendPollVotes(itemId, {});
+			poll->session().api().polls().sendVotes(itemId, {});
 		});
 	}
 	if (item->canStopPoll()) {

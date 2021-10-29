@@ -9,7 +9,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "boxes/peers/edit_participant_box.h"
 #include "boxes/peers/edit_peer_type_box.h"
-#include "boxes/confirm_box.h"
+#include "ui/boxes/confirm_box.h"
+#include "boxes/max_invite_box.h"
 #include "lang/lang_keys.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
@@ -105,7 +106,8 @@ void AddParticipantsBoxController::rowClicked(not_null<PeerListRow*> row) {
 	} else if (count >= serverConfig.chatSizeMax
 		&& count < serverConfig.megagroupSizeMax) {
 		Ui::show(
-			Box<InformBox>(tr::lng_profile_add_more_after_create(tr::now)),
+			Box<Ui::InformBox>(
+				tr::lng_profile_add_more_after_create(tr::now)),
 			Ui::LayerOption::KeepOther);
 	}
 }
@@ -565,20 +567,20 @@ void AddSpecialBoxController::showAdmin(
 			if (canBanMembers) {
 				if (!sure) {
 					_editBox = Ui::show(
-						Box<ConfirmBox>(
+						Box<Ui::ConfirmBox>(
 							tr::lng_sure_add_admin_unremove(tr::now),
 							showAdminSure),
 						Ui::LayerOption::KeepOther);
 					return;
 				}
 			} else {
-				Ui::show(Box<InformBox>(
+				Ui::show(Box<Ui::InformBox>(
 					tr::lng_error_cant_add_admin_unban(tr::now)),
 					Ui::LayerOption::KeepOther);
 				return;
 			}
 		} else {
-			Ui::show(Box<InformBox>(
+			Ui::show(Box<Ui::InformBox>(
 				tr::lng_error_cant_add_admin_invite(tr::now)),
 				Ui::LayerOption::KeepOther);
 			return;
@@ -588,14 +590,14 @@ void AddSpecialBoxController::showAdmin(
 		if (canBanMembers) {
 			if (!sure) {
 				_editBox = Ui::show(
-					Box<ConfirmBox>(
+					Box<Ui::ConfirmBox>(
 						tr::lng_sure_add_admin_unremove(tr::now),
 						showAdminSure),
 					Ui::LayerOption::KeepOther);
 				return;
 			}
 		} else {
-			Ui::show(Box<InformBox>(
+			Ui::show(Box<Ui::InformBox>(
 				tr::lng_error_cant_add_admin_unban(tr::now)),
 				Ui::LayerOption::KeepOther);
 			return;
@@ -608,7 +610,7 @@ void AddSpecialBoxController::showAdmin(
 					? tr::lng_sure_add_admin_invite
 					: tr::lng_sure_add_admin_invite_channel)(tr::now);
 				_editBox = Ui::show(
-					Box<ConfirmBox>(
+					Box<Ui::ConfirmBox>(
 						text,
 						showAdminSure),
 					Ui::LayerOption::KeepOther);
@@ -616,7 +618,8 @@ void AddSpecialBoxController::showAdmin(
 			}
 		} else {
 			Ui::show(
-				Box<InformBox>(tr::lng_error_cant_add_admin_invite(tr::now)),
+				Box<Ui::InformBox>(
+					tr::lng_error_cant_add_admin_invite(tr::now)),
 				Ui::LayerOption::KeepOther);
 			return;
 		}
@@ -716,7 +719,7 @@ void AddSpecialBoxController::showRestricted(
 		if (!_additional.isCreator(user) && _additional.canEditAdmin(user)) {
 			if (!sure) {
 				_editBox = Ui::show(
-					Box<ConfirmBox>(
+					Box<Ui::ConfirmBox>(
 						tr::lng_sure_ban_admin(tr::now),
 						showRestrictedSure),
 					Ui::LayerOption::KeepOther);
@@ -724,7 +727,7 @@ void AddSpecialBoxController::showRestricted(
 			}
 		} else {
 			Ui::show(
-				Box<InformBox>(tr::lng_error_cant_ban_admin(tr::now)),
+				Box<Ui::InformBox>(tr::lng_error_cant_ban_admin(tr::now)),
 				Ui::LayerOption::KeepOther);
 			return;
 		}
@@ -813,7 +816,7 @@ void AddSpecialBoxController::kickUser(
 		if (!_additional.isCreator(user) && _additional.canEditAdmin(user)) {
 			if (!sure) {
 				_editBox = Ui::show(
-					Box<ConfirmBox>(
+					Box<Ui::ConfirmBox>(
 						tr::lng_sure_ban_admin(tr::now),
 						kickUserSure),
 					Ui::LayerOption::KeepOther);
@@ -821,7 +824,7 @@ void AddSpecialBoxController::kickUser(
 			}
 		} else {
 			Ui::show(
-				Box<InformBox>(tr::lng_error_cant_ban_admin(tr::now)),
+				Box<Ui::InformBox>(tr::lng_error_cant_ban_admin(tr::now)),
 				Ui::LayerOption::KeepOther);
 			return;
 		}
@@ -836,7 +839,7 @@ void AddSpecialBoxController::kickUser(
 				lt_user,
 				participant->name);
 		_editBox = Ui::show(
-			Box<ConfirmBox>(text, kickUserSure),
+			Box<Ui::ConfirmBox>(text, kickUserSure),
 			Ui::LayerOption::KeepOther);
 		return;
 	}

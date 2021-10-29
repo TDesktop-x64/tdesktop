@@ -38,8 +38,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/platform/base_platform_info.h"
 #include "base/weak_ptr.h"
 #include "media/player/media_player_instance.h"
+#include "boxes/delete_messages_box.h"
 #include "boxes/peer_list_controllers.h"
-#include "boxes/confirm_box.h"
 #include "core/file_utilities.h"
 #include "facades.h"
 
@@ -1906,7 +1906,7 @@ void ListWidget::validateTrippleClickStartTime() {
 	}
 }
 
-void ListWidget::enterEventHook(QEvent *e) {
+void ListWidget::enterEventHook(QEnterEvent *e) {
 	mouseActionUpdate(QCursor::pos());
 	return RpWidget::enterEventHook(e);
 }

@@ -15,7 +15,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/level_meter.h"
 #include "ui/widgets/buttons.h"
 #include "ui/boxes/single_choice_box.h"
-#include "boxes/confirm_box.h"
+#include "ui/boxes/confirm_box.h"
 #include "platform/platform_specific.h"
 #include "main/main_session.h"
 #include "lang/lang_keys.h"
@@ -290,7 +290,7 @@ void Calls::setupContent() {
 			Platform::SystemSettingsType::Audio);
 		if (!opened) {
 			_controller->show(
-				Box<InformBox>(tr::lng_linux_no_audio_prefs(tr::now)));
+				Box<Ui::InformBox>(tr::lng_linux_no_audio_prefs(tr::now)));
 		}
 	});
 
@@ -322,7 +322,7 @@ void Calls::requestPermissionAndStartTestingMicrophone() {
 				Platform::PermissionType::Microphone);
 			Ui::hideLayer();
 		};
-		_controller->show(Box<ConfirmBox>(
+		_controller->show(Box<Ui::ConfirmBox>(
 			tr::lng_no_mic_permission(tr::now),
 			tr::lng_menu_settings(tr::now),
 			showSystemSettings));

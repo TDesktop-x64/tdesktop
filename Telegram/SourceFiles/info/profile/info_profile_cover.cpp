@@ -5,6 +5,7 @@ the official desktop application for the Telegram messaging service.
 For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
+#include <ui/toast/toast.h>
 #include "info/profile/info_profile_cover.h"
 
 #include "data/data_photo.h"
@@ -257,6 +258,9 @@ Cover::Cover(
 	_peer->isMegagroup()
 		? st::infoProfileMegagroupStatusLabel
 		: st::infoProfileStatusLabel)
+, _id(
+	this,
+	st::infoProfileMegagroupStatusLabel)
 , _refreshStatusTimer([this] { refreshStatusText(); }) {
 	_peer->updateFull();
 
@@ -433,6 +437,29 @@ void Cover::refreshStatusText() {
 			_showSection.fire(Section::Type::Members);
 		}));
 	}
+
+	QLocale::setDefault(QLocale::Language::French);
+
+	auto idText = QString();
+	auto id = QString();
+
+	if (_peer->isChat()) {
+		id = QString("-%1").arg(_peer->id.to<ChatId>().bare);
+		idText = textcmdLink(1, QString("ID: -%L1").arg(_peer->id.to<ChatId>().bare));
+	} else if (_peer->isMegagroup() || _peer->isChannel()) {
+		id = QString("-100%1").arg(_peer->id.to<ChannelId>().bare);
+		idText = textcmdLink(1, QString("ID: -1 00%L1").arg(_peer->id.to<ChannelId>().bare));
+	} else {
+		id = QString("%1").arg(_peer->id.to<UserId>().bare);
+		idText = textcmdLink(1, QString("ID: %L1").arg(_peer->id.to<UserId>().bare));
+	}
+	_id->setRichText(idText);
+
+	_id->setLink(1, std::make_shared<LambdaClickHandler>([=] {
+		QGuiApplication::clipboard()->setText(id);
+		Ui::Toast::Show("ID copied to clipboard.");
+	}));
+
 	refreshStatusGeometry(width());
 }
 
@@ -483,6 +510,11 @@ void Cover::refreshStatusGeometry(int newWidth) {
 	_status->moveToLeft(
 		st::infoProfileStatusLeft,
 		st::infoProfileStatusTop,
+		newWidth);
+	_id->resizeToWidth(statusWidth);
+	_id->moveToLeft(
+		st::infoProfileStatusLeft,
+		st::infoProfileStatusTop + 20,
 		newWidth);
 }
 

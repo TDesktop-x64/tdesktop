@@ -68,21 +68,6 @@ void StripExternalLinks(TextWithEntities &text) {
 
 } // namespace
 
-rpl::producer<TextWithEntities> IDValue(not_null<PeerData*> peer, int type) {
-	if (type == 0) {
-		return rpl::single(QString("-%1").arg(peer->id.to<ChatId>().bare)) | Ui::Text::ToWithEntities();
-	} else if (type == 1) {
-		return rpl::single(QString("-100%1").arg(peer->id.to<ChannelId>().bare)) | Ui::Text::ToWithEntities();
-	}
-	else {
-		return rpl::single(QString("%1").arg(peer->id.to<UserId>().bare)) | Ui::Text::ToWithEntities();
-	}
-}
-
-rpl::producer<TextWithEntities> StringValue(QString text) {
-	return rpl::single(QString("%1").arg(text)) | Ui::Text::ToWithEntities();
-}
-
 rpl::producer<TextWithEntities> NameValue(not_null<PeerData*> peer) {
 	return peer->session().changes().peerFlagsValue(
 		peer,

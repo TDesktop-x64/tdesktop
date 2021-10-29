@@ -268,19 +268,6 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 		return result;
 	};
 	if (const auto user = _peer->asUser()) {
-		// Source from kotatogram
-		if (user->isBot()) {
-			addInfoOneLine(
-				tr::lng_profile_bot_id(),
-				IDValue(user, 2),
-				tr::lng_profile_copy_id(tr::now));
-		} else {
-			addInfoOneLine(
-				tr::lng_profile_user_id(),
-				IDValue(user, 2),
-				tr::lng_profile_copy_id(tr::now));
-		}
-
 		if (user->session().supportMode()) {
 			addInfoLineGeneric(
 				user->session().supportHelper().infoLabelValue(user),
@@ -308,35 +295,6 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 			[=] { controller->window().show(Box(EditContactBox, controller, user)); },
 			tracker);
 	} else {
-		// Source from kotatogram
-		if (_peer->isChat()) {
-			addInfoOneLine(
-				tr::lng_profile_group_id(),
-				IDValue(_peer, 0),
-				tr::lng_profile_copy_id(tr::now));
-		} else if (_peer->isMegagroup()) {
-			addInfoOneLine(
-				tr::lng_profile_supergroup_id(),
-				IDValue(_peer, 1),
-				tr::lng_profile_copy_id(tr::now));
-			addInfoOneLine(
-				tr::lng_chat_restriction_reason(),
-				StringValue(_peer->asMegagroup()->restriction_reason),
-				tr::lng_copy_restriction_reason(tr::now));
-		
-		} else {
-			addInfoOneLine(
-				tr::lng_profile_channel_id(),
-				IDValue(_peer, 1),
-				tr::lng_profile_copy_id(tr::now));
-			addInfoOneLine(
-				tr::lng_chat_restriction_reason(),
-				StringValue(_peer->asChannel()->restriction_reason),
-				tr::lng_copy_restriction_reason(tr::now));
-		}
-
-		
-
 		auto linkText = LinkValue(
 			_peer
 		) | rpl::map([](const QString &link) {

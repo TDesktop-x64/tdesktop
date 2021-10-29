@@ -78,7 +78,7 @@
 
     "lng_user_not_found": "404 User not found.\nNote: You must have \"seen\" that user before open this link.",
 
-    "lng_settings_always_delete_for": "Auto check delete message for",
+    "lng_settings_always_delete_for": "Always select delete for",
     "lng_settings_delete_disabled": "Disabled",
     "lng_settings_delete_for_group": "Group",
     "lng_settings_delete_for_person": "Person",

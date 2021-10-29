@@ -42,7 +42,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "boxes/peers/edit_participant_box.h"
 #include "boxes/peers/edit_participants_box.h"
-#include "boxes/confirm_box.h"
+#include "ui/boxes/confirm_box.h"
 #include "data/data_session.h"
 #include "data/data_photo.h"
 #include "data/data_photo_media.h"
@@ -1415,8 +1415,8 @@ void InnerWidget::suggestRestrictUser(not_null<UserData*> user) {
 		const auto text = tr::lng_profile_sure_kick(tr::now, lt_user, user->firstName);
 		auto editRestrictions = [=](bool hasAdminRights, ChatRestrictionsInfo currentRights) {
 			auto weak = QPointer<InnerWidget>(this);
-			auto weakBox = std::make_shared<QPointer<ConfirmBox>>();
-			auto box = Box<ConfirmBox>(
+			auto weakBox = std::make_shared<QPointer<Ui::ConfirmBox>>();
+			auto box = Box<Ui::ConfirmBox>(
 				text,
 				tr::lng_box_remove(tr::now),
 				crl::guard(this, [=] {

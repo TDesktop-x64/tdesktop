@@ -21,7 +21,7 @@ https://github.com/TDesktop-x64/tdesktop/blob/dev/LEGAL
 #include "boxes/connection_box.h"
 #include "boxes/enhanced_options_box.h"
 #include "boxes/about_box.h"
-#include "boxes/confirm_box.h"
+#include "ui/boxes/confirm_box.h"
 #include "platform/platform_specific.h"
 #include "window/window_session_controller.h"
 #include "lang/lang_keys.h"

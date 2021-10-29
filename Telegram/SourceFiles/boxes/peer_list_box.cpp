@@ -1521,7 +1521,7 @@ crl::time PeerListContent::paintRow(
 	if (auto adminTitleWidth = row->adminTitleWidth()) {
 		namew -= adminTitleWidth;
 		auto rankx = width() - adminTitleWidth - skipRight;
-		if (!actionSize.isEmpty() && selected) {
+		if (!rightActionSize.isEmpty() && selected) {
 			namew -= skipRight;
 			rankx -= skipRight;
 		}

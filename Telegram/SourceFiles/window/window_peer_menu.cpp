@@ -1150,7 +1150,7 @@ QPointer<Ui::RpWidget> ShowNewForwardMessagesBox(
 			}
 			text.append(error.first);
 			Ui::show(
-				Box<InformBox>(text),
+				Box<Ui::InformBox>(text),
 				Ui::LayerOption::KeepOther);
 			return;
 		}
@@ -1278,7 +1278,7 @@ QPointer<Ui::RpWidget> ShowForwardNoQuoteMessagesBox(
 			}
 			text.append(error.first);
 			Ui::show(
-				Box<InformBox>(text),
+				Box<Ui::InformBox>(text),
 				Ui::LayerOption::KeepOther);
 			return;
 		}

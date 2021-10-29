@@ -1578,7 +1578,7 @@ void Controller::upgradeWithConfirmation() {
 		Ui::hideLayer();
 	});
 	Ui::show(
-		Box<ConfirmBox>(
+		Box<Ui::ConfirmBox>(
 			text,
 			tr::lng_profile_convert_confirm(tr::now),
 			st::attentionBoxButton,

@@ -14,7 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/labels.h"
 #include "styles/style_layers.h"
 #include "styles/style_boxes.h"
-#include "boxes/confirm_box.h"
+#include "ui/boxes/confirm_box.h"
 #include "core/enhanced_settings.h"
 #include "settings/settings_enhanced.h"
 #include "app.h"
@@ -78,7 +78,7 @@ void NetBoostBox::save() {
 	const auto box = std::make_shared<QPointer<BoxContent>>();
 
 	*box = getDelegate()->show(
-			Box<ConfirmBox>(
+			Box<Ui::ConfirmBox>(
 					tr::lng_net_boost_restart_desc(tr::now),
 					tr::lng_settings_restart_now(tr::now),
 					tr::lng_cancel(tr::now),

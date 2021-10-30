@@ -1392,7 +1392,7 @@ void CustomLangPack::loadDefaultLangFile() {
 		QJsonDocument str = QJsonDocument::fromJson(file.readAll());
 		QJsonObject json = str.object();
 		for (const QString& key : json.keys()) {
-			Lang::GetInstance().applyValue(key.toLocal8Bit(), QByteArray(json.value(key).toString().toLocal8Bit()));
+			Lang::GetInstance().applyValue(key.toLocal8Bit(), json.value(key).toString().toUtf8());
 		}
 		Lang::GetInstance().updatePluralRules();
 		file.close();
@@ -1402,10 +1402,10 @@ void CustomLangPack::loadDefaultLangFile() {
 void CustomLangPack::parseLangFile(QJsonDocument str) {
 	QJsonObject json = str.object();
 	for (const QString& key : json.keys()) {
-		Lang::GetInstance().applyValue(key.toLocal8Bit(), QByteArray(json.value(key).toString().toLocal8Bit()));
+		Lang::GetInstance().applyValue(key.toLocal8Bit(), json.value(key).toString().toUtf8());
 		if (key.contains("#other")) {
-			Lang::GetInstance().applyValue(key.toLocal8Bit().replace("#other", "#few"), QByteArray(json.value(key).toString().toLocal8Bit()));
-			Lang::GetInstance().applyValue(key.toLocal8Bit().replace("#other", "#many"), QByteArray(json.value(key).toString().toLocal8Bit()));
+			Lang::GetInstance().applyValue(key.toLocal8Bit().replace("#other", "#few"), json.value(key).toString().toUtf8());
+			Lang::GetInstance().applyValue(key.toLocal8Bit().replace("#other", "#many"), json.value(key).toString().toUtf8());
 		}
 	}
 	Lang::GetInstance().updatePluralRules();

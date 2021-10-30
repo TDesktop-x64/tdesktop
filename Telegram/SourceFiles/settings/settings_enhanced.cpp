@@ -325,6 +325,22 @@ namespace Settings {
 			App::wnd()->fixOrder();
 		}, container->lifetime());
 
+		AddButton(
+				container,
+				tr::lng_settings_skip_message(),
+				st::settingsButton
+		)->toggleOn(
+				rpl::single(cSkipSc())
+		)->toggledValue(
+		) | rpl::filter([](bool enabled) {
+			return (enabled != cSkipSc());
+		}) | rpl::start_with_next([=](bool enabled) {
+			cSetSkipSc(enabled);
+			EnhancedSettings::Write();
+		}, container->lifetime());
+
+		AddDividerText(container, tr::lng_settings_skip_message_desc());
+
 		AddSkip(container);
 	}
 

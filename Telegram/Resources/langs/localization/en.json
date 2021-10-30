@@ -23,6 +23,9 @@
     "lng_settings_hide_all_chats": "Hide \"All chats\" folder",
     "lng_settings_restart_hint": "WARNING: Changing options that are colored in red will take effect only after the app restarts.",
 
+    "lng_settings_skip_message": "Skip to next unread chat",
+    "lng_settings_skip_message_desc": "Note: Allow ALT+↑/↓ shortcut to skip to next unread chat",
+
     "lng_net_speed_boost_title": "Network speed boost",
     "lng_net_speed_boost_desc": "Warning: changing this parameter to high values on slow networks can make it even worse. Use it at your own risk.",
     "lng_show_emoji_button_as_text_desc": "Note: If you can't see an emoji button, please turn on this option.",

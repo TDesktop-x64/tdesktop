@@ -273,6 +273,10 @@ namespace EnhancedSettings {
 			cSetHideFilterAllChats(v);
 		});
 
+		ReadBoolOption(settings, "skip_to_next", [&](auto v) {
+			cSetSkipSc(v);
+		});
+
 		return true;
 	}
 
@@ -305,6 +309,7 @@ namespace EnhancedSettings {
 		settings.insert(qsl("bitrate"), 0);
 		settings.insert(qsl("hide_all_chats"), false);
 		settings.insert(qsl("hd_video"), false);
+		settings.insert(qsl("skip_to_next"), false);
 
 		auto document = QJsonDocument();
 		document.setObject(settings);
@@ -343,6 +348,7 @@ namespace EnhancedSettings {
 		settings.insert(qsl("bitrate"), cVoiceChatBitrate());
 		settings.insert(qsl("hide_all_chats"), cHideFilterAllChats());
 		settings.insert(qsl("hd_video"), cHDVideo());
+		settings.insert(qsl("skip_to_next"), cSkipSc());
 
 		auto document = QJsonDocument();
 		document.setObject(settings);

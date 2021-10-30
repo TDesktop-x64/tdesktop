@@ -3037,6 +3037,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_hide_all_chats" = "Hide \"All chats\" folder";
 "lng_settings_restart_hint" = "WARNING: Changing options that are colored in red will take effect only after the app restarts.";
 
+"lng_settings_skip_message" = "Skip to next unread chat";
+"lng_settings_skip_message_desc" = "Note: Allow ALT+↑/↓ shortcut to skip to next unread chat";
+
 "lng_settings_always_delete_for" = "Always select delete for";
 "lng_settings_delete_disabled" = "Disabled";
 "lng_settings_delete_for_group" = "Group";

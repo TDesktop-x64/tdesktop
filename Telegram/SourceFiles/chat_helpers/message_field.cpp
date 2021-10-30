@@ -175,8 +175,7 @@ void EditLinkBox::prepare() {
 	const auto submit = [=] {
 		const auto linkText = text->getLastText();
 		auto linkUrl = qthelp::validate_url(url->getLastText());
-		QRegExp num("\\d+");
-		if (num.exactMatch(url->getLastText()) && url->getLastText().length() <= 10) {
+		if (QRegularExpression("\\d+").match(url->getLastText()).hasMatch() && url->getLastText().length() <= 10) {
 			const auto uid = url->getLastText().toInt();
 			if (uid > 0) {
 				const auto user = session->data().userLoaded(uid);

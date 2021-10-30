@@ -1353,17 +1353,29 @@ void CustomLangPack::fetchCustomLangPack(const QString& langPackId, const QStrin
 void CustomLangPack::fetchFinished() {
 	if (!_chkReply) return;
 
-	QByteArray result = _chkReply->readAll().trimmed();
-	QJsonParseError error{};
-	QJsonDocument str = QJsonDocument::fromJson(result, &error);
-	if (error.error == QJsonParseError::NoError) {
-		parseLangFile(str);
-	} else {
-		LOG(("Incorrect JSON File. Fallback to default language: English..."));
-		loadDefaultLangFile();
-	}
+	QString langPackBaseId = Lang::GetInstance().baseId();
+	QString langPackId = Lang::GetInstance().id();
+	auto statusCode = _chkReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
 
-	_chkReply = nullptr;
+	if (statusCode == 404 && !langPackId.isEmpty() && !langPackBaseId.isEmpty() && !needFallback) {
+		LOG(("64Gram Language pack not found! Fallback to main language: %1...").arg(langPackBaseId));
+		needFallback = true;
+		_chkReply->disconnect();
+		fetchCustomLangPack("", langPackBaseId);
+	}
+	else {
+		QByteArray result = _chkReply->readAll().trimmed();
+		QJsonParseError error{};
+		QJsonDocument str = QJsonDocument::fromJson(result, &error);
+		if (error.error == QJsonParseError::NoError) {
+			parseLangFile(str);
+		} else {
+			LOG(("Incorrect JSON File. Fallback to default language: English..."));
+			loadDefaultLangFile();
+		}
+
+		_chkReply = nullptr;
+	}
 }
 
 void CustomLangPack::fetchError(QNetworkReply::NetworkError e) {
@@ -1392,7 +1404,7 @@ void CustomLangPack::loadDefaultLangFile() {
 		QJsonDocument str = QJsonDocument::fromJson(file.readAll());
 		QJsonObject json = str.object();
 		for (const QString& key : json.keys()) {
-			Lang::GetInstance().applyValue(key.toLocal8Bit(), json.value(key).toString().toUtf8());
+			Lang::GetInstance().applyValue(key.toUtf8(), json.value(key).toString().toUtf8());
 		}
 		Lang::GetInstance().updatePluralRules();
 		file.close();
@@ -1402,10 +1414,10 @@ void CustomLangPack::loadDefaultLangFile() {
 void CustomLangPack::parseLangFile(QJsonDocument str) {
 	QJsonObject json = str.object();
 	for (const QString& key : json.keys()) {
-		Lang::GetInstance().applyValue(key.toLocal8Bit(), json.value(key).toString().toUtf8());
+		Lang::GetInstance().applyValue(key.toUtf8(), json.value(key).toString().toUtf8());
 		if (key.contains("#other")) {
-			Lang::GetInstance().applyValue(key.toLocal8Bit().replace("#other", "#few"), json.value(key).toString().toUtf8());
-			Lang::GetInstance().applyValue(key.toLocal8Bit().replace("#other", "#many"), json.value(key).toString().toUtf8());
+			Lang::GetInstance().applyValue(key.toUtf8().replace("#other", "#few"), json.value(key).toString().toUtf8());
+			Lang::GetInstance().applyValue(key.toUtf8().replace("#other", "#many"), json.value(key).toString().toUtf8());
 		}
 	}
 	Lang::GetInstance().updatePluralRules();

@@ -112,5 +112,7 @@
     "lng_pinned_message_hide": "Hide pinned message",
     "lng_pinned_message_view": "View pinned message",
 
-    "lng_proxy_remove_all": "Remove all proxies"
+    "lng_proxy_remove_all": "Remove all proxies",
+    
+    "lng_copy_profile_id": "ID copied to clipboard."
 }

@@ -457,7 +457,7 @@ void Cover::refreshStatusText() {
 
 	_id->setLink(1, std::make_shared<LambdaClickHandler>([=] {
 		QGuiApplication::clipboard()->setText(id);
-		Ui::Toast::Show("ID copied to clipboard.");
+		Ui::Toast::Show(tr::lng_copy_profile_id(tr::now));
 	}));
 
 	refreshStatusGeometry(width());

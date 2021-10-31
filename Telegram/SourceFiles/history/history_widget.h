@@ -185,9 +185,6 @@ public:
 
 	QPoint clampMousePosition(QPoint point);
 
-	void checkSelectingScroll(QPoint point);
-	void noSelectingScroll();
-
 	bool touchScroll(const QPoint &delta);
 
 	void enqueueMessageHighlight(not_null<HistoryView::Element*> view);
@@ -370,7 +367,6 @@ private:
 	void preloadHistoryIfNeeded();
 
 	void handleScroll();
-	void scrollByTimer();
 	void updateHistoryItemsByTimer();
 
 	[[nodiscard]] Dialogs::EntryState computeDialogsEntryState() const;
@@ -770,9 +766,6 @@ private:
 	Ui::Animations::Simple _a_show;
 	Window::SlideDirection _showDirection;
 	QPixmap _cacheUnder, _cacheOver;
-
-	base::Timer _scrollTimer;
-	int32 _scrollDelta = 0;
 
 	MsgId _highlightedMessageId = 0;
 	std::deque<MsgId> _highlightQueue;

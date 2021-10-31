@@ -343,7 +343,6 @@ HistoryWidget::HistoryWidget(
 	controller,
 	this)))
 , _membersDropdownShowTimer([=] { showMembersDropdown(); })
-, _scrollTimer([=] { scrollByTimer(); })
 , _saveDraftTimer([=] { saveDraft(); })
 , _saveCloudDraftTimer([=] { saveCloudDraft(); })
 , _topShadow(this) {
@@ -1029,6 +1028,13 @@ void HistoryWidget::initVoiceRecordBar() {
 	_voiceRecordBar->lockViewportEvents(
 	) | rpl::start_with_next([=](not_null<QEvent*> e) {
 		_scroll->viewportEvent(e);
+	}, lifetime());
+
+	_voiceRecordBar->recordingTipRequests(
+	) | rpl::start_with_next([=] {
+		Ui::ShowMultilineToast({
+			.text = { tr::lng_record_hold_tip(tr::now) },
+		});
 	}, lifetime());
 
 	_voiceRecordBar->hideFast();
@@ -2185,7 +2191,6 @@ void HistoryWidget::showHistory(
 		}
 	}
 
-	noSelectingScroll();
 	_nonEmptySelection = false;
 	_itemRevealPending.clear();
 	_itemRevealAnimations.clear();
@@ -7582,32 +7587,6 @@ QPoint HistoryWidget::clampMousePosition(QPoint point) {
 		point.setY(_scroll->scrollTop() + _scroll->height() - 1);
 	}
 	return point;
-}
-
-void HistoryWidget::scrollByTimer() {
-	const auto d = (_scrollDelta > 0)
-		? qMin(_scrollDelta * 3 / 20 + 1, int32(Ui::kMaxScrollSpeed))
-		: qMax(_scrollDelta * 3 / 20 - 1, -int32(Ui::kMaxScrollSpeed));
-	_scroll->scrollToY(_scroll->scrollTop() + d);
-}
-
-void HistoryWidget::checkSelectingScroll(QPoint point) {
-	if (point.y() < _scroll->scrollTop()) {
-		_scrollDelta = point.y() - _scroll->scrollTop();
-	} else if (point.y() >= _scroll->scrollTop() + _scroll->height()) {
-		_scrollDelta = point.y() - _scroll->scrollTop() - _scroll->height() + 1;
-	} else {
-		_scrollDelta = 0;
-	}
-	if (_scrollDelta) {
-		_scrollTimer.callEach(15);
-	} else {
-		_scrollTimer.cancel();
-	}
-}
-
-void HistoryWidget::noSelectingScroll() {
-	_scrollTimer.cancel();
 }
 
 bool HistoryWidget::touchScroll(const QPoint &delta) {

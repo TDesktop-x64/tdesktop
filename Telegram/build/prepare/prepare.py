@@ -44,9 +44,15 @@ optionsList = [
     'build-stackwalk',
 ]
 options = []
+runCommand = []
+customRunCommand = False
 for arg in sys.argv[1:]:
+    if customRunCommand:
+        runCommand.append(arg)
     if arg in optionsList:
         options.append(arg)
+    elif arg == 'run':
+        customRunCommand = True
 buildQt5 = not 'skip-qt5' in options if win else 'build-qt5' in options
 buildQt6 = 'build-qt6' in options if win else not 'skip-qt6' in options
 
@@ -384,10 +390,18 @@ def runStages():
             finish(1)
         writeCacheKey(stage)
 
+if customRunCommand:
+    os.chdir(executePath)
+    command = ' '.join(runCommand) + '\n'
+    if not run(command):
+        print('FAILED :(')
+        finish(1)
+    finish(0)
+
 stage('patches', """
     git clone https://github.com/desktop-app/patches.git
     cd patches
-    git checkout 0ddad09b1e
+    git checkout 17c7e63cfd
 """)
 
 stage('depot_tools', """

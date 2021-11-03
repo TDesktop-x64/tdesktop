@@ -74,6 +74,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_histories.h"
 #include "data/data_changes.h"
 #include "data/stickers/data_stickers.h"
+#include "data/data_sponsored_messages.h"
 #include "facades.h"
 #include "app.h"
 #include "styles/style_chat.h"
@@ -682,15 +683,19 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 					seltoy - mtop);
 				view->draw(p, context);
 
-				if (item->hasViews()) {
-					session().api().views().scheduleIncrement(item);
-				}
-				if (item->isUnreadMention() && !item->isUnreadMedia()) {
-					readMentions.insert(item);
-					_widget->enqueueMessageHighlight(view);
+				const auto height = view->height();
+				const auto middle = top + height / 2;
+				if (_visibleAreaBottom >= middle
+					&& _visibleAreaTop <= middle) {
+					if (item->hasViews()) {
+						session().api().views().scheduleIncrement(item);
+					}
+					if (item->isUnreadMention() && !item->isUnreadMedia()) {
+						readMentions.insert(item);
+						_widget->enqueueMessageHighlight(view);
+					}
 				}
 
-				const auto height = view->height();
 				top += height;
 				context.translate(0, -height);
 				p.translate(0, height);
@@ -738,6 +743,10 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 						const auto item = view->data();
 						if (!item->out() && item->unread()) {
 							readTill = item;
+						}
+						if (item->isSponsored()) {
+							session().data().sponsoredMessages().view(
+								item->fullId());
 						}
 					}
 					if (_visibleAreaBottom >= middle

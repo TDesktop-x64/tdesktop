@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "data/data_peer.h"
 #include "data/data_user.h"
+#include "data/data_channel.h"
 #include "data/data_changes.h"
 #include "data/data_session.h"
 #include "data/data_histories.h"
@@ -884,6 +885,9 @@ void AddPermanentLinkBlock(
 	const auto value = container->lifetime().make_state<
 		rpl::variable<LinkData>
 	>();
+	const auto currentLinkFields = container->lifetime().make_state<
+		Api::InviteLink
+	>(Api::InviteLink{ .admin = admin });
 	if (admin->isSelf()) {
 		*value = peer->session().changes().peerFlagsValue(
 			peer,
@@ -892,11 +896,19 @@ void AddPermanentLinkBlock(
 			const auto &links = peer->session().api().inviteLinks().myLinks(
 				peer).links;
 			const auto link = links.empty() ? nullptr : &links.front();
-			return (link && link->permanent && !link->revoked)
-				? LinkData{ link->link, link->usage }
-				: LinkData();
+			if (link && link->permanent && !link->revoked) {
+				*currentLinkFields = *link;
+				return LinkData{ link->link, link->usage };
+			}
+			return LinkData();
 		});
 	} else {
+		rpl::duplicate(
+			fromList
+		) | rpl::start_with_next([=](const Api::InviteLink &link) {
+			*currentLinkFields = link;
+		}, container->lifetime());
+
 		*value = std::move(
 			fromList
 		) | rpl::map([](const Api::InviteLink &link) {
@@ -1055,6 +1067,9 @@ void AddPermanentLinkBlock(
 		state->content.value(),
 		st::inviteLinkJoinedRowPadding
 	)->setClickedCallback([=] {
+		if (!currentLinkFields->link.isEmpty()) {
+			ShowInviteLinkBox(peer, *currentLinkFields);
+		}
 	});
 
 	container->add(object_ptr<Ui::SlideWrap<Ui::FixedHeightWidget>>(
@@ -1197,9 +1212,10 @@ void EditLink(
 		}
 	};
 	const auto isGroup = !peer->isBroadcast();
+	const auto isPublic = peer->isChannel() && peer->asChannel()->isPublic();
 	*box = Ui::show(
 		(creating
-			? Box(Ui::CreateInviteLinkBox, isGroup, done)
+			? Box(Ui::CreateInviteLinkBox, isGroup, isPublic, done)
 			: Box(
 				Ui::EditInviteLinkBox,
 				Fields{
@@ -1209,6 +1225,7 @@ void EditLink(
 					.usageLimit = data.usageLimit,
 					.requestApproval = data.requestApproval,
 					.isGroup = isGroup,
+					.isPublic = isPublic,
 				},
 				done)),
 		Ui::LayerOption::KeepOther);

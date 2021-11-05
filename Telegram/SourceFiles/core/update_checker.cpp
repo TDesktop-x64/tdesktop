@@ -653,7 +653,7 @@ void HttpChecker::start() {
 	const auto path = Local::readAutoupdatePrefix() + qstr("/check");
 	auto url = QUrl(path);
 	DEBUG_LOG(("Update Info: requesting update state"));
-	QNetworkRequest request(url);
+	auto request = QNetworkRequest(url);
 	request.setRawHeader("td-version", AppVersionReleaseStr);
 	request.setRawHeader("beta", cInstallBetaVersion() ? "1" : "0");
 	_manager = std::make_unique<QNetworkAccessManager>();

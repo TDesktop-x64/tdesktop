@@ -507,7 +507,7 @@ int main(int argc, char *argv[]) {
 		push(workdir);
 	}
 
-	auto args = vector<const char*>();
+	auto args = vector<char*>();
 	for (auto &arg : values) {
 		args.push_back(arg.data());
 	}

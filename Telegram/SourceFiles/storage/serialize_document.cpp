@@ -148,6 +148,9 @@ DocumentData *Document::readFromStreamHelper(
 		}
 	}
 
+	if (!thumb) {
+		return nullptr;
+	}
 	const auto storage = std::get_if<StorageFileLocation>(
 		&thumb->file().data);
 	if ((stream.status() != QDataStream::Ok)

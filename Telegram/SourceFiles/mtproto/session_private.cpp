@@ -81,7 +81,7 @@ using namespace details;
 #else
 	const auto arch = ' ' + QSysInfo::buildCpuArchitecture();
 #endif
-	return QString::fromLatin1(AppVersionReleaseStr) + arch + ([] {
+	return QString::fromLatin1(AppVersionStr) + arch + ([] {
 #if defined OS_MAC_STORE
 		return u" Mac App Store"_q;
 #elif defined OS_WIN_STORE // OS_MAC_STORE

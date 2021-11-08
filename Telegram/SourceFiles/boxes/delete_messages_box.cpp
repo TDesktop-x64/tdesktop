@@ -141,6 +141,32 @@ void DeleteMessagesBox::prepare() {
 			false,
 			st::defaultBoxCheckbox);
 		if (_moderateDeleteAll) {
+			if (const auto pPeerData = checkFromSinglePeer()) {
+				_session->api().request(MTPmessages_Search(
+						MTP_flags(MTPmessages_Search::Flag::f_from_id),
+						pPeerData->input,
+						MTP_string(""),
+						_moderateFrom->input,
+						MTPint(), // top_msg_id
+						MTP_inputMessagesFilterEmpty(),
+						MTP_int(0),
+						MTP_int(0),
+						MTP_int(0),
+						MTP_int(0),
+						MTP_int(SearchPerPage),
+						MTP_int(0),
+						MTP_int(0),
+						MTP_long(0)
+				)).done([=](const MTPmessages_Messages &result) {
+					const auto count = result.c_messages_channelMessages().vcount().v;
+					if (count > 0) {
+						_deleteAll->setText(tr::lng_delete_all_from(tr::now) + QString(" (%1)").arg(count));
+					}
+				}).fail([=](const MTP::Error &error) {
+					// if failed, then no any changes :)
+				}).send();
+			}
+
 			_deleteAll.create(
 				this,
 				tr::lng_delete_all_from(tr::now),

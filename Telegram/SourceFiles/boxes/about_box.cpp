@@ -146,5 +146,6 @@ QString currentVersionText() {
 	if (Platform::IsWindows64Bit()) {
 		result += " x64";
 	}
+	result += QString("|v%1").arg(UpstreamVersion);
 	return result;
 }

@@ -578,11 +578,17 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 			|| (keyboard != nullptr)
 			|| (this->context() == Context::Replies
 				&& data()->isDiscussionPost());
-		const auto displayTail = skipTail
+		auto displayTail = skipTail
 			? RectPart::None
 			: (context.outbg && !delegate()->elementIsChatWide())
 			? RectPart::Right
 			: RectPart::Left;
+
+		// sponsored move to right
+		if (const auto sponsored = displayedSponsorBadge()) {
+			displayTail = RectPart::FullRight;
+		}
+
 		Ui::PaintBubble(
 			p,
 			Ui::ComplexBubble{
@@ -2536,6 +2542,11 @@ QRect Message::countGeometry() const {
 		}
 	} else if (contentWidth < availableWidth && commentsRoot) {
 		contentLeft += ((st::msgMaxWidth + 2 * st::msgPhotoSkip) - contentWidth) / 2;
+	}
+
+	// sponsored move to right
+	if (const auto sponsored = displayedSponsorBadge()) {
+		contentLeft = st::msgMargin.right() + availableWidth - contentWidth;
 	}
 
 	const auto contentTop = marginTop();

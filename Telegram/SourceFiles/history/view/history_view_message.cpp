@@ -1789,14 +1789,14 @@ void Message::drawInfo(
 		if (views->replies.count > 0
 			&& !views->commentsMegagroupId
 			&& this->context() != Context::Replies) {
-			const auto &icon = (item->id > 0)
+			const auto &icon = (!item->isSending() && !item->hasFailed())
 				? (invertedsprites
 					? st->historyRepliesInvertedIcon()
 					: stm->historyRepliesIcon)
 				: (invertedsprites
 					? st->historyViewsSendingInvertedIcon()
 					: st->historyViewsSendingIcon());
-			if (item->id > 0) {
+			if (!item->isSending() && !item->hasFailed()) {
 				icon.paint(p, left, viewIconTop, width);
 				p.drawText(left + st::historyViewsWidth, textTop, views->replies.text);
 			} else if (!context.outbg && views->views.count < 0) { // sending outbg icon will be painted below
@@ -1808,14 +1808,14 @@ void Message::drawInfo(
 				+ st::historyViewsWidth;
 		}
 		if (views->views.count >= 0) {
-			const auto &icon = (item->id > 0)
+			const auto &icon = (!item->isSending() && !item->hasFailed())
 				? (invertedsprites
 					? st->historyViewsInvertedIcon()
 					: stm->historyViewsIcon)
 				: (invertedsprites
 					? st->historyViewsSendingInvertedIcon()
 					: st->historyViewsSendingIcon());
-			if (item->id > 0) {
+			if (!item->isSending() && !item->hasFailed()) {
 				icon.paint(p, left, viewIconTop, width);
 				p.drawText(left + st::historyViewsWidth, textTop, views->views.text);
 			} else if (!context.outbg) { // sending outbg icon will be painted below
@@ -1826,7 +1826,9 @@ void Message::drawInfo(
 				+ views->views.textWidth
 				+ st::historyViewsWidth;
 		}
-	} else if (item->id < 0 && item->history()->peer->isSelf() && !context.outbg) {
+	} else if ((item->isSending() || item->hasFailed())
+		&& item->history()->peer->isSelf()
+		&& !context.outbg) {
 		const auto &icon = invertedsprites
 			? st->historyViewsSendingInvertedIcon()
 			: st->historyViewsSendingIcon();
@@ -1840,7 +1842,7 @@ void Message::drawInfo(
 		left += st::historyPinWidth;
 	}
 	if (context.outbg) {
-		const auto &icon = (item->id <= 0)
+		const auto &icon = (item->isSending() || item->hasFailed())
 			? (invertedsprites
 				? st->historySendingInvertedIcon()
 				: st->historySendingIcon())
@@ -1902,7 +1904,8 @@ int Message::infoWidth() const {
 				+ views->replies.textWidth
 				+ st::historyViewsWidth;
 		}
-	} else if (item->id < 0 && item->history()->peer->isSelf()) {
+	} else if ((item->isSending() || item->hasFailed())
+		&& item->history()->peer->isSelf()) {
 		if (!hasOutLayout()) {
 			result += st::historySendStateSpace;
 		}
@@ -1954,7 +1957,8 @@ int Message::timeLeft() const {
 			&& context() != Context::Replies) {
 			result += st::historyViewsSpace + views->replies.textWidth + st::historyViewsWidth;
 		}
-	} else if (item->id < 0 && item->history()->peer->isSelf()) {
+	} else if ((item->isSending() || item->hasFailed())
+		&& item->history()->peer->isSelf()) {
 		if (!hasOutLayout()) {
 			result += st::historySendStateSpace;
 		}
@@ -2186,7 +2190,7 @@ bool Message::hasFastReply() const {
 
 bool Message::displayFastReply() const {
 	return hasFastReply()
-		&& IsServerMsgId(data()->id)
+		&& data()->isRegular()
 		&& data()->history()->peer->canWrite()
 		&& !delegate()->elementInSelectionMode();
 }
@@ -2219,7 +2223,7 @@ std::optional<QSize> Message::rightActionSize() const {
 bool Message::displayFastShare() const {
 	const auto item = message();
 	const auto peer = item->history()->peer;
-	if (!IsServerMsgId(item->id)) {
+	if (!item->isRegular()) {
 		return false;
 	} else if (peer->isChannel()) {
 		return !peer->isMegagroup();

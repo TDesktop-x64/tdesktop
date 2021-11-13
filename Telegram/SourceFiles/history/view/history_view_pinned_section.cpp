@@ -621,7 +621,7 @@ bool PinnedWidget::listAllowsMultiSelect() {
 
 bool PinnedWidget::listIsItemGoodForSelection(
 		not_null<HistoryItem*> item) {
-	return IsServerMsgId(item->id);
+	return item->isRegular();
 }
 
 bool PinnedWidget::listIsLessInOrder(
@@ -669,7 +669,7 @@ bool PinnedWidget::listElementShownUnread(not_null<const Element*> view) {
 
 bool PinnedWidget::listIsGoodForAroundPosition(
 		not_null<const Element*> view) {
-	return IsServerMsgId(view->data()->id);
+	return view->data()->isRegular();
 }
 
 void PinnedWidget::listSendBotCommand(

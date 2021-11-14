@@ -513,8 +513,8 @@ void Cover::refreshStatusGeometry(int newWidth) {
 		newWidth);
 	_id->resizeToWidth(statusWidth);
 	auto scale = 20;
-	if (cConfigScale() > 100) {
-		scale = cConfigScale() / 100 * 6 + 20;
+	if (cScreenScale() > 100) {
+		scale = cScreenScale() / 100 * 6 + 20;
 	}
 	_id->moveToLeft(
 		st::infoProfileStatusLeft,

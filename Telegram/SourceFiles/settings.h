@@ -172,6 +172,7 @@ DeclareSetting(bool, AutoUnmute);
 DeclareSetting(bool, VoiceChatPinned);
 DeclareSetting(bool, HDVideo);
 DeclareSetting(bool, SkipSc);
+DeclareSetting(bool, DisableLinkWarning);
 DeclareSetting(QString, RadioController);
 
 DeclareSetting(int, NetSpeedBoost);

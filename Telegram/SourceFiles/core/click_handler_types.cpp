@@ -79,7 +79,7 @@ void HiddenUrlClickHandler::Open(QString url, QVariant context) {
 		open();
 	} else {
 		const auto parsedUrl = QUrl::fromUserInput(url);
-		if (UrlRequiresConfirmation(parsedUrl)
+		if (!cDisableLinkWarning() && UrlRequiresConfirmation(parsedUrl)
 			&& QGuiApplication::keyboardModifiers() != Qt::ControlModifier) {
 			Core::App().hideMediaView();
 			const auto displayed = parsedUrl.isValid()

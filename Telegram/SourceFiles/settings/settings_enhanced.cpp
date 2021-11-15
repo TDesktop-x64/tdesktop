@@ -172,6 +172,20 @@ namespace Settings {
 			cSetHideClassicFwd(toggled);
 			EnhancedSettings::Write();
 		}, container->lifetime());
+
+		AddButton(
+				inner,
+				tr::lng_settings_disable_link_warning(),
+				st::settingsButton
+		)->toggleOn(
+				rpl::single(cDisableLinkWarning())
+		)->toggledChanges(
+		) | rpl::filter([=](bool toggled) {
+			return (toggled != cDisableLinkWarning());
+		}) | rpl::start_with_next([=](bool toggled) {
+			cSetDisableLinkWarning(toggled);
+			EnhancedSettings::Write();
+		}, container->lifetime());
 	}
 
 	void Enhanced::SetupEnhancedButton(not_null<Ui::VerticalLayout *> container) {

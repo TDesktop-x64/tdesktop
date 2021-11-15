@@ -277,6 +277,10 @@ namespace EnhancedSettings {
 			cSetSkipSc(v);
 		});
 
+		ReadBoolOption(settings, "disable_link_warning", [&](auto v) {
+			cSetDisableLinkWarning(v);
+		});
+
 		return true;
 	}
 
@@ -310,6 +314,7 @@ namespace EnhancedSettings {
 		settings.insert(qsl("hide_all_chats"), false);
 		settings.insert(qsl("hd_video"), false);
 		settings.insert(qsl("skip_to_next"), false);
+		settings.insert(qsl("disable_link_warning"), false);
 
 		auto document = QJsonDocument();
 		document.setObject(settings);
@@ -349,6 +354,7 @@ namespace EnhancedSettings {
 		settings.insert(qsl("hide_all_chats"), cHideFilterAllChats());
 		settings.insert(qsl("hd_video"), cHDVideo());
 		settings.insert(qsl("skip_to_next"), cSkipSc());
+		settings.insert(qsl("disable_link_warning"), cDisableLinkWarning());
 
 		auto document = QJsonDocument();
 		document.setObject(settings);

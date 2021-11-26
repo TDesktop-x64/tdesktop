@@ -26,16 +26,17 @@ RUN yum -y install centos-release-scl && yum clean all
 
 RUN yum -y install git meson ninja-build autoconf automake libtool \
 	fontconfig-devel freetype-devel libX11-devel at-spi2-core-devel alsa-lib-devel \
-	pulseaudio-libs-devel mesa-libGL-devel mesa-libEGL-devel libudev-devel \
-	webkitgtk4-devel pkgconfig bison yasm file which xorg-x11-util-macros \
-	devtoolset-9-make devtoolset-9-gcc devtoolset-9-gcc-c++ \
-	devtoolset-9-binutils llvm-toolset-7.0 llvm-toolset-7.0-clang-devel \
-	llvm-toolset-7.0-llvm-devel perl-XML-Parser && yum clean all
+	pulseaudio-libs-devel mesa-libGL-devel mesa-libEGL-devel gtk3-devel \
+	perl-XML-Parser pkgconfig bison yasm file which xorg-x11-util-macros \
+	devtoolset-10-make devtoolset-10-gcc devtoolset-10-gcc-c++ \
+	devtoolset-10-binutils llvm-toolset-7.0 llvm-toolset-7.0-clang-devel \
+	llvm-toolset-7.0-llvm-devel && yum clean all
 
-SHELL [ "bash", "-c", ". /opt/rh/devtoolset-9/enable; exec bash -c \"$@\"", "-s"]
+SHELL [ "bash", "-c", ". /opt/rh/devtoolset-10/enable; exec bash -c \"$@\"", "-s"]
 
 ENV LibrariesPath /usr/src/Libraries
-ENV HFLAGS "-fstack-protector-all -fstack-clash-protection -fPIC -D_FORTIFY_SOURCE=2"
+ENV HFLAGS_DEBUG "-fstack-protector-all -fstack-clash-protection -fPIC"
+ENV HFLAGS "$HFLAGS_DEBUG -D_FORTIFY_SOURCE=2"
 WORKDIR $LibrariesPath
 
 RUN mkdir /opt/cmake
@@ -52,8 +53,8 @@ FROM builder AS extra-cmake-modules
 RUN git clone -b v5.87.0 --depth=1 $GIT/KDE/extra-cmake-modules.git
 
 WORKDIR extra-cmake-modules
-RUN cmake -B build . -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
-RUN cmake --build build -j$(nproc)
+RUN cmake -GNinja -B build . -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+RUN cmake --build build --parallel
 RUN DESTDIR="$LibrariesPath/extra-cmake-modules-cache" cmake --install build
 
 WORKDIR ..
@@ -87,8 +88,8 @@ RUN git clone -b v5.2.5 https://git.tukaani.org/xz.git
 
 WORKDIR xz
 RUN CFLAGS="$HFLAGS" \
-	cmake -B build . -DCMAKE_BUILD_TYPE=Release
-RUN cmake --build build -j$(nproc)
+	cmake -GNinja -B build . -DCMAKE_BUILD_TYPE=Release
+RUN cmake --build build --parallel
 RUN DESTDIR="$LibrariesPath/xz-cache" cmake --install build
 
 WORKDIR ..
@@ -104,7 +105,7 @@ RUN meson build \
 	--default-library=both \
 	-Dtests=false
 
-RUN meson compile -C build -j$(nproc)
+RUN meson compile -C build
 RUN DESTDIR="$LibrariesPath/libepoxy-cache" meson install -C build
 
 WORKDIR ..
@@ -115,13 +116,13 @@ RUN git clone -b 0.4.17 --depth=1 $GIT/libproxy/libproxy.git
 
 WORKDIR libproxy
 RUN git apply ../patches/libproxy.patch
-RUN CFLAGS="$HFLAGS" CXXFLAGS="$HFLAGS" cmake -B build . \
+RUN CFLAGS="$HFLAGS" CXXFLAGS="$HFLAGS" cmake -GNinja -B build . \
 	-DCMAKE_BUILD_TYPE=Release \
 	-DWITH_DBUS=OFF \
 	-DWITH_NM=OFF \
 	-DWITH_NMold=OFF
 
-RUN cmake --build build -j$(nproc)
+RUN cmake --build build --parallel
 RUN DESTDIR="$LibrariesPath/libproxy-cache" cmake --install build
 
 WORKDIR ..
@@ -131,13 +132,13 @@ FROM builder AS mozjpeg
 RUN git clone -b v4.0.3 --depth=1 $GIT/mozilla/mozjpeg.git
 
 WORKDIR mozjpeg
-RUN CFLAGS="$HFLAGS" cmake -B build . \
+RUN CFLAGS="$HFLAGS" cmake -GNinja -B build . \
 	-DCMAKE_BUILD_TYPE=Release \
 	-DCMAKE_INSTALL_PREFIX=/usr/local \
 	-DWITH_JPEG8=ON \
 	-DPNG_SUPPORTED=OFF
 
-RUN cmake --build build -j$(nproc)
+RUN cmake --build build --parallel
 RUN DESTDIR="$LibrariesPath/mozjpeg-cache" cmake --install build
 
 WORKDIR ..
@@ -159,10 +160,10 @@ FROM builder AS rnnoise
 RUN git clone -b master --depth=1 $GIT/desktop-app/rnnoise
 
 WORKDIR rnnoise
-RUN CFLAGS="$HFLAGS" cmake -B build . \
+RUN CFLAGS="$HFLAGS" cmake -GNinja -B build . \
 	-DCMAKE_BUILD_TYPE=Release
 
-RUN cmake --build build -j$(nproc)
+RUN cmake --build build --parallel
 RUN mkdir -p "$LibrariesPath/rnnoise-cache/usr/local/include"
 RUN cp "include/rnnoise.h" "$LibrariesPath/rnnoise-cache/usr/local/include/"
 RUN mkdir -p "$LibrariesPath/rnnoise-cache/usr/local/lib"
@@ -367,8 +368,8 @@ COPY --from=extra-cmake-modules ${LibrariesPath}/extra-cmake-modules-cache /
 RUN git clone -b v1.4.0 --depth=1 $GIT/KDE/plasma-wayland-protocols.git
 
 WORKDIR plasma-wayland-protocols
-RUN cmake -B build . -DCMAKE_BUILD_TYPE=Release
-RUN cmake --build build -j$(nproc)
+RUN cmake -GNinja -B build . -DCMAKE_BUILD_TYPE=Release
+RUN cmake --build build --parallel
 RUN DESTDIR="$LibrariesPath/plasma-wayland-protocols-cache" cmake --install build
 
 WORKDIR ..
@@ -396,7 +397,7 @@ RUN meson build \
 	--buildtype=release \
 	--default-library=both
 
-RUN meson compile -C build -j$(nproc)
+RUN meson compile -C build
 RUN DESTDIR="$LibrariesPath/drm-cache" meson install -C build
 
 WORKDIR ..
@@ -437,7 +438,7 @@ RUN meson build \
 	-Ddocumentation=false \
 	-Dmoduledir=/usr/lib/vdpau
 
-RUN meson compile -C build -j$(nproc)
+RUN meson compile -C build
 RUN DESTDIR="$LibrariesPath/libvdpau-cache" meson install -C build
 
 WORKDIR ..
@@ -568,7 +569,7 @@ ADD https://api.github.com/repos/telegramdesktop/openal-soft/git/refs/heads/fix_
 RUN git clone -b fix_pulse_default --depth=1 $GIT/telegramdesktop/openal-soft.git
 
 WORKDIR openal-soft
-RUN CFLAGS="$HFLAGS" CXXFLAGS="$HFLAGS" cmake -B build . \
+RUN CFLAGS="$HFLAGS" CXXFLAGS="$HFLAGS" cmake -GNinja -B build . \
 	-DCMAKE_BUILD_TYPE=Release \
 	-DLIBTYPE:STRING=STATIC \
 	-DALSOFT_EXAMPLES=OFF \
@@ -576,7 +577,7 @@ RUN CFLAGS="$HFLAGS" CXXFLAGS="$HFLAGS" cmake -B build . \
 	-DALSOFT_UTILS=OFF \
 	-DALSOFT_CONFIG=OFF
 
-RUN cmake --build build -j$(nproc)
+RUN cmake --build build --parallel
 RUN DESTDIR="$LibrariesPath/openal-cache" cmake --install build
 
 WORKDIR ..
@@ -616,7 +617,7 @@ RUN meson build \
 	-Dxkb-config-extra-path=/etc/xkb \
 	-Dx-locale-root=/usr/share/X11/locale
 
-RUN meson compile -C build -j$(nproc)
+RUN meson compile -C build
 RUN DESTDIR="$LibrariesPath/xkbcommon-cache" meson install -C build
 
 WORKDIR ..
@@ -759,7 +760,7 @@ RUN [ -z "${QT6}" ] || ./configure -prefix "$QT6_PREFIX" \
 	-nomake examples \
 	-nomake tests
 
-RUN [ -z "${QT6}" ] || cmake --build . -j$(nproc)
+RUN [ -z "${QT6}" ] || cmake --build . --parallel
 RUN [ -z "${QT6}" ] || DESTDIR="$LibrariesPath/qt-cache" cmake --install .
 
 WORKDIR ..
@@ -790,8 +791,8 @@ RUN git clone -b v5.87.0 --depth=1 $GIT/KDE/kwayland.git
 
 WORKDIR kwayland
 RUN [ -z "${QT6}" ] || git apply ../patches/kwayland-qt6.patch
-RUN cmake -B build . -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTING=OFF
-RUN cmake --build build --target KF5WaylandClient -j$(nproc)
+RUN cmake -GNinja -B build . -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTING=OFF
+RUN cmake --build build --target KF5WaylandClient --parallel
 RUN DESTDIR="$LibrariesPath/kwayland-cache" cmake --install build/src/client
 
 WORKDIR ..
@@ -801,40 +802,19 @@ FROM patches AS breakpad
 RUN git clone https://chromium.googlesource.com/breakpad/breakpad.git
 
 WORKDIR breakpad
-RUN git checkout bc8fb886
+RUN git checkout dfcb7b6799
+RUN git apply ../patches/breakpad.diff
 RUN git clone https://chromium.googlesource.com/linux-syscall-support.git src/third_party/lss
 
 WORKDIR src/third_party/lss
-RUN git checkout 8048ece
-WORKDIR ${LibrariesPath}
+RUN git checkout e1e7b0ad8e
 
-ENV BreakpadCache ${LibrariesPath}/breakpad-cache
-RUN git clone https://chromium.googlesource.com/external/gyp.git
-
-WORKDIR gyp
-RUN git checkout 9f2a7bb1
-RUN git apply ../patches/gyp.diff
-
-WORKDIR ../breakpad
+WORKDIR ../../..
 RUN ./configure
 RUN make -j$(nproc)
-RUN make DESTDIR="$BreakpadCache" install
-
-WORKDIR src
-RUN rm -rf testing
-RUN git clone --depth=1 $GIT/google/googletest.git testing
-
-WORKDIR tools
-RUN sed -i 's/minidump_upload.m/minidump_upload.cc/' linux/tools_linux.gypi
-RUN ../../../gyp/gyp  --depth=. --generator-output=.. -Goutput_dir=../out tools.gyp --format=cmake
-
-WORKDIR ../../out/Default
-RUN cmake .
-RUN cmake --build . --target dump_syms -j$(nproc)
-RUN mv dump_syms $BreakpadCache
+RUN make DESTDIR="${LibrariesPath}/breakpad-cache" install
 
 WORKDIR ..
-RUN rm -rf gyp
 
 FROM builder AS webrtc
 
@@ -855,12 +835,15 @@ RUN git submodule init
 RUN git submodule update
 
 WORKDIR src/third_party/pipewire
-RUN meson build
+RUN meson build -Dspa-plugins=disabled
 
 WORKDIR ../../..
 
-RUN CFLAGS="$HFLAGS" CXXFLAGS="$HFLAGS" cmake -B out/Release . \
-	-DCMAKE_BUILD_TYPE=Release \
+RUN cmake -G"Ninja Multi-Config" -B out . \
+	-DCMAKE_C_FLAGS_RELEASE="-O3 -DNDEBUG $HFLAGS" \
+	-DCMAKE_C_FLAGS_DEBUG="-g $HFLAGS_DEBUG" \
+	-DCMAKE_CXX_FLAGS_RELEASE="-O3 -DNDEBUG $HFLAGS" \
+	-DCMAKE_CXX_FLAGS_DEBUG="-g $HFLAGS_DEBUG" \
 	-DTG_OWT_BUILD_AUDIO_BACKENDS=OFF \
 	-DTG_OWT_SPECIAL_TARGET=linux \
 	-DTG_OWT_LIBJPEG_INCLUDE_PATH=/usr/local/include \
@@ -868,18 +851,8 @@ RUN CFLAGS="$HFLAGS" CXXFLAGS="$HFLAGS" cmake -B out/Release . \
 	-DTG_OWT_OPUS_INCLUDE_PATH=/usr/local/include/opus \
 	-DTG_OWT_FFMPEG_INCLUDE_PATH=/usr/local/include
 
-RUN cmake --build out/Release -- -j$(nproc)
-
-ENV HFLAGS_DEBUG="-fstack-protector-all -fstack-clash-protection -fPIC"
-RUN CFLAGS="$HFLAGS_DEBUG" CXXFLAGS="$HFLAGS_DEBUG" cmake -B out/Debug . \
-	-DCMAKE_BUILD_TYPE=Debug \
-	-DTG_OWT_SPECIAL_TARGET=linux \
-	-DTG_OWT_LIBJPEG_INCLUDE_PATH=/usr/local/include \
-	-DTG_OWT_OPENSSL_INCLUDE_PATH=$OPENSSL_PREFIX/include \
-	-DTG_OWT_OPUS_INCLUDE_PATH=/usr/local/include/opus \
-	-DTG_OWT_FFMPEG_INCLUDE_PATH=/usr/local/include
-
-RUN cmake --build out/Debug -- -j$(nproc)
+RUN cmake --build out --config Release --parallel
+RUN cmake --build out --config Debug --parallel
 
 FROM builder
 

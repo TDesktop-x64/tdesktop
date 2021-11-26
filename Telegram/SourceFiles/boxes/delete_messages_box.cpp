@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/delete_messages_box.h"
 
 #include "apiwrap.h"
+#include "api/api_chat_participants.h"
 #include "base/unixtime.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
@@ -39,7 +40,7 @@ DeleteMessagesBox::DeleteMessagesBox(
 		_moderateBan = item->suggestBanReport();
 		_moderateDeleteAll = item->suggestDeleteAllReport();
 		if (_moderateBan || _moderateDeleteAll) {
-			_moderateFrom = item->from()->asUser();
+			_moderateFrom = item->from();
 			_moderateInChannel = item->history()->peer->asChannel();
 		}
 	}
@@ -52,6 +53,18 @@ DeleteMessagesBox::DeleteMessagesBox(
 : _session(session)
 , _ids(std::move(selected)) {
 	Expects(!_ids.empty());
+}
+
+DeleteMessagesBox::DeleteMessagesBox(
+	QWidget*,
+	not_null<PeerData*> peer,
+	QDate firstDayToDelete,
+	QDate lastDayToDelete)
+: _session(&peer->session())
+, _wipeHistoryPeer(peer)
+, _wipeHistoryJustClear(true)
+, _wipeHistoryFirstToDelete(firstDayToDelete)
+, _wipeHistoryLastToDelete(lastDayToDelete) {
 }
 
 DeleteMessagesBox::DeleteMessagesBox(
@@ -73,7 +86,27 @@ void DeleteMessagesBox::prepare() {
 	auto deleteStyle = &st::defaultBoxButton;
 	auto canDelete = true;
 	if (const auto peer = _wipeHistoryPeer) {
-		if (_wipeHistoryJustClear) {
+		if (!_wipeHistoryFirstToDelete.isNull()) {
+			details = (_wipeHistoryFirstToDelete
+				== _wipeHistoryLastToDelete)
+				? tr::lng_sure_delete_by_date_one(
+					tr::now,
+					lt_date,
+					TextWithEntities{
+						langDayOfMonthFull(_wipeHistoryFirstToDelete) },
+					Ui::Text::RichLangValue)
+				: tr::lng_sure_delete_by_date_many(
+					tr::now,
+					lt_days,
+					tr::lng_sure_delete_selected_days(
+						tr::now,
+						lt_count,
+						_wipeHistoryFirstToDelete.daysTo(
+							_wipeHistoryLastToDelete) + 1,
+						Ui::Text::WithEntities),
+					Ui::Text::RichLangValue);
+			deleteStyle = &st::attentionBoxButton;
+		} else if (_wipeHistoryJustClear) {
 			const auto isChannel = peer->isBroadcast();
 			const auto isPublicGroup = peer->isMegagroup()
 				&& peer->asChannel()->isPublic();
@@ -429,16 +462,41 @@ void DeleteMessagesBox::keyPressEvent(QKeyEvent *e) {
 
 void DeleteMessagesBox::deleteAndClear() {
 	const auto revoke = _revoke ? _revoke->checked() : false;
-	if (const auto peer = _wipeHistoryPeer) {
+	const auto session = _session;
+	const auto invokeCallbackAndClose = [&] {
+		// deleteMessages can initiate closing of the current section,
+		// which will cause this box to be destroyed.
+		const auto weak = Ui::MakeWeak(this);
+		if (const auto callback = _deleteConfirmedCallback) {
+			callback();
+		}
+		if (const auto strong = weak.data()) {
+			strong->closeBox();
+		}
+	};
+	if (!_wipeHistoryFirstToDelete.isNull()) {
+		const auto peer = _wipeHistoryPeer;
+		const auto firstDayToDelete = _wipeHistoryFirstToDelete;
+		const auto lastDayToDelete = _wipeHistoryLastToDelete;
+
+		invokeCallbackAndClose();
+		session->data().histories().deleteMessagesByDates(
+			session->data().history(peer),
+			firstDayToDelete,
+			lastDayToDelete,
+			revoke);
+		session->data().sendHistoryChangeNotifications();
+		return;
+	} else if (const auto peer = _wipeHistoryPeer) {
 		const auto justClear = _wipeHistoryJustClear;
-		closeBox();
+		invokeCallbackAndClose();
 
 		if (justClear) {
-			peer->session().api().clearHistory(peer, revoke);
+			session->api().clearHistory(peer, revoke);
 		} else {
-			for (const auto &controller : peer->session().windows()) {
+			for (const auto &controller : session->windows()) {
 				if (controller->activeChatCurrent().peer() == peer) {
-					Ui::showChatsList(&peer->session());
+					Ui::showChatsList(session);
 				}
 			}
 			// Don't delete old history by default,
@@ -447,13 +505,13 @@ void DeleteMessagesBox::deleteAndClear() {
 			//if (const auto from = peer->migrateFrom()) {
 			//	peer->session().api().deleteConversation(from, false);
 			//}
-			peer->session().api().deleteConversation(peer, revoke);
+			session->api().deleteConversation(peer, revoke);
 		}
 		return;
 	}
 	if (_moderateFrom) {
 		if (_banUser && _banUser->checked()) {
-			_moderateInChannel->session().api().kickParticipant(
+			_moderateInChannel->session().api().chatParticipants().kick(
 				_moderateInChannel,
 				_moderateFrom,
 				ChatRestrictionsInfo());
@@ -462,30 +520,19 @@ void DeleteMessagesBox::deleteAndClear() {
 			_moderateInChannel->session().api().request(
 				MTPchannels_ReportSpam(
 					_moderateInChannel->inputChannel,
-					_moderateFrom->inputUser,
+					_moderateFrom->input,
 					MTP_vector<MTPint>(1, MTP_int(_ids[0].msg)))
 			).send();
 		}
 		if (_deleteAll && _deleteAll->checked()) {
-			_moderateInChannel->session().api().deleteAllFromUser(
+			_moderateInChannel->session().api().deleteAllFromParticipant(
 				_moderateInChannel,
 				_moderateFrom);
 		}
 	}
 
-	if (_deleteConfirmedCallback) {
-		_deleteConfirmedCallback();
-	}
-
-	// deleteMessages can initiate closing of the current section,
-	// which will cause this box to be destroyed.
-	const auto session = _session;
-	const auto weak = Ui::MakeWeak(this);
-
-	session->data().histories().deleteMessages(_ids, revoke);
-
-	if (const auto strong = weak.data()) {
-		strong->closeBox();
-	}
+	const auto ids = _ids;
+	invokeCallbackAndClose();
+	session->data().histories().deleteMessages(ids, revoke);
 	session->data().sendHistoryChangeNotifications();
 }

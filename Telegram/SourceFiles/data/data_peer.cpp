@@ -1,4 +1,4 @@
-/*
+﻿/*
 This file is part of Telegram Desktop,
 the official desktop application for the Telegram messaging service.
 
@@ -21,6 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/crc32hash.h"
 #include "lang/lang_keys.h"
 #include "apiwrap.h"
+#include "api/api_chat_participants.h"
 #include "ui/boxes/confirm_box.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
@@ -518,10 +519,9 @@ bool PeerData::canEditMessagesIndefinitely() const {
 }
 
 bool PeerData::canExportChatHistory() const {
-	if (isRepliesChat()) {
+	if (isRepliesChat() || !allowsForwarding()) {
 		return false;
-	}
-	if (const auto channel = asChannel()) {
+	} else if (const auto channel = asChannel()) {
 		if (!channel->amIn() && channel->invitePeekExpires()) {
 			return false;
 		}
@@ -561,6 +561,9 @@ void PeerData::checkFolder(FolderId folderId) {
 
 void PeerData::setSettings(const MTPPeerSettings &data) {
 	data.match([&](const MTPDpeerSettings &data) {
+		_requestChatTitle = data.vrequest_chat_title().value_or_empty();
+		_requestChatDate = data.vrequest_chat_date().value_or_empty();
+
 		using Flag = PeerSetting;
 		setSettings((data.is_add_contact() ? Flag::AddContact : Flag())
 			| (data.is_autoarchived() ? Flag::AutoArchived : Flag())
@@ -571,7 +574,11 @@ void PeerData::setSettings(const MTPPeerSettings &data) {
 				: Flag())
 			//| (data.is_report_geo() ? Flag::ReportGeo : Flag())
 			| (data.is_report_spam() ? Flag::ReportSpam : Flag())
-			| (data.is_share_contact() ? Flag::ShareContact : Flag()));
+			| (data.is_share_contact() ? Flag::ShareContact : Flag())
+			| (data.vrequest_chat_title() ? Flag::RequestChat : Flag())
+			| (data.is_request_chat_broadcast()
+				? Flag::RequestChatIsBroadcast
+				: Flag()));
 	});
 }
 
@@ -637,7 +644,7 @@ void PeerData::updateFullForced() {
 	session().api().requestFullPeer(this);
 	if (const auto channel = asChannel()) {
 		if (!channel->amCreator() && !channel->inviter) {
-			session().api().requestSelfParticipant(channel);
+			session().api().chatParticipants().requestSelf(channel);
 		}
 	}
 }
@@ -848,6 +855,17 @@ bool PeerData::canWrite() const {
 	return false;
 }
 
+bool PeerData::allowsForwarding() const {
+	if (const auto user = asUser()) {
+		return true;
+	} else if (const auto channel = asChannel()) {
+		return channel->allowsForwarding();
+	} else if (const auto chat = asChat()) {
+		return chat->allowsForwarding();
+	}
+	return false;
+}
+
 Data::RestrictionCheckResult PeerData::amRestricted(
 		ChatRestriction right) const {
 	using Result = Data::RestrictionCheckResult;
@@ -1051,24 +1069,6 @@ void PeerData::setMessagesTTL(TimeId period) {
 
 namespace Data {
 
-std::vector<ChatRestrictions> ListOfRestrictions() {
-	using Flag = ChatRestriction;
-
-	return {
-		Flag::SendMessages,
-		Flag::SendMedia,
-		Flag::SendStickers,
-		Flag::SendGifs,
-		Flag::SendGames,
-		Flag::SendInline,
-		Flag::EmbedLinks,
-		Flag::SendPolls,
-		Flag::InviteUsers,
-		Flag::PinMessages,
-		Flag::ChangeInfo,
-	};
-}
-
 std::optional<QString> RestrictionError(
 		not_null<PeerData*> peer,
 		ChatRestriction restriction) {
@@ -1255,24 +1255,6 @@ std::optional<int> ResolvePinnedCount(
 	return (slice.count.has_value() && old.count.has_value())
 		? std::make_optional(*slice.count + *old.count)
 		: std::nullopt;
-}
-
-ChatAdminRights ChatAdminRightsFlags(const MTPChatAdminRights &rights) {
-	return rights.match([](const MTPDchatAdminRights &data) {
-		return ChatAdminRights::from_raw(int32(data.vflags().v));
-	});
-}
-
-ChatRestrictions ChatBannedRightsFlags(const MTPChatBannedRights &rights) {
-	return rights.match([](const MTPDchatBannedRights &data) {
-		return ChatRestrictions::from_raw(int32(data.vflags().v));
-	});
-}
-
-TimeId ChatBannedRightsUntilDate(const MTPChatBannedRights &rights) {
-	return rights.match([](const MTPDchatBannedRights &data) {
-		return data.vuntil_date().v;
-	});
 }
 
 } // namespace Data

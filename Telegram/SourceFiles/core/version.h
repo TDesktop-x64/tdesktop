@@ -24,6 +24,6 @@ constexpr auto AppName = "64Gram Desktop"_cs;
 constexpr auto AppFile = "64Gram"_cs;
 constexpr auto AppVersion = 1000001;
 constexpr auto AppVersionStr = "1.0.1";
-constexpr auto AppBetaVersion = false;
+constexpr auto AppBetaVersion = true;
 constexpr auto AppAlphaVersion = TDESKTOP_ALPHA_VERSION;
 constexpr auto UpstreamVersion = "3.2.5";

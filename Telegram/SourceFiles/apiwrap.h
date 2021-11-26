@@ -66,6 +66,7 @@ class ViewsManager;
 class ConfirmPhone;
 class PeerPhoto;
 class Polls;
+class ChatParticipants;
 
 namespace details {
 
@@ -172,10 +173,6 @@ public:
 	void requestPeer(not_null<PeerData*> peer);
 	void requestPeers(const QList<PeerData*> &peers);
 	void requestPeerSettings(not_null<PeerData*> peer);
-	void requestLastParticipants(not_null<ChannelData*> channel);
-	void requestBots(not_null<ChannelData*> channel);
-	void requestAdmins(not_null<ChannelData*> channel);
-	void requestParticipantsCountDelayed(not_null<ChannelData*> channel);
 
 	using UpdatedFileReferences = Data::UpdatedFileReferences;
 	using FileReferencesHandler = FnMut<void(const UpdatedFileReferences&)>;
@@ -204,15 +201,9 @@ public:
 		Fn<void(const MTP::Error &)> fail);
 	void importChatInvite(const QString &hash, bool isGroup);
 
-	void requestChannelMembersForAdd(
-		not_null<ChannelData*> channel,
-		Fn<void(const MTPchannels_ChannelParticipants&)> callback);
 	void processFullPeer(
 		not_null<PeerData*> peer,
 		const MTPmessages_ChatFull &result);
-	void processFullPeer(
-		not_null<UserData*> user,
-		const MTPUserFull &result);
 
 	void migrateChat(
 		not_null<ChatData*> chat,
@@ -222,20 +213,9 @@ public:
 	void markMediaRead(const base::flat_set<not_null<HistoryItem*>> &items);
 	void markMediaRead(not_null<HistoryItem*> item);
 
-	void requestSelfParticipant(not_null<ChannelData*> channel);
-	void kickParticipant(
-		not_null<ChatData*> chat,
-		not_null<PeerData*> participant);
-	void kickParticipant(
+	void deleteAllFromParticipant(
 		not_null<ChannelData*> channel,
-		not_null<PeerData*> participant,
-		ChatRestrictionsInfo currentRights);
-	void unblockParticipant(
-		not_null<ChannelData*> channel,
-		not_null<PeerData*> participant);
-	void deleteAllFromUser(
-		not_null<ChannelData*> channel,
-		not_null<UserData*> from);
+		not_null<PeerData*> from);
 
 	void requestWebPageDelayed(WebPageData *page);
 	void clearWebPageRequest(WebPageData *page);
@@ -295,25 +275,6 @@ public:
 
 	void readFeaturedSetDelayed(uint64 setId);
 
-	void parseChannelParticipants(
-		not_null<ChannelData*> channel,
-		const MTPchannels_ChannelParticipants &result,
-		Fn<void(
-			int availableCount,
-			const QVector<MTPChannelParticipant> &list)> callbackList,
-		Fn<void()> callbackNotModified = nullptr);
-	void parseRecentChannelParticipants(
-		not_null<ChannelData*> channel,
-		const MTPchannels_ChannelParticipants &result,
-		Fn<void(
-			int availableCount,
-			const QVector<MTPChannelParticipant> &list)> callbackList = nullptr,
-		Fn<void()> callbackNotModified = nullptr);
-	void addChatParticipants(
-		not_null<PeerData*> peer,
-		const std::vector<not_null<UserData*>> &users,
-		Fn<void(bool)> done = nullptr);
-
 	rpl::producer<SendAction> sendActions() const {
 		return _sendActions.events();
 	}
@@ -357,15 +318,12 @@ public:
 
 	void sendUploadedPhoto(
 		FullMsgId localId,
-		const MTPInputFile &file,
-		Api::SendOptions options,
-		std::vector<MTPInputDocument> attachedStickers);
+		Api::RemoteFileInfo info,
+		Api::SendOptions options);
 	void sendUploadedDocument(
 		FullMsgId localId,
-		const MTPInputFile &file,
-		const std::optional<MTPInputFile> &thumb,
-		Api::SendOptions options,
-		std::vector<MTPInputDocument> attachedStickers);
+		Api::RemoteFileInfo file,
+		Api::SendOptions options);
 
 	void cancelLocalItem(not_null<HistoryItem*> item);
 
@@ -401,6 +359,7 @@ public:
 	[[nodiscard]] Api::ConfirmPhone &confirmPhone();
 	[[nodiscard]] Api::PeerPhoto &peerPhoto();
 	[[nodiscard]] Api::Polls &polls();
+	[[nodiscard]] Api::ChatParticipants &chatParticipants();
 
 	void updatePrivacyLastSeens();
 
@@ -462,16 +421,8 @@ private:
 		mtpRequestId req);
 	void gotUserFull(
 		not_null<UserData*> user,
-		const MTPUserFull &result,
+		const MTPusers_UserFull &result,
 		mtpRequestId req);
-	void applyLastParticipantsList(
-		not_null<ChannelData*> channel,
-		int availableCount,
-		const QVector<MTPChannelParticipant> &list);
-	void applyBotsList(
-		not_null<ChannelData*> channel,
-		int availableCount,
-		const QVector<MTPChannelParticipant> &list);
 	void resolveWebPages();
 	void gotWebPages(
 		ChannelData *channel,
@@ -487,10 +438,6 @@ private:
 	void requestFeaturedStickers(TimeId now);
 	void requestSavedGifs(TimeId now);
 	void readFeaturedSets();
-
-	void refreshChannelAdmins(
-		not_null<ChannelData*> channel,
-		const QVector<MTPChannelParticipant> &participants);
 
 	void jumpToHistoryDate(not_null<PeerData*> peer, const QDate &date);
 	template <typename Callback>
@@ -524,9 +471,9 @@ private:
 		bool revoke);
 	void applyAffectedMessages(const MTPmessages_AffectedMessages &result);
 
-	void deleteAllFromUserSend(
+	void deleteAllFromParticipantSend(
 		not_null<ChannelData*> channel,
-		not_null<UserData*> from);
+		not_null<PeerData*> from);
 
 	void uploadAlbumMedia(
 		not_null<HistoryItem*> item,
@@ -582,25 +529,9 @@ private:
 	PeerRequests _peerRequests;
 	base::flat_set<not_null<PeerData*>> _requestedPeerSettings;
 
-	PeerRequests _participantsRequests;
-	PeerRequests _botsRequests;
-	PeerRequests _adminsRequests;
-	base::DelayedCallTimer _participantsCountRequestTimer;
-
-	ChannelData *_channelMembersForAdd = nullptr;
-	mtpRequestId _channelMembersForAddRequestId = 0;
-	Fn<void(
-		const MTPchannels_ChannelParticipants&)> _channelMembersForAddCallback;
 	base::flat_map<
 		not_null<History*>,
 		std::pair<mtpRequestId,Fn<void()>>> _historyArchivedRequests;
-
-	using KickRequest = std::pair<
-		not_null<ChannelData*>,
-		not_null<PeerData*>>;
-	base::flat_map<KickRequest, mtpRequestId> _kickRequests;
-
-	base::flat_set<not_null<ChannelData*>> _selfParticipantRequests;
 
 	QMap<WebPageData*, mtpRequestId> _webPagesPending;
 	base::Timer _webPagesTimer;
@@ -708,6 +639,7 @@ private:
 	const std::unique_ptr<Api::ConfirmPhone> _confirmPhone;
 	const std::unique_ptr<Api::PeerPhoto> _peerPhoto;
 	const std::unique_ptr<Api::Polls> _polls;
+	const std::unique_ptr<Api::ChatParticipants> _chatParticipants;
 
 	mtpRequestId _wallPaperRequestId = 0;
 	QString _wallPaperSlug;

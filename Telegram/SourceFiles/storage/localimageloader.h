@@ -168,8 +168,7 @@ private:
 
 struct SendingAlbum {
 	struct Item {
-		explicit Item(TaskId taskId) : taskId(taskId) {
-		}
+		explicit Item(TaskId taskId);
 
 		TaskId taskId;
 		uint64 randomId = 0;
@@ -194,7 +193,7 @@ struct SendingAlbum {
 
 struct FileLoadTo {
 	FileLoadTo(
-		const PeerId &peer,
+		PeerId peer,
 		Api::SendOptions options,
 		MsgId replyTo,
 		MsgId replaceMediaOf)

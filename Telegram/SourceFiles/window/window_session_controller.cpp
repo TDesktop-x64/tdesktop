@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/add_contact_box.h"
 #include "boxes/peers/edit_peer_info_box.h"
 #include "boxes/peer_list_controllers.h"
+#include "boxes/delete_messages_box.h"
 #include "window/window_adaptive.h"
 #include "window/window_controller.h"
 #include "window/main_window.h"
@@ -151,7 +152,7 @@ void DateClickHandler::setDate(QDate date) {
 void DateClickHandler::onClick(ClickContext context) const {
 	const auto my = context.other.value<ClickHandlerContext>();
 	if (const auto window = my.sessionWindow.get()) {
-		window->showJumpToDate(_chat, _date);
+		window->showCalendar(_chat, _date);
 	}
 }
 
@@ -1175,81 +1176,136 @@ void SessionController::startOrJoinGroupCall(
 	}
 }
 
-void SessionController::showJumpToDate(Dialogs::Key chat, QDate requestedDate) {
+void SessionController::showCalendar(Dialogs::Key chat, QDate requestedDate) {
+	const auto history = chat.history();
+	if (!history) {
+		return;
+	}
 	const auto currentPeerDate = [&] {
-		if (const auto history = chat.history()) {
-			if (history->scrollTopItem) {
-				return history->scrollTopItem->dateTime().date();
-			} else if (history->loadedAtTop()
-				&& !history->isEmpty()
-				&& history->peer->migrateFrom()) {
-				if (const auto migrated = history->owner().historyLoaded(history->peer->migrateFrom())) {
-					if (migrated->scrollTopItem) {
-						// We're up in the migrated history.
-						// So current date is the date of first message here.
-						return history->blocks.front()->messages.front()->dateTime().date();
-					}
+		if (history->scrollTopItem) {
+			return history->scrollTopItem->dateTime().date();
+		} else if (history->loadedAtTop()
+			&& !history->isEmpty()
+			&& history->peer->migrateFrom()) {
+			if (const auto migrated = history->owner().historyLoaded(history->peer->migrateFrom())) {
+				if (migrated->scrollTopItem) {
+					// We're up in the migrated history.
+					// So current date is the date of first message here.
+					return history->blocks.front()->messages.front()->dateTime().date();
 				}
-			} else if (const auto item = history->lastMessage()) {
-				return base::unixtime::parse(item->date()).date();
 			}
+		} else if (const auto item = history->lastMessage()) {
+			return base::unixtime::parse(item->date()).date();
 		}
 		return QDate();
 	}();
-	const auto maxPeerDate = [](Dialogs::Key chat) {
-		if (auto history = chat.history()) {
-			if (const auto channel = history->peer->migrateTo()) {
-				history = channel->owner().historyLoaded(channel);
-			}
-			if (const auto item = history ? history->lastMessage() : nullptr) {
-				return base::unixtime::parse(item->date()).date();
-			}
+	const auto maxPeerDate = [&] {
+		const auto check = history->peer->migrateTo()
+			? history->owner().historyLoaded(history->peer->migrateTo())
+			: history;
+		if (const auto item = check ? check->lastMessage() : nullptr) {
+			return base::unixtime::parse(item->date()).date();
 		}
-		return QDate::currentDate();
-	};
-	const auto minPeerDate = [](Dialogs::Key chat) {
+		return QDate();
+	}();
+	const auto minPeerDate = [&] {
 		const auto startDate = [] {
 			// Telegram was launched in August 2013 :)
 			return QDate(2013, 8, 1);
 		};
-		if (const auto history = chat.history()) {
-			if (const auto chat = history->peer->migrateFrom()) {
-				if (const auto history = chat->owner().historyLoaded(chat)) {
-					if (history->loadedAtTop()) {
-						if (!history->isEmpty()) {
-							return history->blocks.front()->messages.front()->dateTime().date();
-						}
-					} else {
-						return startDate();
+		if (const auto chat = history->peer->migrateFrom()) {
+			if (const auto history = chat->owner().historyLoaded(chat)) {
+				if (history->loadedAtTop()) {
+					if (!history->isEmpty()) {
+						return history->blocks.front()->messages.front()->dateTime().date();
 					}
+				} else {
+					return startDate();
 				}
-			}
-			if (history->loadedAtTop()) {
-				if (!history->isEmpty()) {
-					return history->blocks.front()->messages.front()->dateTime().date();
-				}
-				return QDate::currentDate();
 			}
 		}
+		if (history->loadedAtTop()) {
+			if (!history->isEmpty()) {
+				return history->blocks.front()->messages.front()->dateTime().date();
+			}
+			return QDate::currentDate();
+		}
 		return startDate();
-	};
+	}();
 	const auto highlighted = !requestedDate.isNull()
 		? requestedDate
 		: !currentPeerDate.isNull()
 		? currentPeerDate
 		: QDate::currentDate();
-	const auto month = highlighted;
-	auto callback = [=](const QDate &date) {
-		session().api().jumpToDate(chat, date);
+	struct ButtonState {
+		enum class Type {
+			None,
+			Disabled,
+			Active,
+		};
+		Type type = Type::None;
+		style::complex_color disabledFg = style::complex_color([] {
+			auto result = st::attentionBoxButton.textFg->c;
+			result.setAlpha(result.alpha() / 2);
+			return result;
+		});
+		style::RoundButton disabled = st::attentionBoxButton;
 	};
-	auto box = Box<Ui::CalendarBox>(
-		month,
-		highlighted,
-		std::move(callback));
-	box->setMinDate(minPeerDate(chat));
-	box->setMaxDate(maxPeerDate(chat));
-	box->setBeginningButton(true);
-	show(std::move(box));
+	const auto buttonState = std::make_shared<ButtonState>();
+	buttonState->disabled.textFg
+		= buttonState->disabled.textFgOver
+		= buttonState->disabledFg.color();
+	buttonState->disabled.ripple.color
+		= buttonState->disabled.textBgOver
+		= buttonState->disabled.textBg;
+	const auto selectionChanged = [=](
+			not_null<Ui::CalendarBox*> box,
+			std::optional<int> selected) {
+		if (!selected.has_value()) {
+			buttonState->type = ButtonState::Type::None;
+			return;
+		}
+		const auto type = (*selected > 0)
+			? ButtonState::Type::Active
+			: ButtonState::Type::Disabled;
+		if (buttonState->type == type) {
+			return;
+		}
+		buttonState->type = type;
+		box->clearButtons();
+		box->addButton(tr::lng_cancel(), [=] {
+			box->toggleSelectionMode(false);
+		});
+		auto text = tr::lng_profile_clear_history();
+		const auto button = box->addLeftButton(std::move(text), [=] {
+			const auto firstDate = box->selectedFirstDate();
+			const auto lastDate = box->selectedLastDate();
+			if (!firstDate.isNull()) {
+				auto confirm = Box<DeleteMessagesBox>(
+					history->peer,
+					firstDate,
+					lastDate);
+				confirm->setDeleteConfirmedCallback(crl::guard(box, [=] {
+					box->closeBox();
+				}));
+				box->getDelegate()->show(std::move(confirm));
+			}
+		}, (*selected > 0) ? st::attentionBoxButton : buttonState->disabled);
+		if (!*selected) {
+			button->setPointerCursor(false);
+		}
+	};
+	show(Box<Ui::CalendarBox>(Ui::CalendarBoxArgs{
+		.month = highlighted,
+		.highlighted = highlighted,
+		.callback = [=](const QDate &date) {
+			session().api().jumpToDate(chat, date);
+		},
+		.minDate = minPeerDate,
+		.maxDate = maxPeerDate,
+		.allowsSelection = history->peer->isUser(),
+		.selectionChanged = selectionChanged,
+	}));
 }
 
 void SessionController::showPassportForm(const Passport::FormRequest &request) {

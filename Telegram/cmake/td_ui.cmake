@@ -80,6 +80,9 @@ PRIVATE
     media/clip/media_clip_reader.cpp
     media/clip/media_clip_reader.h
 
+    media/player/media_player_dropdown.cpp
+    media/player/media_player_dropdown.h
+
     passport/ui/passport_details_row.cpp
     passport/ui/passport_details_row.h
     passport/ui/passport_form_row.cpp
@@ -176,6 +179,8 @@ PRIVATE
     ui/controls/invite_link_buttons.h
     ui/controls/invite_link_label.cpp
     ui/controls/invite_link_label.h
+    ui/controls/send_as_button.cpp
+    ui/controls/send_as_button.h
     ui/controls/send_button.cpp
     ui/controls/send_button.h
     ui/controls/who_read_context_action.cpp

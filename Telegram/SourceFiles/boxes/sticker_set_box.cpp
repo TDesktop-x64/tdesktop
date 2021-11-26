@@ -367,7 +367,8 @@ StickerSetBox::Inner::Inner(
 , _input(set)
 , _previewTimer([=] { showPreview(); }) {
 	_api.request(MTPmessages_GetStickerSet(
-		Data::InputStickerSet(_input)
+		Data::InputStickerSet(_input),
+		MTP_int(0) // hash
 	)).done([=](const MTPmessages_StickerSet &result) {
 		gotSet(result);
 	}).fail([=](const MTP::Error &error) {
@@ -463,6 +464,8 @@ void StickerSetBox::Inner::gotSet(const MTPmessages_StickerSet &set) {
 				set->setThumbnail(_setThumbnail);
 			}
 		});
+	}, [&](const MTPDmessages_stickerSetNotModified &data) {
+		LOG(("API Error: Unexpected messages.stickerSetNotModified."));
 	});
 
 	if (_pack.isEmpty()) {
@@ -625,7 +628,7 @@ void StickerSetBox::Inner::mouseReleaseEvent(QMouseEvent *e) {
 	if (index < 0 || index >= _pack.size() || isMasksSet()) {
 		return;
 	}
-	send(_pack[index], Api::SendOptions());
+	send(_pack[index], {});
 }
 
 void StickerSetBox::Inner::send(

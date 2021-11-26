@@ -41,6 +41,12 @@ enum class CursorState : char;
 enum class PointState : char;
 enum class Context : char;
 
+enum class CopyRestrictionType : char {
+	None,
+	Group,
+	Channel,
+};
+
 struct SelectedItem {
 	explicit SelectedItem(FullMsgId msgId) : msgId(msgId) {
 	}
@@ -94,6 +100,12 @@ public:
 		const FullMsgId &context) = 0;
 	virtual void listHandleViaClick(not_null<UserData*> bot) = 0;
 	virtual not_null<Ui::ChatTheme*> listChatTheme() = 0;
+	virtual CopyRestrictionType listCopyRestrictionType(
+		HistoryItem *item) = 0;
+	CopyRestrictionType listCopyRestrictionType() {
+		return listCopyRestrictionType(nullptr);
+	}
+	virtual CopyRestrictionType listSelectRestrictionType() = 0;
 
 };
 
@@ -101,7 +113,6 @@ struct SelectionData {
 	bool canDelete = false;
 	bool canForward = false;
 	bool canSendNow = false;
-
 };
 
 using SelectedMap = base::flat_map<
@@ -199,11 +210,17 @@ public:
 	void selectItem(not_null<HistoryItem*> item);
 	void selectItemAsGroup(not_null<HistoryItem*> item);
 
-	bool loadedAtTopKnown() const;
-	bool loadedAtTop() const;
-	bool loadedAtBottomKnown() const;
-	bool loadedAtBottom() const;
-	bool isEmpty() const;
+	[[nodiscard]] bool loadedAtTopKnown() const;
+	[[nodiscard]] bool loadedAtTop() const;
+	[[nodiscard]] bool loadedAtBottomKnown() const;
+	[[nodiscard]] bool loadedAtBottom() const;
+	[[nodiscard]] bool isEmpty() const;
+
+	[[nodiscard]] bool hasCopyRestriction(HistoryItem *item = nullptr) const;
+	[[nodiscard]] bool showCopyRestriction(HistoryItem *item = nullptr);
+	[[nodiscard]] bool hasCopyRestrictionForSelected() const;
+	[[nodiscard]] bool showCopyRestrictionForSelected();
+	[[nodiscard]] bool hasSelectRestriction() const;
 
 	// AbstractTooltipShower interface
 	QString tooltipText() const override;
@@ -606,5 +623,11 @@ void ConfirmForwardSelectedItems(not_null<ListWidget*> widget);
 void ConfirmForwardNoQuoteSelectedItems(not_null<ListWidget*> widget);
 void ConfirmForwardSelectedToSavedMessagesItems(not_null<ListWidget*> widget);
 void ConfirmSendNowSelectedItems(not_null<ListWidget*> widget);
+
+[[nodiscard]] CopyRestrictionType CopyRestrictionTypeFor(
+	not_null<PeerData*> peer,
+	HistoryItem *item = nullptr);
+[[nodiscard]] CopyRestrictionType SelectRestrictionTypeFor(
+	not_null<PeerData*> peer);
 
 } // namespace HistoryView

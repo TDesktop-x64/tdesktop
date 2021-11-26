@@ -31,6 +31,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_histories.h"
 #include "lang/lang_keys.h"
 #include "apiwrap.h"
+#include "api/api_chat_participants.h"
 #include "mainwidget.h"
 #include "mainwindow.h"
 #include "main/main_session.h"
@@ -459,6 +460,20 @@ void History::destroyMessage(not_null<HistoryItem*> item) {
 
 	if (document) {
 		session().data().documentMessageRemoved(document);
+	}
+}
+
+void History::destroyMessagesByDates(TimeId minDate, TimeId maxDate) {
+	auto toDestroy = std::vector<not_null<HistoryItem*>>();
+	for (const auto &message : _messages) {
+		if (message->isRegular()
+			&& message->date() > minDate
+			&& message->date() < maxDate) {
+			toDestroy.push_back(message.get());
+		}
+	}
+	for (const auto item : toDestroy) {
+		item->destroy();
 	}
 }
 
@@ -2573,7 +2588,7 @@ void History::applyDialog(
 				data.vtop_message().v);
 			if (const auto item = owner().message(topMessageId)) {
 				if (item->date() <= channel->date) {
-					session().api().requestSelfParticipant(channel);
+					session().api().chatParticipants().requestSelf(channel);
 				}
 			}
 		}
@@ -3080,13 +3095,13 @@ bool History::removeOrphanMediaGroupPart() {
 	return false;
 }
 
-QVector<MsgId> History::collectMessagesFromUserToDelete(
-		not_null<UserData*> user) const {
-	auto result = QVector<MsgId>();
+std::vector<MsgId> History::collectMessagesFromParticipantToDelete(
+		not_null<PeerData*> participant) const {
+	auto result = std::vector<MsgId>();
 	for (const auto &block : blocks) {
 		for (const auto &message : block->messages) {
 			const auto item = message->data();
-			if (item->from() == user && item->canDelete()) {
+			if (item->from() == participant && item->canDelete()) {
 				result.push_back(item->id);
 			}
 		}

@@ -53,7 +53,7 @@ jobs:
 
     defaults:
       run:
-        shell: scl enable llvm-toolset-7.0 -- scl enable devtoolset-9 -- bash --noprofile --norc -eo pipefail {0}
+        shell: scl enable llvm-toolset-7.0 -- scl enable devtoolset-10 -- bash --noprofile --norc -eo pipefail {0}
 
     strategy:
       matrix:
@@ -103,8 +103,7 @@ jobs:
           -D DESKTOP_APP_DISABLE_CRASH_REPORTS=OFF \
           $DEFINE
 
-          cd ../out/Debug
-          make -j$(nproc)
+          cmake --build ../out --config Debug --parallel
 
       - name: Check.
         run: |

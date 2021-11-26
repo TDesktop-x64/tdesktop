@@ -31,6 +31,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/toast/toast.h"
+#include "ui/toasts/common_toasts.h"
 #include "ui/inactive_press.h"
 #include "ui/effects/path_shift_gradient.h"
 #include "ui/chat/chat_theme.h"
@@ -1076,7 +1077,9 @@ void ListWidget::cancelSelection() {
 }
 
 void ListWidget::selectItem(not_null<HistoryItem*> item) {
-	if (const auto view = viewForItem(item)) {
+	if (hasSelectRestriction()) {
+		return;
+	} else if (const auto view = viewForItem(item)) {
 		clearTextSelection();
 		changeSelection(
 			_selected,
@@ -1087,7 +1090,9 @@ void ListWidget::selectItem(not_null<HistoryItem*> item) {
 }
 
 void ListWidget::selectItemAsGroup(not_null<HistoryItem*> item) {
-	if (const auto view = viewForItem(item)) {
+	if (hasSelectRestriction()) {
+		return;
+	} else if (const auto view = viewForItem(item)) {
 		clearTextSelection();
 		changeSelectionAsGroup(
 			_selected,
@@ -1163,6 +1168,52 @@ bool ListWidget::isEmpty() const {
 	return loadedAtTop()
 		&& loadedAtBottom()
 		&& (_itemsHeight + _itemsRevealHeight == 0);
+}
+
+bool ListWidget::hasCopyRestriction(HistoryItem *item) const {
+	return _delegate->listCopyRestrictionType(item)
+		!= CopyRestrictionType::None;
+}
+
+bool ListWidget::showCopyRestriction(HistoryItem *item) {
+	const auto type = _delegate->listCopyRestrictionType(item);
+	if (type == CopyRestrictionType::None) {
+		return false;
+	}
+	Ui::ShowMultilineToast({
+		.text = { (type == CopyRestrictionType::Channel)
+			? tr::lng_error_nocopy_channel(tr::now)
+			: tr::lng_error_nocopy_group(tr::now) },
+	});
+	return true;
+}
+
+bool ListWidget::hasCopyRestrictionForSelected() const {
+	if (hasCopyRestriction()) {
+		return true;
+	}
+	for (const auto &[itemId, selection] : _selected) {
+		if (const auto item = session().data().message(itemId)) {
+			if (item->forbidsForward()) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+bool ListWidget::showCopyRestrictionForSelected() {
+	for (const auto &[itemId, selection] : _selected) {
+		if (showCopyRestriction(session().data().message(itemId))) {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool ListWidget::hasSelectRestriction() const {
+	return _delegate->listSelectRestrictionType()
+		!= CopyRestrictionType::None;
 }
 
 int ListWidget::itemMinimalHeight() const {
@@ -1732,7 +1783,9 @@ void ListWidget::paintEvent(QPaintEvent *e) {
 }
 
 void ListWidget::applyDragSelection() {
-	applyDragSelection(_selected);
+	if (!hasSelectRestriction()) {
+		applyDragSelection(_selected);
+	}
 	clearDragSelection();
 	pushSelectedItems();
 }
@@ -1893,11 +1946,15 @@ void ListWidget::keyPressEvent(QKeyEvent *e) {
 			_delegate->listCancelRequest();
 		}
 	} else if (e == QKeySequence::Copy
-		&& (hasSelectedText() || hasSelectedItems())) {
+		&& (hasSelectedText() || hasSelectedItems())
+		&& !showCopyRestriction()
+		&& !hasCopyRestrictionForSelected()) {
 		TextUtilities::SetClipboardText(getSelectedText());
 #ifdef Q_OS_MAC
 	} else if (e->key() == Qt::Key_E
-		&& e->modifiers().testFlag(Qt::ControlModifier)) {
+		&& e->modifiers().testFlag(Qt::ControlModifier)
+		&& !showCopyRestriction()
+		&& !hasCopyRestrictionForSelected()) {
 		TextUtilities::SetClipboardText(getSelectedText(), QClipboard::FindBuffer);
 #endif // Q_OS_MAC
 	} else if (e == QKeySequence::Delete) {
@@ -2059,7 +2116,9 @@ void ListWidget::leaveEventHook(QEvent *e) {
 }
 
 void ListWidget::updateDragSelection() {
-	if (!_overState.itemId || !_pressState.itemId) {
+	if (!_overState.itemId
+		|| !_pressState.itemId
+		|| hasSelectRestriction()) {
 		clearDragSelection();
 		return;
 	} else if (_items.empty() || !_overElement || !_selectEnabled) {
@@ -2260,7 +2319,7 @@ void ListWidget::mouseActionStart(
 	} else if (hasSelectedItems()) {
 		if (overSelectedItems()) {
 			_mouseAction = MouseAction::PrepareDrag;
-		} else if (!_pressWasInactive) {
+		} else if (!_pressWasInactive && !hasSelectRestriction()) {
 			_mouseAction = MouseAction::PrepareSelect;
 		}
 	}
@@ -2305,7 +2364,7 @@ void ListWidget::mouseActionStart(
 							_mouseTextSymbol,
 							_mouseTextSymbol));
 						_mouseAction = MouseAction::Selecting;
-					} else {
+					} else if (!hasSelectRestriction()) {
 						_mouseAction = MouseAction::PrepareSelect;
 					}
 				}
@@ -2418,7 +2477,8 @@ void ListWidget::mouseActionFinish(
 
 	if (QGuiApplication::clipboard()->supportsSelection()
 		&& _selectedTextItem
-		&& _selectedTextRange.from != _selectedTextRange.to) {
+		&& _selectedTextRange.from != _selectedTextRange.to
+		&& !hasCopyRestriction(_selectedTextItem)) {
 		if (const auto view = viewForItem(_selectedTextItem)) {
 			TextUtilities::SetClipboardText(
 				view->selectedText(_selectedTextRange),
@@ -2631,7 +2691,8 @@ std::unique_ptr<QMimeData> ListWidget::prepareDrag() {
 		return nullptr;
 	}
 	auto pressedHandler = ClickHandler::getPressed();
-	if (dynamic_cast<VoiceSeekClickHandler*>(pressedHandler.get())) {
+	if (dynamic_cast<VoiceSeekClickHandler*>(pressedHandler.get())
+		|| hasCopyRestriction()) {
 		return nullptr;
 	}
 
@@ -2993,15 +3054,12 @@ void ConfirmDeleteSelectedItems(not_null<ListWidget*> widget) {
 			return;
 		}
 	}
-	const auto weak = Ui::MakeWeak(widget);
 	auto box = Box<DeleteMessagesBox>(
 		&widget->controller()->session(),
 		widget->getSelectedIds());
-	box->setDeleteConfirmedCallback([=] {
-		if (const auto strong = weak.data()) {
-			strong->cancelSelection();
-		}
-	});
+	box->setDeleteConfirmedCallback(crl::guard(widget, [=] {
+		widget->cancelSelection();
+	}));
 	widget->controller()->show(std::move(box));
 }
 
@@ -3119,6 +3177,30 @@ void ConfirmSendNowSelectedItems(not_null<ListWidget*> widget) {
 		history,
 		widget->getSelectedIds(),
 		clearSelection);
+}
+
+CopyRestrictionType CopyRestrictionTypeFor(
+		not_null<PeerData*> peer,
+		HistoryItem *item) {
+	return (peer->allowsForwarding() && (!item || !item->forbidsForward()))
+		? CopyRestrictionType::None
+		: peer->isBroadcast()
+		? CopyRestrictionType::Channel
+		: CopyRestrictionType::Group;
+}
+
+CopyRestrictionType SelectRestrictionTypeFor(
+		not_null<PeerData*> peer) {
+	if (const auto chat = peer->asChat()) {
+		return chat->canDeleteMessages()
+			? CopyRestrictionType::None
+			: CopyRestrictionTypeFor(peer);
+	} else if (const auto channel = peer->asChannel()) {
+		return channel->canDeleteMessages()
+			? CopyRestrictionType::None
+			: CopyRestrictionTypeFor(peer);
+	}
+	return CopyRestrictionType::None;
 }
 
 } // namespace HistoryView

@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "boxes/peers/add_participants_box.h"
 
+#include "api/api_chat_participants.h"
 #include "boxes/peers/edit_participant_box.h"
 #include "boxes/peers/edit_peer_type_box.h"
 #include "ui/boxes/confirm_box.h"
@@ -231,7 +232,7 @@ bool AddParticipantsBoxController::inviteSelectedUsers(
 	if (users.empty()) {
 		return false;
 	}
-	_peer->session().api().addChatParticipants(_peer, users);
+	_peer->session().api().chatParticipants().add(_peer, users);
 	return true;
 }
 
@@ -465,9 +466,10 @@ void AddSpecialBoxController::loadMoreRows() {
 	)).done([=](const MTPchannels_ChannelParticipants &result) {
 		_loadRequestId = 0;
 		auto &session = channel->session();
-		session.api().parseChannelParticipants(channel, result, [&](
-				int availableCount,
-				const QVector<MTPChannelParticipant> &list) {
+		result.match([&](const MTPDchannels_channelParticipants &data) {
+			const auto &[availableCount, list] = Api::ChatParticipants::Parse(
+				channel,
+				data);
 			for (const auto &data : list) {
 				if (const auto participant = _additional.applyParticipant(
 						data)) {
@@ -480,8 +482,9 @@ void AddSpecialBoxController::loadMoreRows() {
 				// To be sure - wait for a whole empty result list.
 				_allLoaded = true;
 			}
+		}, [&](const MTPDchannels_channelParticipantsNotModified &) {
+			LOG(("API Error: channels.channelParticipantsNotModified received!"));
 		});
-
 		if (delegate()->peerListFullRowsCount() > 0) {
 			setDescriptionText(QString());
 		} else if (_allLoaded) {
@@ -524,7 +527,8 @@ bool AddSpecialBoxController::checkInfoLoaded(
 	)).done([=](const MTPchannels_ChannelParticipant &result) {
 		result.match([&](const MTPDchannels_channelParticipant &data) {
 			channel->owner().processUsers(data.vusers());
-			_additional.applyParticipant(data.vparticipant());
+			_additional.applyParticipant(
+				Api::ChatParticipant(data.vparticipant(), channel));
 		});
 		callback();
 	}).fail([=](const MTP::Error &error) {
@@ -658,37 +662,7 @@ void AddSpecialBoxController::editAdminDone(
 		_editParticipantBox->closeBox();
 	}
 
-	const auto date = base::unixtime::now(); // Incorrect, but ignored.
-	if (_additional.isCreator(user) && user->isSelf()) {
-		using Flag = MTPDchannelParticipantCreator::Flag;
-		_additional.applyParticipant(MTP_channelParticipantCreator(
-			MTP_flags(rank.isEmpty() ? Flag(0) : Flag::f_rank),
-			peerToBareMTPInt(user->id),
-			MTP_chatAdminRights(
-				MTP_flags(MTPDchatAdminRights::Flags::from_raw(
-					uint32(rights.flags)))),
-			MTP_string(rank)));
-	} else if (!rights.flags) {
-		_additional.applyParticipant(MTP_channelParticipant(
-			peerToBareMTPInt(user->id),
-			MTP_int(date)));
-	} else {
-		using Flag = MTPDchannelParticipantAdmin::Flag;
-		const auto alreadyPromotedBy = _additional.adminPromotedBy(user);
-		_additional.applyParticipant(MTP_channelParticipantAdmin(
-			MTP_flags(Flag::f_can_edit
-				| (rank.isEmpty() ? Flag(0) : Flag::f_rank)),
-			peerToBareMTPInt(user->id),
-			MTPlong(), // inviter_id
-			peerToBareMTPInt(alreadyPromotedBy
-				? alreadyPromotedBy->id
-				: user->session().userPeerId()),
-			MTP_int(date),
-			MTP_chatAdminRights(
-				MTP_flags(MTPDchatAdminRights::Flags::from_raw(
-					uint32(rights.flags)))),
-			MTP_string(rank)));
-	}
+	_additional.applyAdminLocally(user, rights, rank);
 	if (const auto callback = _adminDoneCallback) {
 		callback(user, rights, rank);
 	}
@@ -765,33 +739,7 @@ void AddSpecialBoxController::editRestrictedDone(
 		_editParticipantBox->closeBox();
 	}
 
-	const auto date = base::unixtime::now(); // Incorrect, but ignored.
-	if (!rights.flags) {
-		if (const auto user = participant->asUser()) {
-			_additional.applyParticipant(MTP_channelParticipant(
-				peerToBareMTPInt(user->id),
-				MTP_int(date)));
-		} else {
-			_additional.setExternal(participant);
-		}
-	} else {
-		const auto kicked = rights.flags & ChatRestriction::ViewMessages;
-		const auto alreadyRestrictedBy = _additional.restrictedBy(
-			participant);
-		_additional.applyParticipant(MTP_channelParticipantBanned(
-			MTP_flags(kicked
-				? MTPDchannelParticipantBanned::Flag::f_left
-				: MTPDchannelParticipantBanned::Flag(0)),
-			peerToMTP(participant->id),
-			peerToBareMTPInt(alreadyRestrictedBy
-				? alreadyRestrictedBy->id
-				: participant->session().userPeerId()),
-			MTP_int(date),
-			MTP_chatBannedRights(
-				MTP_flags(MTPDchatBannedRights::Flags::from_raw(
-					uint32(rights.flags))),
-				MTP_int(rights.until))));
-	}
+	_additional.applyBannedLocally(participant, rights);
 	if (const auto callback = _bannedDoneCallback) {
 		callback(participant, rights);
 	}
@@ -1021,7 +969,7 @@ void AddSpecialBoxSearchController::searchParticipantsDone(
 	const auto channel = _peer->asChannel();
 	auto query = _query;
 	if (requestId) {
-		const auto addToCache = [&](auto&&...) {
+		const auto addToCache = [&] {
 			auto it = _participantsQueries.find(requestId);
 			if (it != _participantsQueries.cend()) {
 				query = it->second.text;
@@ -1033,10 +981,13 @@ void AddSpecialBoxSearchController::searchParticipantsDone(
 				_participantsQueries.erase(it);
 			}
 		};
-		channel->session().api().parseChannelParticipants(
-			channel,
-			result,
-			addToCache);
+		result.match([&](const MTPDchannels_channelParticipants &data) {
+			Api::ChatParticipants::Parse(channel, data);
+			addToCache();
+		}, [&](const MTPDchannels_channelParticipantsNotModified &) {
+			LOG(("API Error: "
+				"channels.channelParticipantsNotModified received!"));
+		});
 	}
 
 	if (_requestId != requestId) {
@@ -1056,7 +1007,8 @@ void AddSpecialBoxSearchController::searchParticipantsDone(
 			}
 		}
 		for (const auto &data : list) {
-			if (const auto user = _additional->applyParticipant(data)) {
+			if (const auto user = _additional->applyParticipant(
+					Api::ChatParticipant(data, channel))) {
 				delegate()->peerListSearchAddRow(user);
 			}
 		}

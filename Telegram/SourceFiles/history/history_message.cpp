@@ -45,6 +45,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_channel.h"
 #include "data/data_user.h"
 #include "data/data_histories.h"
+#include "data/data_web_page.h"
 #include "styles/style_dialogs.h"
 #include "styles/style_widgets.h"
 #include "styles/style_chat.h"
@@ -292,9 +293,9 @@ void FastShareMessage(not_null<HistoryItem*> item) {
 		for (const auto peer : result) {
 			const auto history = owner->history(peer);
 			if (!comment.text.isEmpty()) {
-				auto message = ApiWrap::MessageToSend(history);
+				auto message = Api::MessageToSend(
+					Api::SendAction(history, options));
 				message.textWithTags = comment;
-				message.action.options = options;
 				message.action.clearDraft = false;
 				api.sendMessage(std::move(message));
 			}
@@ -310,7 +311,8 @@ void FastShareMessage(not_null<HistoryItem*> item) {
 					MTP_vector<MTPint>(msgIds),
 					MTP_vector<MTPlong>(generateRandom()),
 					peer->input,
-					MTP_int(options.scheduled)
+					MTP_int(options.scheduled),
+					MTP_inputPeerEmpty() // send_as
 				)).done([=](const MTPUpdates &updates, mtpRequestId requestId) {
 					history->session().api().applyUpdates(updates);
 					data->requests.remove(requestId);
@@ -1001,9 +1003,11 @@ void HistoryMessage::setCommentsItemId(FullMsgId id) {
 bool HistoryMessage::updateDependencyItem() {
 	if (const auto reply = Get<HistoryMessageReply>()) {
 		const auto documentId = reply->replyToDocumentId;
+		const auto webpageId = reply->replyToWebPageId;
 		const auto result = reply->updateData(this, true);
-		if (documentId != reply->replyToDocumentId
-			&& generateLocalEntitiesByReply()) {
+		const auto mediaIdChanged = (documentId != reply->replyToDocumentId)
+			|| (webpageId != reply->replyToWebPageId);
+		if (mediaIdChanged && generateLocalEntitiesByReply()) {
 			reapplyText();
 		}
 		return result;
@@ -1035,7 +1039,10 @@ void HistoryMessage::applySentMessage(
 }
 
 bool HistoryMessage::allowsForward() const {
-	return isRegular() && (!_media || _media->allowsForward());
+	return isRegular()
+		&& !forbidsForward()
+		&& history()->peer->allowsForwarding()
+		&& (!_media || _media->allowsForward());
 }
 
 bool HistoryMessage::allowsSendNow() const {
@@ -1525,34 +1532,50 @@ Storage::SharedMediaTypesMask HistoryMessage::sharedMediaTypes() const {
 }
 
 bool HistoryMessage::generateLocalEntitiesByReply() const {
-	return !_media || _media->webpage();
+	if (!_media) {
+		return true;
+	} else if (const auto webpage = _media->webpage()) {
+		return !webpage->document && webpage->type != WebPageType::Video;
+	}
+	return false;
 }
 
 TextWithEntities HistoryMessage::withLocalEntities(
 		const TextWithEntities &textWithEntities) const {
+	using namespace HistoryView;
 	if (!generateLocalEntitiesByReply()) {
+		if (const auto webpage = _media ? _media->webpage() : nullptr) {
+			if (const auto duration = DurationForTimestampLinks(webpage)) {
+				return AddTimestampLinks(
+					textWithEntities,
+					duration,
+					TimestampLinkBase(webpage, fullId()));
+			}
+		}
 		return textWithEntities;
 	}
 	if (const auto reply = Get<HistoryMessageReply>()) {
 		const auto document = reply->replyToDocumentId
 			? history()->owner().document(reply->replyToDocumentId).get()
 			: nullptr;
-		if (document
-			&& (document->isVideoFile()
-				|| document->isSong()
-				|| document->isVoiceMessage())) {
-			using namespace HistoryView;
-			const auto duration = document->getDuration();
-			const auto base = (duration > 0)
-				? DocumentTimestampLinkBase(
-					document,
-					reply->replyToMsg->fullId())
-				: QString();
-			if (!base.isEmpty()) {
+		const auto webpage = reply->replyToWebPageId
+			? history()->owner().webpage(reply->replyToWebPageId).get()
+			: nullptr;
+		if (document) {
+			if (const auto duration = DurationForTimestampLinks(document)) {
+				const auto context = reply->replyToMsg->fullId();
 				return AddTimestampLinks(
 					textWithEntities,
 					duration,
-					base);
+					TimestampLinkBase(document, context));
+			}
+		} else if (webpage) {
+			if (const auto duration = DurationForTimestampLinks(webpage)) {
+				const auto context = reply->replyToMsg->fullId();
+				return AddTimestampLinks(
+					textWithEntities,
+					duration,
+					TimestampLinkBase(webpage, context));
 			}
 		}
 	}

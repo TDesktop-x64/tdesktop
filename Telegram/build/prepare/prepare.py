@@ -401,7 +401,7 @@ if customRunCommand:
 stage('patches', """
     git clone https://github.com/desktop-app/patches.git
     cd patches
-    git checkout 85bce38ec7
+    git checkout eb843853be
 """)
 
 stage('depot_tools', """
@@ -1159,7 +1159,7 @@ mac:
 stage('tg_owt', """
     git clone https://github.com/desktop-app/tg_owt.git
     cd tg_owt
-    git checkout d578c760dc
+    git checkout b02478677b
     git submodule init
     git submodule update src/third_party/libvpx/source/libvpx src/third_party/libyuv
 win:

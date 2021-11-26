@@ -291,7 +291,7 @@ sessionWhenFont: msgDateFont;
 sessionWhenFg: windowSubTextFg;
 sessionInfoFont: msgFont;
 sessionInfoFg: windowSubTextFg;
-sessionTerminateTop: 28px;
+sessionTerminateTop: 9px;
 sessionTerminateSkip: 22px;
 sessionNamePadding: margins(0px, 0px, 5px, 0px);
 sessionTerminate: IconButton {
@@ -492,8 +492,8 @@ calendarPrevious: IconButton {
 	width: calendarTitleHeight;
 	height: calendarTitleHeight;
 
-	icon: icon {{ "title_back", boxTitleFg }};
-	iconPosition: point(20px, 20px);
+	icon: icon {{ "calendar_down-flip_vertical", boxTitleFg }};
+	iconPosition: point(-1px, -1px);
 
 	rippleAreaPosition: point(6px, 6px);
 	rippleAreaSize: 44px;
@@ -501,9 +501,9 @@ calendarPrevious: IconButton {
 		color: windowBgOver;
 	}
 }
-calendarPreviousDisabled: icon {{ "title_back", menuIconFg }};
+calendarPreviousDisabled: icon {{ "calendar_down-flip_vertical", menuIconFg }};
 calendarNext: IconButton(calendarPrevious) {
-	icon: icon {{ "title_back-flip_horizontal", boxTitleFg }};
+	icon: icon {{ "calendar_down", boxTitleFg }};
 }
 CalendarSizes {
 	width: pixels;
@@ -512,18 +512,25 @@ CalendarSizes {
 	cellInner: pixels;
 	padding: margins;
 }
-calendarNextDisabled: icon {{ "title_back-flip_horizontal", menuIconFg }};
+calendarNextDisabled: icon {{ "calendar_down", menuIconFg }};
 calendarTitleFont: boxTitleFont;
 defaultCalendarSizes: CalendarSizes {
 	width: boxWideWidth;
-	daysHeight: 32px;
+	daysHeight: 40px;
 	cellSize: size(48px, 40px);
 	cellInner: 34px;
-	padding: margins(14px, 15px, 14px, 10px);
+	padding: margins(14px, 0px, 14px, 0px);
 }
 calendarDaysFont: normalFont;
 calendarDaysFg: boxTitleAdditionalFg;
-calendarScroll: backgroundScroll;
+calendarScroll: ScrollArea(defaultSolidScroll) {
+	deltat: 3px;
+	deltab: 3px;
+	round: 1px;
+	width: 8px;
+	deltax: 3px;
+	hiding: 1000;
+}
 
 passcodeTextStyle: TextStyle(defaultTextStyle) {
 	lineHeight: 20px;

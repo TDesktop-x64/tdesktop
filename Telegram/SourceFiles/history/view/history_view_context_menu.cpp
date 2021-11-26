@@ -129,16 +129,23 @@ void ToggleFavedSticker(
 void AddPhotoActions(
 		not_null<Ui::PopupMenu*> menu,
 		not_null<PhotoData*> photo,
+		HistoryItem *item,
 		not_null<ListWidget*> list) {
-	menu->addAction(
-		tr::lng_context_save_image(tr::now),
-		App::LambdaDelayed(
-			st::defaultDropdownMenu.menu.ripple.hideDuration,
-			&photo->session(),
-			[=] { SavePhotoToFile(photo); }));
-	menu->addAction(tr::lng_context_copy_image(tr::now), [=] {
-		CopyImage(photo);
-	});
+	const auto contextId = item ? item->fullId() : FullMsgId();
+	if (!list->hasCopyRestriction(item)) {
+		menu->addAction(
+			tr::lng_context_save_image(tr::now),
+			App::LambdaDelayed(
+				st::defaultDropdownMenu.menu.ripple.hideDuration,
+				&photo->session(),
+				[=] { SavePhotoToFile(photo); }));
+		menu->addAction(tr::lng_context_copy_image(tr::now), [=] {
+			const auto item = photo->owner().message(contextId);
+			if (!list->showCopyRestriction(item)) {
+				CopyImage(photo);
+			}
+		});
+	}
 	if (photo->hasAttachedStickers()) {
 		const auto controller = list->controller();
 		auto callback = [=] {
@@ -184,8 +191,14 @@ void ShowInFolder(not_null<DocumentData*> document) {
 
 void AddSaveDocumentAction(
 		not_null<Ui::PopupMenu*> menu,
-		Data::FileOrigin origin,
-		not_null<DocumentData*> document) {
+		HistoryItem *item,
+		not_null<DocumentData*> document,
+		not_null<ListWidget*> list) {
+	if (list->hasCopyRestriction(item)) {
+		return;
+	}
+	const auto origin = Data::FileOrigin(
+		item ? item->fullId() : FullMsgId());
 	const auto save = [=] {
 		DocumentSaveClickHandler::Save(
 			origin,
@@ -212,7 +225,7 @@ void AddSaveDocumentAction(
 void AddDocumentActions(
 		not_null<Ui::PopupMenu*> menu,
 		not_null<DocumentData*> document,
-		FullMsgId contextId,
+		HistoryItem *item,
 		not_null<ListWidget*> list) {
 	if (document->loading()) {
 		menu->addAction(tr::lng_context_cancel_download(tr::now), [=] {
@@ -220,8 +233,9 @@ void AddDocumentActions(
 		});
 		return;
 	}
+	const auto contextId = item ? item->fullId() : FullMsgId();
 	const auto session = &document->session();
-	if (const auto item = session->data().message(contextId)) {
+	if (item) {
 		const auto notAutoplayedGif = [&] {
 			return document->isGifv()
 				&& !Data::AutoDownload::ShouldAutoPlay(
@@ -234,7 +248,7 @@ void AddDocumentActions(
 				OpenGif(list->controller(), contextId);
 			});
 		}
-		if (document->isGifv()) {
+		if (document->isGifv() && !list->hasCopyRestriction(item)) {
 			menu->addAction(tr::lng_context_save_gif(tr::now), [=] {
 				SaveGif(list->controller(), contextId);
 			});
@@ -269,7 +283,7 @@ void AddDocumentActions(
 			tr::lng_context_attached_stickers(tr::now),
 			std::move(callback));
 	}
-	AddSaveDocumentAction(menu, contextId, document);
+	AddSaveDocumentAction(menu, item, document, list);
 }
 
 void AddPostLinkAction(
@@ -727,16 +741,13 @@ bool AddDeleteSelectedAction(
 	}
 
 	menu->addAction(tr::lng_context_delete_selected(tr::now), [=] {
-		const auto weak = Ui::MakeWeak(list);
 		auto items = ExtractIdsList(request.selectedItems);
 		auto box = Box<DeleteMessagesBox>(
 			&request.navigation->session(),
 			std::move(items));
-		box->setDeleteConfirmedCallback([=] {
-			if (const auto strong = weak.data()) {
-				strong->cancelSelection();
-			}
-		});
+		box->setDeleteConfirmedCallback(crl::guard(list, [=] {
+			list->cancelSelection();
+		}));
 		request.navigation->parentController()->show(std::move(box));
 	});
 	return true;
@@ -853,7 +864,10 @@ bool AddSelectMessageAction(
 	const auto item = request.item;
 	if (request.overSelection && !request.selectedItems.empty()) {
 		return false;
-	} else if (!item || item->isLocal() || item->isService()) {
+	} else if (!item
+		|| item->isLocal()
+		|| item->isService()
+		|| list->hasSelectRestriction()) {
 		return false;
 	}
 	const auto owner = &item->history()->owner();
@@ -949,20 +963,22 @@ base::unique_qptr<Ui::PopupMenu> FillContextMenu(
 	const auto hasSelection = !request.selectedItems.empty()
 		|| !request.selectedText.empty();
 
-	if (request.overSelection) {
+	if (request.overSelection && !list->hasCopyRestrictionForSelected()) {
 		const auto text = request.selectedItems.empty()
 			? tr::lng_context_copy_selected(tr::now)
 			: tr::lng_context_copy_selected_items(tr::now);
 		result->addAction(text, [=] {
-			TextUtilities::SetClipboardText(list->getSelectedText());
+			if (!list->showCopyRestrictionForSelected()) {
+				TextUtilities::SetClipboardText(list->getSelectedText());
+			}
 		});
 	}
 
 	AddTopMessageActions(result, request, list);
 	if (linkPhoto) {
-		AddPhotoActions(result, photo, list);
+		AddPhotoActions(result, photo, item, list);
 	} else if (linkDocument) {
-		AddDocumentActions(result, document, itemId, list);
+		AddDocumentActions(result, document, item, list);
 	} else if (poll) {
 		AddPollActions(result, poll, item, list->elementContext());
 	} else if (!request.overSelection && view && !hasSelection) {
@@ -970,23 +986,23 @@ base::unique_qptr<Ui::PopupMenu> FillContextMenu(
 		const auto media = view->media();
 		const auto mediaHasTextForCopy = media && media->hasTextForCopy();
 		if (const auto document = media ? media->getDocument() : nullptr) {
-			AddDocumentActions(
-				result,
-				document,
-				view->data()->fullId(),
-				list);
+			AddDocumentActions(result, document, view->data(), list);
 		}
-		if (!link && (view->hasVisibleText() || mediaHasTextForCopy)) {
+		if (!link
+			&& (view->hasVisibleText() || mediaHasTextForCopy)
+			&& !list->hasCopyRestriction(view->data())) {
 			const auto asGroup = (request.pointState != PointState::GroupPart);
 			result->addAction(tr::lng_context_copy_text(tr::now), [=] {
 				if (const auto item = owner->message(itemId)) {
-					if (asGroup) {
-						if (const auto group = owner->groups().find(item)) {
-							TextUtilities::SetClipboardText(HistoryGroupText(group));
-							return;
+					if (!list->showCopyRestriction(item)) {
+						if (asGroup) {
+							if (const auto group = owner->groups().find(item)) {
+								TextUtilities::SetClipboardText(HistoryGroupText(group));
+								return;
+							}
 						}
+						TextUtilities::SetClipboardText(HistoryItemText(item));
 					}
-					TextUtilities::SetClipboardText(HistoryItemText(item));
 				}
 			});
 		}

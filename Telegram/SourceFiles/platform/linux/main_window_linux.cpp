@@ -42,6 +42,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtCore/QSize>
 #include <QtCore/QTemporaryFile>
+#include <QtCore/QMimeData>
 #include <QtGui/QWindow>
 
 #ifndef DESKTOP_APP_DISABLE_DBUS_INTEGRATION
@@ -1068,84 +1069,89 @@ void MainWindow::createGlobalMenu() {
 
 	psUndo = edit->addAction(
 		tr::lng_linux_menu_undo(tr::now),
-		this,
-		[=] { psLinuxUndo(); },
+		[] { SendKeySequence(Qt::Key_Z, Qt::ControlModifier); },
 		QKeySequence::Undo);
 
 	psRedo = edit->addAction(
 		tr::lng_linux_menu_redo(tr::now),
-		this,
-		[=] { psLinuxRedo(); },
+		[] {
+			SendKeySequence(
+				Qt::Key_Z,
+				Qt::ControlModifier | Qt::ShiftModifier);
+		},
 		QKeySequence::Redo);
 
 	edit->addSeparator();
 
 	psCut = edit->addAction(
 		tr::lng_mac_menu_cut(tr::now),
-		this,
-		[=] { psLinuxCut(); },
+		[] { SendKeySequence(Qt::Key_X, Qt::ControlModifier); },
 		QKeySequence::Cut);
+
 	psCopy = edit->addAction(
 		tr::lng_mac_menu_copy(tr::now),
-		this,
-		[=] { psLinuxCopy(); },
+		[] { SendKeySequence(Qt::Key_C, Qt::ControlModifier); },
 		QKeySequence::Copy);
 
 	psPaste = edit->addAction(
 		tr::lng_mac_menu_paste(tr::now),
-		this,
-		[=] { psLinuxPaste(); },
+		[] { SendKeySequence(Qt::Key_V, Qt::ControlModifier); },
 		QKeySequence::Paste);
 
 	psDelete = edit->addAction(
 		tr::lng_mac_menu_delete(tr::now),
-		this,
-		[=] { psLinuxDelete(); },
+		[] { SendKeySequence(Qt::Key_Delete); },
 		QKeySequence(Qt::ControlModifier | Qt::Key_Backspace));
 
 	edit->addSeparator();
 
 	psBold = edit->addAction(
 		tr::lng_menu_formatting_bold(tr::now),
-		this,
-		[=] { psLinuxBold(); },
+		[] { SendKeySequence(Qt::Key_B, Qt::ControlModifier); },
 		QKeySequence::Bold);
 
 	psItalic = edit->addAction(
 		tr::lng_menu_formatting_italic(tr::now),
-		this,
-		[=] { psLinuxItalic(); },
+		[] { SendKeySequence(Qt::Key_I, Qt::ControlModifier); },
 		QKeySequence::Italic);
 
 	psUnderline = edit->addAction(
 		tr::lng_menu_formatting_underline(tr::now),
-		this,
-		[=] { psLinuxUnderline(); },
+		[] { SendKeySequence(Qt::Key_U, Qt::ControlModifier); },
 		QKeySequence::Underline);
 
 	psStrikeOut = edit->addAction(
 		tr::lng_menu_formatting_strike_out(tr::now),
-		this,
-		[=] { psLinuxStrikeOut(); },
+		[] {
+			SendKeySequence(
+				Qt::Key_X,
+				Qt::ControlModifier | Qt::ShiftModifier);
+		},
 		Ui::kStrikeOutSequence);
 
 	psMonospace = edit->addAction(
 		tr::lng_menu_formatting_monospace(tr::now),
-		this,
-		[=] { psLinuxMonospace(); },
+		[] {
+			SendKeySequence(
+				Qt::Key_M,
+				Qt::ControlModifier | Qt::ShiftModifier);
+		},
 		Ui::kMonospaceSequence);
 
 	psClearFormat = edit->addAction(
 		tr::lng_menu_formatting_clear(tr::now),
-		this,
-		[=] { psLinuxClearFormat(); },
+		[] {
+			SendKeySequence(
+				Qt::Key_N,
+				Qt::ControlModifier | Qt::ShiftModifier);
+		},
 		Ui::kClearFormatSequence);
 
 	edit->addSeparator();
 
 	psSelectAll = edit->addAction(
 		tr::lng_mac_menu_select_all(tr::now),
-		this, [=] { psLinuxSelectAll(); },
+		[] { SendKeySequence(Qt::Key_A, Qt::ControlModifier); },
 		QKeySequence::SelectAll);
 
 	edit->addSeparator();
@@ -1234,58 +1240,6 @@ void MainWindow::createGlobalMenu() {
 	updateGlobalMenu();
 }
 
-void MainWindow::psLinuxUndo() {
-	SendKeySequence(Qt::Key_Z, Qt::ControlModifier);
-}
-
-void MainWindow::psLinuxRedo() {
-	SendKeySequence(Qt::Key_Z, Qt::ControlModifier | Qt::ShiftModifier);
-}
-
-void MainWindow::psLinuxCut() {
-	SendKeySequence(Qt::Key_X, Qt::ControlModifier);
-}
-
-void MainWindow::psLinuxCopy() {
-	SendKeySequence(Qt::Key_C, Qt::ControlModifier);
-}
-
-void MainWindow::psLinuxPaste() {
-	SendKeySequence(Qt::Key_V, Qt::ControlModifier);
-}
-
-void MainWindow::psLinuxDelete() {
-	SendKeySequence(Qt::Key_Delete);
-}
-
-void MainWindow::psLinuxSelectAll() {
-	SendKeySequence(Qt::Key_A, Qt::ControlModifier);
-}
-
-void MainWindow::psLinuxBold() {
-	SendKeySequence(Qt::Key_B, Qt::ControlModifier);
-}
-
-void MainWindow::psLinuxItalic() {
-	SendKeySequence(Qt::Key_I, Qt::ControlModifier);
-}
-
-void MainWindow::psLinuxUnderline() {
-	SendKeySequence(Qt::Key_U, Qt::ControlModifier);
-}
-
-void MainWindow::psLinuxStrikeOut() {
-	SendKeySequence(Qt::Key_X, Qt::ControlModifier | Qt::ShiftModifier);
-}
-
-void MainWindow::psLinuxMonospace() {
-	SendKeySequence(Qt::Key_M, Qt::ControlModifier | Qt::ShiftModifier);
-}
-
-void MainWindow::psLinuxClearFormat() {
-	SendKeySequence(Qt::Key_N, Qt::ControlModifier | Qt::ShiftModifier);
-}
-
 void MainWindow::updateGlobalMenuHook() {
 	if (!positionInited()) {
 		return;
@@ -1299,8 +1253,8 @@ void MainWindow::updateGlobalMenuHook() {
 	auto canPaste = false;
 	auto canDelete = false;
 	auto canSelectAll = false;
-	const auto clipboardHasText = QGuiApplication::clipboard()
-		->ownsClipboard();
+	const auto mimeData = QGuiApplication::clipboard()->mimeData();
+	const auto clipboardHasText = mimeData ? mimeData->hasText() : false;
 	auto markdownEnabled = false;
 	if (const auto edit = qobject_cast<QLineEdit*>(focused)) {
 		canCut = canCopy = canDelete = edit->hasSelectedText();

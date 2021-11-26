@@ -22,7 +22,7 @@ public:
 
 		bool incomplete = false;
 		TimeId activeTime = 0;
-		QString name, active, info, ip;
+		QString name, active, info, ip, location, system;
 	};
 	using List = std::vector<Entry>;
 
@@ -40,6 +40,17 @@ public:
 	[[nodiscard]] int total() const;
 	[[nodiscard]] rpl::producer<int> totalChanges() const;
 
+	void updateTTL(int days);
+	[[nodiscard]] rpl::producer<int> ttlDays() const;
+
+	void toggleCallsDisabledHere(bool disabled) {
+		toggleCallsDisabled(0, disabled);
+	}
+	void toggleCallsDisabled(uint64 hash, bool disabled);
+	[[nodiscard]] bool callsDisabledHere() const;
+	[[nodiscard]] rpl::producer<bool> callsDisabledHereValue() const;
+	[[nodiscard]] rpl::producer<bool> callsDisabledHereChanges() const;
+
 private:
 	MTP::Sender _api;
 	mtpRequestId _requestId = 0;
@@ -47,7 +58,14 @@ private:
 	List _list;
 	rpl::event_stream<> _listChanges;
 
+	mtpRequestId _ttlRequestId = 0;
+	rpl::variable<int> _ttlDays = 0;
+
+	base::flat_map<uint64, mtpRequestId> _toggleCallsDisabledRequests;
+	rpl::variable<bool> _callsDisabledHere;
+
 	crl::time _lastReceived = 0;
+	rpl::lifetime _lifetime;
 
 };
 

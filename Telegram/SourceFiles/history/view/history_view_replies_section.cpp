@@ -743,19 +743,15 @@ void RepliesWidget::sendingFilesConfirmed(
 		std::move(list),
 		way,
 		_history->peer->slowmodeApplied());
-	const auto replyTo = replyToId();
 	const auto type = way.sendImagesAsPhotos()
 		? SendMediaType::Photo
 		: SendMediaType::File;
-	auto action = Api::SendAction(_history);
-	action.replyTo = replyTo ? replyTo : _rootId;
-	action.options = options;
+	auto action = prepareSendAction(options);
 	action.clearDraft = false;
 	if ((groups.size() != 1 || !groups.front().sentWithCaption())
 		&& !caption.text.isEmpty()) {
-		auto message = Api::MessageToSend(_history);
+		auto message = Api::MessageToSend(action);
 		message.textWithTags = base::take(caption);
-		message.action = action;
 		session().api().sendMessage(std::move(message));
 	}
 	for (auto &group : groups) {
@@ -769,7 +765,7 @@ void RepliesWidget::sendingFilesConfirmed(
 			album,
 			action);
 	}
-	if (_composeControls->replyingToMessage().msg == replyTo) {
+	if (_composeControls->replyingToMessage().msg == action.replyTo) {
 		_composeControls->cancelReplyMessage();
 		refreshTopBarActiveChat();
 	}
@@ -877,9 +873,7 @@ void RepliesWidget::uploadFile(
 		const QByteArray &fileContent,
 		SendMediaType type) {
 	// #TODO replies schedule
-	auto action = Api::SendAction(_history);
-	action.replyTo = replyToId();
-	session().api().sendFile(fileContent, type, action);
+	session().api().sendFile(fileContent, type, prepareSendAction({}));
 }
 
 bool RepliesWidget::showSendingFilesError(
@@ -926,11 +920,19 @@ bool RepliesWidget::showSendingFilesError(
 	return true;
 }
 
+Api::SendAction RepliesWidget::prepareSendAction(
+		Api::SendOptions options) const {
+	auto result = Api::SendAction(_history, options);
+	result.replyTo = replyToId();
+	result.options.sendAs = _composeControls->sendAsPeer();
+	return result;
+}
+
 void RepliesWidget::send() {
 	if (_composeControls->getTextWithAppliedMarkdown().text.isEmpty()) {
 		return;
 	}
-	send(Api::SendOptions());
+	send({});
 	// #TODO replies schedule
 	//const auto callback = [=](Api::SendOptions options) { send(options); };
 	//Ui::show(
@@ -939,9 +941,7 @@ void RepliesWidget::send() {
 }
 
 void RepliesWidget::sendVoice(ComposeControls::VoiceToSend &&data) {
-	auto action = Api::SendAction(_history);
-	action.replyTo = replyToId();
-	action.options = data.options;
+	auto action = prepareSendAction(data.options);
 	session().api().sendVoiceMessage(
 		data.bytes,
 		data.waveform,
@@ -960,10 +960,8 @@ void RepliesWidget::send(Api::SendOptions options) {
 
 	const auto webPageId = _composeControls->webPageId();
 
-	auto message = ApiWrap::MessageToSend(_history);
+	auto message = ApiWrap::MessageToSend(prepareSendAction(options));
 	message.textWithTags = _composeControls->getTextWithAppliedMarkdown();
-	message.action.options = options;
-	message.action.replyTo = replyToId();
 	message.webPageId = webPageId;
 
 	//const auto error = GetErrorTextForSending(
@@ -1071,7 +1069,7 @@ void RepliesWidget::edit(
 
 void RepliesWidget::sendExistingDocument(
 		not_null<DocumentData*> document) {
-	sendExistingDocument(document, Api::SendOptions());
+	sendExistingDocument(document, {});
 	// #TODO replies schedule
 	//const auto callback = [=](Api::SendOptions options) {
 	//	sendExistingDocument(document, options);
@@ -1096,10 +1094,9 @@ bool RepliesWidget::sendExistingDocument(
 		return false;
 	}
 
-	auto message = Api::MessageToSend(_history);
-	message.action.replyTo = replyToId();
-	message.action.options = options;
-	Api::SendExistingDocument(std::move(message), document);
+	Api::SendExistingDocument(
+		Api::MessageToSend(prepareSendAction(options)),
+		document);
 
 	_composeControls->cancelReplyMessage();
 	finishSending();
@@ -1107,7 +1104,7 @@ bool RepliesWidget::sendExistingDocument(
 }
 
 void RepliesWidget::sendExistingPhoto(not_null<PhotoData*> photo) {
-	sendExistingPhoto(photo, Api::SendOptions());
+	sendExistingPhoto(photo, {});
 	// #TODO replies schedule
 	//const auto callback = [=](Api::SendOptions options) {
 	//	sendExistingPhoto(photo, options);
@@ -1132,10 +1129,9 @@ bool RepliesWidget::sendExistingPhoto(
 		return false;
 	}
 
-	auto message = Api::MessageToSend(_history);
-	message.action.replyTo = replyToId();
-	message.action.options = options;
-	Api::SendExistingPhoto(std::move(message), photo);
+	Api::SendExistingPhoto(
+		Api::MessageToSend(prepareSendAction(options)),
+		photo);
 
 	_composeControls->cancelReplyMessage();
 	finishSending();
@@ -1150,7 +1146,7 @@ void RepliesWidget::sendInlineResult(
 		controller()->show(Box<Ui::InformBox>(errorText));
 		return;
 	}
-	sendInlineResult(result, bot, Api::SendOptions());
+	sendInlineResult(result, bot, {});
 	//const auto callback = [=](Api::SendOptions options) {
 	//	sendInlineResult(result, bot, options);
 	//};
@@ -1163,9 +1159,7 @@ void RepliesWidget::sendInlineResult(
 		not_null<InlineBots::Result*> result,
 		not_null<UserData*> bot,
 		Api::SendOptions options) {
-	auto action = Api::SendAction(_history);
-	action.replyTo = replyToId();
-	action.options = options;
+	auto action = prepareSendAction(options);
 	action.generateLocal = true;
 	session().api().sendInlineResult(bot, result, action);
 
@@ -1920,9 +1914,9 @@ void RepliesWidget::listSendBotCommand(
 		_history->peer,
 		command,
 		context);
-	auto message = ApiWrap::MessageToSend(_history);
+	auto message = ApiWrap::MessageToSend(
+		prepareSendAction({}));
 	message.textWithTags = { text };
-	message.action.replyTo = replyToId();
 	session().api().sendMessage(std::move(message));
 	finishSending();
 }
@@ -1933,6 +1927,15 @@ void RepliesWidget::listHandleViaClick(not_null<UserData*> bot) {
 
 not_null<Ui::ChatTheme*> RepliesWidget::listChatTheme() {
 	return _theme.get();
+}
+
+CopyRestrictionType RepliesWidget::listCopyRestrictionType(
+		HistoryItem *item) {
+	return CopyRestrictionTypeFor(_history->peer, item);
+}
+
+CopyRestrictionType RepliesWidget::listSelectRestrictionType() {
+	return SelectRestrictionTypeFor(_history->peer);
 }
 
 void RepliesWidget::confirmDeleteSelected() {

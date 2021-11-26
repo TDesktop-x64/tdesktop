@@ -55,7 +55,6 @@ class Widget;
 namespace Media {
 namespace Player {
 class Widget;
-class VolumeWidget;
 class Panel;
 struct TrackState;
 } // namespace Player
@@ -151,7 +150,6 @@ public:
 	void showBackFromStack(
 		const SectionShow &params);
 	void orderWidgets();
-	QRect historyRect() const;
 	QPixmap grabForShowAnimation(const Window::SectionSlideParams &params);
 	void checkMainSectionToLayer();
 
@@ -242,7 +240,6 @@ public Q_SLOTS:
 protected:
 	void paintEvent(QPaintEvent *e) override;
 	void resizeEvent(QResizeEvent *e) override;
-	void keyPressEvent(QKeyEvent *e) override;
 	bool eventFilter(QObject *o, QEvent *e) override;
 
 private:
@@ -250,7 +247,6 @@ private:
 	void handleAdaptiveLayoutUpdate();
 	void updateWindowAdaptiveLayout();
 	void handleAudioUpdate(const Media::Player::TrackState &state);
-	void updateMediaPlayerPosition();
 	void updateMediaPlaylistPosition(int x);
 	void updateControlsGeometry();
 	void updateDialogsWidthAnimated();
@@ -367,7 +363,6 @@ private:
 
 	object_ptr<Window::TopBarWrapWidget<Media::Player::Widget>> _player
 		= { nullptr };
-	object_ptr<Media::Player::VolumeWidget> _playerVolume = { nullptr };
 	object_ptr<Media::Player::Panel> _playerPlaylist;
 	bool _playerUsingPanel = false;
 

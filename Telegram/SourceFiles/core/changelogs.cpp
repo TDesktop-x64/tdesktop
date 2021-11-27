@@ -160,35 +160,36 @@ std::unique_ptr<Changelogs> Changelogs::Create(
 
 void Changelogs::requestCloudLogs() {
 	_chatsSubscription.destroy();
-
-	const auto callback = [this](const MTPUpdates &result) {
-		_session->api().applyUpdates(result);
-
-		auto resultEmpty = true;
-		switch (result.type()) {
-		case mtpc_updateShortMessage:
-		case mtpc_updateShortChatMessage:
-		case mtpc_updateShort:
-			resultEmpty = false;
-			break;
-		case mtpc_updatesCombined:
-			resultEmpty = result.c_updatesCombined().vupdates().v.isEmpty();
-			break;
-		case mtpc_updates:
-			resultEmpty = result.c_updates().vupdates().v.isEmpty();
-			break;
-		case mtpc_updatesTooLong:
-		case mtpc_updateShortSentMessage:
-			LOG(("API Error: Bad updates type in app changelog."));
-			break;
-		}
-		if (resultEmpty) {
-			addLocalLogs();
-		}
-	};
-	_session->api().requestChangelog(
-		FormatVersionPrecise(_oldVersion),
-		crl::guard(this, callback));
+//
+//	const auto callback = [this](const MTPUpdates &result) {
+//		_session->api().applyUpdates(result);
+//
+//		auto resultEmpty = true;
+//		switch (result.type()) {
+//		case mtpc_updateShortMessage:
+//		case mtpc_updateShortChatMessage:
+//		case mtpc_updateShort:
+//			resultEmpty = false;
+//			break;
+//		case mtpc_updatesCombined:
+//			resultEmpty = result.c_updatesCombined().vupdates().v.isEmpty();
+//			break;
+//		case mtpc_updates:
+//			resultEmpty = result.c_updates().vupdates().v.isEmpty();
+//			break;
+//		case mtpc_updatesTooLong:
+//		case mtpc_updateShortSentMessage:
+//			LOG(("API Error: Bad updates type in app changelog."));
+//			break;
+//		}
+//		if (resultEmpty) {
+//			addLocalLogs();
+//		}
+//	};
+//	_session->api().requestChangelog(
+//		FormatVersionPrecise(_oldVersion),
+//		crl::guard(this, callback));
+    addLocalLogs();
 }
 
 void Changelogs::addLocalLogs() {

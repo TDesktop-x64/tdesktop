@@ -97,6 +97,9 @@ void ToggleHistoryArchived(not_null<History*> history, bool archived);
 Fn<void()> ClearHistoryHandler(not_null<PeerData*> peer);
 Fn<void()> DeleteAndLeaveHandler(not_null<PeerData*> peer);
 
+[[nodiscard]] Api::SendAction prepareSendAction(
+		History *history, Api::SendOptions options);
+
 QPointer<Ui::RpWidget> ShowOldForwardMessagesBox(
 	not_null<Window::SessionNavigation*> navigation,
 	Data::ForwardDraft &&draft,

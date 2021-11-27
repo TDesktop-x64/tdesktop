@@ -1098,6 +1098,14 @@ QPointer<Ui::RpWidget> ShowOldForwardMessagesBox(
 	return weak->data();
 }
 
+Api::SendAction prepareSendAction(
+		History *history, Api::SendOptions options) {
+	auto result = Api::SendAction(history, options);
+	result.replyTo = 0;
+	result.options.sendAs = nullptr;
+	return result;
+}
+
 // Source from kotatogram
 QPointer<Ui::RpWidget> ShowNewForwardMessagesBox(
 		not_null<Window::SessionNavigation*> navigation,
@@ -1183,7 +1191,7 @@ QPointer<Ui::RpWidget> ShowNewForwardMessagesBox(
 		for (const auto peer : result) {
 			const auto history = owner->history(peer);
 			if (!comment.text.isEmpty()) {
-				auto message = ApiWrap::MessageToSend(history);
+				auto message = ApiWrap::MessageToSend(prepareSendAction(history, Api::SendOptions()));
 				message.textWithTags = comment;
 				message.action.options = options;
 				message.action.clearDraft = false;
@@ -1197,7 +1205,8 @@ QPointer<Ui::RpWidget> ShowNewForwardMessagesBox(
 						MTP_vector<MTPint>(msgIds),
 						MTP_vector<MTPlong>(generateRandom()),
 						peer->input,
-						MTP_int(options.scheduled)
+						MTP_int(options.scheduled),
+						MTP_inputPeerEmpty()
 				)).done([=](const MTPUpdates &updates, mtpRequestId requestId) {
 					history->session().api().applyUpdates(updates);
 					data->requests.remove(requestId);
@@ -1336,7 +1345,7 @@ QPointer<Ui::RpWidget> ShowForwardNoQuoteMessagesBox(
 		for (const auto peer : result) {
 			const auto history = owner->history(peer);
 			if (!comment.text.isEmpty()) {
-				auto message = ApiWrap::MessageToSend(history);
+				auto message = ApiWrap::MessageToSend(prepareSendAction(history, Api::SendOptions()));
 				message.textWithTags = comment;
 				message.action.options = options;
 				message.action.clearDraft = false;
@@ -1360,7 +1369,8 @@ QPointer<Ui::RpWidget> ShowForwardNoQuoteMessagesBox(
 								peer->input,
 								MTPint(),
 								MTP_vector<MTPInputSingleMedia>(album),
-								MTP_int(options.scheduled)
+								MTP_int(options.scheduled),
+								MTP_inputPeerEmpty()
 						)).done([=](const MTPUpdates &result) {
 							//finish();
 						}).fail([=](const MTP::Error &error) {
@@ -1379,7 +1389,7 @@ QPointer<Ui::RpWidget> ShowForwardNoQuoteMessagesBox(
 					if (it->media() != nullptr && it->media()->webpage() == nullptr) {
 						if (it->media()->document() != nullptr) {
 							const auto document = it->media()->document();
-							auto message = ApiWrap::MessageToSend(history);
+							auto message = ApiWrap::MessageToSend(prepareSendAction(history, Api::SendOptions()));
 							message.textWithTags = { it->originalText().text, TextUtilities::ConvertEntitiesToTextTags(it->originalText().entities) };
 							message.action = Api::SendAction(history);
 							message.action.options.scheduled = options.scheduled;
@@ -1387,14 +1397,14 @@ QPointer<Ui::RpWidget> ShowForwardNoQuoteMessagesBox(
 						}
 						else if (it->media()->photo() != nullptr) {
 							const auto photo = it->media()->photo();
-							auto message = ApiWrap::MessageToSend(history);
+							auto message = ApiWrap::MessageToSend(prepareSendAction(history, Api::SendOptions()));
 							message.textWithTags = { it->originalText().text, TextUtilities::ConvertEntitiesToTextTags(it->originalText().entities) };
 							message.action = Api::SendAction(history);
 							message.action.options.scheduled = options.scheduled;
 							Api::SendExistingPhoto(std::move(message), photo);
 						}
 					} else {
-						auto message = ApiWrap::MessageToSend(history);
+						auto message = ApiWrap::MessageToSend(prepareSendAction(history, Api::SendOptions()));
 						message.textWithTags = { it->originalText().text, TextUtilities::ConvertEntitiesToTextTags(it->originalText().entities) };
 						message.action = Api::SendAction(history);
 						message.action.options.scheduled = options.scheduled;

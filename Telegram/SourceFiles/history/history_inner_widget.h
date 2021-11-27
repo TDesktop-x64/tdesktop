@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include <apiwrap.h>
 #include "ui/rp_widget.h"
 #include "ui/effects/animations.h"
 #include "ui/chat/select_scroll_manager.h" // Has base/timer.h.
@@ -63,6 +64,8 @@ public:
 		return _theme.get();
 	}
 
+	[[nodiscard]] Api::SendAction prepareSendAction(
+			History *history, Api::SendOptions options) const;
 	void messagesReceived(PeerData *peer, const QVector<MTPMessage> &messages);
 	void messagesReceivedDown(PeerData *peer, const QVector<MTPMessage> &messages);
 

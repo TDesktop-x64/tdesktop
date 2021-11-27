@@ -24,6 +24,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_context_menu.h"
 #include "history/view/history_view_emoji_interactions.h"
 #include "ui/chat/chat_style.h"
+#include "ui/toast/toast.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/image/image.h"
 #include "ui/toasts/common_toasts.h"
@@ -57,6 +58,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "apiwrap.h"
 #include "api/api_attached_stickers.h"
+#include "api/api_common.h"
 #include "api/api_toggling_media.h"
 #include "api/api_who_read.h"
 #include "api/api_views.h"
@@ -1619,6 +1621,14 @@ void HistoryInner::contextMenuEvent(QContextMenuEvent *e) {
 	showContextMenu(e);
 }
 
+Api::SendAction HistoryInner::prepareSendAction(
+		History *history, Api::SendOptions options) const {
+	auto result = Api::SendAction(history, options);
+	result.replyTo = 0;
+	result.options.sendAs = nullptr;
+	return result;
+}
+
 void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 	if (e->reason() == QContextMenuEvent::Mouse) {
 		mouseActionUpdate(e->globalPos());
@@ -1924,7 +1934,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
                             if (!item->emptyText() && item->media() == nullptr) {
                                 _menu->addAction(tr::lng_context_repeat_msg_no_fwd(tr::now), [=] {
                                     const auto api = &item->history()->peer->session().api();
-                                    auto message = ApiWrap::MessageToSend(_history);
+                                    auto message = ApiWrap::MessageToSend(prepareSendAction(_history, Api::SendOptions()));
                                     message.textWithTags = { item->originalText().text, TextUtilities::ConvertEntitiesToTextTags(item->originalText().entities) };
                                     message.action = Api::SendAction(item->history()->peer->owner().history(item->history()->peer));
                                     if (cRepeaterReplyToOrigMsg()) {
@@ -2119,7 +2129,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
                             if (!item->emptyText() && item->media() == nullptr) {
                                 _menu->addAction(tr::lng_context_repeat_msg_no_fwd(tr::now), [=] {
                                     const auto api = &item->history()->peer->session().api();
-                                    auto message = ApiWrap::MessageToSend(_history);
+									auto message = ApiWrap::MessageToSend(prepareSendAction(_history, Api::SendOptions()));
                                     message.textWithTags = { item->originalText().text, TextUtilities::ConvertEntitiesToTextTags(item->originalText().entities) };
                                     message.action = Api::SendAction(item->history()->peer->owner().history(item->history()->peer));
                                     if (cRepeaterReplyToOrigMsg()) {

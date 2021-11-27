@@ -286,7 +286,10 @@ void HistoryInner::setupSharingDisallowed() {
 	const auto channel = _peer->asChannel();
 	_sharingDisallowed = chat
 		? Data::PeerFlagValue(chat, ChatDataFlag::NoForwards)
-		: Data::PeerFlagValue(channel, ChannelDataFlag::NoForwards);
+		: Data::PeerFlagValue(
+			channel,
+			ChannelDataFlag::NoForwards
+		) | rpl::type_erased();
 
 	auto rights = chat
 		? chat->adminRightsValue()

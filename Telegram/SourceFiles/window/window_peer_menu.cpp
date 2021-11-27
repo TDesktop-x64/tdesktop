@@ -1195,7 +1195,6 @@ QPointer<Ui::RpWidget> ShowNewForwardMessagesBox(
 				message.textWithTags = comment;
 				message.action.options = options;
 				message.action.clearDraft = false;
-				message.action.options.sendAs = history->session().sendAsPeers().resolveChosen(history->peer);
 				api.sendMessage(std::move(message));
 			}
 			histories.sendRequest(history, requestType, [=](Fn<void()> finish) {
@@ -1350,7 +1349,6 @@ QPointer<Ui::RpWidget> ShowForwardNoQuoteMessagesBox(
 				message.textWithTags = comment;
 				message.action.options = options;
 				message.action.clearDraft = false;
-				message.action.options.sendAs = history->session().sendAsPeers().resolveChosen(history->peer);
 				api.sendMessage(std::move(message));
 			}
 
@@ -1395,7 +1393,6 @@ QPointer<Ui::RpWidget> ShowForwardNoQuoteMessagesBox(
 							message.textWithTags = { it->originalText().text, TextUtilities::ConvertEntitiesToTextTags(it->originalText().entities) };
 							message.action = Api::SendAction(history);
 							message.action.options.scheduled = options.scheduled;
-							message.action.options.sendAs = history->session().sendAsPeers().resolveChosen(history->peer);
 							Api::SendExistingDocument(std::move(message), document);
 						}
 						else if (it->media()->photo() != nullptr) {
@@ -1404,7 +1401,6 @@ QPointer<Ui::RpWidget> ShowForwardNoQuoteMessagesBox(
 							message.textWithTags = { it->originalText().text, TextUtilities::ConvertEntitiesToTextTags(it->originalText().entities) };
 							message.action = Api::SendAction(history);
 							message.action.options.scheduled = options.scheduled;
-							message.action.options.sendAs = history->session().sendAsPeers().resolveChosen(history->peer);
 							Api::SendExistingPhoto(std::move(message), photo);
 						}
 					} else {
@@ -1412,7 +1408,6 @@ QPointer<Ui::RpWidget> ShowForwardNoQuoteMessagesBox(
 						message.textWithTags = { it->originalText().text, TextUtilities::ConvertEntitiesToTextTags(it->originalText().entities) };
 						message.action = Api::SendAction(history);
 						message.action.options.scheduled = options.scheduled;
-						message.action.options.sendAs = history->session().sendAsPeers().resolveChosen(history->peer);
 						api->sendMessage(std::move(message));
 					}
 				}

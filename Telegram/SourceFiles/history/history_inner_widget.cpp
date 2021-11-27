@@ -2117,10 +2117,9 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					    if (cShowRepeaterOption()) {
                             _menu->addAction(tr::lng_context_repeat_msg(tr::now), [=] {
                                 const auto api = &item->history()->peer->session().api();
-                                auto action = Api::SendAction(item->history()->peer->owner().history(item->history()->peer));
+                                auto action = Api::SendAction(item->history()->peer->owner().history(item->history()->peer), Api::SendOptions{ .sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer) });
                                 action.clearDraft = false;
                                 action.generateLocal = false;
-                                action.options.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer);
 
                                 const auto history = item->history()->peer->owner().history(item->history()->peer);
                                 auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = std::move(MessageIdsList( 1, itemId )) });
@@ -2132,7 +2131,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
                             if (!item->emptyText() && item->media() == nullptr) {
                                 _menu->addAction(tr::lng_context_repeat_msg_no_fwd(tr::now), [=] {
                                     const auto api = &item->history()->peer->session().api();
-									auto message = ApiWrap::MessageToSend(prepareSendAction(_history, Api::SendOptions()));
+                                    auto message = ApiWrap::MessageToSend(prepareSendAction(_history, Api::SendOptions{ .sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer) }));
                                     message.textWithTags = { item->originalText().text, TextUtilities::ConvertEntitiesToTextTags(item->originalText().entities) };
                                     if (cRepeaterReplyToOrigMsg()) {
                                         message.action.replyTo = item->idOriginal();

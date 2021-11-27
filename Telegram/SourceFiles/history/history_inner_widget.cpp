@@ -55,6 +55,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "layout/layout_selection.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
+#include "main/session/send_as_peers.h"
 #include "core/application.h"
 #include "apiwrap.h"
 #include "api/api_attached_stickers.h"
@@ -1625,7 +1626,6 @@ Api::SendAction HistoryInner::prepareSendAction(
 		History *history, Api::SendOptions options) const {
 	auto result = Api::SendAction(history, options);
 	result.replyTo = 0;
-	result.options.sendAs = nullptr;
 	return result;
 }
 
@@ -1923,6 +1923,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
                                 auto action = Api::SendAction(item->history()->peer->owner().history(item->history()->peer));
                                 action.clearDraft = false;
                                 action.generateLocal = false;
+                                action.options.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer);
 
                                 const auto history = item->history()->peer->owner().history(item->history()->peer);
                                 auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = std::move(MessageIdsList( 1, itemId )) });
@@ -1937,6 +1938,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
                                     auto message = ApiWrap::MessageToSend(prepareSendAction(_history, Api::SendOptions()));
                                     message.textWithTags = { item->originalText().text, TextUtilities::ConvertEntitiesToTextTags(item->originalText().entities) };
                                     message.action = Api::SendAction(item->history()->peer->owner().history(item->history()->peer));
+                                    message.action.options.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer);
                                     if (cRepeaterReplyToOrigMsg()) {
                                         message.action.replyTo = item->idOriginal();
                                     }
@@ -1949,6 +1951,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
                             auto action = Api::SendAction(item->history()->peer->owner().history(api->session().user()->asUser()));
                             action.clearDraft = false;
                             action.generateLocal = false;
+                            action.options.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer);
 
                             const auto history = item->history()->peer->owner().history(api->session().user()->asUser());
                             auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = std::move(MessageIdsList( 1, itemId )) });
@@ -2118,6 +2121,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
                                 auto action = Api::SendAction(item->history()->peer->owner().history(item->history()->peer));
                                 action.clearDraft = false;
                                 action.generateLocal = false;
+                                action.options.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer);
 
                                 const auto history = item->history()->peer->owner().history(item->history()->peer);
                                 auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = std::move(MessageIdsList( 1, itemId )) });
@@ -2132,6 +2136,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 									auto message = ApiWrap::MessageToSend(prepareSendAction(_history, Api::SendOptions()));
                                     message.textWithTags = { item->originalText().text, TextUtilities::ConvertEntitiesToTextTags(item->originalText().entities) };
                                     message.action = Api::SendAction(item->history()->peer->owner().history(item->history()->peer));
+                                    message.action.options.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer);
                                     if (cRepeaterReplyToOrigMsg()) {
                                         message.action.replyTo = item->idOriginal();
                                     }
@@ -2144,6 +2149,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
                             auto action = Api::SendAction(item->history()->peer->owner().history(api->session().user()->asUser()));
                             action.clearDraft = false;
                             action.generateLocal = false;
+                            action.options.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer);
 
                             const auto history = item->history()->peer->owner().history(api->session().user()->asUser());
                             auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = std::move(MessageIdsList( 1, itemId )) });

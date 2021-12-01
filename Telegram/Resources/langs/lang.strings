@@ -723,12 +723,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_sessions_terminate_all_about" = "Logs out all devices except for this one.";
 "lng_sessions_incomplete" = "Incomplete login attempts";
 "lng_sessions_incomplete_about" = "The devices above have no access to your messages. The code was entered correctly, but no correct password was given.";
-"lng_sessions_terminate" = "Terminate";
+"lng_sessions_info" = "Info";
+"lng_sessions_terminate" = "Terminate Session";
 "lng_sessions_application" = "Application";
-"lng_sessions_system" = "System Version";
-"lng_sessions_ip" = "IP Address";
+"lng_sessions_system" = "System version";
+"lng_sessions_ip" = "IP address";
 "lng_sessions_location" = "Location";
-"lng_sessions_location_about" = "This location estimate is based on the IP address and may not always be accurate.";
+"lng_sessions_location_about" = "This location is based only on the IP address and may not always be accurate.";
+"lng_sessions_about_apps" = "The official Telegram app is available for Android, iPhone, iPad, Windows, macOS and Linux.";
 
 "lng_blocked_list_title" = "Blocked users";
 "lng_blocked_list_unknown_phone" = "unknown phone number";
@@ -1018,7 +1020,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_manage_public_peer_title" = "Public";
 "lng_manage_peer_no_forwards_title" = "Saving content";
 "lng_manage_peer_no_forwards" = "Restrict saving content";
-"lng_manage_peer_no_forwards_about" = "Participants won't be able to forward messages from this channel or save media files.";
+"lng_manage_peer_no_forwards_about" = "Members won't be able to forward messages from this group or save media files.";
+"lng_manage_peer_no_forwards_about_channel" = "Subscribers won't be able to forward messages from this channel or save media files.";
 
 "lng_manage_discussion_group" = "Discussion";
 "lng_manage_discussion_group_add" = "Add a group";
@@ -2022,7 +2025,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_payments_webview_no_card" = "Unfortunately, you can't add a new card with current system configuration.";
 "lng_payments_webview_no_use" = "Unfortunately, you can't use payments with current system configuration.";
 "lng_payments_webview_install_edge" = "Please install {link}.";
-"lng_payments_webview_install_webkit" = "Please install WebKitGTK 4 (webkit2gtk-4.0) using your package manager.";
+"lng_payments_webview_install_webkit" = "Please install WebKitGTK (webkit2gtk-5.0/webkit2gtk-4.1/webkit2gtk-4.0) using your package manager.";
 "lng_payments_webview_switch_mutter" = "Qt's window embedding doesn't work well with Mutter window manager. Please switch to another window manager or desktop environment.";
 "lng_payments_webview_switch_wayland" = "There is no way to embed WebView window on Wayland. Please switch to X11.";
 "lng_payments_sure_close" = "Are you sure you want to close this payment form? The changes you made will be lost.";

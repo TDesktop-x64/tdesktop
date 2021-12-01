@@ -286,7 +286,7 @@ void Call::startIncoming() {
 
 	_api.request(MTPphone_ReceivedCall(
 		MTP_inputPhoneCall(MTP_long(_id), MTP_long(_accessHash))
-	)).done([=](const MTPBool &result) {
+	)).done([=] {
 		if (_state.current() == State::Starting) {
 			setState(State::WaitingIncoming);
 		}
@@ -1209,7 +1209,7 @@ void Call::finish(FinishType type, const MTPPhoneCallDiscardReason &reason) {
 		// updates being handled, but in a guarded way.
 		crl::on_main(weak, [=] { setState(finalState); });
 		session->api().applyUpdates(result);
-	}).fail(crl::guard(weak, [this, finalState](const MTP::Error &error) {
+	}).fail(crl::guard(weak, [this, finalState] {
 		setState(finalState);
 	})).send();
 }

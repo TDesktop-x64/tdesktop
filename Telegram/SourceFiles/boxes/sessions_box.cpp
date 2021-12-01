@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/algorithm.h"
 #include "base/platform/base_platform_info.h"
 #include "boxes/self_destruction_box.h"
+#include "boxes/peer_lists_box.h"
 #include "ui/boxes/confirm_box.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
@@ -22,8 +23,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/labels.h"
 #include "ui/widgets/scroll_area.h"
 #include "ui/wrap/slide_wrap.h"
+#include "ui/wrap/padding_wrap.h"
 #include "ui/wrap/vertical_layout.h"
 #include "ui/layers/generic_box.h"
+#include "lottie/lottie_icon.h"
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "window/window_session_controller.h"
@@ -38,6 +41,66 @@ constexpr auto kSessionsShortPollTimeout = 60 * crl::time(1000);
 constexpr auto kMaxDeviceModelLength = 32;
 
 using EntryData = Api::Authorizations::Entry;
+
+enum class Type {
+	Windows,
+	Mac,
+	Ubuntu,
+	Linux,
+	iPhone,
+	iPad,
+	Android,
+	Web,
+	Chrome,
+	Edge,
+	Firefox,
+	Safari,
+	Other,
+};
+
+class Row;
+
+class RowDelegate {
+public:
+	virtual void rowUpdateRow(not_null<Row*> row) = 0;
+};
+
+class Row final : public PeerListRow {
+public:
+	Row(not_null<RowDelegate*> delegate, const EntryData &data);
+
+	void update(const EntryData &data);
+	void updateName(const QString &name);
+
+	[[nodiscard]] EntryData data() const;
+
+	QString generateName() override;
+	QString generateShortName() override;
+	PaintRoundImageCallback generatePaintUserpicCallback() override;
+
+	int elementsCount() const override;
+	QRect elementGeometry(int element, int outerWidth) const override;
+	bool elementDisabled(int element) const override;
+	bool elementOnlySelect(int element) const override;
+	void elementAddRipple(
+		int element,
+		QPoint point,
+		Fn<void()> updateCallback) override;
+	void elementsStopLastRipple() override;
+	void elementsPaint(
+		Painter &p,
+		int outerWidth,
+		bool selected,
+		int selectedElement) override;
+
+private:
+	const not_null<RowDelegate*> _delegate;
+	Ui::Text::String _location;
+	Type _type = Type::Other;
+	EntryData _data;
+	QImage _userpic;
+
+};
 
 void RenameBox(not_null<Ui::GenericBox*> box) {
 	box->setTitle(tr::lng_settings_rename_device_title());
@@ -76,61 +139,472 @@ void RenameBox(not_null<Ui::GenericBox*> box) {
 	box->addButton(tr::lng_cancel(), [=] { box->closeBox(); });
 }
 
+[[nodiscard]] QString LocationAndDate(const EntryData &entry) {
+	return (entry.location.isEmpty() ? entry.ip : entry.location)
+		+ (entry.hash
+			? (QString::fromUtf8(" \xE2\x80\xA2 ") + entry.active)
+			: QString());
+}
+
+[[nodiscard]] Type TypeFromEntry(const EntryData &entry) {
+	const auto platform = entry.platform.toLower();
+	const auto device = entry.name.toLower();
+	const auto system = entry.system.toLower();
+	const auto apiId = entry.apiId;
+	const auto kDesktop = std::array{ 2040, 17349, 611335 };
+	const auto kMac = std::array{ 2834 };
+	const auto kAndroid
+		= std::array{ 5, 6, 24, 1026, 1083, 2458, 2521, 21724 };
+	const auto kiOS = std::array{ 1, 7, 10840, 16352 };
+	const auto kWeb = std::array{ 2496, 739222, 1025907 };
+
+	const auto detectBrowser = [&]() -> std::optional<Type> {
+		if (device.contains("edg/")
+			|| device.contains("edgios/")
+			|| device.contains("edga/")) {
+			return Type::Edge;
+		} else if (device.contains("chrome")) {
+			return Type::Chrome;
+		} else if (device.contains("safari")) {
+			return Type::Safari;
+		} else if (device.contains("firefox")) {
+			return Type::Firefox;
+		}
+		return {};
+	};
+	const auto detectDesktop = [&]() -> std::optional<Type> {
+		if (platform.contains("windows") || system.contains("windows")) {
+			return Type::Windows;
+		} else if (platform.contains("macos") || system.contains("macos")) {
+			return Type::Mac;
+		} else if (platform.contains("ubuntu")
+			|| system.contains("ubuntu")
+			|| platform.contains("unity")
+			|| system.contains("unity")) {
+			return Type::Ubuntu;
+		} else if (platform.contains("linux") || system.contains("linux")) {
+			return Type::Linux;
+		}
+		return {};
+	};
+
+	if (ranges::contains(kAndroid, apiId)) {
+		return Type::Android;
+	} else if (ranges::contains(kDesktop, apiId)) {
+		return detectDesktop().value_or(Type::Linux);
+	} else if (ranges::contains(kMac, apiId)) {
+		return Type::Mac;
+	} else if (ranges::contains(kWeb, apiId)) {
+		return detectBrowser().value_or(Type::Web);
+	} else if (device.contains("chromebook")) {
+		return Type::Other;
+	} else if (const auto browser = detectBrowser()) {
+		return *browser;
+    } else if (device.contains("iphone")) {
+		return Type::iPhone;
+	} else if (device.contains("ipad")) {
+		return Type::iPad;
+	} else if (ranges::contains(kiOS, apiId)) {
+		return Type::iPhone;
+	} else if (const auto desktop = detectDesktop()) {
+		return *desktop;
+	} else if (platform.contains("android") || system.contains("android")) {
+		return Type::Android;
+    } else if (platform.contains("ios") || system.contains("ios")) {
+		return Type::iPhone;
+    }
+	return Type::Other;
+}
+
+[[nodiscard]] style::color ColorForType(Type type) {
+	switch (type) {
+	case Type::Windows:
+	case Type::Mac:
+	case Type::Other:
+		return st::historyPeer4UserpicBg; // blue
+	case Type::Ubuntu:
+		return st::historyPeer8UserpicBg; // orange
+	case Type::Linux:
+		return st::historyPeer5UserpicBg; // purple
+	case Type::iPhone:
+	case Type::iPad:
+		return st::historyPeer7UserpicBg; // sea
+	case Type::Android:
+		return st::historyPeer2UserpicBg; // green
+	case Type::Web:
+	case Type::Chrome:
+	case Type::Edge:
+	case Type::Firefox:
+	case Type::Safari:
+		return st::historyPeer6UserpicBg; // pink
+	}
+	Unexpected("Type in ColorForType.");
+}
+
+[[nodiscard]] const style::icon &IconForType(Type type) {
+	switch (type) {
+	case Type::Windows: return st::sessionIconWindows;
+	case Type::Mac: return st::sessionIconMac;
+	case Type::Ubuntu: return st::sessionIconUbuntu;
+	case Type::Linux: return st::sessionIconLinux;
+	case Type::iPhone: return st::sessionIconiPhone;
+	case Type::iPad: return st::sessionIconiPad;
+	case Type::Android: return st::sessionIconAndroid;
+	case Type::Web: return st::sessionIconWeb;
+	case Type::Chrome: return st::sessionIconChrome;
+	case Type::Edge: return st::sessionIconEdge;
+	case Type::Firefox: return st::sessionIconFirefox;
+	case Type::Safari: return st::sessionIconSafari;
+	case Type::Other: return st::sessionIconOther;
+	}
+	Unexpected("Type in IconForType.");
+}
+
+[[nodiscard]] const style::icon *IconBigForType(Type type) {
+	switch (type) {
+	case Type::Web: return &st::sessionBigIconWeb;
+	case Type::Other: return &st::sessionBigIconOther;
+	}
+	return nullptr;
+}
+
+[[nodiscard]] std::unique_ptr<Lottie::Icon> LottieForType(Type type) {
+	if (IconBigForType(type)) {
+		return nullptr;
+	}
+	const auto path = [&] {
+		switch (type) {
+		case Type::Windows: return "device_desktop_win";
+		case Type::Mac: return "device_desktop_mac";
+		case Type::Ubuntu: return "device_linux_ubuntu";
+		case Type::Linux: return "device_linux";
+		case Type::iPhone: return "device_phone_ios";
+		case Type::iPad: return "device_tablet_ios";
+		case Type::Android: return "device_phone_android";
+		case Type::Chrome: return "device_web_chrome";
+		case Type::Edge: return "device_web_edge";
+		case Type::Firefox: return "device_web_firefox";
+		case Type::Safari: return "device_web_safari";
+		}
+		Unexpected("Type in LottieForType.");
+	}();
+	const auto size = st::sessionBigLottieSize;
+	static const auto kWhite = style::owned_color(Qt::white);
+	return std::make_unique<Lottie::Icon>(Lottie::IconDescriptor{
+		.path = u":/icons/settings/devices/"_q + path + u".lottie"_q,
+		.color = kWhite.color(),
+		.sizeOverride = QSize(size, size),
+		.frame = 1,
+	});
+}
+
+[[nodiscard]] QImage GenerateUserpic(Type type) {
+	const auto size = st::sessionListItem.photoSize;
+	const auto full = size * style::DevicePixelRatio();
+	const auto rect = QRect(0, 0, size, size);
+
+	auto result = QImage(full, full, QImage::Format_ARGB32_Premultiplied);
+	result.fill(Qt::transparent);
+	result.setDevicePixelRatio(style::DevicePixelRatio());
+
+	auto p = QPainter(&result);
+	auto hq = PainterHighQualityEnabler(p);
+	p.setBrush(ColorForType(type));
+	p.setPen(Qt::NoPen);
+	p.drawEllipse(rect);
+	IconForType(type).paintInCenter(p, rect);
+	p.end();
+
+	return result;
+}
+
+[[nodiscard]] not_null<Ui::RpWidget*> GenerateUserpicBig(
+		not_null<Ui::RpWidget*> parent,
+		rpl::producer<> shown,
+		Type type) {
+	const auto size = st::sessionBigUserpicSize;
+	const auto full = size * style::DevicePixelRatio();
+	const auto rect = QRect(0, 0, size, size);
+
+	const auto result = Ui::CreateChild<Ui::RpWidget>(parent.get());
+	result->resize(rect.size());
+	struct State {
+		QImage background;
+		std::unique_ptr<Lottie::Icon> lottie;
+		QImage lottieFrame;
+		QImage colorizedFrame;
+	};
+	const auto state = result->lifetime().make_state<State>();
+	state->background = QImage(
+		full,
+		full,
+		QImage::Format_ARGB32_Premultiplied);
+	state->background.fill(Qt::transparent);
+	state->background.setDevicePixelRatio(style::DevicePixelRatio());
+	state->colorizedFrame = state->lottieFrame = state->background;
+
+	auto p = QPainter(&state->background);
+	auto hq = PainterHighQualityEnabler(p);
+	p.setBrush(ColorForType(type));
+	p.setPen(Qt::NoPen);
+	p.drawEllipse(rect);
+	if (const auto icon = IconBigForType(type)) {
+		icon->paintInCenter(p, rect);
+	}
+	p.end();
+
+	if ((state->lottie = LottieForType(type))) {
+		std::move(
+			shown
+		) | rpl::start_with_next([=] {
+			state->lottie->animate(
+				[=] { result->update(); },
+				0,
+				state->lottie->framesCount());
+		}, result->lifetime());
+	}
+
+	result->paintRequest(
+	) | rpl::start_with_next([=] {
+		auto p = QPainter(result);
+		p.drawImage(QPoint(0, 0), state->background);
+		if (state->lottie) {
+			state->lottieFrame.fill(Qt::black);
+			auto q = QPainter(&state->lottieFrame);
+			state->lottie->paintInCenter(q, result->rect());
+			q.end();
+			style::colorizeImage(
+				state->lottieFrame,
+				st::historyPeerUserpicFg->c,
+				&state->colorizedFrame);
+			p.drawImage(QPoint(0, 0), state->colorizedFrame);
+
+		}
+	}, result->lifetime());
+
+	return result;
+}
+
 void SessionInfoBox(
 		not_null<Ui::GenericBox*> box,
 		const EntryData &data,
 		Fn<void(uint64)> terminate) {
-	box->setTitle(rpl::single(data.name));
-	box->setWidth(st::boxWidth);
+	box->setWidth(st::boxWideWidth);
 
-	const auto skips = style::margins(0, 0, 0, st::settingsSectionSkip);
-	const auto date = base::unixtime::parse(data.activeTime);
-	box->addRow(
-		object_ptr<Ui::FlatLabel>(
+	const auto shown = box->lifetime().make_state<rpl::event_stream<>>();
+	box->setShowFinishedCallback([=] {
+		shown->fire({});
+	});
+
+	const auto userpicWrap = box->addRow(
+		object_ptr<Ui::FixedHeightWidget>(box, st::sessionBigUserpicSize),
+		st::sessionBigCoverPadding);
+	const auto big = GenerateUserpicBig(
+		userpicWrap,
+		shown->events(),
+		TypeFromEntry(data));
+	userpicWrap->sizeValue(
+	) | rpl::start_with_next([=](QSize size) {
+		big->move((size.width() - big->width()) / 2, 0);
+	}, userpicWrap->lifetime());
+
+	const auto nameWrap = box->addRow(
+		object_ptr<Ui::FixedHeightWidget>(
 			box,
-			rpl::single(langDateTimeFull(date)),
-			st::boxDividerLabel),
-		st::boxRowPadding + skips);
+			st::sessionBigName.maxHeight));
+	const auto name = Ui::CreateChild<Ui::FlatLabel>(
+		nameWrap,
+		rpl::single(data.name),
+		st::sessionBigName);
+	nameWrap->widthValue(
+	) | rpl::start_with_next([=](int width) {
+		name->resizeToWidth(width);
+		name->move((width - name->width()) / 2, 0);
+	}, name->lifetime());
+
+	const auto dateWrap = box->addRow(
+		object_ptr<Ui::FixedHeightWidget>(
+			box,
+			st::sessionDateLabel.style.font->height),
+		style::margins(0, 0, 0, st::sessionDateSkip));
+	const auto date = Ui::CreateChild<Ui::FlatLabel>(
+		dateWrap,
+		rpl::single(
+			langDateTimeFull(base::unixtime::parse(data.activeTime))),
+		st::sessionDateLabel);
+	rpl::combine(
+		dateWrap->widthValue(),
+		date->widthValue()
+	) | rpl::start_with_next([=](int outer, int inner) {
+		date->move((outer - inner) / 2, 0);
+	}, date->lifetime());
+
+	using namespace Settings;
+	const auto container = box->verticalLayout();
+	AddDivider(container);
+	AddSkip(container, st::sessionSubtitleSkip);
+	AddSubsectionTitle(container, tr::lng_sessions_info());
 
 	const auto add = [&](rpl::producer<QString> label, QString value) {
 		if (value.isEmpty()) {
 			return;
 		}
-		Settings::AddSubsectionTitle(
-			box->verticalLayout(),
-			std::move(label));
-		box->addRow(
+		container->add(
 			object_ptr<Ui::FlatLabel>(
-				box,
+				container,
 				rpl::single(value),
-				st::boxDividerLabel),
-			st::boxRowPadding + skips);
+				st::boxLabel),
+			st::boxRowPadding + st::sessionValuePadding);
+		container->add(
+			object_ptr<Ui::FlatLabel>(
+				container,
+				std::move(label),
+				st::sessionValueLabel),
+			(st::boxRowPadding
+				+ style::margins{ 0, 0, 0, st::sessionValueSkip }));
 	};
 	add(tr::lng_sessions_application(), data.info);
 	add(tr::lng_sessions_system(), data.system);
 	add(tr::lng_sessions_ip(), data.ip);
 	add(tr::lng_sessions_location(), data.location);
+	AddSkip(container, st::sessionValueSkip);
 	if (!data.location.isEmpty()) {
-		Settings::AddDividerText(
-			box->verticalLayout(),
-			tr::lng_sessions_location_about());
+		AddDividerText(container, tr::lng_sessions_location_about());
 	}
 
 	box->addButton(tr::lng_about_done(), [=] { box->closeBox(); });
-	box->addLeftButton(tr::lng_sessions_terminate(), [=, hash = data.hash] {
-		const auto weak = Ui::MakeWeak(box.get());
-		terminate(hash);
-		if (weak) {
-			box->closeBox();
-		}
-	}, st::attentionBoxButton);
+	if (const auto hash = data.hash) {
+		box->addLeftButton(tr::lng_sessions_terminate(), [=] {
+			const auto weak = Ui::MakeWeak(box.get());
+			terminate(hash);
+			if (weak) {
+				box->closeBox();
+			}
+		}, st::attentionBoxButton);
+	}
 }
 
-[[nodiscard]] QString LocationAndDate(const EntryData &entry) {
-	return (entry.location.isEmpty() ? entry.ip : entry.location)
-		+ (entry.hash
-			? (QString::fromUtf8(" \xe2\x80\x93 ") + entry.active)
-			: QString());
+Row::Row(not_null<RowDelegate*> delegate, const EntryData &data)
+: PeerListRow(data.hash)
+, _delegate(delegate)
+, _location(st::defaultTextStyle, LocationAndDate(data))
+, _type(TypeFromEntry(data))
+, _data(data)
+, _userpic(GenerateUserpic(_type)) {
+	setCustomStatus(_data.info);
+}
+
+void Row::update(const EntryData &data) {
+	_data = data;
+	setCustomStatus(_data.info);
+	refreshName(st::sessionListItem);
+	_location.setText(st::defaultTextStyle, LocationAndDate(_data));
+	_type = TypeFromEntry(_data);
+	_userpic = GenerateUserpic(_type);
+	_delegate->rowUpdateRow(this);
+}
+
+void Row::updateName(const QString &name) {
+	_data.name = name;
+	refreshName(st::sessionListItem);
+	_delegate->rowUpdateRow(this);
+}
+
+EntryData Row::data() const {
+	return _data;
+}
+
+QString Row::generateName() {
+	return _data.name;
+}
+
+QString Row::generateShortName() {
+	return generateName();
+}
+
+PaintRoundImageCallback Row::generatePaintUserpicCallback() {
+	return [=](
+			Painter &p,
+			int x,
+			int y,
+			int outerWidth,
+			int size) {
+		p.drawImage(x, y, _userpic);
+	};
+}
+
+int Row::elementsCount() const {
+	return 2;
+}
+
+QRect Row::elementGeometry(int element, int outerWidth) const {
+	switch (element) {
+	case 1: {
+		return QRect(
+			st::sessionListItem.namePosition.x(),
+			st::sessionLocationTop,
+			outerWidth,
+			st::normalFont->height);
+	} break;
+	case 2: {
+		const auto size = QSize(
+			st::sessionTerminate.width,
+			st::sessionTerminate.height);
+		const auto margins = QMargins(
+			0,
+			(st::sessionListItem.height - size.height()) / 2,
+			st::sessionListThreeDotsSkip,
+			0);
+		const auto right = st::sessionTerminateSkip;
+		const auto top = st::sessionTerminateTop;
+		const auto left = outerWidth - right - size.width();
+		return QRect(QPoint(left, top), size);
+	} break;
+	}
+	return QRect();
+}
+
+bool Row::elementDisabled(int element) const {
+	return !id() || (element == 1);
+}
+
+bool Row::elementOnlySelect(int element) const {
+	return false;
+}
+
+void Row::elementAddRipple(
+		int element,
+		QPoint point,
+		Fn<void()> updateCallback) {
+}
+
+void Row::elementsStopLastRipple() {
+}
+
+void Row::elementsPaint(
+		Painter &p,
+		int outerWidth,
+		bool selected,
+		int selectedElement) {
+	if (id()) {
+		const auto geometry = elementGeometry(2, outerWidth);
+		const auto position = geometry.topLeft()
+			+ st::sessionTerminate.iconPosition;
+		const auto &icon = (selectedElement == 2)
+			? st::sessionTerminate.iconOver
+			: st::sessionTerminate.icon;
+		icon.paint(p, position.x(), position.y(), outerWidth);
+	}
+	p.setFont(st::msgFont);
+	p.setPen(st::sessionInfoFg);
+	const auto locationLeft = st::sessionListItem.namePosition.x();
+	const auto available = outerWidth - locationLeft;
+	_location.drawLeftElided(
+		p,
+		locationLeft,
+		st::sessionLocationTop,
+		available,
+		outerWidth);
 }
 
 } // namespace
@@ -148,30 +622,13 @@ protected:
 	void paintEvent(QPaintEvent *e) override;
 
 private:
-	struct Entry {
-		Entry() = default;
-		Entry(const EntryData &entry)
-		: data(entry)
-		, incomplete(entry.incomplete)
-		, activeTime(entry.activeTime)
-		, name(st::sessionNameStyle, entry.name)
-		, info(st::sessionInfoStyle, entry.info)
-		, location(st::sessionInfoStyle, LocationAndDate(entry)) {
-		};
-
-		EntryData data;
-
-		bool incomplete = false;
-		TimeId activeTime = 0;
-		Ui::Text::String name, info, location;
-	};
 	struct Full {
-		Entry current;
-		std::vector<Entry> incomplete;
-		std::vector<Entry> list;
+		EntryData current;
+		std::vector<EntryData> incomplete;
+		std::vector<EntryData> list;
 	};
 	class Inner;
-	class List;
+	class ListController;
 
 	void shortPollSessions();
 	void parse(const Api::Authorizations::List &list);
@@ -193,43 +650,38 @@ private:
 
 };
 
-class SessionsContent::List : public Ui::RpWidget {
+class SessionsContent::ListController final
+	: public PeerListController
+	, public RowDelegate
+	, public base::has_weak_ptr {
 public:
-	List(QWidget *parent);
+	explicit ListController(not_null<Main::Session*> session);
 
-	void showData(gsl::span<const Entry> items);
+	Main::Session &session() const override;
+	void prepare() override;
+	void rowClicked(not_null<PeerListRow*> row) override;
+	void rowElementClicked(not_null<PeerListRow*> row, int element) override;
+
+	void rowUpdateRow(not_null<Row*> row) override;
+
+	void showData(gsl::span<const EntryData> items);
 	rpl::producer<int> itemsCount() const;
 	rpl::producer<uint64> terminateRequests() const;
 	[[nodiscard]] rpl::producer<EntryData> showRequests() const;
 
-	void terminating(uint64 hash, bool terminating);
-
-protected:
-	void resizeEvent(QResizeEvent *e) override;
-	void paintEvent(QPaintEvent *e) override;
-
-	void mousePressEvent(QMouseEvent *e) override;
-	void mouseReleaseEvent(QMouseEvent *e) override;
-
-	int resizeGetHeight(int newWidth) override;
+	[[nodiscard]] static std::unique_ptr<ListController> Add(
+		not_null<Ui::VerticalLayout*> container,
+		not_null<Main::Session*> session,
+		style::margins margins = {});
 
 private:
-	struct RowWidth {
-		int available = 0;
-		int info = 0;
-	};
-
 	void subscribeToCustomDeviceModel();
-	void computeRowWidth();
 
-	RowWidth _rowWidth;
-	std::vector<Entry> _items;
-	std::map<uint64, std::unique_ptr<Ui::IconButton>> _terminateButtons;
+	const not_null<Main::Session*> _session;
+
 	rpl::event_stream<uint64> _terminateRequests;
 	rpl::event_stream<int> _itemsCount;
 	rpl::event_stream<EntryData> _showRequests;
-
-	int _pressed = -1;
 
 };
 
@@ -244,21 +696,20 @@ public:
 	[[nodiscard]] rpl::producer<EntryData> showRequests() const;
 	[[nodiscard]] rpl::producer<uint64> terminateOne() const;
 	[[nodiscard]] rpl::producer<> terminateAll() const;
-	[[nodiscard]] rpl::producer<> renameCurrentRequests() const;
-
-	void terminatingOne(uint64 hash, bool terminating);
 
 private:
 	void setupContent();
 
 	const not_null<Window::SessionController*> _controller;
-	QPointer<List> _current;
+	std::unique_ptr<ListController> _current;
 	QPointer<Ui::SettingsButton> _terminateAll;
-	QPointer<List> _incomplete;
-	QPointer<List> _list;
+	std::unique_ptr<ListController> _incomplete;
+	std::unique_ptr<ListController> _list;
 	rpl::variable<int> _ttlDays;
 
 };
+
+//, location(st::sessionInfoStyle, LocationAndDate(entry))
 
 SessionsContent::SessionsContent(
 	QWidget*,
@@ -316,20 +767,19 @@ void SessionsContent::parse(const Api::Authorizations::List &list) {
 	}
 	_data = Full();
 	for (const auto &auth : list) {
-		auto entry = Entry(auth);
-		if (!entry.data.hash) {
-			_data.current = std::move(entry);
-		} else if (entry.incomplete) {
-			_data.incomplete.push_back(std::move(entry));
+		if (!auth.hash) {
+			_data.current = auth;
+		} else if (auth.incomplete) {
+			_data.incomplete.push_back(auth);
 		} else {
-			_data.list.push_back(std::move(entry));
+			_data.list.push_back(auth);
 		}
 	}
 
 	_loading = false;
 
-	ranges::sort(_data.list, std::greater<>(), &Entry::activeTime);
-	ranges::sort(_data.incomplete, std::greater<>(), &Entry::activeTime);
+	ranges::sort(_data.list, std::greater<>(), &EntryData::activeTime);
+	ranges::sort(_data.incomplete, std::greater<>(), &EntryData::activeTime);
 
 	_inner->showData(_data);
 
@@ -397,13 +847,12 @@ void SessionsContent::terminateOne(uint64 hash) {
 			if (mtpIsFalse(result)) {
 				return;
 			}
-			_inner->terminatingOne(hash, false);
-			const auto removeByHash = [&](std::vector<Entry> &list) {
+			const auto removeByHash = [&](std::vector<EntryData> &list) {
 				list.erase(
 					ranges::remove(
 						list,
 						hash,
-						[](const Entry &entry) { return entry.data.hash; }),
+						[](const EntryData &entry) { return entry.hash; }),
 					end(list));
 			};
 			removeByHash(_data.incomplete);
@@ -411,13 +860,11 @@ void SessionsContent::terminateOne(uint64 hash) {
 			_inner->showData(_data);
 		});
 		auto fail = crl::guard(weak, [=](const MTP::Error &error) {
-			_inner->terminatingOne(hash, false);
 		});
 		_authorizations->requestTerminate(
 			std::move(done),
 			std::move(fail),
 			hash);
-		_inner->terminatingOne(hash, true);
 	};
 	terminate(std::move(callback), tr::lng_settings_reset_one_sure(tr::now));
 }
@@ -475,17 +922,24 @@ void SessionsContent::Inner::setupContent() {
 		Ui::show(Box(RenameBox), Ui::LayerOption::KeepOther);
 	});
 
-	_current = content->add(object_ptr<List>(content));
+	const auto session = &_controller->session();
+	_current = ListController::Add(
+		content,
+		session,
+		style::margins{ 0, 0, 0, st::sessionCurrentSkip });
 	const auto terminateWrap = content->add(
 		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
 			content,
 			object_ptr<Ui::VerticalLayout>(content)))->setDuration(0);
 	const auto terminateInner = terminateWrap->entity();
 	_terminateAll = terminateInner->add(
-		object_ptr<Ui::SettingsButton>(
+		CreateButton(
 			terminateInner,
 			tr::lng_sessions_terminate_all(),
-			st::terminateSessionsButton));
+			st::sessionsTerminateAll,
+			&st::sessionsTerminateAllIcon,
+			st::sessionsTerminateAllIconLeft,
+			&st::attentionButtonFg));
 	AddSkip(terminateInner);
 	AddDividerText(terminateInner, tr::lng_sessions_terminate_all_about());
 
@@ -494,9 +948,9 @@ void SessionsContent::Inner::setupContent() {
 			content,
 			object_ptr<Ui::VerticalLayout>(content)))->setDuration(0);
 	const auto incompleteInner = incompleteWrap->entity();
-	AddSkip(incompleteInner);
+	AddSkip(incompleteInner, st::sessionSubtitleSkip);
 	AddSubsectionTitle(incompleteInner, tr::lng_sessions_incomplete());
-	_incomplete = incompleteInner->add(object_ptr<List>(incompleteInner));
+	_incomplete = ListController::Add(incompleteInner, session);
 	AddSkip(incompleteInner);
 	AddDividerText(incompleteInner, tr::lng_sessions_incomplete_about());
 
@@ -505,19 +959,18 @@ void SessionsContent::Inner::setupContent() {
 			content,
 			object_ptr<Ui::VerticalLayout>(content)))->setDuration(0);
 	const auto listInner = listWrap->entity();
-	AddSkip(listInner);
+	AddSkip(listInner, st::sessionSubtitleSkip);
 	AddSubsectionTitle(listInner, tr::lng_sessions_other_header());
-	_list = listInner->add(object_ptr<List>(listInner));
+	_list = ListController::Add(listInner, session);
 	AddSkip(listInner);
+	AddDividerText(listInner, tr::lng_sessions_about_apps());
 
 	const auto ttlWrap = content->add(
 		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
 			content,
 			object_ptr<Ui::VerticalLayout>(content)))->setDuration(0);
 	const auto ttlInner = ttlWrap->entity();
-	AddDivider(ttlInner);
-	AddSkip(ttlInner);
-
+	AddSkip(ttlInner, st::sessionSubtitleSkip);
 	AddSubsectionTitle(ttlInner, tr::lng_settings_terminate_title());
 
 	AddButtonWithLabel(
@@ -575,166 +1028,118 @@ rpl::producer<uint64> SessionsContent::Inner::terminateOne() const {
 
 rpl::producer<EntryData> SessionsContent::Inner::showRequests() const {
 	return rpl::merge(
+		_current->showRequests(),
 		_incomplete->showRequests(),
 		_list->showRequests());
 }
 
-void SessionsContent::Inner::terminatingOne(uint64 hash, bool terminating) {
-	_incomplete->terminating(hash, terminating);
-	_list->terminating(hash, terminating);
+SessionsContent::ListController::ListController(
+	not_null<Main::Session*> session)
+: _session(session) {
 }
 
-SessionsContent::List::List(QWidget *parent) : RpWidget(parent) {
-	setAttribute(Qt::WA_OpaquePaintEvent);
+Main::Session &SessionsContent::ListController::session() const {
+	return *_session;
 }
 
-void SessionsContent::List::resizeEvent(QResizeEvent *e) {
-	RpWidget::resizeEvent(e);
-
-	computeRowWidth();
-}
-
-void SessionsContent::List::subscribeToCustomDeviceModel() {
+void SessionsContent::ListController::subscribeToCustomDeviceModel() {
 	Core::App().settings().deviceModelChanges(
 	) | rpl::start_with_next([=](const QString &model) {
-		for (auto &entry : _items) {
-			if (!entry.data.hash) {
-				entry.name.setText(st::sessionNameStyle, model);
+		for (auto i = 0; i != delegate()->peerListFullRowsCount(); ++i) {
+			const auto row = delegate()->peerListRowAt(i);
+			if (!row->id()) {
+				static_cast<Row*>(row.get())->updateName(model);
 			}
 		}
-		update();
 	}, lifetime());
 }
 
-void SessionsContent::List::showData(gsl::span<const Entry> items) {
-	computeRowWidth();
+void SessionsContent::ListController::prepare() {
+}
 
-	auto buttons = base::take(_terminateButtons);
-	_items.clear();
-	_items.insert(begin(_items), items.begin(), items.end());
-	for (const auto &entry : _items) {
-		const auto hash = entry.data.hash;
-		if (!hash) {
+void SessionsContent::ListController::rowClicked(
+		not_null<PeerListRow*> row) {
+	_showRequests.fire_copy(static_cast<Row*>(row.get())->data());
+}
+
+void SessionsContent::ListController::rowElementClicked(
+		not_null<PeerListRow*> row,
+		int element) {
+	if (element == 2) {
+		if (const auto hash = static_cast<Row*>(row.get())->data().hash) {
+			_terminateRequests.fire_copy(hash);
+		}
+	}
+}
+
+void SessionsContent::ListController::rowUpdateRow(not_null<Row*> row) {
+	delegate()->peerListUpdateRow(row);
+}
+
+void SessionsContent::ListController::showData(
+		gsl::span<const EntryData> items) {
+	auto index = 0;
+	auto positions = base::flat_map<uint64, int>();
+	positions.reserve(items.size());
+	for (const auto &entry : items) {
+		const auto id = entry.hash;
+		positions.emplace(id, index++);
+		if (const auto row = delegate()->peerListFindRow(id)) {
+			static_cast<Row*>(row)->update(entry);
+		} else {
+			delegate()->peerListAppendRow(
+				std::make_unique<Row>(this, entry));
+		}
+	}
+	for (auto i = 0; i != delegate()->peerListFullRowsCount();) {
+		const auto row = delegate()->peerListRowAt(i);
+		if (positions.contains(row->id())) {
+			++i;
 			continue;
 		}
-		const auto button = [&] {
-			const auto i = buttons.find(hash);
-			return _terminateButtons.emplace(
-				hash,
-				(i != end(buttons)
-					? std::move(i->second)
-					: std::make_unique<Ui::IconButton>(
-						this,
-						st::sessionTerminate))).first->second.get();
-		}();
-		button->setClickedCallback([=] {
-			_terminateRequests.fire_copy(hash);
-		});
-		button->show();
-		const auto number = _terminateButtons.size() - 1;
-		widthValue(
-		) | rpl::start_with_next([=] {
-			button->moveToRight(
-				st::sessionTerminateSkip,
-				(number * st::sessionHeight + st::sessionTerminateTop));
-		}, lifetime());
+		delegate()->peerListRemoveRow(row);
 	}
-	resizeToWidth(width());
-	_itemsCount.fire(_items.size());
+	delegate()->peerListSortRows([&](
+			const PeerListRow &a,
+			const PeerListRow &b) {
+		return positions[a.id()] < positions[b.id()];
+	});
+	delegate()->peerListRefreshRows();
+	_itemsCount.fire(delegate()->peerListFullRowsCount());
 }
 
-rpl::producer<EntryData> SessionsContent::List::showRequests() const {
-	return _showRequests.events();
+rpl::producer<int> SessionsContent::ListController::itemsCount() const {
+	return _itemsCount.events_starting_with(
+		delegate()->peerListFullRowsCount());
 }
 
-rpl::producer<int> SessionsContent::List::itemsCount() const {
-	return _itemsCount.events_starting_with(_items.size());
-}
-
-rpl::producer<uint64> SessionsContent::List::terminateRequests() const {
+rpl::producer<uint64> SessionsContent::ListController::terminateRequests() const {
 	return _terminateRequests.events();
 }
 
-void SessionsContent::List::terminating(uint64 hash, bool terminating) {
-	const auto i = _terminateButtons.find(hash);
-	if (i != _terminateButtons.cend()) {
-		if (terminating) {
-			i->second->clearState();
-			i->second->hide();
-		} else {
-			i->second->show();
-		}
-	}
+rpl::producer<EntryData> SessionsContent::ListController::showRequests() const {
+	return _showRequests.events();
 }
 
-int SessionsContent::List::resizeGetHeight(int newWidth) {
-	return _items.size() * st::sessionHeight;
-}
-
-void SessionsContent::List::computeRowWidth() {
-	const auto available = width()
-		- st::sessionPadding.left()
-		- st::sessionTerminateSkip;
-	_rowWidth = {
-		.available = available,
-		.info = available - st::sessionTerminate.width,
-	};
-}
-
-void SessionsContent::List::paintEvent(QPaintEvent *e) {
-	QRect r(e->rect());
-	Painter p(this);
-
-	p.fillRect(r, st::boxBg);
-	p.setFont(st::linkFont);
-	const auto count = int(_items.size());
-	const auto from = floorclamp(r.y(), st::sessionHeight, 0, count);
-	const auto till = ceilclamp(
-		r.y() + r.height(),
-		st::sessionHeight,
-		0,
-		count);
-
-	const auto available = _rowWidth.available;
-	const auto x = st::sessionPadding.left();
-	const auto y = st::sessionPadding.top();
-	const auto w = width();
-	const auto xact = st::sessionTerminateSkip
-		+ st::sessionTerminate.iconPosition.x();
-	p.translate(0, from * st::sessionHeight);
-	for (auto i = from; i != till; ++i) {
-		const auto &entry = _items[i];
-
-		const auto nameW = _rowWidth.info;
-		const auto nameH = entry.name.style()->font->height;
-		const auto infoW = entry.data.hash ? _rowWidth.info : available;
-		const auto infoH = entry.info.style()->font->height;
-
-		p.setPen(st::sessionNameFg);
-		entry.name.drawLeftElided(p, x, y, nameW, w);
-
-		p.setPen(st::boxTextFg);
-		entry.info.drawLeftElided(p, x, y + nameH, infoW, w);
-
-		p.setPen(st::sessionInfoFg);
-		entry.location.drawLeftElided(p, x, y + nameH + infoH, available, w);
-
-		p.translate(0, st::sessionHeight);
-	}
-}
-
-void SessionsContent::List::mousePressEvent(QMouseEvent *e) {
-	const auto index = e->pos().y() / st::sessionHeight;
-	_pressed = (index >= 0 && index < _items.size()) ? index : -1;
-}
-
-void SessionsContent::List::mouseReleaseEvent(QMouseEvent *e) {
-	const auto index = e->pos().y() / st::sessionHeight;
-	const auto released = (index >= 0 && index < _items.size()) ? index : -1;
-	if (released == _pressed && released >= 0) {
-		_showRequests.fire_copy(_items[released].data);
-	}
-	_pressed = -1;
+auto SessionsContent::ListController::Add(
+	not_null<Ui::VerticalLayout*> container,
+	not_null<Main::Session*> session,
+	style::margins margins)
+-> std::unique_ptr<ListController> {
+	auto &lifetime = container->lifetime();
+	const auto delegate = lifetime.make_state<
+		PeerListContentDelegateSimple
+	>();
+	auto controller = std::make_unique<ListController>(session);
+	controller->setStyleOverrides(&st::sessionList);
+	const auto content = container->add(
+		object_ptr<PeerListContent>(
+			container,
+			controller.get()),
+		margins);
+	delegate->setContent(content);
+	controller->setDelegate(delegate);
+	return controller;
 }
 
 SessionsBox::SessionsBox(
@@ -770,6 +1175,7 @@ Sessions::Sessions(
 
 void Sessions::setupContent(not_null<Window::SessionController*> controller) {
 	const auto container = Ui::CreateChild<Ui::VerticalLayout>(this);
+	AddSkip(container, st::settingsPrivacySkip);
 	const auto content = container->add(
 		object_ptr<SessionsContent>(container, controller));
 	content->setupContent();

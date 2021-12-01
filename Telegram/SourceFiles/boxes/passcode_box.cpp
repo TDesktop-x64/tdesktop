@@ -478,10 +478,6 @@ void PasscodeBox::closeReplacedBy() {
 	}
 }
 
-void PasscodeBox::setPasswordFail(const MTP::Error &error) {
-	setPasswordFail(error.type());
-}
-
 void PasscodeBox::setPasswordFail(const QString &type) {
 	if (MTP::IsFloodError(type)) {
 		closeReplacedBy();
@@ -533,7 +529,7 @@ void PasscodeBox::setPasswordFail(
 
 		validateEmail(email, codeLength, newPasswordBytes);
 	} else {
-		setPasswordFail(error);
+		setPasswordFail(error.type());
 	}
 }
 
@@ -550,7 +546,7 @@ void PasscodeBox::validateEmail(
 		}
 		_setRequest = _api.request(MTPaccount_ConfirmPasswordEmail(
 			MTP_string(code)
-		)).done([=](const MTPBool &result) {
+		)).done([=] {
 			*set = true;
 			setPasswordDone(newPasswordBytes);
 		}).fail([=](const MTP::Error &error) {
@@ -579,10 +575,10 @@ void PasscodeBox::validateEmail(
 			return;
 		}
 		_setRequest = _api.request(MTPaccount_ResendPasswordEmail(
-		)).done([=](const MTPBool &result) {
+		)).done([=] {
 			_setRequest = 0;
 			resent->fire(tr::lng_cloud_password_resent(tr::now));
-		}).fail([=](const MTP::Error &error) {
+		}).fail([=] {
 			_setRequest = 0;
 			errors->fire(Lang::Hard::ServerError());
 		}).send();
@@ -834,7 +830,7 @@ void PasscodeBox::sendClearCloudPassword(
 			MTP_string(hint),
 			MTP_string(email),
 			MTPSecureSecretSettings())
-	)).done([=](const MTPBool &result) {
+	)).done([=] {
 		setPasswordDone({});
 	}).fail([=](const MTP::Error &error) mutable {
 		setPasswordFail({}, QString(), error);
@@ -869,7 +865,7 @@ void PasscodeBox::setNewCloudPassword(const QString &newPassword) {
 		_setRequest = _api.request(MTPaccount_UpdatePasswordSettings(
 			MTP_inputCheckPasswordEmpty(),
 			settings
-		)).done([=](const MTPBool &result) {
+		)).done([=] {
 			setPasswordDone(newPasswordBytes);
 		}).fail([=](const MTP::Error &error) {
 			setPasswordFail(newPasswordBytes, email, error);
@@ -942,7 +938,7 @@ void PasscodeBox::changeCloudPassword(
 			});
 		}
 	}).fail([=](const MTP::Error &error) {
-		setPasswordFail(error);
+		setPasswordFail(error.type());
 	}).handleFloodErrors().send();
 }
 
@@ -976,7 +972,7 @@ void PasscodeBox::resetSecret(
 				MTP_securePasswordKdfAlgoUnknown(), // secure_algo
 				MTP_bytes(), // secure_secret
 				MTP_long(0))) // secure_secret_id
-	)).done([=](const MTPBool &result) {
+	)).done([=] {
 		_setRequest = 0;
 		callback();
 		checkPasswordHash([=](const Core::CloudPasswordResult &check) {
@@ -1030,7 +1026,7 @@ void PasscodeBox::sendChangeCloudPassword(
 				Core::PrepareSecureSecretAlgo(_cloudFields.newSecureSecretAlgo),
 				MTP_bytes(newSecureSecret),
 				MTP_long(newSecureSecretId)))
-	)).done([=](const MTPBool &result) {
+	)).done([=] {
 		setPasswordDone(newPasswordBytes);
 	}).fail([=](const MTP::Error &error) {
 		setPasswordFail(newPasswordBytes, QString(), error);
@@ -1261,7 +1257,7 @@ void RecoverBox::submit() {
 			// From "Change cloud password".
 			_submitRequest = _api.request(MTPauth_CheckRecoveryPassword(
 				MTP_string(code)
-			)).done([=](const MTPBool &result) {
+			)).done([=] {
 				proceedToChange(code);
 			}).fail([=](const MTP::Error &error) {
 				checkSubmitFail(error);
@@ -1382,7 +1378,7 @@ RecoveryEmailValidation ConfirmRecoveryEmail(
 		}
 		*requestId = session->api().request(MTPaccount_ConfirmPasswordEmail(
 			MTP_string(code)
-		)).done([=](const MTPBool &result) {
+		)).done([=] {
 			*requestId = 0;
 			reloads->fire({});
 			if (*weak) {
@@ -1416,10 +1412,10 @@ RecoveryEmailValidation ConfirmRecoveryEmail(
 			return;
 		}
 		*requestId = session->api().request(MTPaccount_ResendPasswordEmail(
-		)).done([=](const MTPBool &result) {
+		)).done([=] {
 			*requestId = 0;
 			resent->fire(tr::lng_cloud_password_resent(tr::now));
-		}).fail([=](const MTP::Error &error) {
+		}).fail([=] {
 			*requestId = 0;
 			errors->fire(Lang::Hard::ServerError());
 		}).send();
@@ -1438,15 +1434,14 @@ RecoveryEmailValidation ConfirmRecoveryEmail(
 }
 
 [[nodiscard]] object_ptr<Ui::GenericBox> PrePasswordErrorBox(
-		const MTP::Error &error,
+		const QString &error,
 		not_null<Main::Session*> session,
 		TextWithEntities &&about) {
 	const auto type = [&] {
-		const auto &type = error.type();
-		if (type == qstr("PASSWORD_MISSING")) {
+		if (error == u"PASSWORD_MISSING"_q) {
 			return PasswordErrorType::NoPassword;
-		} else if (type.startsWith(qstr("PASSWORD_TOO_FRESH_"))
-			|| type.startsWith(qstr("SESSION_TOO_FRESH_"))) {
+		} else if (error.startsWith(u"PASSWORD_TOO_FRESH_"_q)
+			|| error.startsWith(u"SESSION_TOO_FRESH_"_q)) {
 			return PasswordErrorType::Later;
 		}
 		return PasswordErrorType::None;

@@ -46,7 +46,7 @@ RUN ln -s /opt/cmake/bin/cmake /usr/local/bin/cmake
 RUN rm $CMAKE_FILE
 
 FROM builder AS patches
-RUN git clone $GIT/desktop-app/patches.git && cd patches && git checkout be978cc050
+RUN git clone $GIT/desktop-app/patches.git && cd patches && git checkout b6c29e99da
 
 FROM builder AS extra-cmake-modules
 
@@ -829,7 +829,7 @@ RUN mkdir tg_owt
 WORKDIR tg_owt
 RUN git init
 RUN git remote add origin $GIT/desktop-app/tg_owt.git
-RUN git fetch --depth=1 origin d578c760dc6f1ae5f0f3bb5317b0b2ed04b79138
+RUN git fetch --depth=1 origin b02478677baac6d563589f216800ff9cea0fd65c
 RUN git reset --hard FETCH_HEAD
 RUN git submodule init
 RUN git submodule update

@@ -68,6 +68,7 @@ private:
 	const Fn<void(bool)> _menuOverCallback;
 	base::unique_qptr<Ui::DropdownMenu> _menu;
 	bool _temporarilyHidden = false;
+	bool _overButton = false;
 
 };
 
@@ -120,9 +121,17 @@ WithDropdownController::WithDropdownController(
 , _menuOverCallback(std::move(menuOverCallback)) {
 	button->events(
 	) | rpl::filter([=](not_null<QEvent*> e) {
-		return (e->type() == QEvent::Enter);
-	}) | rpl::start_with_next([=] {
-		showMenu();
+		return (e->type() == QEvent::Enter)
+			|| (e->type() == QEvent::Leave);
+	}) | rpl::start_with_next([=](not_null<QEvent*> e) {
+		_overButton = (e->type() == QEvent::Enter);
+		if (_overButton) {
+			InvokeQueued(button, [=] {
+				if (_overButton) {
+					showMenu();
+				}
+			});
+		}
 	}, button->lifetime());
 }
 
@@ -515,7 +524,12 @@ Widget::Widget(
 		handleSongUpdate(state);
 	}, lifetime());
 
-	PrepareVolumeDropdown(_volume.get(), controller);
+	PrepareVolumeDropdown(_volume.get(), controller, _volumeToggle->events(
+	) | rpl::filter([=](not_null<QEvent*> e) {
+		return (e->type() == QEvent::Wheel);
+	}) | rpl::map([=](not_null<QEvent*> e) {
+		return not_null{ static_cast<QWheelEvent*>(e.get()) };
+	}));
 	_volumeToggle->installEventFilter(_volume.get());
 	_volume->events(
 	) | rpl::start_with_next([=](not_null<QEvent*> e) {
@@ -528,17 +542,18 @@ Widget::Widget(
 
 	hidePlaylistOn(_playPause);
 	hidePlaylistOn(_close);
+	hidePlaylistOn(_rightControls);
 
 	setType(AudioMsgId::Type::Song);
 }
 
-void Widget::hidePlaylistOn(const object_ptr<Ui::IconButton> &button) {
-	button->events(
+void Widget::hidePlaylistOn(not_null<Ui::RpWidget*> widget) {
+	widget->events(
 	) | rpl::filter([=](not_null<QEvent*> e) {
 		return (e->type() == QEvent::Enter);
 	}) | rpl::start_with_next([=] {
 		updateOverLabelsState(false);
-	}, button->lifetime());
+	}, widget->lifetime());
 }
 
 void Widget::setupRightControls() {
@@ -734,8 +749,9 @@ void Widget::markOver(bool over) {
 	if (over) {
 		_over = true;
 		_wontBeOver = false;
-		updateControlsWrapVisibility();
-		updateOverLabelsState(true);
+		InvokeQueued(this, [=] {
+			updateControlsWrapVisibility();
+		});
 	} else {
 		_wontBeOver = true;
 		InvokeQueued(this, [=] {

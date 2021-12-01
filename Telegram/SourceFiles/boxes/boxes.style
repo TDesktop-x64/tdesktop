@@ -279,49 +279,6 @@ membersAbout: FlatLabel(defaultFlatLabel) {
 	style: boxLabelStyle;
 }
 
-sessionsScroll: boxScroll;
-sessionsHeight: 350px;
-sessionHeight: 70px;
-sessionCurrentPadding: margins(0px, 7px, 0px, 4px);
-sessionCurrentHeight: 118px;
-sessionPadding: margins(22px, 10px, 22px, 0px);
-sessionNameFont: msgNameFont;
-sessionNameFg: boxTextFg;
-sessionWhenFont: msgDateFont;
-sessionWhenFg: windowSubTextFg;
-sessionInfoFont: msgFont;
-sessionInfoFg: windowSubTextFg;
-sessionTerminateTop: 9px;
-sessionTerminateSkip: 22px;
-sessionNamePadding: margins(0px, 0px, 5px, 0px);
-sessionTerminate: IconButton {
-	width: 20px;
-	height: 20px;
-
-	icon: smallCloseIcon;
-	iconOver: smallCloseIconOver;
-	iconPosition: point(5px, 5px);
-
-	rippleAreaPosition: point(0px, 0px);
-	rippleAreaSize: 20px;
-	ripple: RippleAnimation(defaultRippleAnimation) {
-		color: windowBgOver;
-	}
-}
-sessionTerminateAllButton: LinkButton(boxLinkButton) {
-	color: attentionButtonFg;
-	overColor: attentionButtonFg;
-}
-sessionNameStyle: TextStyle(defaultTextStyle) {
-	font: sessionNameFont;
-}
-sessionWhenStyle: TextStyle(defaultTextStyle) {
-	font: sessionWhenFont;
-}
-sessionInfoStyle: TextStyle(defaultTextStyle) {
-	font: sessionInfoFont;
-}
-
 passcodeHeaderFont: font(19px);
 passcodeHeaderHeight: 80px;
 passcodeInput: InputField(introPhone) {

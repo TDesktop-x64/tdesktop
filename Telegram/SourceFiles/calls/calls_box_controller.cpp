@@ -341,7 +341,7 @@ void BoxController::loadMoreRows() {
 		} break;
 		default: Unexpected("Type of messages.Messages (Calls::BoxController::preloadRows)");
 		}
-	}).fail([this](const MTP::Error &error) {
+	}).fail([this] {
 		_loadRequestId = 0;
 	}).send();
 }

@@ -17,6 +17,7 @@ namespace Api {
 namespace {
 
 constexpr auto TestApiId = 17349;
+constexpr auto SnapApiId = 611335;
 constexpr auto DesktopApiId = 2040;
 
 Authorizations::Entry ParseEntry(const MTPDauthorization &data) {
@@ -25,9 +26,11 @@ Authorizations::Entry ParseEntry(const MTPDauthorization &data) {
 	result.hash = data.is_current() ? 0 : data.vhash().v;
 	result.incomplete = data.is_password_pending();
 
-	const auto apiId = data.vapi_id().v;
+	const auto apiId = result.apiId = data.vapi_id().v;
 	const auto isTest = (apiId == TestApiId);
-	const auto isDesktop = (apiId == DesktopApiId) || isTest;
+	const auto isDesktop = (apiId == DesktopApiId)
+		|| (apiId == SnapApiId)
+		|| isTest;
 
 	const auto appName = isDesktop
 		? QString("Telegram Desktop%1").arg(isTest ? " (GitHub)" : QString())
@@ -59,6 +62,7 @@ Authorizations::Entry ParseEntry(const MTPDauthorization &data) {
 	//	country = QString::fromUtf8(j.value()->name);
 	//}
 	result.system = qs(data.vsystem_version());
+	result.platform = qs(data.vplatform());
 	result.activeTime = data.vdate_active().v
 		? data.vdate_active().v
 		: data.vdate_created().v;
@@ -128,7 +132,7 @@ void Authorizations::reload() {
 			}) | ranges::to<List>;
 			_listChanges.fire({});
 		});
-	}).fail([=](const MTP::Error &error) {
+	}).fail([=] {
 		_requestId = 0;
 	}).send();
 }
@@ -190,9 +194,9 @@ void Authorizations::updateTTL(int days) {
 	_api.request(_ttlRequestId).cancel();
 	_ttlRequestId = _api.request(MTPaccount_SetAuthorizationTTL(
 		MTP_int(days)
-	)).done([=](const MTPBool &result) {
+	)).done([=] {
 		_ttlRequestId = 0;
-	}).fail([=](const MTP::Error &result) {
+	}).fail([=] {
 		_ttlRequestId = 0;
 	}).send();
 	_ttlDays = days;
@@ -212,9 +216,9 @@ void Authorizations::toggleCallsDisabled(uint64 hash, bool disabled) {
 		MTP_long(hash),
 		MTPBool(), // encrypted_requests_disabled
 		MTP_bool(disabled)
-	)).done([=](const MTPBool &) {
+	)).done([=] {
 		_toggleCallsDisabledRequests.remove(hash);
-	}).fail([=](const MTP::Error &) {
+	}).fail([=] {
 		_toggleCallsDisabledRequests.remove(hash);
 	}).send();
 	_toggleCallsDisabledRequests.emplace(hash, id);

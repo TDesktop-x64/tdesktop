@@ -1439,6 +1439,7 @@ void InnerWidget::suggestRestrictParticipant(
 	});
 
 	_menu->addAction(tr::lng_context_remove_from_group(tr::now), [=] {
+		const auto user = participant->asUser();
 		const auto text = tr::lng_profile_sure_kick(tr::now, lt_user, user->firstName);
 		auto editRestrictions = [=](bool hasAdminRights, ChatRestrictionsInfo currentRights) {
 			auto weak = QPointer<InnerWidget>(this);
@@ -1448,7 +1449,10 @@ void InnerWidget::suggestRestrictParticipant(
 				tr::lng_box_remove(tr::now),
 				crl::guard(this, [=] {
 					if (weak) {
-						weak->restrictUser(user, currentRights, ChannelData::KickedRestrictedRights(user));
+						restrictParticipant(
+							participant,
+							ChatRestrictionsInfo(),
+							ChannelData::KickedRestrictedRights(participant));
 					}
 					if (*weakBox) {
 						(*weakBox)->closeBox();

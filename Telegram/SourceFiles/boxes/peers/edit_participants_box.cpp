@@ -663,7 +663,7 @@ UserData *ParticipantsAdditionalData::applyCreator(
 		} else {
 			_adminCanEdit.erase(user);
 		}
-		if (data.rank().isEmpty()) {
+		if (!data.rank().isEmpty()) {
 			_adminRanks[user] = data.rank();
 		} else {
 			_adminRanks.remove(user);
@@ -694,7 +694,7 @@ UserData *ParticipantsAdditionalData::applyAdmin(
 	} else {
 		_adminCanEdit.erase(user);
 	}
-	if (data.rank().isEmpty()) {
+	if (!data.rank().isEmpty()) {
 		_adminRanks[user] = data.rank();
 	} else {
 		_adminRanks.remove(user);

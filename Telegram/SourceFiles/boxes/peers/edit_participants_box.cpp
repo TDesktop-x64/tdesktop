@@ -1935,10 +1935,10 @@ void ParticipantsBoxController::refreshCustomStatus(
 	const auto participant = row->peer();
 	const auto user = participant->asUser();
 	QString title;
-	if (_additional.adminRank(user) != "") {
-		title = _additional.adminRank(user) + "|";
-	}
 	if (_role == Role::Admins) {
+		if (_additional.adminRank(user) != "") {
+			title = _additional.adminRank(user) + "|";
+		}
 		Assert(user != nullptr);
 		if (const auto by = _additional.adminPromotedBy(user)) {
 			row->setCustomStatus(title+tr::lng_channel_admin_status_promoted_by(

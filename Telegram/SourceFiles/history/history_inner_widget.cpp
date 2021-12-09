@@ -1629,6 +1629,9 @@ Api::SendAction HistoryInner::prepareSendAction(
 		History *history, Api::SendOptions options) const {
 	auto result = Api::SendAction(history, options);
 	result.replyTo = 0;
+	if (history->peer->isUser()) {
+	    result.options.sendAs = nullptr;
+	}
 	return result;
 }
 
@@ -1925,7 +1928,9 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
                                 const auto api = &item->history()->peer->session().api();
                                 auto action = Api::SendAction(item->history()->peer->owner().history(item->history()->peer), Api::SendOptions{ .sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer) });
                                 action.clearDraft = false;
-                                action.generateLocal = false;
+                                if (item->history()->peer->isUser()) {
+                                    action.options.sendAs = nullptr;
+                                }
 
                                 const auto history = item->history()->peer->owner().history(item->history()->peer);
                                 auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = std::move(MessageIdsList( 1, itemId )) });
@@ -2119,7 +2124,9 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
                                 const auto api = &item->history()->peer->session().api();
                                 auto action = Api::SendAction(item->history()->peer->owner().history(item->history()->peer), Api::SendOptions{ .sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer) });
                                 action.clearDraft = false;
-                                action.generateLocal = false;
+                                if (item->history()->peer->isUser()) {
+                                    action.options.sendAs = nullptr;
+                                }
 
                                 const auto history = item->history()->peer->owner().history(item->history()->peer);
                                 auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = std::move(MessageIdsList( 1, itemId )) });

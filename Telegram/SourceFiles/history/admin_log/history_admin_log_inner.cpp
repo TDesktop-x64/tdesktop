@@ -1440,8 +1440,13 @@ void InnerWidget::suggestRestrictParticipant(
 	});
 
 	_menu->addAction(tr::lng_context_remove_from_group(tr::now), [=] {
-		const auto user = participant->asUser();
-		const auto text = tr::lng_profile_sure_kick(tr::now, lt_user, user->firstName);
+		PeerData* sender = nullptr;
+		if (participant->isUser()) {
+			sender = participant->asUser();
+		} else {
+			sender = participant->asChannel();
+		}
+		const auto text = tr::lng_profile_sure_kick(tr::now, lt_user, sender->name);
 		auto editRestrictions = [=](bool hasAdminRights, ChatRestrictionsInfo currentRights) {
 			auto weak = QPointer<InnerWidget>(this);
 			auto weakBox = std::make_shared<QPointer<Ui::ConfirmBox>>();
@@ -1463,12 +1468,12 @@ void InnerWidget::suggestRestrictParticipant(
 				std::move(box),
 				Ui::LayerOption::KeepOther);
 		};
-		if (base::contains(_admins, user)) {
+		if (base::contains(_admins, sender)) {
 			editRestrictions(true, ChatRestrictionsInfo());
 		} else {
 			_api.request(MTPchannels_GetParticipant(
 				_channel->inputChannel,
-				user->input
+				sender->input
 			)).done([=](const MTPchannels_ChannelParticipant &result) {
 				Expects(result.type() == mtpc_channels_channelParticipant);
 

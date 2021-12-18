@@ -295,6 +295,16 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 			[=] { controller->window().show(Box(EditContactBox, controller, user)); },
 			tracker);
 	} else {
+		if (_peer->isMegagroup()) {
+			addInfoLine(
+				tr::lng_chat_restriction_reason(),
+				StringValue(_peer->asMegagroup()->restriction_reason));
+		} else if (_peer->isChannel()) {
+			addInfoLine(
+				tr::lng_chat_restriction_reason(),
+				StringValue(_peer->asChannel()->restriction_reason));
+		}
+
 		auto linkText = LinkValue(
 			_peer
 		) | rpl::map([](const QString &link) {

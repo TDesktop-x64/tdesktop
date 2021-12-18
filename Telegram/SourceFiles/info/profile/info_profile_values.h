@@ -34,7 +34,6 @@ inline auto ToSingleLine() {
 rpl::producer<not_null<PeerData*>> MigratedOrMeValue(
 	not_null<PeerData*> peer);
 
-rpl::producer<TextWithEntities> IDValue(not_null<PeerData*> peer_id, int type);
 rpl::producer<TextWithEntities> StringValue(QString text);
 rpl::producer<TextWithEntities> NameValue(not_null<PeerData*> peer);
 rpl::producer<TextWithEntities> PhoneValue(not_null<UserData*> user);

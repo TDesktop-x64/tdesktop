@@ -1306,6 +1306,8 @@ QPointer<Ui::RpWidget> ShowForwardNoQuoteMessagesBox(
 				continue;
 			}
 
+			if (it->groupId().value == 0) continue;
+
 			// Get newest file reference for forward as copy
 			auto refreshed = [=](const Data::UpdatedFileReferences &updates) {
 				if (updates.data.empty()) {
@@ -1321,8 +1323,6 @@ QPointer<Ui::RpWidget> ShowForwardNoQuoteMessagesBox(
 					: media->document() ? media->document()->stickerOrGifOrigin()
 					: Data::FileOrigin();
 			api.refreshFileReference(origin, std::move(refreshed));
-
-			if (it->groupId().value == 0) continue;
 
 			if (media != nullptr && media->webpage() == nullptr) {
 				auto inputMedia = media->photo()

@@ -3050,7 +3050,9 @@ MessageIdsList HistoryInner::getSelectedItems() const {
 	}) | to_vector;
 
 	result |= actions::sort(less{}, [](const FullMsgId &msgId) {
-		return msgId.channel ? msgId.msg : (msgId.msg - ServerMaxMsgId);
+		return peerIsChannel(msgId.peer)
+			? msgId.msg
+			: (msgId.msg - ServerMaxMsgId);
 	});
 	return result;
 }

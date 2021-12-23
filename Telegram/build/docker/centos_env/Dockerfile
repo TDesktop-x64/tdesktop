@@ -9,9 +9,9 @@ ENV QT5_VER 5_15_2
 ENV QT5_TAG v5.15.2
 ENV QT5_PREFIX /usr/local/desktop-app/Qt-5.15.2
 ENV Qt5_DIR ${QT5_PREFIX}
-ENV QT6_VER 6_2_0
-ENV QT6_TAG v6.2.0
-ENV QT6_PREFIX /usr/local/desktop-app/Qt-6.2.0
+ENV QT6_VER 6_2_2
+ENV QT6_TAG v6.2.2
+ENV QT6_PREFIX /usr/local/desktop-app/Qt-6.2.2
 ENV Qt6_DIR ${QT6_PREFIX}
 ENV OPENSSL_VER 1_1_1
 ENV OPENSSL_PREFIX /usr/local/desktop-app/openssl-1.1.1
@@ -19,12 +19,14 @@ ENV OPENSSL_ROOT_DIR ${OPENSSL_PREFIX}
 ENV CMAKE_VER 3.21.3
 ENV CMAKE_FILE cmake-$CMAKE_VER-Linux-x86_64.sh
 ENV PATH ${PATH}:${QT5_PREFIX}/bin:${QT6_PREFIX}/bin
+ENV HFLAGS_DEBUG "-fstack-protector-all -fstack-clash-protection -fPIC"
+ENV HFLAGS "$HFLAGS_DEBUG -D_FORTIFY_SOURCE=2"
 
 RUN yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm && yum clean all
 RUN yum -y install https://packages.endpoint.com/rhel/7/os/x86_64/endpoint-repo-1.7-1.x86_64.rpm && yum clean all
 RUN yum -y install centos-release-scl && yum clean all
 
-RUN yum -y install git meson ninja-build autoconf automake libtool \
+RUN yum -y install git meson ninja-build autoconf automake libtool patch \
 	fontconfig-devel freetype-devel libX11-devel at-spi2-core-devel alsa-lib-devel \
 	pulseaudio-libs-devel mesa-libGL-devel mesa-libEGL-devel gtk3-devel \
 	perl-XML-Parser pkgconfig bison yasm file which xorg-x11-util-macros \
@@ -32,11 +34,12 @@ RUN yum -y install git meson ninja-build autoconf automake libtool \
 	devtoolset-10-binutils llvm-toolset-7.0 llvm-toolset-7.0-clang-devel \
 	llvm-toolset-7.0-llvm-devel && yum clean all
 
+# Fix a bug with argument naming in CentOS 7 glibc
+RUN sed -i 's/char \*__block/char */' /usr/include/unistd.h
+
 SHELL [ "bash", "-c", ". /opt/rh/devtoolset-10/enable; exec bash -c \"$@\"", "-s"]
 
 ENV LibrariesPath /usr/src/Libraries
-ENV HFLAGS_DEBUG "-fstack-protector-all -fstack-clash-protection -fPIC"
-ENV HFLAGS "$HFLAGS_DEBUG -D_FORTIFY_SOURCE=2"
 WORKDIR $LibrariesPath
 
 RUN mkdir /opt/cmake
@@ -46,7 +49,7 @@ RUN ln -s /opt/cmake/bin/cmake /usr/local/bin/cmake
 RUN rm $CMAKE_FILE
 
 FROM builder AS patches
-RUN git clone $GIT/desktop-app/patches.git && cd patches && git checkout b6c29e99da
+RUN git clone $GIT/desktop-app/patches.git && cd patches && git checkout 5368789dc7
 
 FROM builder AS extra-cmake-modules
 
@@ -454,9 +457,13 @@ COPY --from=drm ${LibrariesPath}/drm-cache /
 COPY --from=libva ${LibrariesPath}/libva-cache /
 COPY --from=libvdpau ${LibrariesPath}/libvdpau-cache /
 
-RUN git clone -b release/4.4 --depth=1 $GIT/FFmpeg/FFmpeg.git ffmpeg
-
+RUN mkdir ffmpeg
 WORKDIR ffmpeg
+RUN git init
+RUN git remote add origin $GIT/FFmpeg/FFmpeg.git
+RUN git fetch --depth=1 origin cc33e73618a981de7fd96385ecb34719de031f16
+RUN git reset --hard FETCH_HEAD
+
 RUN ./configure \
 	--extra-cflags="-DCONFIG_SAFE_BITSTREAM_READER=1 $HFLAGS" \
 	--extra-cxxflags="-DCONFIG_SAFE_BITSTREAM_READER=1 $HFLAGS" \
@@ -766,38 +773,6 @@ RUN [ -z "${QT6}" ] || DESTDIR="$LibrariesPath/qt-cache" cmake --install .
 WORKDIR ..
 RUN [ -z "${QT6}" ] || rm -rf qt_${QT6_VER}
 
-FROM patches AS kwayland
-ARG QT6
-
-COPY --from=extra-cmake-modules ${LibrariesPath}/extra-cmake-modules-cache /
-COPY --from=libffi ${LibrariesPath}/libffi-cache /
-COPY --from=zlib ${LibrariesPath}/zlib-cache /
-COPY --from=libproxy ${LibrariesPath}/libproxy-cache /
-COPY --from=mozjpeg ${LibrariesPath}/mozjpeg-cache /
-COPY --from=xcb ${LibrariesPath}/xcb-cache /
-COPY --from=xcb-wm ${LibrariesPath}/xcb-wm-cache /
-COPY --from=xcb-util ${LibrariesPath}/xcb-util-cache /
-COPY --from=xcb-image ${LibrariesPath}/xcb-image-cache /
-COPY --from=xcb-keysyms ${LibrariesPath}/xcb-keysyms-cache /
-COPY --from=xcb-render-util ${LibrariesPath}/xcb-render-util-cache /
-COPY --from=wayland ${LibrariesPath}/wayland-cache /
-COPY --from=wayland-protocols ${LibrariesPath}/wayland-protocols-cache /
-COPY --from=plasma-wayland-protocols ${LibrariesPath}/plasma-wayland-protocols-cache /
-COPY --from=openssl ${LibrariesPath}/openssl-cache /
-COPY --from=xkbcommon ${LibrariesPath}/xkbcommon-cache /
-COPY --from=qt ${LibrariesPath}/qt-cache /
-
-RUN git clone -b v5.87.0 --depth=1 $GIT/KDE/kwayland.git
-
-WORKDIR kwayland
-RUN [ -z "${QT6}" ] || git apply ../patches/kwayland-qt6.patch
-RUN cmake -GNinja -B build . -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTING=OFF
-RUN cmake --build build --target KF5WaylandClient --parallel
-RUN DESTDIR="$LibrariesPath/kwayland-cache" cmake --install build/src/client
-
-WORKDIR ..
-RUN rm -rf kwayland
-
 FROM patches AS breakpad
 RUN git clone https://chromium.googlesource.com/breakpad/breakpad.git
 
@@ -880,6 +855,8 @@ COPY --from=libXrender ${LibrariesPath}/libXrender-cache /
 COPY --from=libXdamage ${LibrariesPath}/libXdamage-cache /
 COPY --from=libXcomposite ${LibrariesPath}/libXcomposite-cache /
 COPY --from=wayland ${LibrariesPath}/wayland-cache /
+COPY --from=wayland-protocols ${LibrariesPath}/wayland-protocols-cache /
+COPY --from=plasma-wayland-protocols ${LibrariesPath}/plasma-wayland-protocols-cache /
 COPY --from=libpciaccess ${LibrariesPath}/libpciaccess-cache /
 COPY --from=drm ${LibrariesPath}/drm-cache /
 COPY --from=libva ${LibrariesPath}/libva-cache /
@@ -892,7 +869,6 @@ COPY --from=xkbcommon ${LibrariesPath}/xkbcommon-cache /
 COPY --from=libsigcplusplus ${LibrariesPath}/libsigcplusplus-cache /
 COPY --from=glibmm ${LibrariesPath}/glibmm-cache /
 COPY --from=qt ${LibrariesPath}/qt-cache /
-COPY --from=kwayland ${LibrariesPath}/kwayland-cache /
 COPY --from=breakpad ${LibrariesPath}/breakpad breakpad
 COPY --from=breakpad ${LibrariesPath}/breakpad-cache /
 COPY --from=webrtc ${LibrariesPath}/tg_owt tg_owt

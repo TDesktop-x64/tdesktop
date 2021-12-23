@@ -374,7 +374,7 @@ private:
 	void refreshTopBarActiveChat();
 
 	void requestMessageData(MsgId msgId);
-	void messageDataReceived(ChannelData *channel, MsgId msgId);
+	void messageDataReceived(not_null<PeerData*> peer, MsgId msgId);
 
 	[[nodiscard]] Api::SendAction prepareSendAction(
 		Api::SendOptions options) const;
@@ -674,7 +674,6 @@ private:
 
 	PeerData *_peer = nullptr;
 
-	ChannelId _channel = NoChannel;
 	bool _canSendMessages = false;
 	MsgId _showAtMsgId = ShowAtUnreadMsgId;
 

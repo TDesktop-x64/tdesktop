@@ -61,7 +61,7 @@ constexpr auto kPreloadedScreensCountFull
 constexpr auto kMediaCountForSearch = 10;
 
 UniversalMsgId GetUniversalId(FullMsgId itemId) {
-	return (itemId.channel != 0)
+	return peerIsChannel(itemId.peer)
 		? UniversalMsgId(itemId.msg)
 		: UniversalMsgId(itemId.msg - ServerMaxMsgId);
 }
@@ -855,8 +855,10 @@ FullMsgId ListWidget::computeFullId(
 	Expects(universalId != 0);
 
 	return (universalId > 0)
-		? FullMsgId(peerToChannel(_peer->id), universalId)
-		: FullMsgId(NoChannel, ServerMaxMsgId + universalId);
+		? FullMsgId(_peer->id, universalId)
+		: FullMsgId(
+			(_migrated ? _migrated : _peer.get())->id,
+			ServerMaxMsgId + universalId);
 }
 
 auto ListWidget::collectSelectedItems() const -> SelectedItems {
@@ -964,9 +966,8 @@ bool ListWidget::isMyItem(not_null<const HistoryItem*> item) const {
 }
 
 bool ListWidget::isPossiblyMyId(FullMsgId fullId) const {
-	return fullId.channel
-		? (_peer->isChannel() && peerToChannel(_peer->id) == fullId.channel)
-		: (!_peer->isChannel() || _migrated);
+	return (fullId.peer == _peer->id)
+		|| (_migrated && fullId.peer == _migrated->id);
 }
 
 bool ListWidget::isItemLayout(

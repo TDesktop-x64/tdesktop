@@ -6075,7 +6075,7 @@ bool HistoryWidget::hasHiddenPinnedMessage(not_null<PeerData*> peer) {
 	const auto top = Data::ResolveTopPinnedId(peer, migrated);
 	const auto universal = !top
 						   ? int32(0)
-						   : (migrated && !top.channel)
+						   : (migrated && !top)
 							 ? (top.msg - ServerMaxMsgId)
 							 : top.msg;
 	if (universal) {
@@ -6098,7 +6098,7 @@ bool HistoryWidget::switchPinnedHidden(not_null<PeerData*> peer, bool hidden) {
 		const auto top = Data::ResolveTopPinnedId(peer, migrated);
 		const auto universal = !top
 							   ? int32(0)
-							   : (migrated && !top.channel)
+							   : (migrated && !top)
 							   ? (top.msg - ServerMaxMsgId)
 							   : top.msg;
 		if (universal) {

@@ -1790,11 +1790,11 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			if (msgSigned) {
 				_menu->addAction(tr::lng_context_show_messages_from(tr::now), [=] {
 					App::searchByHashtag(msgSigned->author, peer, item->from()->asUser());
-				});
+				}, &st::menuIconInfo);
 			} else {
 				_menu->addAction(tr::lng_context_show_messages_from(tr::now), [=] {
 					App::searchByHashtag(QString(), peer, item->from()->asUser());
-				});
+				}, &st::menuIconInfo);
 			}
 		}
 	};
@@ -1972,7 +1972,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 								api->forwardMessages(std::move(resolved), action, [] {
 									Ui::Toast::Show(tr::lng_share_done(tr::now));
 								});
-							});
+							}, &st::menuIconDiscussion);
 						}
 						if (!item->isService() && !item->emptyText() && item->media() == nullptr) {
 							_menu->addAction(tr::lng_context_repeat_msg_no_fwd(tr::now), [=] {
@@ -1983,7 +1983,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 									message.action.replyTo = item->idOriginal();
 								}
 								api->sendMessage(std::move(message));
-							});
+							}, &st::menuIconDiscussion);
 						}
 					}
 				}
@@ -2175,7 +2175,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 								api->forwardMessages(std::move(resolved), action, [] {
 									Ui::Toast::Show(tr::lng_share_done(tr::now));
 								});
-							});
+							}, &st::menuIconDiscussion);
 						}
 						if (!item->isService() && !item->emptyText() && item->media() == nullptr) {
 							_menu->addAction(tr::lng_context_repeat_msg_no_fwd(tr::now), [=] {
@@ -2186,7 +2186,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 									message.action.replyTo = item->idOriginal();
 								}
 								api->sendMessage(std::move(message));
-							});
+							}, &st::menuIconDiscussion);
 						}
 					}
 					if (canForward) {

@@ -86,6 +86,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_pinned_section.h"
 #include "history/view/history_view_pinned_bar.h"
 #include "history/view/history_view_group_call_bar.h"
+#include "history/view/history_view_item_preview.h"
 #include "history/view/history_view_requests_bar.h"
 #include "history/view/media/history_view_media.h"
 #include "profile/profile_block_group_members.h"
@@ -603,6 +604,13 @@ HistoryWidget::HistoryWidget(
 		if (view->data()->mainView() == view) {
 			updateHistoryGeometry();
 		}
+	}, lifetime());
+
+	session().data().itemDataChanges(
+	) | rpl::filter([=](not_null<HistoryItem*> item) {
+		return !_list && (item->mainView() != nullptr);
+	}) | rpl::start_with_next([=](not_null<HistoryItem*> item) {
+		item->mainView()->itemDataChanged();
 	}, lifetime());
 
 	Core::App().settings().largeEmojiChanges(
@@ -2112,6 +2120,7 @@ void HistoryWidget::showHistory(
 			return;
 		} else {
 			session().data().sponsoredMessages().clearItems(_history);
+			session().data().hideShownSpoilers();
 		}
 		session().sendProgressManager().update(
 			_history,

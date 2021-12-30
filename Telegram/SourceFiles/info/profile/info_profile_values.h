@@ -12,6 +12,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 struct ChannelLocation;
 
+namespace Main {
+class Session;
+} // namespace Main
+
 namespace Ui {
 class RpWidget;
 template <typename Widget>
@@ -64,6 +68,8 @@ rpl::producer<int> SharedMediaCountValue(
 	Storage::SharedMediaType type);
 rpl::producer<int> CommonGroupsCountValue(not_null<UserData*> user);
 rpl::producer<bool> CanAddMemberValue(not_null<PeerData*> peer);
+rpl::producer<int> FullReactionsCountValue(not_null<Main::Session*> peer);
+rpl::producer<int> AllowedReactionsCountValue(not_null<PeerData*> peer);
 
 enum class Badge {
 	None,

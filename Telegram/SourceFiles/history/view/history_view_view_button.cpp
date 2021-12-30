@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/history_view_view_button.h"
 
+#include "api/api_chat_invite.h"
 #include "core/application.h"
 #include "core/click_handler_types.h"
 #include "data/data_cloud_themes.h"
@@ -82,7 +83,7 @@ struct ViewButton::Inner {
 	const style::margins &margins;
 	const ClickHandlerPtr link;
 	const Fn<void()> updateCallback;
-	bool underDate = true;
+	bool belowInfo = true;
 	int lastWidth = 0;
 	QPoint lastPoint;
 	std::unique_ptr<Ui::RippleAnimation> ripple;
@@ -119,9 +120,12 @@ ViewButton::Inner::Inner(not_null<PeerData*> peer, Fn<void()> updateCallback)
 	const auto my = context.other.value<ClickHandlerContext>();
 	if (const auto controller = my.sessionWindow.get()) {
 		const auto &data = controller->session().data();
-		controller->showPeer(
-			peer,
-			data.sponsoredMessages().channelPost(my.itemId));
+		const auto link = data.sponsoredMessages().channelPost(my.itemId);
+		if (link.hash) {
+			Api::CheckChatInvite(controller, *link.hash);
+		} else {
+			controller->showPeer(peer, link.msgId);
+		}
 	}
 }))
 , updateCallback(std::move(updateCallback))
@@ -143,7 +147,7 @@ ViewButton::Inner::Inner(
 	}
 }))
 , updateCallback(std::move(updateCallback))
-, underDate(false)
+, belowInfo(false)
 , text(st::historyViewButtonTextStyle, WebPageToPhrase(media->webpage())) {
 }
 
@@ -185,6 +189,10 @@ void ViewButton::resized() const {
 
 int ViewButton::height() const {
 	return st::historyViewButtonHeight;
+}
+
+bool ViewButton::belowMessageInfo() const {
+	return _inner->belowInfo;
 }
 
 void ViewButton::draw(
@@ -252,10 +260,9 @@ bool ViewButton::getState(
 }
 
 QRect ViewButton::countRect(const QRect &r) const {
-	const auto dateHeight = (_inner->underDate ? 0 : st::msgDateFont->height);
 	return QRect(
 		r.left(),
-		r.top() + r.height() - height() - dateHeight,
+		r.top() + r.height() - height(),
 		r.width(),
 		height()) - _inner->margins;
 }

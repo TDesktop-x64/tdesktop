@@ -54,6 +54,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_scheduled_messages.h"
 #include "data/data_send_action.h"
 #include "data/data_sponsored_messages.h"
+#include "data/data_message_reactions.h"
 #include "data/data_cloud_themes.h"
 #include "data/data_streaming.h"
 #include "data/data_media_rotation.h"
@@ -241,7 +242,8 @@ Session::Session(not_null<Main::Session*> session)
 , _mediaRotation(std::make_unique<MediaRotation>())
 , _histories(std::make_unique<Histories>(this))
 , _stickers(std::make_unique<Stickers>(this))
-, _sponsoredMessages(std::make_unique<SponsoredMessages>(this)) {
+, _sponsoredMessages(std::make_unique<SponsoredMessages>(this))
+, _reactions(std::make_unique<Reactions>(this)) {
 	_cache->open(_session->local().cacheKey());
 	_bigFileCache->open(_session->local().cacheBigFileKey());
 
@@ -271,7 +273,6 @@ Session::Session(not_null<Main::Session*> session)
 			session->saveSettingsDelayed();
 		}
 	}, _lifetime);
-
 }
 
 void Session::clear() {
@@ -1452,6 +1453,14 @@ rpl::producer<not_null<HistoryItem*>> Session::itemViewRefreshRequest() const {
 	return _itemViewRefreshRequest.events();
 }
 
+void Session::notifyItemDataChange(not_null<HistoryItem*> item) {
+	_itemDataChanges.fire_copy(item);
+}
+
+rpl::producer<not_null<HistoryItem*>> Session::itemDataChanges() const {
+	return _itemDataChanges.events();
+}
+
 void Session::requestItemTextRefresh(not_null<HistoryItem*> item) {
 	if (const auto i = _views.find(item); i != _views.end()) {
 		for (const auto view : i->second) {
@@ -1589,6 +1598,25 @@ void Session::unloadHeavyViewParts(
 	for (const auto view : remove) {
 		view->unloadHeavyPart();
 	}
+}
+
+void Session::registerShownSpoiler(FullMsgId id) {
+	if (const auto item = message(id)) {
+		_shownSpoilers.emplace(item);
+	}
+}
+
+void Session::unregisterShownSpoiler(FullMsgId id) {
+	if (const auto item = message(id)) {
+		_shownSpoilers.remove(item);
+	}
+}
+
+void Session::hideShownSpoilers() {
+	for (const auto &item : _shownSpoilers) {
+		item->hideSpoilers();
+	}
+	_shownSpoilers = base::flat_set<not_null<HistoryItem*>>();
 }
 
 void Session::removeMegagroupParticipant(
@@ -1810,7 +1838,7 @@ void Session::reorderTwoPinnedChats(
 	notifyPinnedDialogsOrderUpdated();
 }
 
-bool Session::checkEntitiesAndViewsUpdate(const MTPDmessage &data) {
+bool Session::updateExistingMessage(const MTPDmessage &data) {
 	const auto peer = peerFromMTP(data.vpeer_id());
 	const auto existing = message(peer, data.vid().v);
 	if (!existing) {
@@ -1838,7 +1866,7 @@ void Session::updateEditedMessage(const MTPMessage &data) {
 		return;
 	}
 	if (existing->isLocalUpdateMedia() && data.type() == mtpc_message) {
-		checkEntitiesAndViewsUpdate(data.c_message());
+		updateExistingMessage(data.c_message());
 	}
 	data.match([](const MTPDmessageEmpty &) {
 	}, [&](const MTPDmessageService &data) {
@@ -1858,7 +1886,7 @@ void Session::processMessages(
 			const auto &data = message.c_message();
 			// new message, index my forwarded messages to links overview
 			if ((type == NewMessageType::Unread)
-				&& checkEntitiesAndViewsUpdate(data)) {
+				&& updateExistingMessage(data)) {
 				continue;
 			}
 		}
@@ -2035,6 +2063,7 @@ void Session::removeDependencyMessage(not_null<HistoryItem*> item) {
 void Session::unregisterMessage(not_null<HistoryItem*> item) {
 	const auto peerId = item->history()->peer->id;
 	const auto itemId = item->id;
+	_shownSpoilers.remove(item);
 	_itemRemoved.fire_copy(item);
 	session().changes().messageUpdated(
 		item,
@@ -4050,7 +4079,7 @@ void Session::insertCheckedServiceNotification(
 				MTPint(), // edit_date
 				MTPstring(),
 				MTPlong(),
-				//MTPMessageReactions(),
+				MTPMessageReactions(),
 				MTPVector<MTPRestrictionReason>(),
 				MTPint()), // ttl_period
 			localFlags,

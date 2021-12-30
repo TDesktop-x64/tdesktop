@@ -72,6 +72,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_layers.h"
 #include "styles/style_boxes.h"
 #include "styles/style_window.h" // st::windowMinWidth
+#include "styles/style_menu_icons.h"
 
 #include <QAction>
 #include <QtGui/QGuiApplication>
@@ -336,7 +337,7 @@ void Filler::addHidePromotion() {
 		history->session().api().request(MTPhelp_HidePromoData(
 			history->peer->input
 		)).send();
-	});
+	}, &st::menuIconRemove);
 }
 
 void Filler::addTogglePin() {
@@ -352,7 +353,12 @@ void Filler::addTogglePin() {
 	const auto pinToggle = [=] {
 		TogglePinnedDialog(controller, history, filterId);
 	};
-	const auto pinAction = _addAction(pinText(), pinToggle);
+	const auto pinAction = _addAction(
+		pinText(),
+		pinToggle,
+		(history->isPinnedDialog(filterId)
+			? &st::menuIconUnpin
+			: &st::menuIconPin));
 
 	auto actionText = history->session().changes().historyUpdates(
 		history,
@@ -371,7 +377,7 @@ void Filler::addInfo() {
 			: tr::lng_context_view_channel(tr::now));
 	_addAction(text, [=] {
 		controller->showPeerInfo(peer);
-	});
+	}, peer->isUser() ? &st::menuIconProfile : &st::menuIconInfo);
 }
 
 //void Filler::addSearch() {
@@ -379,7 +385,7 @@ void Filler::addInfo() {
 //	const auto peer = _peer;
 //	_addAction(tr::lng_profile_search_messages(tr::now), [=] {
 //		controller->content()->searchInChat(peer->owner().history(peer));
-//	});
+//	}, &st::menuIconSearch);
 //}
 
 void Filler::addToggleUnreadMark() {
@@ -399,7 +405,9 @@ void Filler::addToggleUnreadMark() {
 				history,
 				!markAsRead);
 		}
-	});
+	}, (IsUnreadHistory(history)
+		? &st::menuIconMarkRead
+		: &st::menuIconMarkUnread));
 
 	auto actionText = history->session().changes().historyUpdates(
 		history,
@@ -422,7 +430,10 @@ void Filler::addToggleArchive() {
 	const auto toggle = [=] {
 		ToggleHistoryArchived(history, !isArchived());
 	};
-	const auto archiveAction = _addAction(label(), toggle);
+	const auto archiveAction = _addAction(
+		label(),
+		toggle,
+		isArchived() ? &st::menuIconUnarchive : &st::menuIconArchive);
 
 	auto actionText = history->session().changes().historyUpdates(
 		history,
@@ -455,7 +466,11 @@ void Filler::addBlockUser(not_null<UserData*> user) {
 				v::null,
 				v::null));
 		}
-	});
+	}, (!user->isBlocked()
+		? &st::menuIconBlock
+		: user->isBot()
+		? &st::menuIconRestartBot
+		: &st::menuIconUnblock));
 
 	auto actionText = _peer->session().changes().peerUpdates(
 		_peer,
@@ -475,7 +490,7 @@ void Filler::addUserActions(not_null<UserData*> user) {
 		if (user->session().supportMode()) {
 			_addAction("Edit support info", [=] {
 				user->session().supportHelper().editInfo(controller, user);
-			});
+			}, &st::menuIconEdit);
 		}
 		if (user->owner().history(user)->hasPinnedMessages()) {
 			auto hasHidden = HistoryWidget::hasHiddenPinnedMessage(user);
@@ -498,20 +513,24 @@ void Filler::addUserActions(not_null<UserData*> user) {
 		if (!user->isContact() && !user->isSelf() && !user->isBot()) {
 			_addAction(
 				tr::lng_info_add_as_contact(tr::now),
-				[=] { window->show(Box(EditContactBox, controller, user)); });
+				[=] { window->show(Box(EditContactBox, controller, user)); },
+				&st::menuIconInvite);
 		}
 		if (user->canShareThisContact()) {
 			_addAction(
 				tr::lng_info_share_contact(tr::now),
-				[=] { PeerMenuShareContactBox(controller, user); });
+				[=] { PeerMenuShareContactBox(controller, user); },
+				&st::menuIconShare);
 		}
 		if (user->isContact() && !user->isSelf()) {
 			_addAction(
 				tr::lng_info_edit_contact(tr::now),
-				[=] { window->show(Box(EditContactBox, controller, user)); });
+				[=] { window->show(Box(EditContactBox, controller, user)); },
+				&st::menuIconEdit);
 			_addAction(
 				tr::lng_info_delete_contact(tr::now),
-				[=] { PeerMenuDeleteContact(user); });
+				[=] { PeerMenuDeleteContact(user); },
+				&st::menuIconRemove);
 		}
 		if (user->isBot()
 			&& !user->isRepliesChat()
@@ -519,26 +538,31 @@ void Filler::addUserActions(not_null<UserData*> user) {
 			using AddBotToGroup = AddBotToGroupBoxController;
 			_addAction(
 				tr::lng_profile_invite_to_group(tr::now),
-				[=] { AddBotToGroup::Start(user); });
+				[=] { AddBotToGroup::Start(user); },
+				&st::menuIconInvite);
 		}
 		addPollAction(user);
 		if (!user->isBot() && _request.section == Section::History) {
 			_addAction(
 				tr::lng_chat_theme_change(tr::now),
-				[=] { controller->toggleChooseChatTheme(user); });
+				[=] { controller->toggleChooseChatTheme(user); },
+				&st::menuIconChangeColors);
 		}
 		if (user->canExportChatHistory()) {
 			_addAction(
 				tr::lng_profile_export_chat(tr::now),
-				[=] { PeerMenuExportChat(user); });
+				[=] { PeerMenuExportChat(user); },
+				&st::menuIconExport);
 		}
 	}
 	_addAction(
 		tr::lng_profile_delete_conversation(tr::now),
-		DeleteAndLeaveHandler(user));
+		DeleteAndLeaveHandler(user),
+		&st::menuIconDelete);
 	_addAction(
 		tr::lng_profile_clear_history(tr::now),
-		ClearHistoryHandler(user));
+		ClearHistoryHandler(user),
+		&st::menuIconClear);
 	if (!user->isInaccessible()
 		&& user != user->session().user()
 		&& !user->isRepliesChat()
@@ -554,7 +578,7 @@ void Filler::addChatActions(not_null<ChatData*> chat) {
 			const auto text = tr::lng_manage_group_title(tr::now);
 			_addAction(text, [=] {
 				navigation->showEditPeerBox(chat);
-			});
+			}, &st::menuIconManage);
 		}
 		if (chat->owner().history(chat)->hasPinnedMessages()) {
 			auto hasHidden = HistoryWidget::hasHiddenPinnedMessage(chat);
@@ -577,26 +601,30 @@ void Filler::addChatActions(not_null<ChatData*> chat) {
 		if (chat->canAddMembers()) {
 			_addAction(
 				tr::lng_channel_add_members(tr::now),
-				[=] { AddChatMembers(navigation, chat); });
+				[=] { AddChatMembers(navigation, chat); },
+				&st::menuIconInvite);
 		}
 		addPollAction(chat);
 		if (chat->canExportChatHistory()) {
 			_addAction(
 				tr::lng_profile_export_chat(tr::now),
-				[=] { PeerMenuExportChat(chat); });
+				[=] { PeerMenuExportChat(chat); },
+				&st::menuIconExport);
 		}
 	}
 	_addAction(
 		tr::lng_profile_clear_and_exit(tr::now),
-		DeleteAndLeaveHandler(_peer));
+		DeleteAndLeaveHandler(_peer),
+		&st::menuIconDelete);
 	_addAction(
 		tr::lng_profile_clear_history(tr::now),
-		ClearHistoryHandler(_peer));
+		ClearHistoryHandler(_peer),
+		&st::menuIconClear);
 	if (_request.section != Section::ChatsList) {
 		if (!chat->amCreator()) {
 			_addAction(tr::lng_profile_report(tr::now), [=] {
 				HistoryView::ShowReportPeerBox(navigation, chat);
-			});
+			}, &st::menuIconReport);
 		}
 	}
 }
@@ -616,7 +644,7 @@ void Filler::addChannelActions(not_null<ChannelData*> channel) {
 					navigation->showPeerHistory(
 						chat,
 						Window::SectionShow::Way::Forward);
-				});
+				}, &st::menuIconDiscussion);
 			}
 		}
 		if (EditPeerInfoBox::Available(channel)) {
@@ -625,7 +653,7 @@ void Filler::addChannelActions(not_null<ChannelData*> channel) {
 				: tr::lng_manage_channel_title(tr::now);
 			_addAction(text, [=] {
 				navigation->showEditPeerBox(channel);
-			});
+			}, &st::menuIconManage);
 		}
 		if (channel->owner().history(channel)->hasPinnedMessages()) {
 			auto hasHidden = HistoryWidget::hasHiddenPinnedMessage(channel);
@@ -650,7 +678,8 @@ void Filler::addChannelActions(not_null<ChannelData*> channel) {
 				(channel->isMegagroup()
 					? tr::lng_channel_add_members(tr::now)
 					: tr::lng_channel_add_users(tr::now)),
-				[=] { PeerMenuAddChannelMembers(navigation, channel); });
+				[=] { PeerMenuAddChannelMembers(navigation, channel); },
+				&st::menuIconInvite);
 		}
 		addPollAction(channel);
 		if (channel->canExportChatHistory()) {
@@ -658,19 +687,24 @@ void Filler::addChannelActions(not_null<ChannelData*> channel) {
 				(isGroup
 					? tr::lng_profile_export_chat(tr::now)
 					: tr::lng_profile_export_channel(tr::now)),
-				[=] { PeerMenuExportChat(channel); });
+				[=] { PeerMenuExportChat(channel); },
+				&st::menuIconExport);
 		}
 	}
 	if (channel->amIn()) {
 		auto text = isGroup
 			? tr::lng_profile_leave_group(tr::now)
 			: tr::lng_profile_leave_channel(tr::now);
-		_addAction(text, DeleteAndLeaveHandler(channel));
+		_addAction(
+			text,
+			DeleteAndLeaveHandler(channel),
+			&st::menuIconLeave);
 		if ((isGroup && !channel->isPublic())
 			|| channel->canDeleteMessages()) {
 			_addAction(
 				tr::lng_profile_clear_history(tr::now),
-				ClearHistoryHandler(channel));
+				ClearHistoryHandler(channel),
+				&st::menuIconClear);
 		}
 	} else {
 		auto text = isGroup
@@ -678,13 +712,14 @@ void Filler::addChannelActions(not_null<ChannelData*> channel) {
 			: tr::lng_profile_join_channel(tr::now);
 		_addAction(
 			text,
-			[=] { channel->session().api().joinChannel(channel); });
+			[=] { channel->session().api().joinChannel(channel); },
+			&st::menuIconInvite); // #TODO icons
 	}
 	if (_request.section != Section::ChatsList) {
 		if (!channel->amCreator()) {
 			_addAction(tr::lng_profile_report(tr::now), [=] {
 				HistoryView::ShowReportPeerBox(navigation, channel);
-			});
+			}, &st::menuIconReport);
 		}
 	}
 }
@@ -716,7 +751,10 @@ void Filler::addPollAction(not_null<PeerData*> peer) {
 			source,
 			sendMenuType);
 	};
-	_addAction(tr::lng_polls_create(tr::now), std::move(callback));
+	_addAction(
+		tr::lng_polls_create(tr::now),
+		std::move(callback),
+		&st::menuIconCreatePoll);
 }
 
 void Filler::fill() {
@@ -771,7 +809,7 @@ void Filler::addTogglesForArchive() {
 	_addAction(text, [=] {
 		controller->session().settings().setArchiveCollapsed(!hidden);
 		controller->session().saveSettingsDelayed();
-	});
+	}, hidden ? &st::menuIconExpand : &st::menuIconCollapse);
 
 	_addAction(tr::lng_context_archive_to_menu(tr::now), [=] {
 		Ui::Toast::Show(Ui::Toast::Config{
@@ -784,7 +822,7 @@ void Filler::addTogglesForArchive() {
 		controller->session().settings().setArchiveInMainMenu(
 			!controller->session().settings().archiveInMainMenu());
 		controller->session().saveSettingsDelayed();
-	});
+	}, &st::menuIconToMainMenu);
 
 	MenuAddMarkAsReadChatListAction(
 		[folder = _folder] { return folder->chatsList(); },
@@ -1626,7 +1664,9 @@ void PeerMenuAddMuteAction(
 		} else {
 			peer->owner().updateNotifySettings(peer, 0);
 		}
-	});
+	}, (peer->owner().notifyIsMuted(peer)
+		? &st::menuIconUnmute
+		: &st::menuIconMute));
 
 	auto actionText = Info::Profile::NotificationsEnabledValue(
 		peer
@@ -1652,7 +1692,8 @@ void MenuAddMarkAsReadAllChatsAction(
 	};
 	addAction(
 		tr::lng_context_mark_read_all(tr::now),
-		std::move(callback));
+		std::move(callback),
+		&st::menuIconMarkRead);
 }
 
 void MenuAddMarkAsReadChatListAction(
@@ -1678,7 +1719,8 @@ void MenuAddMarkAsReadChatListAction(
 	};
 	addAction(
 		tr::lng_context_mark_read(tr::now),
-		std::move(callback));
+		std::move(callback),
+		&st::menuIconMarkRead);
 }
 
 void ToggleHistoryArchived(not_null<History*> history, bool archived) {

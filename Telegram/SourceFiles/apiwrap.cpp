@@ -2936,7 +2936,7 @@ void ApiWrap::preloadEnoughUnreadMentions(not_null<History*> history) {
 void ApiWrap::checkForUnreadMentions(
 		const base::flat_set<MsgId> &possiblyReadMentions,
 		ChannelData *channel) {
-	for (const auto msgId : possiblyReadMentions) {
+	for (const auto &msgId : possiblyReadMentions) {
 		requestMessageData(channel, msgId, [=] {
 			const auto item = channel
 				? _session->data().message(channel->id, msgId)
@@ -3686,9 +3686,6 @@ void ApiWrap::sendInlineResult(
 	FillMessagePostFlags(action, peer, flags);
 	if (silentPost) {
 		sendFlags |= MTPmessages_SendInlineBotResult::Flag::f_silent;
-	}
-	if (bot) {
-		flags |= MessageFlag::HasViaBot;
 	}
 	if (action.options.scheduled) {
 		flags |= MessageFlag::IsOrWasScheduled;

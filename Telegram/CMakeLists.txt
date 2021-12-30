@@ -153,8 +153,8 @@ PRIVATE
     api/api_user_privacy.h
     api/api_views.cpp
     api/api_views.h
-    api/api_who_read.cpp
-    api/api_who_read.h
+    api/api_who_reacted.cpp
+    api/api_who_reacted.h
     boxes/filters/edit_filter_box.cpp
     boxes/filters/edit_filter_box.h
     boxes/filters/edit_filter_chats_list.cpp
@@ -180,6 +180,8 @@ PRIVATE
     boxes/peers/edit_peer_history_visibility_box.h
     boxes/peers/edit_peer_permissions_box.cpp
     boxes/peers/edit_peer_permissions_box.h
+    boxes/peers/edit_peer_reactions.cpp
+    boxes/peers/edit_peer_reactions.h
     boxes/peers/edit_peer_requests_box.cpp
     boxes/peers/edit_peer_requests_box.h
     boxes/peers/edit_peer_type_box.cpp
@@ -449,6 +451,8 @@ PRIVATE
     data/data_media_types.h
     data/data_messages.cpp
     data/data_messages.h
+    data/data_message_reactions.cpp
+    data/data_message_reactions.h
     data/data_msg_id.h
     data/data_notify_settings.cpp
     data/data_notify_settings.h
@@ -623,6 +627,12 @@ PRIVATE
     history/view/media/history_view_theme_document.cpp
     history/view/media/history_view_web_page.h
     history/view/media/history_view_web_page.cpp
+    history/view/reactions/message_reactions_list.cpp
+    history/view/reactions/message_reactions_list.h
+    history/view/reactions/message_reactions_selector.cpp
+    history/view/reactions/message_reactions_selector.h
+    history/view/history_view_bottom_info.cpp
+    history/view/history_view_bottom_info.h
     history/view/history_view_contact_status.cpp
     history/view/history_view_contact_status.h
     history/view/history_view_context_menu.cpp
@@ -637,6 +647,7 @@ PRIVATE
     history/view/history_view_empty_list_bubble.h
     history/view/history_view_group_call_bar.cpp
     history/view/history_view_group_call_bar.h
+    history/view/history_view_item_preview.h
     history/view/history_view_list_widget.cpp
     history/view/history_view_list_widget.h
     history/view/history_view_message.cpp
@@ -648,6 +659,10 @@ PRIVATE
     history/view/history_view_pinned_section.h
     history/view/history_view_pinned_tracker.cpp
     history/view/history_view_pinned_tracker.h
+    history/view/history_view_react_button.cpp
+    history/view/history_view_react_button.h
+    history/view/history_view_reactions.cpp
+    history/view/history_view_reactions.h
     history/view/history_view_replies_section.cpp
     history/view/history_view_replies_section.h
     history/view/history_view_requests_bar.cpp
@@ -660,6 +675,8 @@ PRIVATE
     history/view/history_view_send_action.h
     history/view/history_view_service_message.cpp
     history/view/history_view_service_message.h
+    history/view/history_view_spoiler_click_handler.cpp
+    history/view/history_view_spoiler_click_handler.h
     history/view/history_view_top_bar_widget.cpp
     history/view/history_view_top_bar_widget.h
     history/view/history_view_view_button.cpp

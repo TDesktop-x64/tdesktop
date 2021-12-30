@@ -52,6 +52,7 @@ class WallPaper;
 class ScheduledMessages;
 class SendActionManager;
 class SponsoredMessages;
+class Reactions;
 class ChatFilters;
 class CloudThemes;
 class Streaming;
@@ -113,6 +114,10 @@ public:
 	[[nodiscard]] SponsoredMessages &sponsoredMessages() const {
 		return *_sponsoredMessages;
 	}
+	[[nodiscard]] Reactions &reactions() const {
+		return *_reactions;
+	}
+
 	[[nodiscard]] MsgId nextNonHistoryEntryId() {
 		return ++_nonHistoryEntryId;
 	}
@@ -251,6 +256,8 @@ public:
 	[[nodiscard]] rpl::producer<not_null<HistoryItem*>> animationPlayInlineRequest() const;
 	void notifyHistoryUnloaded(not_null<const History*> history);
 	[[nodiscard]] rpl::producer<not_null<const History*>> historyUnloaded() const;
+	void notifyItemDataChange(not_null<HistoryItem*> item);
+	[[nodiscard]] rpl::producer<not_null<HistoryItem*>> itemDataChanges() const;
 
 	[[nodiscard]] rpl::producer<not_null<const HistoryItem*>> itemRemoved() const;
 	[[nodiscard]] rpl::producer<not_null<const HistoryItem*>> itemRemoved(
@@ -274,6 +281,10 @@ public:
 		not_null<HistoryView::ElementDelegate*> delegate,
 		int from,
 		int till);
+
+	void registerShownSpoiler(FullMsgId id);
+	void unregisterShownSpoiler(FullMsgId id);
+	void hideShownSpoilers();
 
 	using MegagroupParticipant = std::tuple<
 		not_null<ChannelData*>,
@@ -337,7 +348,7 @@ public:
 	void unregisterMessageTTL(TimeId when, not_null<HistoryItem*> item);
 
 	// Returns true if item found and it is not detached.
-	bool checkEntitiesAndViewsUpdate(const MTPDmessage &data);
+	bool updateExistingMessage(const MTPDmessage &data);
 	void updateEditedMessage(const MTPMessage &data);
 	void processMessages(
 		const QVector<MTPMessage> &data,
@@ -832,6 +843,7 @@ private:
 	rpl::event_stream<not_null<ViewElement*>> _viewResizeRequest;
 	rpl::event_stream<not_null<HistoryItem*>> _itemViewRefreshRequest;
 	rpl::event_stream<not_null<HistoryItem*>> _itemTextRefreshRequest;
+	rpl::event_stream<not_null<HistoryItem*>> _itemDataChanges;
 	rpl::event_stream<not_null<HistoryItem*>> _animationPlayInlineRequest;
 	rpl::event_stream<not_null<const HistoryItem*>> _itemRemoved;
 	rpl::event_stream<not_null<const ViewElement*>> _viewRemoved;
@@ -935,6 +947,8 @@ private:
 	rpl::event_stream<InviteToCall> _invitesToCalls;
 	base::flat_map<uint64, base::flat_set<not_null<UserData*>>> _invitedToCallUsers;
 
+	base::flat_set<not_null<HistoryItem*>> _shownSpoilers;
+
 	History *_topPromoted = nullptr;
 
 	NotifySettings _defaultUserNotifySettings;
@@ -959,15 +973,17 @@ private:
 	uint64 _wallpapersHash = 0;
 
 	Groups _groups;
-	std::unique_ptr<ChatFilters> _chatsFilters;
+	const std::unique_ptr<ChatFilters> _chatsFilters;
 	std::unique_ptr<ScheduledMessages> _scheduledMessages;
-	std::unique_ptr<CloudThemes> _cloudThemes;
-	std::unique_ptr<SendActionManager> _sendActionManager;
-	std::unique_ptr<Streaming> _streaming;
-	std::unique_ptr<MediaRotation> _mediaRotation;
-	std::unique_ptr<Histories> _histories;
-	std::unique_ptr<Stickers> _stickers;
+	const std::unique_ptr<CloudThemes> _cloudThemes;
+	const std::unique_ptr<SendActionManager> _sendActionManager;
+	const std::unique_ptr<Streaming> _streaming;
+	const std::unique_ptr<MediaRotation> _mediaRotation;
+	const std::unique_ptr<Histories> _histories;
+	const std::unique_ptr<Stickers> _stickers;
 	std::unique_ptr<SponsoredMessages> _sponsoredMessages;
+	const std::unique_ptr<Reactions> _reactions;
+
 	MsgId _nonHistoryEntryId = ServerMaxMsgId;
 
 	rpl::lifetime _lifetime;

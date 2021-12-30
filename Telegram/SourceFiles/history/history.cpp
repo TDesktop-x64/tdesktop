@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 
 #include "history/view/history_view_element.h"
+#include "history/view/history_view_item_preview.h"
 #include "history/history_message.h"
 #include "history/history_service.h"
 #include "history/history_item_components.h"
@@ -2961,6 +2962,16 @@ void History::checkLocalMessages() {
 void History::removeJoinedMessage() {
 	if (_joinedMessage) {
 		_joinedMessage->destroy();
+	}
+}
+
+void History::reactionsEnabledChanged(bool enabled) {
+	if (!enabled) {
+		for (const auto &item : _messages) {
+			item->updateReactions(nullptr);
+		}
+	} else {
+
 	}
 }
 

@@ -33,6 +33,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_session_controller.h"
 #include "history/history.h"
 #include "facades.h"
+#include "styles/style_menu_icons.h"
 
 namespace {
 
@@ -1522,7 +1523,9 @@ base::unique_qptr<Ui::PopupMenu> ParticipantsBoxController::rowContextMenu(
 	const auto channel = _peer->asChannel();
 	const auto participant = row->peer();
 	const auto user = participant->asUser();
-	auto result = base::make_unique_q<Ui::PopupMenu>(parent);
+	auto result = base::make_unique_q<Ui::PopupMenu>(
+		parent,
+		st::popupMenuWithIcons);
 	if (_navigation) {
 		result->addAction(
 			(participant->isUser()
@@ -1531,7 +1534,10 @@ base::unique_qptr<Ui::PopupMenu> ParticipantsBoxController::rowContextMenu(
 				? tr::lng_context_view_channel
 				: tr::lng_context_view_group)(tr::now),
 			crl::guard(this, [=] {
-				_navigation->showPeerInfo(participant); }));
+				_navigation->showPeerInfo(participant); }),
+			(participant->isUser()
+				? &st::menuIconProfile
+				: &st::menuIconInfo));
 		result->addAction(
 			tr::lng_context_show_messages_from(tr::now),
 			crl::guard(this, [=] { App::searchByHashtag(QString(), _peer, user); }));
@@ -1542,11 +1548,13 @@ base::unique_qptr<Ui::PopupMenu> ParticipantsBoxController::rowContextMenu(
 			if (user && channel->canAddMembers()) {
 				result->addAction(
 					tr::lng_context_add_to_group(tr::now),
-					crl::guard(this, [=] { unkickParticipant(user); }));
+					crl::guard(this, [=] { unkickParticipant(user); }),
+					&st::menuIconInvite);
 			}
 			result->addAction(
 				tr::lng_profile_delete_removed(tr::now),
-				crl::guard(this, [=] { removeKickedWithRow(participant); }));
+				crl::guard(this, [=] { removeKickedWithRow(participant); }),
+				&st::menuIconDelete);
 		}
 		return result;
 	}
@@ -1557,7 +1565,10 @@ base::unique_qptr<Ui::PopupMenu> ParticipantsBoxController::rowContextMenu(
 			(isAdmin
 				? tr::lng_context_edit_permissions
 				: tr::lng_context_promote_admin)(tr::now),
-			crl::guard(this, [=] { showAdmin(user); }));
+			crl::guard(this, [=] { showAdmin(user); }),
+			(isAdmin
+				? &st::menuIconAdmin
+				: &st::menuIconPromote));
 	}
 	if (user && _additional.canRestrictParticipant(participant)) {
 		const auto canRestrictWithoutKick = [&] {
@@ -1569,7 +1580,8 @@ base::unique_qptr<Ui::PopupMenu> ParticipantsBoxController::rowContextMenu(
 		if (canRestrictWithoutKick) {
 			result->addAction(
 				tr::lng_context_restrict_user(tr::now),
-				crl::guard(this, [=] { showRestricted(user); }));
+				crl::guard(this, [=] { showRestricted(user); }),
+				&st::menuIconRestrict);
 		}
 	}
 	if (user && _additional.canRemoveParticipant(participant)) {
@@ -1579,7 +1591,8 @@ base::unique_qptr<Ui::PopupMenu> ParticipantsBoxController::rowContextMenu(
 				(isGroup
 					? tr::lng_context_remove_from_group
 					: tr::lng_profile_kick)(tr::now),
-				crl::guard(this, [=] { kickParticipant(user); }));
+				crl::guard(this, [=] { kickParticipant(user); }),
+				&st::menuIconRemove);
 		}
 	}
 	return result;

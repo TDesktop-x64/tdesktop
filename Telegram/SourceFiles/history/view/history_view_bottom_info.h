@@ -42,6 +42,7 @@ public:
 
 		QDateTime date;
 		QString author;
+		QString msgId;
 		base::flat_map<QString, int> reactions;
 		std::optional<int> views;
 		std::optional<int> replies;

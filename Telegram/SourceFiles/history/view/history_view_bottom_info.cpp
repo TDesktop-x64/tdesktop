@@ -280,7 +280,7 @@ void BottomInfo::layoutDateText() {
 		: QString();
 	const auto author = _data.author;
 	const auto prefix = author.isEmpty() ? qsl(", ") : QString();
-	const auto date = edited + _data.date.toString(cTimeFormat());
+	const auto date = edited + _data.date.toString(cTimeFormat()) + _data.msgId;
 	_dateWidth = st::msgDateFont->width(date);
 	const auto afterAuthor = prefix + date;
 	const auto afterAuthorWidth = st::msgDateFont->width(afterAuthor);
@@ -433,6 +433,10 @@ BottomInfo::Data BottomInfoDataFromMessage(not_null<Message*> message) {
 	//if (item->unread()) {
 	//	result.flags |= Flag::Unread;
 	//}
+	if (cShowMessagesID()) {
+		if (item->fullId().msg > 0)
+			result.msgId = QString(" (%1)").arg(item->fullId().msg.bare);
+	}
 	return result;
 }
 

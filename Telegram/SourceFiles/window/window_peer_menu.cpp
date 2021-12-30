@@ -497,18 +497,18 @@ void Filler::addUserActions(not_null<UserData*> user) {
 			if (hasHidden) {
 				_addAction(
 						tr::lng_pinned_message_show(tr::now),
-						[=] { PeerMenuUnhidePinnedMessage(user); });
+						[=] { PeerMenuUnhidePinnedMessage(user); }, &st::menuIconEdit);
 			} else {
 				_addAction(
 						tr::lng_pinned_message_hide(tr::now),
-						[=] { PeerMenuHidePinnedMessage(user); });
+						[=] { PeerMenuHidePinnedMessage(user); }, &st::menuIconEdit);
 			}
 			_addAction(
 					tr::lng_pinned_message_view(tr::now),
 					[=] {
 						const auto history = user->owner().history(user);
 						App::wnd()->sessionController()->showSection(std::make_shared<HistoryView::PinnedMemento>(history, 0));
-					});
+					}, & st::menuIconEdit);
 		}
 		if (!user->isContact() && !user->isSelf() && !user->isBot()) {
 			_addAction(
@@ -585,18 +585,18 @@ void Filler::addChatActions(not_null<ChatData*> chat) {
 			if (hasHidden) {
 				_addAction(
 						tr::lng_pinned_message_show(tr::now),
-						[=] { PeerMenuUnhidePinnedMessage(chat); });
+						[=] { PeerMenuUnhidePinnedMessage(chat); }, &st::menuIconEdit);
 			} else {
 				_addAction(
 						tr::lng_pinned_message_hide(tr::now),
-						[=] { PeerMenuHidePinnedMessage(chat); });
+						[=] { PeerMenuHidePinnedMessage(chat); }, &st::menuIconEdit);
 			}
 			_addAction(
 					tr::lng_pinned_message_view(tr::now),
 					[=] {
 						const auto history = chat->owner().history(chat);
 						App::wnd()->sessionController()->showSection(std::make_shared<HistoryView::PinnedMemento>(history, 0));
-					});
+					}, & st::menuIconEdit);
 		}
 		if (chat->canAddMembers()) {
 			_addAction(
@@ -660,18 +660,18 @@ void Filler::addChannelActions(not_null<ChannelData*> channel) {
 			if (hasHidden) {
 				_addAction(
 						tr::lng_pinned_message_show(tr::now),
-						[=] { PeerMenuUnhidePinnedMessage(channel); });
+						[=] { PeerMenuUnhidePinnedMessage(channel); }, &st::menuIconEdit);
 			} else {
 				_addAction(
 						tr::lng_pinned_message_hide(tr::now),
-						[=] { PeerMenuHidePinnedMessage(channel); });
+						[=] { PeerMenuHidePinnedMessage(channel); }, &st::menuIconEdit);
 			}
 			_addAction(
 					tr::lng_pinned_message_view(tr::now),
 					[=] {
 						const auto history = channel->owner().history(channel);
 						App::wnd()->sessionController()->showSection(std::make_shared<HistoryView::PinnedMemento>(history, 0));
-					});
+					}, & st::menuIconEdit);
 		}
 		if (channel->canAddMembers()) {
 			_addAction(

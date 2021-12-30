@@ -633,7 +633,7 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 			: RectPart::Left;
 
 		// sponsored move to right
-		if (const auto sponsored = displayedSponsorBadge()) {
+		if (const auto sponsored = item->isSponsored()) {
 			displayTail = RectPart::FullRight;
 		}
 
@@ -2647,7 +2647,7 @@ QRect Message::countGeometry() const {
 	}
 
 	// sponsored move to right
-	if (const auto sponsored = displayedSponsorBadge()) {
+	if (const auto sponsored = data()->isSponsored()) {
 		contentLeft = st::msgMargin.right() + availableWidth - contentWidth;
 	}
 

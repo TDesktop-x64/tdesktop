@@ -309,11 +309,17 @@ base::unique_qptr<Ui::SideBarButton> FiltersMenu::prepareButton(
 		) | rpl::filter([=](not_null<QEvent*> e) {
 			return e->type() == QEvent::ContextMenu;
 		}) | rpl::start_with_next([=] {
-			_popupMenu = base::make_unique_q<Ui::PopupMenu>(raw);
-			const auto addAction = [&](const QString &text, Fn<void()> callback) {
-				return _popupMenu->addAction(
+			_popupMenu = base::make_unique_q<Ui::PopupMenu>(
+				raw,
+				st::popupMenuWithIcons);;
+			const auto addAction = [&](
+				const QString& text,
+				Fn<void()> callback,
+				const style::icon* icon) {
+					return _popupMenu->addAction(
 						text,
-						crl::guard(&_outer, std::move(callback)));
+						crl::guard(raw, std::move(callback)),
+						icon);
 			};
 			Window::MenuAddMarkAsReadAllChatsAction(
 					&_session->session().data(),

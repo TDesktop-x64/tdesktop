@@ -1920,17 +1920,17 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				if (!cHideClassicFwd()) {
 					_menu->addAction(tr::lng_context_forward_msg_old_selected(tr::now), [=] {
 						_widget->oldForwardSelected();
-					});
+					}, &st::menuIconForward);
 				}
 				_menu->addAction(tr::lng_context_forward_selected(tr::now), [=] {
 					_widget->forwardSelected();
 				}, &st::menuIconForward);
 				_menu->addAction(tr::lng_context_forward_selected_no_quote(tr::now), [=] {
 					_widget->forwardNoQuoteSelected();
-				});
+				}, &st::menuIconForward);
 				_menu->addAction(tr::lng_forward_to_saved_message(tr::now), [=] {
 					_widget->forwardSelectedToSavedMessages();
-				});
+				}, &st::menuIconDownload);
 			}
 			if (selectedState.count > 0 && selectedState.canDeleteCount == selectedState.count) {
 				_menu->addAction(tr::lng_context_delete_selected(tr::now), [=] {
@@ -1947,13 +1947,13 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				if (item->allowsForward()) {
 					_menu->addAction(tr::lng_context_forward_msg_old(tr::now), [=] {
 						oldForwardItem(itemId);
-					});
+					}, &st::menuIconForward);
 					_menu->addAction(tr::lng_context_forward_msg(tr::now), [=] {
 						forwardItem(itemId);
 					}, &st::menuIconForward);
 					_menu->addAction(tr::lng_context_forward_msg_no_quote(tr::now), [=] {
 						forwardItemNoQuote(itemId);
-					});
+					}, &st::menuIconForward);
 				}
 				if ((item->history()->peer->isMegagroup() || item->history()->peer->isChat() || item->history()->peer->isUser())) {
 					if (cShowRepeaterOption()) {
@@ -2000,7 +2000,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 						api->forwardMessages(std::move(resolved), action, [] {
 							Ui::Toast::Show(tr::lng_share_done(tr::now));
 						});
-					});
+					}, &st::menuIconDownload);
 				}
 				if (item->canDelete()) {
 					_menu->addAction(Ui::DeleteMessageContextAction(
@@ -2125,17 +2125,17 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				if (!cHideClassicFwd()) {
 					_menu->addAction(tr::lng_context_forward_msg_old_selected(tr::now), [=] {
 						_widget->oldForwardSelected();
-					});
+					}, &st::menuIconForward);
 				}
 				_menu->addAction(tr::lng_context_forward_selected(tr::now), [=] {
 					_widget->forwardSelected();
 				}, &st::menuIconForward);
 				_menu->addAction(tr::lng_context_forward_selected_no_quote(tr::now), [=] {
 					_widget->forwardNoQuoteSelected();
-				});
+				}, &st::menuIconForward);
 				_menu->addAction(tr::lng_forward_to_saved_message(tr::now), [=] {
 					_widget->forwardSelectedToSavedMessages();
-				});
+				}, &st::menuIconDownload);
 			}
 			if (selectedState.count > 0 && selectedState.count == selectedState.canDeleteCount) {
 				_menu->addAction(tr::lng_context_delete_selected(tr::now), [=] {
@@ -2150,13 +2150,13 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				if (canForward) {
 					_menu->addAction(tr::lng_context_forward_msg_old(tr::now), [=] {
 						oldForwardAsGroup(itemId);
-					});
+					}, &st::menuIconForward);
 					_menu->addAction(tr::lng_context_forward_msg(tr::now), [=] {
 						forwardAsGroup(itemId);
 					}, &st::menuIconForward);
 					_menu->addAction(tr::lng_context_forward_msg_no_quote(tr::now), [=] {
 						forwardAsGroupNoQuote(itemId);
-					});
+					}, &st::menuIconForward);
 				}
 				if ((item->history()->peer->isMegagroup() || item->history()->peer->isChat() || item->history()->peer->isUser())) {
 					if (cShowRepeaterOption()) {
@@ -2202,7 +2202,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 							api->forwardMessages(std::move(resolved), action, [] {
 								Ui::Toast::Show(tr::lng_share_done(tr::now));
 							});
-						});
+						}, &st::menuIconDownload);
 					}
 				}
 				if (canDelete) {

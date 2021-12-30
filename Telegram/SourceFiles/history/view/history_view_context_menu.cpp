@@ -366,7 +366,7 @@ bool AddForwardSelectedAction(
 				request.navigation,
 				ExtractIdsList(request.selectedItems),
 				callback);
-	});
+	}, &st::menuIconForward);
 	menu->addAction(tr::lng_forward_to_saved_message(tr::now), [=] {
 		const auto weak = Ui::MakeWeak(list);
 		const auto items = ExtractIdsList(request.selectedItems);
@@ -390,7 +390,7 @@ bool AddForwardSelectedAction(
 				strong->cancelSelection();
 			}
 		});
-	});
+	}, &st::menuIconDownload);
 	return true;
 }
 

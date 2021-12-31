@@ -32,6 +32,7 @@ constexpr auto kMaskCacheIndex = 2;
 constexpr auto kCacheColumsCount = 3;
 constexpr auto kButtonShowDelay = crl::time(300);
 constexpr auto kButtonExpandDelay = crl::time(300);
+constexpr auto kButtonHideDelay = crl::time(200);
 
 [[nodiscard]] QPoint LocalPosition(not_null<QWheelEvent*> e) {
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
@@ -42,29 +43,42 @@ constexpr auto kButtonExpandDelay = crl::time(300);
 }
 
 [[nodiscard]] QSize CountMaxSizeWithMargins(style::margins margins) {
-	const auto extended = QRect(
+	return QRect(
 		QPoint(),
 		st::reactionCornerSize
-	).marginsAdded(margins);
-	const auto scale = Button::ScaleForState(ButtonState::Active);
-	return QSize(
-		int(base::SafeRound(extended.width() * scale)),
-		int(base::SafeRound(extended.height() * scale)));
+	).marginsAdded(margins).size();
 }
 
 [[nodiscard]] QSize CountOuterSize() {
 	return CountMaxSizeWithMargins(st::reactionCornerShadow);
 }
 
+[[nodiscard]] int CornerImageSize(float64 scale) {
+	return int(base::SafeRound(st::reactionCornerImage * scale));
+}
+
+[[nodiscard]] QImage PrepareMaxOtherReaction(QImage image) {
+	const auto size = CornerImageSize(1.);
+	const auto factor = style::DevicePixelRatio();
+	auto result = image.scaled(
+		QSize(size, size) * factor,
+		Qt::IgnoreAspectRatio,
+		Qt::SmoothTransformation);
+	result.setDevicePixelRatio(factor);
+	return result;
+}
+
 } // namespace
 
 Button::Button(
 	Fn<void(QRect)> update,
-	ButtonParameters parameters)
+	ButtonParameters parameters,
+	Fn<void()> hideMe)
 : _update(std::move(update))
 , _collapsed(QPoint(), CountOuterSize())
 , _finalHeight(_collapsed.height())
-, _expandTimer([=] { applyState(State::Inside, _update); }) {
+, _expandTimer([=] { applyState(State::Inside, _update); })
+, _hideTimer(hideMe) {
 	applyParameters(parameters, nullptr);
 }
 
@@ -152,6 +166,11 @@ void Button::applyParameters(
 			update(_geometry);
 		}
 	}
+	if (parameters.outside && _state == State::Shown) {
+		_hideTimer.callOnce(kButtonHideDelay);
+	} else {
+		_hideTimer.cancel();
+	}
 }
 
 void Button::updateExpandDirection(const ButtonParameters &parameters) {
@@ -202,6 +221,7 @@ void Button::applyState(State state) {
 void Button::applyState(State state, Fn<void(QRect)> update) {
 	if (state == State::Hidden) {
 		_expandTimer.cancel();
+		_hideTimer.cancel();
 	}
 	const auto finalHeight = (state == State::Inside)
 		? _expandedHeight
@@ -255,13 +275,10 @@ Manager::Manager(
 	QWidget *wheelEventsTarget,
 	Fn<void(QRect)> buttonUpdate)
 : _outer(CountOuterSize())
-, _inner(QRectF({}, st::reactionCornerSize))
-, _innerActive(QRect({}, CountMaxSizeWithMargins({})))
+, _inner(QRect({}, st::reactionCornerSize))
 , _buttonShowTimer([=] { showButtonDelayed(); })
 , _buttonUpdate(std::move(buttonUpdate)) {
-	_inner.translate(QRectF({}, _outer).center() - _inner.center());
-	_innerActive.translate(
-		QRect({}, _outer).center() - _innerActive.center());
+	_inner.translate(QRect({}, _outer).center() - _inner.center());
 
 	const auto ratio = style::DevicePixelRatio();
 	_cacheInOutService = QImage(
@@ -332,6 +349,10 @@ void Manager::updateButton(ButtonParameters parameters) {
 	} else if (_button) {
 		_button->applyParameters(parameters);
 		return;
+	} else if (parameters.outside) {
+		_buttonShowTimer.cancel();
+		_scheduledParameters = std::nullopt;
+		return;
 	}
 	const auto globalPositionChanged = _scheduledParameters
 		&& (_scheduledParameters->globalPointer != parameters.globalPointer);
@@ -345,7 +366,10 @@ void Manager::updateButton(ButtonParameters parameters) {
 }
 
 void Manager::showButtonDelayed() {
-	_button = std::make_unique<Button>(_buttonUpdate, *_scheduledParameters);
+	_button = std::make_unique<Button>(
+		_buttonUpdate,
+		*_scheduledParameters,
+		[=]{ updateButton({}); });
 }
 
 void Manager::applyList(std::vector<Data::Reaction> list) {
@@ -386,7 +410,7 @@ void Manager::setMainReactionImage(QImage image) {
 	loadOtherReactions();
 }
 
-QMarginsF Manager::innerMargins() const {
+QMargins Manager::innerMargins() const {
 	return {
 		_inner.x(),
 		_inner.y(),
@@ -395,12 +419,12 @@ QMarginsF Manager::innerMargins() const {
 	};
 }
 
-QRectF Manager::buttonInner() const {
+QRect Manager::buttonInner() const {
 	return buttonInner(_button.get());
 }
 
-QRectF Manager::buttonInner(not_null<Button*> button) const {
-	return QRectF(button->geometry()).marginsRemoved(innerMargins());
+QRect Manager::buttonInner(not_null<Button*> button) const {
+	return button->geometry().marginsRemoved(innerMargins());
 }
 
 void Manager::loadOtherReactions() {
@@ -413,7 +437,7 @@ void Manager::loadOtherReactions() {
 			.media = icon->createMediaView(),
 		}).first->second;
 		if (const auto image = entry.media->getStickerLarge()) {
-			entry.image = image->original();
+			entry.image = PrepareMaxOtherReaction(image->original());
 			entry.media = nullptr;
 		} else if (!_otherReactionsLifetime) {
 			icon->session().downloaderTaskFinished(
@@ -429,7 +453,7 @@ void Manager::checkOtherReactions() {
 	for (auto &[icon, entry] : _otherReactions) {
 		if (entry.media) {
 			if (const auto image = entry.media->getStickerLarge()) {
-				entry.image = image->original();
+				entry.image = PrepareMaxOtherReaction(image->original());
 				entry.media = nullptr;
 			} else {
 				all = false;
@@ -571,7 +595,7 @@ void Manager::paintButton(
 			QRect(QPoint(), geometry.size() * style::DevicePixelRatio()));
 	} else {
 		const auto background = (style == ButtonStyle::Service)
-			? context.st->msgServiceFg()->c
+			? context.st->windowBg()->c
 			: context.st->messageStyle(
 				(style == ButtonStyle::Outgoing),
 				false
@@ -647,14 +671,14 @@ void Manager::paintAllEmoji(
 	auto hq = PainterHighQualityEnabler(p);
 	const auto between = st::reactionCornerSkip;
 	const auto oneHeight = st::reactionCornerSize.height() + between;
-	const auto oneSize = st::reactionCornerImage * scale;
+	const auto oneSize = CornerImageSize(scale);
 	const auto expandUp = button->expandUp();
 	const auto shift = QPoint(0, oneHeight * (expandUp ? -1 : 1));
 	auto emojiPosition = mainEmojiPosition
 		+ QPoint(0, button->scroll() * (expandUp ? 1 : -1));
 	for (const auto &reaction : _list) {
-		const auto inner = QRectF(_inner).translated(emojiPosition);
-		const auto target = QRectF(
+		const auto inner = _inner.translated(emojiPosition);
+		const auto target = QRect(
 			inner.x() + (inner.width() - oneSize) / 2,
 			inner.y() + (inner.height() - oneSize) / 2,
 			oneSize,
@@ -723,7 +747,7 @@ QRect Manager::validateShadow(
 	const auto center = _inner.center();
 	const auto add = style::ConvertScale(2.);
 	const auto shift = style::ConvertScale(1.);
-	const auto extended = _inner.marginsAdded({ add, add, add, add });
+	const auto extended = QRectF(_inner).marginsAdded({add, add, add, add});
 	p.setPen(Qt::NoPen);
 	p.setBrush(shadow);
 	p.translate(center);
@@ -753,16 +777,18 @@ QRect Manager::validateEmoji(int frameIndex, float64 scale) {
 	p.setCompositionMode(QPainter::CompositionMode_Source);
 	p.fillRect(QRect(position, result.size() / ratio), Qt::transparent);
 	if (!_mainReactionImage.isNull()) {
-		const auto size = st::reactionCornerImage * scale;
+		const auto size = CornerImageSize(scale);
 		const auto inner = _inner.translated(position);
-		const auto target = QRectF(
+		const auto target = QRect(
 			inner.x() + (inner.width() - size) / 2,
 			inner.y() + (inner.height() - size) / 2,
 			size,
 			size);
 
-		auto hq = PainterHighQualityEnabler(p);
-		p.drawImage(target, _mainReactionImage);
+		p.drawImage(target, _mainReactionImage.scaled(
+			target.size() * ratio,
+			Qt::IgnoreAspectRatio,
+			Qt::SmoothTransformation));
 	}
 
 	_validEmoji[frameIndex] = true;

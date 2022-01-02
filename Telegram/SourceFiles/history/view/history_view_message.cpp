@@ -30,6 +30,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_user.h"
 #include "data/data_channel.h"
 #include "data/data_message_reactions.h"
+#include "data/data_sponsored_messages.h"
 #include "lang/lang_keys.h"
 #include "mainwidget.h"
 #include "main/main_session.h"
@@ -415,7 +416,7 @@ QSize Message::performCountOptimalSize() {
 				const auto from = item->displayFrom();
 				const auto &name = from
 					? from->nameText()
-					: item->hiddenForwardedInfo()->nameText;
+					: item->hiddenSenderInfo()->nameText;
 				auto namew = st::msgPadding.left()
 					+ name.maxWidth()
 					+ st::msgPadding.right();
@@ -941,17 +942,24 @@ void Message::paintFromName(
 
 	const auto nameText = [&]() -> const Ui::Text::String * {
 		const auto from = item->displayFrom();
-		if (context.outbg || item->isPost()) {
-			p.setPen(stm->msgServiceFg);
+		const auto service = (context.outbg || item->isPost());
+		const auto st = context.st;
+		if (from) {
+			p.setPen(!service
+				? FromNameFg(context, from->id)
+				: item->isSponsored()
+				? st->boxTextFgGood()
+				: stm->msgServiceFg);
 			return &from->nameText();
-		} else if (from) {
-			p.setPen(FromNameFg(context, from->id));
-			return &from->nameText();
-		} else if (const auto info = item->hiddenForwardedInfo()) {
-			p.setPen(FromNameFg(context, info->colorPeerId));
+		} else if (const auto info = item->hiddenSenderInfo()) {
+			p.setPen(!service
+				? FromNameFg(context, info->colorPeerId)
+				: item->isSponsored()
+				? st->boxTextFgGood()
+				: stm->msgServiceFg);
 			return &info->nameText;
 		} else {
-			Unexpected("Corrupt forwarded information in message.");
+			Unexpected("Corrupt sender information in message.");
 		}
 	}();
 	nameText->drawElided(p, availableLeft, trect.top(), availableWidth);
@@ -1530,7 +1538,7 @@ bool Message::getStateFromName(
 			const auto nameText = [&]() -> const Ui::Text::String * {
 				if (from) {
 					return &from->nameText();
-				} else if (const auto info = item->hiddenForwardedInfo()) {
+				} else if (const auto info = item->hiddenSenderInfo()) {
 					return &info->nameText;
 				} else {
 					Unexpected("Corrupt forwarded information in message.");
@@ -1865,10 +1873,16 @@ Reactions::ButtonParameters Message::reactionButtonParameters(
 	const auto maybeRelativeCenter = (result.style == ButtonStyle::Service)
 		? media()->reactionButtonCenterOverride()
 		: std::nullopt;
+	const auto addOnTheRight = [&] {
+		return (maybeRelativeCenter
+			|| !(displayFastShare() || displayGoToOriginal()))
+			? st::reactionCornerCenter.x()
+			: 0;
+	};
 	const auto relativeCenter = QPoint(
 		maybeRelativeCenter.value_or(onTheLeft
 			? -st::reactionCornerCenter.x()
-			: (geometry.width() + st::reactionCornerCenter.x())),
+			: (geometry.width() + addOnTheRight())),
 		innerHeight + st::reactionCornerCenter.y());
 	result.center = geometry.topLeft() + relativeCenter;
 	if (reactionState.itemId != result.context
@@ -2082,14 +2096,11 @@ int Message::viewButtonHeight() const {
 }
 
 void Message::updateViewButtonExistence() {
-	const auto has = [&] {
-		const auto item = data();
-		if (item->isSponsored()) {
-			return true;
-		}
-		const auto media = item->media();
-		return media && ViewButton::MediaHasViewButton(media);
-	}();
+	const auto item = data();
+	const auto sponsored = item->Get<HistoryMessageSponsored>();
+	const auto media = sponsored ? nullptr : item->media();
+	const auto has = sponsored
+		|| (media && ViewButton::MediaHasViewButton(media));
 	if (!has) {
 		_viewButton = nullptr;
 		return;
@@ -2097,13 +2108,9 @@ void Message::updateViewButtonExistence() {
 		return;
 	}
 	auto callback = [=] { history()->owner().requestViewRepaint(this); };
-	_viewButton = data()->isSponsored()
-		? std::make_unique<ViewButton>(
-			data()->displayFrom(),
-			std::move(callback))
-		: std::make_unique<ViewButton>(
-			data()->media(),
-			std::move(callback));
+	_viewButton = sponsored
+		? std::make_unique<ViewButton>(sponsored, std::move(callback))
+		: std::make_unique<ViewButton>(media, std::move(callback));
 }
 
 void Message::initLogEntryOriginal() {
@@ -2578,7 +2585,7 @@ void Message::fromNameUpdated(int width) const {
 			const auto nameText = [&]() -> const Ui::Text::String * {
 				if (from) {
 					return &from->nameText();
-				} else if (const auto info = item->hiddenForwardedInfo()) {
+				} else if (const auto info = item->hiddenSenderInfo()) {
 					return &info->nameText;
 				} else {
 					Unexpected("Corrupted forwarded information in message.");
@@ -2794,6 +2801,8 @@ int Message::resizeContentGetHeight(int newWidth) {
 
 		if (item->repliesAreComments() || item->externalReply()) {
 			newHeight += st::historyCommentsButtonHeight;
+		} else {
+			_comments = nullptr;
 		}
 		newHeight += viewButtonHeight();
 	} else if (mediaDisplayed) {

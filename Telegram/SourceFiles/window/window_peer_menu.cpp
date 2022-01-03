@@ -164,6 +164,7 @@ private:
 	void addBotToGroup();
 	void addNewMembers();
 	void addDeleteContact();
+	void addPinnedMessages();
 
 	void addChatActions(not_null<ChatData*> chat);
 	void addChannelActions(not_null<ChannelData*> channel);
@@ -683,24 +684,6 @@ void Filler::addManageChat() {
 		navigation->showEditPeerBox(peer);
 	}, &st::menuIconManage);
 }
-		if (channel->owner().history(channel)->hasPinnedMessages()) {
-			auto hasHidden = HistoryWidget::hasHiddenPinnedMessage(channel);
-			if (hasHidden) {
-				_addAction(
-						tr::lng_pinned_message_show(tr::now),
-						[=] { PeerMenuUnhidePinnedMessage(channel); }, &st::menuIconEdit);
-			} else {
-				_addAction(
-						tr::lng_pinned_message_hide(tr::now),
-						[=] { PeerMenuHidePinnedMessage(channel); }, &st::menuIconEdit);
-			}
-			_addAction(
-					tr::lng_pinned_message_view(tr::now),
-					[=] {
-						const auto history = channel->owner().history(channel);
-						App::wnd()->sessionController()->showSection(std::make_shared<HistoryView::PinnedMemento>(history, 0));
-					}, & st::menuIconEdit);
-		}
 
 void Filler::addCreatePoll() {
 	if (!_peer->canSendPolls()) {
@@ -748,6 +731,31 @@ void Filler::addThemeEdit() {
 		&st::menuIconChangeColors);
 }
 
+void Filler::addPinnedMessages() {
+	const auto channel = _peer->asChannel();
+	if (!channel) {
+		return;
+	}
+	if (channel->owner().history(channel)->hasPinnedMessages()) {
+		auto hasHidden = HistoryWidget::hasHiddenPinnedMessage(channel);
+		if (hasHidden) {
+			_addAction(
+					tr::lng_pinned_message_show(tr::now),
+					[=] { PeerMenuUnhidePinnedMessage(channel); }, &st::menuIconEdit);
+		} else {
+			_addAction(
+					tr::lng_pinned_message_hide(tr::now),
+					[=] { PeerMenuHidePinnedMessage(channel); }, &st::menuIconEdit);
+		}
+		_addAction(
+				tr::lng_pinned_message_view(tr::now),
+				[=] {
+					const auto history = channel->owner().history(channel);
+					App::wnd()->sessionController()->showSection(std::make_shared<HistoryView::PinnedMemento>(history, 0));
+				}, & st::menuIconEdit);
+	}
+}
+
 void Filler::fill() {
 	if (_folder) {
 		fillArchiveActions();
@@ -785,6 +793,7 @@ void Filler::fillHistoryActions() {
 	addToggleMute();
 	addSupportInfo();
 	addManageChat();
+	addPinnedMessages();
 	addCreatePoll();
 	addThemeEdit();
 	addViewDiscussion();

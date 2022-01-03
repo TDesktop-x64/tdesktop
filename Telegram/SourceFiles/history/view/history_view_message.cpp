@@ -1851,11 +1851,7 @@ Reactions::ButtonParameters Message::reactionButtonParameters(
 	using namespace Reactions;
 	auto result = ButtonParameters{ .context = data()->fullId() };
 	const auto outbg = hasOutLayout();
-	result.style = (!_comments && !embedReactionsInBubble())
-		? ButtonStyle::Service
-		: outbg
-		? ButtonStyle::Outgoing
-		: ButtonStyle::Incoming;
+	const auto outsideBubble = (!_comments && !embedReactionsInBubble());
 	const auto geometry = countGeometry();
 	result.pointer = position;
 	const auto onTheLeft = (outbg && !delegate()->elementIsChatWide());
@@ -1870,7 +1866,7 @@ Reactions::ButtonParameters Message::reactionButtonParameters(
 	const auto innerHeight = geometry.height()
 		- keyboardHeight
 		- reactionsHeight;
-	const auto maybeRelativeCenter = (result.style == ButtonStyle::Service)
+	const auto maybeRelativeCenter = outsideBubble
 		? media()->reactionButtonCenterOverride()
 		: std::nullopt;
 	const auto addOnTheRight = [&] {
@@ -2156,10 +2152,6 @@ bool Message::toggleSelectionByHandlerClick(
 		}
 	}
 	return false;
-}
-
-bool Message::displayPinIcon() const {
-	return data()->isPinned() && !isPinnedContext();
 }
 
 bool Message::hasFromName() const {
@@ -2801,8 +2793,9 @@ int Message::resizeContentGetHeight(int newWidth) {
 
 		if (item->repliesAreComments() || item->externalReply()) {
 			newHeight += st::historyCommentsButtonHeight;
-		} else {
+		} else if (_comments) {
 			_comments = nullptr;
+			checkHeavyPart();
 		}
 		newHeight += viewButtonHeight();
 	} else if (mediaDisplayed) {
@@ -2816,6 +2809,9 @@ int Message::resizeContentGetHeight(int newWidth) {
 			: contentWidth;
 		newHeight += st::mediaInBubbleSkip
 			+ _reactions->resizeGetHeight(reactionsWidth);
+		if (hasOutLayout() && !delegate()->elementIsChatWide()) {
+			_reactions->flipToRight();
+		}
 	}
 
 	if (const auto keyboard = item->inlineReplyKeyboard()) {

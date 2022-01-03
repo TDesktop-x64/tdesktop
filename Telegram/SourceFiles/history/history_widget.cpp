@@ -577,18 +577,6 @@ HistoryWidget::HistoryWidget(
 		Window::ActivateWindow(controller);
 	});
 
-	controller->adaptive().changes(
-	) | rpl::start_with_next([=] {
-		if (_history) {
-			_history->forceFullResize();
-			if (_migrated) {
-				_migrated->forceFullResize();
-			}
-			updateHistoryGeometry();
-			update();
-		}
-	}, lifetime());
-
 	session().data().newItemAdded(
 	) | rpl::start_with_next([=](not_null<HistoryItem*> item) {
 		newItemAdded(item);
@@ -2264,6 +2252,16 @@ void HistoryWidget::showHistory(
 			object_ptr<HistoryInner>(this, _scroll, controller(), _history));
 		_list->show();
 
+		controller()->adaptive().changes(
+		) | rpl::start_with_next([=] {
+			_history->forceFullResize();
+			if (_migrated) {
+				_migrated->forceFullResize();
+			}
+			updateHistoryGeometry();
+			update();
+		}, _list->lifetime());
+
 		if (_chooseForReport && _chooseForReport->active) {
 			_list->setChooseReportReason(_chooseForReport->reason);
 		}
@@ -2356,6 +2354,12 @@ void HistoryWidget::setHistory(History *history) {
 		return;
 	}
 	unregisterDraftSources();
+	if (_history) {
+		_history->forceFullResize();
+	}
+	if (_migrated) {
+		_migrated->forceFullResize();
+	}
 	_history = history;
 	_migrated = _history ? _history->migrateFrom() : nullptr;
 	registerDraftSource();

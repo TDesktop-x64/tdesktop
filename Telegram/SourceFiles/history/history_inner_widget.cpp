@@ -1933,7 +1933,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				}, &st::menuIconForward);
 				_menu->addAction(tr::lng_forward_to_saved_message(tr::now), [=] {
 					_widget->forwardSelectedToSavedMessages();
-				}, &st::menuIconDownload);
+				}, &st::menuIconFave);
 			}
 			if (selectedState.count > 0 && selectedState.canDeleteCount == selectedState.count) {
 				_menu->addAction(tr::lng_context_delete_selected(tr::now), [=] {
@@ -2019,7 +2019,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 						api->forwardMessages(std::move(resolved), action, [] {
 							Ui::Toast::Show(tr::lng_share_done(tr::now));
 						});
-					}, &st::menuIconDownload);
+					}, &st::menuIconFave);
 				}
 				if (item->canDelete()) {
 					_menu->addAction(Ui::DeleteMessageContextAction(
@@ -2154,7 +2154,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				}, &st::menuIconForward);
 				_menu->addAction(tr::lng_forward_to_saved_message(tr::now), [=] {
 					_widget->forwardSelectedToSavedMessages();
-				}, &st::menuIconDownload);
+				}, &st::menuIconFave);
 			}
 			if (selectedState.count > 0 && selectedState.count == selectedState.canDeleteCount) {
 				_menu->addAction(tr::lng_context_delete_selected(tr::now), [=] {
@@ -2237,7 +2237,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 							api->forwardMessages(std::move(resolved), action, [] {
 								Ui::Toast::Show(tr::lng_share_done(tr::now));
 							});
-						}, &st::menuIconDownload);
+						}, &st::menuIconFave);
 					}
 				}
 				if (canDelete) {

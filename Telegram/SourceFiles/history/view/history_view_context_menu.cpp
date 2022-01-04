@@ -390,7 +390,7 @@ bool AddForwardSelectedAction(
 				strong->cancelSelection();
 			}
 		});
-	}, &st::menuIconDownload);
+	}, &st::menuIconFave);
 	return true;
 }
 

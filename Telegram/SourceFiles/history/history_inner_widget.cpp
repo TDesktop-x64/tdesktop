@@ -1987,6 +1987,22 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 								}
 								api->sendMessage(std::move(message));
 							}, &st::menuIconDiscussion);
+						} else if (!item->isService() && item->media()->document() != nullptr && item->media()->document()->sticker() != nullptr) {
+							_menu->addAction(tr::lng_context_repeat_msg_no_fwd(tr::now), [=] {
+								const auto api = &item->history()->peer->session().api();
+								auto action = Api::SendAction(item->history()->peer->owner().history(item->history()->peer),Api::SendOptions{.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer)});
+								action.clearDraft = false;
+								if (item->history()->peer->isUser()) {
+									action.options.sendAs = nullptr;
+								}
+
+								const auto history = item->history()->peer->owner().history(item->history()->peer);
+								auto resolved = history->resolveForwardDraft(Data::ForwardDraft{.ids = std::move(MessageIdsList(1, itemId)), .options = Data::ForwardOptions::NoSenderNames});
+
+								api->forwardMessages(std::move(resolved), action, [] {
+									Ui::Toast::Show(tr::lng_share_done(tr::now));
+								});
+							}, &st::menuIconDiscussion);
 						}
 					}
 				}
@@ -2189,6 +2205,22 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 									message.action.replyTo = item->idOriginal();
 								}
 								api->sendMessage(std::move(message));
+							}, &st::menuIconDiscussion);
+						} else if (!item->isService() && item->media()->document() != nullptr && item->media()->document()->sticker() != nullptr) {
+							_menu->addAction(tr::lng_context_repeat_msg_no_fwd(tr::now), [=] {
+								const auto api = &item->history()->peer->session().api();
+								auto action = Api::SendAction(item->history()->peer->owner().history(item->history()->peer),Api::SendOptions{.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer)});
+								action.clearDraft = false;
+								if (item->history()->peer->isUser()) {
+									action.options.sendAs = nullptr;
+								}
+
+								const auto history = item->history()->peer->owner().history(item->history()->peer);
+								auto resolved = history->resolveForwardDraft(Data::ForwardDraft{.ids = std::move(MessageIdsList(1, itemId)), .options = Data::ForwardOptions::NoSenderNames});
+
+								api->forwardMessages(std::move(resolved), action, [] {
+									Ui::Toast::Show(tr::lng_share_done(tr::now));
+								});
 							}, &st::menuIconDiscussion);
 						}
 					}

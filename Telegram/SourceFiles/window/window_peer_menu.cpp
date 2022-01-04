@@ -1414,78 +1414,26 @@ QPointer<Ui::RpWidget> ShowForwardNoQuoteMessagesBox(
 		}
 
 		for (const auto peer : result) {
-			const auto history = owner->history(peer);
+			const auto _history = owner->history(peer);
 			if (!comment.text.isEmpty()) {
-				auto message = ApiWrap::MessageToSend(prepareSendAction(history, Api::SendOptions()));
+				auto message = ApiWrap::MessageToSend(prepareSendAction(_history, Api::SendOptions()));
 				message.textWithTags = comment;
 				message.action.options = options;
 				message.action.clearDraft = false;
 				api.sendMessage(std::move(message));
 			}
 
-			if (!mediaAlbums.isEmpty()) {
-				for (const auto& album : mediaAlbums) {
-					const auto finalFlags = MTPmessages_SendMultiMedia::Flags(0)
-											| (options.silent
-											   ? MTPmessages_SendMultiMedia::Flag::f_silent
-											   : MTPmessages_SendMultiMedia::Flag(0))
-											| (options.scheduled
-											   ? MTPmessages_SendMultiMedia::Flag::f_schedule_date
-											   : MTPmessages_SendMultiMedia::Flag(0));
-
-					histories.sendRequest(history, requestType, [=](Fn<void()> finish) {
-						const auto api = &item->history()->peer->session().api();
-						history->sendRequestId = session->api().request(MTPmessages_SendMultiMedia(
-								MTP_flags(finalFlags),
-								peer->input,
-								MTPint(),
-								MTP_vector<MTPInputSingleMedia>(album),
-								MTP_int(options.scheduled),
-								MTP_inputPeerEmpty()
-						)).done([=](const MTPUpdates &result) {
-							//finish();
-						}).fail([=](const MTP::Error &error) {
-							//finish();
-						}).afterRequest(history->sendRequestId
-						).send();
-						return history->sendRequestId;
-					});
-				}
+			auto action = Api::SendAction(_history, Api::SendOptions{.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer)});
+			action.clearDraft = false;
+			if (item->history()->peer->isUser()) {
+				action.options.sendAs = nullptr;
 			}
 
-			histories.sendRequest(history, requestType, [=](Fn<void()> finish) {
-				const auto api = &item->history()->peer->session().api();
-				for (const auto it : items) {
-					if (it->groupId().value != 0) continue;
-					if (it->media() != nullptr && it->media()->webpage() == nullptr) {
-						if (it->media()->document() != nullptr) {
-							const auto document = it->media()->document();
-							auto message = ApiWrap::MessageToSend(prepareSendAction(history, Api::SendOptions()));
-							message.textWithTags = { it->originalText().text, TextUtilities::ConvertEntitiesToTextTags(it->originalText().entities) };
-							message.action = Api::SendAction(history);
-							message.action.options.scheduled = options.scheduled;
-							Api::SendExistingDocument(std::move(message), document);
-						}
-						else if (it->media()->photo() != nullptr) {
-							const auto photo = it->media()->photo();
-							auto message = ApiWrap::MessageToSend(prepareSendAction(history, Api::SendOptions()));
-							message.textWithTags = { it->originalText().text, TextUtilities::ConvertEntitiesToTextTags(it->originalText().entities) };
-							message.action = Api::SendAction(history);
-							message.action.options.scheduled = options.scheduled;
-							Api::SendExistingPhoto(std::move(message), photo);
-						}
-					} else {
-						auto message = ApiWrap::MessageToSend(prepareSendAction(history, Api::SendOptions()));
-						message.textWithTags = { it->originalText().text, TextUtilities::ConvertEntitiesToTextTags(it->originalText().entities) };
-						message.action = Api::SendAction(history);
-						message.action.options.scheduled = options.scheduled;
-						api->sendMessage(std::move(message));
-					}
-				}
+			auto resolved = _history->resolveForwardDraft(Data::ForwardDraft{.ids = data->msgIds, .options = Data::ForwardOptions::NoSenderNames});
+
+			api.forwardMessages(std::move(resolved), action, [] {
 				Ui::Toast::Show(tr::lng_share_done(tr::now));
 				Ui::hideLayer();
-				finish();
-				return 0;
 			});
 		}
 	};

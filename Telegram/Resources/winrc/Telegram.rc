@@ -63,7 +63,7 @@ BEGIN
             VALUE "CompanyName", "64Gram"
             VALUE "FileDescription", "64Gram Desktop"
             VALUE "FileVersion", "1.0.5.0"
-            VALUE "LegalCopyright", "Copyright (C) 2014-2021"
+            VALUE "LegalCopyright", "Copyright (C) 2014-2022"
             VALUE "ProductName", "64Gram Desktop"
             VALUE "ProductVersion", "1.0.5.0"
         END

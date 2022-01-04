@@ -647,7 +647,6 @@ void Filler::addNewMembers() {
 		&& (!channel || !channel->canAddMembers())) {
 		return;
 	}
-	const auto peer = _peer;
 	const auto navigation = _controller;
 	const auto callback = chat
 		? Fn<void()>([=] { AddChatMembers(navigation, chat); })

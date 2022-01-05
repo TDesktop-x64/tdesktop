@@ -134,9 +134,9 @@ TextWithEntities AboutWithEntities(
 		|| (user && !isBot);
 	auto result = TextWithEntities{ value };
 	TextUtilities::ParseEntities(result, flags);
-	if (stripExternal) {
-		StripExternalLinks(result);
-	}
+//	if (stripExternal) {
+//		StripExternalLinks(result);
+//	}
 	return result;
 }
 

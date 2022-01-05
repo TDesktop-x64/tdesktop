@@ -166,6 +166,7 @@ private:
 	void addDeleteContact();
 	void addPinnedMessages();
 	void addFirstMessage();
+	void addViewChannel();
 
 	void addChatActions(not_null<ChatData*> chat);
 	void addChannelActions(not_null<ChannelData*> channel);
@@ -769,6 +770,20 @@ void Filler::addFirstMessage() {
 	}, &st::menuIconShowInChat);
 }
 
+void Filler::addViewChannel() {
+	const auto peer = _peer->asChannel();
+	if (!peer) {
+		return;
+	}
+	if (const auto chat = peer->linkedChat()) {
+		_addAction(peer->isMegagroup() ? tr::lng_profile_view_channel(tr::now) : tr::lng_profile_view_discussion(tr::now), [=] {
+			App::wnd()->sessionController()->showPeerHistory(
+					chat,
+					Window::SectionShow::Way::Forward);
+		}, &st::menuIconDiscussion);
+	}
+}
+
 void Filler::fill() {
 	if (_folder) {
 		fillArchiveActions();
@@ -806,6 +821,7 @@ void Filler::fillHistoryActions() {
 	addToggleMute();
 	addSupportInfo();
 	addManageChat();
+	addViewChannel();
 	addFirstMessage();
 	addPinnedMessages();
 	addCreatePoll();

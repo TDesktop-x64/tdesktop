@@ -1792,11 +1792,11 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			const auto msgSigned = pinItem->mainView()->data()->Get<HistoryMessageSigned>();
 			if (msgSigned) {
 				_menu->addAction(tr::lng_context_show_messages_from(tr::now), [=] {
-					App::searchByHashtag(msgSigned->author, peer, item->from()->asUser());
+					App::searchByHashtag(msgSigned->author, peer, item->from());
 				}, &st::menuIconInfo);
 			} else {
 				_menu->addAction(tr::lng_context_show_messages_from(tr::now), [=] {
-					App::searchByHashtag(QString(), peer, item->from()->asUser());
+					App::searchByHashtag(QString(), peer, item->from());
 				}, &st::menuIconInfo);
 			}
 		}

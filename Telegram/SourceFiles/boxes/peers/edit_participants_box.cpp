@@ -1540,7 +1540,8 @@ base::unique_qptr<Ui::PopupMenu> ParticipantsBoxController::rowContextMenu(
 				: &st::menuIconInfo));
 		result->addAction(
 			tr::lng_context_show_messages_from(tr::now),
-			crl::guard(this, [=] { App::searchByHashtag(QString(), _peer, user); }));
+			crl::guard(this, [=] { App::searchByHashtag(QString(), _peer, participant); }),
+			&st::menuIconInfo);
 	}
 	if (_role == Role::Kicked) {
 		if (_peer->isMegagroup()

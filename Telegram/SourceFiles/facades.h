@@ -41,7 +41,7 @@ void activateBotCommand(
 	not_null<const HistoryItem*> msg,
 	int row,
 	int column);
-void searchByHashtag(const QString &tag, PeerData *inPeer, UserData *from = nullptr);
+void searchByHashtag(const QString &tag, PeerData *inPeer, PeerData *from = nullptr);
 
 } // namespace App
 

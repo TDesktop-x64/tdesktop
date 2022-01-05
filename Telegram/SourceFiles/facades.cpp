@@ -224,7 +224,7 @@ void activateBotCommand(
 	}
 }
 
-void searchByHashtag(const QString &tag, PeerData *inPeer, UserData *from) {
+void searchByHashtag(const QString &tag, PeerData *inPeer, PeerData *from) {
 	const auto m = inPeer
 		? CheckMainWidget(&inPeer->session())
 		: App::main(); // multi good

@@ -86,6 +86,7 @@ bool gVoiceChatPinned = false;
 bool gHDVideo = false;
 bool gSkipSc = false;
 bool gDisableLinkWarning = false;
+bool gBlockedUserSpoilerMode = false;
 QString gRadioController;
 int gVoiceChatBitrate = 0;
 

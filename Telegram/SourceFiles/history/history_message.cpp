@@ -501,12 +501,27 @@ HistoryMessage::HistoryMessage(
 	if (const auto media = data.vmedia()) {
 		setMedia(*media);
 	}
-	const auto textWithEntities = TextWithEntities{
-		TextUtilities::Clean(qs(data.vmessage())),
-		Api::EntitiesFromMTP(
-			&history->session(),
-			data.ventities().value_or_empty())
-	};
+
+	auto textWithEntities = TextWithEntities();
+
+	auto user = history->session().data().peerLoaded(data.vfrom_id() ? peerFromMTP(*data.vfrom_id()) : PeerId(0));
+	if (cBlockedUserSpoilerMode() && user && user->isBlocked()) {
+		textWithEntities = TextWithEntities{
+				TextUtilities::Clean("[Blocked User Message]\n"+qs(data.vmessage())),
+				Api::EntitiesFromMTP(
+					&history->session(),
+					data.ventities().value_or_empty(),
+					qs(data.vmessage()).length())
+		};
+	} else {
+		textWithEntities = TextWithEntities{
+			TextUtilities::Clean(qs(data.vmessage())),
+			Api::EntitiesFromMTP(
+				&history->session(),
+				data.ventities().value_or_empty())
+		};
+	}
+
 	setText(_media ? textWithEntities : EnsureNonEmpty(textWithEntities));
 	if (const auto groupedId = data.vgrouped_id()) {
 		setGroupId(

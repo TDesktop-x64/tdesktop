@@ -281,6 +281,10 @@ namespace EnhancedSettings {
 			cSetDisableLinkWarning(v);
 		});
 
+		ReadBoolOption(settings, "blocked_user_spoiler_mode", [&](auto v) {
+			cSetBlockedUserSpoilerMode(v);
+		});
+
 		return true;
 	}
 
@@ -315,6 +319,7 @@ namespace EnhancedSettings {
 		settings.insert(qsl("hd_video"), false);
 		settings.insert(qsl("skip_to_next"), false);
 		settings.insert(qsl("disable_link_warning"), false);
+		settings.insert(qsl("blocked_user_spoiler_mode"), false);
 
 		auto document = QJsonDocument();
 		document.setObject(settings);
@@ -355,6 +360,7 @@ namespace EnhancedSettings {
 		settings.insert(qsl("hd_video"), cHDVideo());
 		settings.insert(qsl("skip_to_next"), cSkipSc());
 		settings.insert(qsl("disable_link_warning"), cDisableLinkWarning());
+		settings.insert(qsl("blocked_user_spoiler_mode"), cBlockedUserSpoilerMode());
 
 		auto document = QJsonDocument();
 		document.setObject(settings);

@@ -22,7 +22,8 @@ enum class ConvertOption {
 
 [[nodiscard]] EntitiesInText EntitiesFromMTP(
 	Main::Session *session,
-	const QVector<MTPMessageEntity> &entities);
+	const QVector<MTPMessageEntity> &entities,
+	int32 length = 0);
 
 [[nodiscard]] MTPVector<MTPMessageEntity> EntitiesToMTP(
 	not_null<Main::Session*> session,

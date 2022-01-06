@@ -173,6 +173,7 @@ DeclareSetting(bool, VoiceChatPinned);
 DeclareSetting(bool, HDVideo);
 DeclareSetting(bool, SkipSc);
 DeclareSetting(bool, DisableLinkWarning);
+DeclareSetting(bool, BlockedUserSpoilerMode);
 DeclareSetting(QString, RadioController);
 
 DeclareSetting(int, NetSpeedBoost);

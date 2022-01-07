@@ -1735,6 +1735,15 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 		}
 		return item;
 	};
+
+	if (hasWhoReactedItem) {
+		HistoryView::AddWhoReactedAction(
+			_menu,
+			this,
+			_dragStateItem,
+			_controller);
+	}
+
 	const auto addItemActions = [&](
 			HistoryItem *item,
 			HistoryItem *albumPartItem) {
@@ -2269,14 +2278,6 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 		} else if (App::mousedItem()) {
 			addSelectMessageAction(App::mousedItem()->data());
 		}
-	}
-
-	if (hasWhoReactedItem) {
-		HistoryView::AddWhoReactedAction(
-			_menu,
-			this,
-			_dragStateItem,
-			_controller);
 	}
 
 	if (_menu->empty()) {

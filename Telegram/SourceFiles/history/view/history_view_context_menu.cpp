@@ -1137,14 +1137,14 @@ void AddWhoReactedAction(
 				QString()));
 		}
 	};
-	if (!menu->empty()) {
-		menu->addSeparator();
-	}
 	menu->addAction(Ui::WhoReactedContextAction(
 		menu.get(),
 		Api::WhoReacted(item, context, st::defaultWhoRead),
 		participantChosen,
 		showAllChosen));
+	if (!menu->empty()) {
+		menu->addSeparator();
+	}
 }
 
 void ShowReportItemsBox(not_null<PeerData*> peer, MessageIdsList ids) {

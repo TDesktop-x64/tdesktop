@@ -1956,21 +1956,23 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			const auto itemId = item->fullId();
 			const auto blockSender = item->history()->peer->isRepliesChat();
 			if (isUponSelected != -2) {
+				auto fwdSubmenu = std::make_unique<Ui::PopupMenu>(this, st::popupMenuWithIcons);
+				auto repeatSubmenu = std::make_unique<Ui::PopupMenu>(this, st::popupMenuWithIcons);
 				if (item->allowsForward()) {
-					_menu->addAction(tr::lng_context_forward_msg_old(tr::now), [=] {
+					fwdSubmenu->addAction(tr::lng_context_forward_msg_old(tr::now), [=] {
 						oldForwardItem(itemId);
 					}, &st::menuIconForward);
-					_menu->addAction(tr::lng_context_forward_msg(tr::now), [=] {
+					fwdSubmenu->addAction(tr::lng_context_forward_msg(tr::now), [=] {
 						forwardItem(itemId);
 					}, &st::menuIconForward);
-					_menu->addAction(tr::lng_context_forward_msg_no_quote(tr::now), [=] {
+					fwdSubmenu->addAction(tr::lng_context_forward_msg_no_quote(tr::now), [=] {
 						forwardItemNoQuote(itemId);
 					}, &st::menuIconForward);
 				}
 				if ((item->history()->peer->isMegagroup() || item->history()->peer->isChat() || item->history()->peer->isUser())) {
 					if (cShowRepeaterOption()) {
 						if (item->allowsForward()) {
-							_menu->addAction(tr::lng_context_repeat_msg(tr::now), [=] {
+							repeatSubmenu->addAction(tr::lng_context_repeat_msg(tr::now), [=] {
 								const auto api = &item->history()->peer->session().api();
 								auto action = Api::SendAction(item->history()->peer->owner().history(item->history()->peer),Api::SendOptions{.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer)});
 								action.clearDraft = false;
@@ -1987,7 +1989,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 							}, &st::menuIconDiscussion);
 						}
 						if (!item->isService() && !item->emptyText() && item->media() == nullptr) {
-							_menu->addAction(tr::lng_context_repeat_msg_no_fwd(tr::now), [=] {
+							repeatSubmenu->addAction(tr::lng_context_repeat_msg_no_fwd(tr::now), [=] {
 								const auto api = &item->history()->peer->session().api();
 								auto message = ApiWrap::MessageToSend(prepareSendAction(_history,Api::SendOptions{.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer)}));
 								message.textWithTags = {item->originalText().text,TextUtilities::ConvertEntitiesToTextTags(item->originalText().entities)};
@@ -1997,7 +1999,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 								api->sendMessage(std::move(message));
 							}, &st::menuIconDiscussion);
 						} else if (!item->isService() && item->media()->document() != nullptr && item->media()->document()->sticker() != nullptr) {
-							_menu->addAction(tr::lng_context_repeat_msg_no_fwd(tr::now), [=] {
+							repeatSubmenu->addAction(tr::lng_context_repeat_msg_no_fwd(tr::now), [=] {
 								const auto api = &item->history()->peer->session().api();
 								auto action = Api::SendAction(item->history()->peer->owner().history(item->history()->peer),Api::SendOptions{.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer)});
 								action.clearDraft = false;
@@ -2016,7 +2018,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					}
 				}
 				if (item->allowsForward()) {
-					_menu->addAction(tr::lng_forward_to_saved_message(tr::now), [=] {
+					fwdSubmenu->addAction(tr::lng_forward_to_saved_message(tr::now), [=] {
 						const auto api = &item->history()->peer->session().api();
 						auto action = Api::SendAction(item->history()->peer->owner().history(api->session().user()->asUser()));
 						action.clearDraft = false;
@@ -2029,6 +2031,10 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 							Ui::Toast::Show(tr::lng_share_done(tr::now));
 						});
 					}, &st::menuIconFave);
+				}
+				_menu->addAction(tr::lng_context_forward_msg(tr::now), std::move(fwdSubmenu), &st::menuIconForward);
+				if (cShowRepeaterOption()) {
+					_menu->addAction(tr::lng_context_repeater(tr::now), std::move(repeatSubmenu), &st::menuIconForward);
 				}
 				if (item->canDelete()) {
 					_menu->addAction(Ui::DeleteMessageContextAction(
@@ -2175,21 +2181,23 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			}, &st::menuIconSelect);
 		} else if (item && ((isUponSelected != -2 && (canForward || canDelete)) || item->isRegular())) {
 			if (isUponSelected != -2) {
+				auto fwdSubmenu = std::make_unique<Ui::PopupMenu>(this, st::popupMenuWithIcons);
+				auto repeatSubmenu = std::make_unique<Ui::PopupMenu>(this, st::popupMenuWithIcons);
 				if (canForward) {
-					_menu->addAction(tr::lng_context_forward_msg_old(tr::now), [=] {
+					fwdSubmenu->addAction(tr::lng_context_forward_msg_old(tr::now), [=] {
 						oldForwardAsGroup(itemId);
 					}, &st::menuIconForward);
-					_menu->addAction(tr::lng_context_forward_msg(tr::now), [=] {
+					fwdSubmenu->addAction(tr::lng_context_forward_msg(tr::now), [=] {
 						forwardAsGroup(itemId);
 					}, &st::menuIconForward);
-					_menu->addAction(tr::lng_context_forward_msg_no_quote(tr::now), [=] {
+					fwdSubmenu->addAction(tr::lng_context_forward_msg_no_quote(tr::now), [=] {
 						forwardAsGroupNoQuote(itemId);
 					}, &st::menuIconForward);
 				}
 				if ((item->history()->peer->isMegagroup() || item->history()->peer->isChat() || item->history()->peer->isUser())) {
 					if (cShowRepeaterOption()) {
 						if (canForward) {
-							_menu->addAction(tr::lng_context_repeat_msg(tr::now), [=] {
+							repeatSubmenu->addAction(tr::lng_context_repeat_msg(tr::now), [=] {
 								const auto api = &item->history()->peer->session().api();
 								auto action = Api::SendAction(item->history()->peer->owner().history(item->history()->peer),Api::SendOptions{.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer)});
 								action.clearDraft = false;
@@ -2206,7 +2214,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 							}, &st::menuIconDiscussion);
 						}
 						if (!item->isService() && !item->emptyText() && item->media() == nullptr) {
-							_menu->addAction(tr::lng_context_repeat_msg_no_fwd(tr::now), [=] {
+							repeatSubmenu->addAction(tr::lng_context_repeat_msg_no_fwd(tr::now), [=] {
 								const auto api = &item->history()->peer->session().api();
 								auto message = ApiWrap::MessageToSend(prepareSendAction(_history, Api::SendOptions{ .sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer) }));
 								message.textWithTags = { item->originalText().text, TextUtilities::ConvertEntitiesToTextTags(item->originalText().entities) };
@@ -2216,7 +2224,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 								api->sendMessage(std::move(message));
 							}, &st::menuIconDiscussion);
 						} else if (!item->isService() && item->media()->document() != nullptr && item->media()->document()->sticker() != nullptr) {
-							_menu->addAction(tr::lng_context_repeat_msg_no_fwd(tr::now), [=] {
+							repeatSubmenu->addAction(tr::lng_context_repeat_msg_no_fwd(tr::now), [=] {
 								const auto api = &item->history()->peer->session().api();
 								auto action = Api::SendAction(item->history()->peer->owner().history(item->history()->peer),Api::SendOptions{.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer)});
 								action.clearDraft = false;
@@ -2234,7 +2242,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 						}
 					}
 					if (canForward) {
-						_menu->addAction(tr::lng_forward_to_saved_message(tr::now), [=] {
+						fwdSubmenu->addAction(tr::lng_forward_to_saved_message(tr::now), [=] {
 							const auto api = &item->history()->peer->session().api();
 							auto action = Api::SendAction(item->history()->peer->owner().history(api->session().user()->asUser()));
 							action.clearDraft = false;
@@ -2247,6 +2255,10 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 								Ui::Toast::Show(tr::lng_share_done(tr::now));
 							});
 						}, &st::menuIconFave);
+					}
+					_menu->addAction(tr::lng_context_forward_msg(tr::now), std::move(fwdSubmenu), &st::menuIconForward);
+					if (cShowRepeaterOption()) {
+						_menu->addAction(tr::lng_context_repeater(tr::now), std::move(repeatSubmenu), &st::menuIconForward);
 					}
 				}
 				if (canDelete) {

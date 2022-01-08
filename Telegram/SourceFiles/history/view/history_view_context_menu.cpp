@@ -422,7 +422,7 @@ bool AddForwardMessageAction(
 					? owner->itemOrItsGroup(item)
 					: MessageIdsList{ 1, itemId }));
 		}
-	});
+	}, &st::menuIconForward);
 	menu->addAction(tr::lng_context_forward_msg_no_quote(tr::now), [=] {
 		if (const auto item = owner->message(itemId)) {
 			Window::ShowForwardNoQuoteMessagesBox(

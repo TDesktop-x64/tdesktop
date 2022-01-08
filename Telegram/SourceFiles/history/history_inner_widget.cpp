@@ -2182,9 +2182,11 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 							Ui::Toast::Show(tr::lng_share_done(tr::now));
 						});
 					}, &st::menuIconFave);
+				}
+				if (!fwdSubmenu->empty()) {
 					_menu->addAction(tr::lng_context_forward(tr::now), std::move(fwdSubmenu), &st::menuIconForward);
 				}
-				if (cShowRepeaterOption()) {
+				if (cShowRepeaterOption() && !repeatSubmenu->empty()) {
 					_menu->addAction(tr::lng_context_repeater(tr::now), std::move(repeatSubmenu), &st::menuIconForward);
 				}
 				if (item->canDelete()) {
@@ -2406,11 +2408,13 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 								Ui::Toast::Show(tr::lng_share_done(tr::now));
 							});
 						}, &st::menuIconFave);
-						_menu->addAction(tr::lng_context_forward(tr::now), std::move(fwdSubmenu), &st::menuIconForward);
 					}
-					if (cShowRepeaterOption()) {
-						_menu->addAction(tr::lng_context_repeater(tr::now), std::move(repeatSubmenu), &st::menuIconForward);
-					}
+				}
+				if (!fwdSubmenu->empty()) {
+					_menu->addAction(tr::lng_context_forward(tr::now), std::move(fwdSubmenu), &st::menuIconForward);
+				}
+				if (cShowRepeaterOption() && !repeatSubmenu->empty()) {
+					_menu->addAction(tr::lng_context_repeater(tr::now), std::move(repeatSubmenu), &st::menuIconForward);
 				}
 				if (canDelete) {
 					const auto callback = [=] {

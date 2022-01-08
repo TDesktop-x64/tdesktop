@@ -2031,8 +2031,8 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 							Ui::Toast::Show(tr::lng_share_done(tr::now));
 						});
 					}, &st::menuIconFave);
+					_menu->addAction(tr::lng_context_forward_msg(tr::now), std::move(fwdSubmenu), &st::menuIconForward);
 				}
-				_menu->addAction(tr::lng_context_forward_msg(tr::now), std::move(fwdSubmenu), &st::menuIconForward);
 				if (cShowRepeaterOption()) {
 					_menu->addAction(tr::lng_context_repeater(tr::now), std::move(repeatSubmenu), &st::menuIconForward);
 				}
@@ -2255,8 +2255,8 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 								Ui::Toast::Show(tr::lng_share_done(tr::now));
 							});
 						}, &st::menuIconFave);
+						_menu->addAction(tr::lng_context_forward_msg(tr::now), std::move(fwdSubmenu), &st::menuIconForward);
 					}
-					_menu->addAction(tr::lng_context_forward_msg(tr::now), std::move(fwdSubmenu), &st::menuIconForward);
 					if (cShowRepeaterOption()) {
 						_menu->addAction(tr::lng_context_repeater(tr::now), std::move(repeatSubmenu), &st::menuIconForward);
 					}

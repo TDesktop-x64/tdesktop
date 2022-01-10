@@ -1414,8 +1414,11 @@ void CustomLangPack::loadDefaultLangFile() {
 void CustomLangPack::parseLangFile(QJsonDocument str) {
 	QJsonObject json = str.object();
 	for (const QString& key : json.keys()) {
+		Lang::GetInstance().resetValue(key.toUtf8());
 		Lang::GetInstance().applyValue(key.toUtf8(), json.value(key).toString().toUtf8());
 		if (key.contains("#other")) {
+			Lang::GetInstance().resetValue(key.toUtf8().replace("#other", "#few"));
+			Lang::GetInstance().resetValue(key.toUtf8().replace("#other", "#few"));
 			Lang::GetInstance().applyValue(key.toUtf8().replace("#other", "#few"), json.value(key).toString().toUtf8());
 			Lang::GetInstance().applyValue(key.toUtf8().replace("#other", "#many"), json.value(key).toString().toUtf8());
 		}

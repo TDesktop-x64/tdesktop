@@ -76,6 +76,7 @@ public:
 	QByteArray serialize() const;
 	void fillFromSerialized(const QByteArray &data, int dataAppVersion);
 	void applyValue(const QByteArray &key, const QByteArray &value);
+	void resetValue(const QByteArray &key);
 	bool supportChoosingStickerReplacement() const;
 	int rightIndexChoosingStickerReplacement(bool named) const;
 
@@ -112,7 +113,6 @@ private:
 	void setBaseId(const QString &baseId, const QString &pluralId);
 
 	void applyDifferenceToMe(const MTPDlangPackDifference &difference);
-	void resetValue(const QByteArray &key);
 	void reset(const Language &language);
 	void fillFromCustomContent(
 		const QString &absolutePath,

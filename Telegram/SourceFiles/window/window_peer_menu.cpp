@@ -1409,7 +1409,7 @@ QPointer<Ui::RpWidget> ShowForwardNoQuoteMessagesBox(
 
 			auto action = Api::SendAction(_history, Api::SendOptions{.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer)});
 			action.clearDraft = false;
-			if (item->history()->peer->isUser()) {
+			if (_history->peer->isUser()) {
 				action.options.sendAs = nullptr;
 			}
 

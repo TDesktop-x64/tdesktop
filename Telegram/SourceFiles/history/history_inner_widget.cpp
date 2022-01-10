@@ -2157,6 +2157,9 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 								if (item->history()->peer->isUser()) {
 									action.options.sendAs = nullptr;
 								}
+								if (cRepeaterReplyToOrigMsg()) {
+									action.replyTo = item->idOriginal();
+								}
 
 								const auto history = item->history()->peer->owner().history(item->history()->peer);
 								auto resolved = history->resolveForwardDraft(Data::ForwardDraft{.ids = std::move(MessageIdsList(1, itemId)), .options = Data::ForwardOptions::NoSenderNames});

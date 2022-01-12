@@ -443,20 +443,20 @@ void Cover::refreshStatusText() {
 
 	QLocale::setDefault(QLocale::Language::French);
 
-	auto idText = QString();
+	auto idText = TextWithEntities();
 	auto id = QString();
 
 	if (_peer->isChat()) {
 		id = QString("-%1").arg(_peer->id.to<ChatId>().bare);
-		idText = textcmdLink(1, QString("ID: -%L1").arg(_peer->id.to<ChatId>().bare));
+		idText = Ui::Text::Link(QString("ID: -%L1").arg(_peer->id.to<ChatId>().bare));
 	} else if (_peer->isMegagroup() || _peer->isChannel()) {
 		id = QString("-100%1").arg(_peer->id.to<ChannelId>().bare);
-		idText = textcmdLink(1, QString("ID: -1 00%L1").arg(_peer->id.to<ChannelId>().bare));
+		idText = Ui::Text::Link(QString("ID: -1 00%L1").arg(_peer->id.to<ChannelId>().bare));
 	} else {
 		id = QString("%1").arg(_peer->id.to<UserId>().bare);
-		idText = textcmdLink(1, QString("ID: %L1").arg(_peer->id.to<UserId>().bare));
+		idText = Ui::Text::Link(QString("ID: %L1").arg(_peer->id.to<UserId>().bare));
 	}
-	_id->setRichText(idText);
+	_id->setMarkedText(idText);
 
 	_id->setLink(1, std::make_shared<LambdaClickHandler>([=] {
 		QGuiApplication::clipboard()->setText(id);

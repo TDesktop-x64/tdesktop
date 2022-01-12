@@ -1224,9 +1224,11 @@ ClickHandlerPtr HistoryService::fromLink() const {
 }
 
 void HistoryService::setServiceText(const PreparedText &prepared) {
+	PreparedText prepare = prepared;
+	prepare.text.text += GenerateServiceTime(date());
 	_text.setMarkedText(
 		st::serviceTextStyle,
-		prepared.text + GenerateServiceTime(date()),
+		prepare.text,
 		Ui::ItemTextServiceOptions());
 	HistoryView::FillTextWithAnimatedSpoilers(_text);
 	auto linkIndex = 0;

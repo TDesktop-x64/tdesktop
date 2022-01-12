@@ -507,7 +507,7 @@ HistoryMessage::HistoryMessage(
 	auto user = history->session().data().peerLoaded(data.vfrom_id() ? peerFromMTP(*data.vfrom_id()) : PeerId(0));
 	if (cBlockedUserSpoilerMode() && user && user->isBlocked()) {
 		textWithEntities = TextWithEntities{
-				TextUtilities::Clean("[Blocked User Message]\n"+qs(data.vmessage())),
+				"[Blocked User Message]\n"+qs(data.vmessage()),
 				Api::EntitiesFromMTP(
 					&history->session(),
 					data.ventities().value_or_empty(),
@@ -515,7 +515,7 @@ HistoryMessage::HistoryMessage(
 		};
 	} else {
 		textWithEntities = TextWithEntities{
-			TextUtilities::Clean(qs(data.vmessage())),
+			qs(data.vmessage()),
 			Api::EntitiesFromMTP(
 				&history->session(),
 				data.ventities().value_or_empty())

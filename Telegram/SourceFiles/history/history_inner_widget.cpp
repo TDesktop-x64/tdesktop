@@ -328,7 +328,9 @@ HistoryInner::HistoryInner(
 , _reactionsManager(
 	std::make_unique<HistoryView::Reactions::Manager>(
 		this,
-		[=](QRect updated) { update(updated); }))
+		Data::UniqueReactionsLimitValue(&controller->session()),
+		[=](QRect updated) { update(updated); },
+		controller->cachedReactionIconFactory().createMethod()))
 , _touchSelectTimer([=] { onTouchSelect(); })
 , _touchScrollTimer([=] { onTouchScrollTimer(); })
 , _scrollDateCheck([this] { scrollDateCheck(); })
@@ -381,8 +383,21 @@ HistoryInner::HistoryInner(
 	using ChosenReaction = HistoryView::Reactions::Manager::Chosen;
 	_reactionsManager->chosen(
 	) | rpl::start_with_next([=](ChosenReaction reaction) {
-		if (const auto item = session().data().message(reaction.context)) {
-			item->toggleReaction(reaction.emoji);
+		const auto item = session().data().message(reaction.context);
+		if (!item) {
+			return;
+		}
+		item->toggleReaction(reaction.emoji);
+		if (item->chosenReaction() != reaction.emoji) {
+			return;
+		} else if (const auto view = item->mainView()) {
+			if (const auto top = itemTop(view); top >= 0) {
+				view->animateSendReaction({
+					.emoji = reaction.emoji,
+					.flyIcon = reaction.icon,
+					.flyFrom = reaction.geometry.translated(0, -top),
+				});
+			}
 		}
 	}, lifetime());
 
@@ -418,6 +433,7 @@ HistoryInner::HistoryInner(
 		return item->mainView() != nullptr;
 	}) | rpl::start_with_next([=](not_null<HistoryItem*> item) {
 		item->mainView()->itemDataChanged();
+		_reactionsManager->updateUniqueLimit(item);
 	}, lifetime());
 
 	session().changes().historyUpdates(
@@ -429,11 +445,10 @@ HistoryInner::HistoryInner(
 
 	setupShortcuts();
 
-	Data::PeerAllowedReactionsValue(
-		_peer
-	) | rpl::start_with_next([=](std::vector<Data::Reaction> &&list) {
-		_reactionsManager->applyList(std::move(list));
-	}, lifetime());
+	HistoryView::Reactions::SetupManagerList(
+		_reactionsManager.get(),
+		&session(),
+		Data::PeerAllowedReactionsValue(_peer));
 
 	controller->adaptive().chatWideValue(
 	) | rpl::start_with_next([=](bool wide) {
@@ -547,6 +562,10 @@ void HistoryInner::repaintItem(const Element *view) {
 	if (top >= 0) {
 		const auto range = view->verticalRepaintRange();
 		update(0, top + range.top, width(), range.height);
+		const auto id = view->data()->fullId();
+		if (const auto area = _reactionsManager->lookupEffectArea(id)) {
+			update(*area);
+		}
 	}
 }
 
@@ -887,6 +906,8 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 	} else {
 		_emptyPainter = nullptr;
 	}
+
+	_reactionsManager->startEffectsCollection();
 	if (!noHistoryDisplayed) {
 		auto readMentions = base::flat_set<not_null<HistoryItem*>>();
 
@@ -916,12 +937,17 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 			context.translate(0, -top);
 			p.translate(0, top);
 			if (context.clip.y() < view->height()) while (top < drawToY) {
+				context.reactionEffects
+					= _reactionsManager->currentReactionEffect();
 				context.outbg = view->hasOutLayout();
 				context.selection = itemRenderSelection(
 					view,
 					selfromy - mtop,
 					seltoy - mtop);
 				view->draw(p, context);
+				_reactionsManager->recordCurrentReactionEffect(
+					item->fullId(),
+					QPoint(0, top));
 
 				const auto height = view->height();
 				const auto middle = top + height / 2;
@@ -971,14 +997,18 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 			while (top < drawToY) {
 				const auto height = view->height();
 				if (context.clip.y() < height && hdrawtop < top + height) {
+					context.reactionEffects
+						= _reactionsManager->currentReactionEffect();
 					context.outbg = view->hasOutLayout();
 					context.selection = itemRenderSelection(
 						view,
 						selfromy - htop,
 						seltoy - htop);
 					view->draw(p, context);
+					_reactionsManager->recordCurrentReactionEffect(
+						item->fullId(),
+						QPoint(0, top));
 
-					const auto item = view->data();
 					const auto middle = top + height / 2;
 					const auto bottom = top + height;
 					if (_visibleAreaBottom >= bottom) {
@@ -1118,7 +1148,7 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 			});
 			p.setOpacity(1.);
 
-			_reactionsManager->paintButtons(p, context);
+			_reactionsManager->paint(p, context);
 
 			p.translate(0, _historyPaddingTop);
 			_emojiInteractions->paint(p);
@@ -1837,6 +1867,12 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 		mouseActionUpdate(e->globalPos());
 	}
 
+	const auto link = ClickHandler::getActive();
+	if (link
+		&& !link->property(kSendReactionEmojiProperty).toString().isEmpty()
+		&& _reactionsManager->showContextMenu(this, e)) {
+		return;
+	}
 	auto selectedState = getSelectionState();
 	auto canSendMessages = _peer->canWrite();
 
@@ -1874,6 +1910,22 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 
 	const auto hasWhoReactedItem = _dragStateItem
 		&& Api::WhoReactedExists(_dragStateItem);
+	const auto clickedEmoji = link
+		? link->property(kReactionsCountEmojiProperty).toString()
+		: QString();
+	_whoReactedMenuLifetime.destroy();
+	if (hasWhoReactedItem && !clickedEmoji.isEmpty()) {
+		HistoryView::ShowWhoReactedMenu(
+			&_menu,
+			e->globalPos(),
+			this,
+			_dragStateItem,
+			clickedEmoji,
+			_controller,
+			_whoReactedMenuLifetime);
+		e->accept();
+		return;
+	}
 	_menu = base::make_unique_q<Ui::PopupMenu>(
 		this,
 		hasWhoReactedItem ? st::whoReadMenu : st::popupMenuWithIcons);
@@ -2054,10 +2106,13 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 		}
 	};
 
-	const auto link = ClickHandler::getActive();
-	auto lnkPhoto = dynamic_cast<PhotoClickHandler*>(link.get());
-	auto lnkDocument = dynamic_cast<DocumentClickHandler*>(link.get());
-	if (lnkPhoto || lnkDocument) {
+	const auto lnkPhotoId = PhotoId(link
+		? link->property(kPhotoLinkMediaIdProperty).toULongLong()
+		: 0);
+	const auto lnkDocumentId = DocumentId(link
+		? link->property(kDocumentLinkMediaIdProperty).toULongLong()
+		: 0);
+	if (lnkPhotoId || lnkDocumentId) {
 		const auto item = _dragStateItem;
 		const auto itemId = item ? item->fullId() : FullMsgId();
 		if (isUponSelected > 0 && !hasCopyRestrictionForSelected()) {
@@ -2069,10 +2124,10 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				&st::menuIconCopy);
 		}
 		addItemActions(item, item);
-		if (lnkPhoto) {
-			addPhotoActions(lnkPhoto->photo(), item);
+		if (lnkPhotoId) {
+			addPhotoActions(session->data().photo(lnkPhotoId), item);
 		} else {
-			addDocumentActions(lnkDocument->document(), item);
+			addDocumentActions(session->data().document(lnkDocumentId), item);
 		}
 		if (item && item->hasDirectLink() && isUponSelected != 2 && isUponSelected != -2) {
 			_menu->addAction(item->history()->peer->isMegagroup() ? tr::lng_context_copy_message_link(tr::now) : tr::lng_context_copy_post_link(tr::now), [=] {
@@ -3073,7 +3128,7 @@ void HistoryInner::enterEventHook(QEnterEvent *e) {
 }
 
 void HistoryInner::leaveEventHook(QEvent *e) {
-	_reactionsManager->updateButton({});
+	_reactionsManager->updateButton({ .cursorLeft = true });
 	if (auto item = App::hoveredItem()) {
 		repaintItem(item);
 		App::hoveredItem(nullptr);
@@ -3406,7 +3461,8 @@ void HistoryInner::mouseActionUpdate() {
 		: nullptr;
 	const auto item = view ? view->data().get() : nullptr;
 	if (view) {
-		if (App::mousedItem() != view) {
+		const auto changed = (App::mousedItem() != view);
+		if (changed) {
 			repaintItem(App::mousedItem());
 			App::mousedItem(view);
 			repaintItem(App::mousedItem());
@@ -3416,6 +3472,9 @@ void HistoryInner::mouseActionUpdate() {
 			view,
 			m,
 			reactionState));
+		if (changed) {
+			_reactionsManager->updateUniqueLimit(item);
+		}
 		if (view->pointState(m) != PointState::Outside) {
 			if (App::hoveredItem() != view) {
 				repaintItem(App::hoveredItem());

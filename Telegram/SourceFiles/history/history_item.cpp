@@ -808,6 +808,26 @@ void HistoryItem::toggleReaction(const QString &reaction) {
 }
 
 void HistoryItem::updateReactions(const MTPMessageReactions *reactions) {
+	const auto history = this->history();
+	const auto toUser = (reactions && out())
+		? history->peer->asUser()
+		: nullptr;
+	const auto toContact = toUser && toUser->isContact();
+	const auto maybeNotify = toContact && lookupHisReaction().isEmpty();
+	setReactions(reactions);
+	if (maybeNotify) {
+		if (const auto reaction = lookupHisReaction(); !reaction.isEmpty()) {
+			const auto notification = ItemNotification{
+				this,
+				ItemNotificationType::Reaction,
+			};
+			history->pushNotification(notification);
+			Core::App().notifications().schedule(notification);
+		}
+	}
+}
+
+void HistoryItem::setReactions(const MTPMessageReactions *reactions) {
 	if (reactions || _reactionsLastRefreshed) {
 		_reactionsLastRefreshed = crl::now();
 	}
@@ -834,7 +854,10 @@ void HistoryItem::updateReactions(const MTPMessageReactions *reactions) {
 		} else if (!_reactions) {
 			_reactions = std::make_unique<Data::MessageReactions>(this);
 		}
-		_reactions->set(data.vresults().v, data.is_min());
+		_reactions->set(
+			data.vresults().v,
+			data.vrecent_reactons().value_or_empty(),
+			data.is_min());
 	});
 }
 
@@ -847,6 +870,14 @@ const base::flat_map<QString, int> &HistoryItem::reactions() const {
 	return _reactions ? _reactions->list() : kEmpty;
 }
 
+auto HistoryItem::recentReactions() const
+-> const base::flat_map<QString, std::vector<not_null<UserData*>>> & {
+	static const auto kEmpty = base::flat_map<
+		QString,
+		std::vector<not_null<UserData*>>>();
+	return _reactions ? _reactions->recent() : kEmpty;
+}
+
 bool HistoryItem::canViewReactions() const {
 	return (_flags & MessageFlag::CanViewReactions)
 		&& _reactions
@@ -855,6 +886,24 @@ bool HistoryItem::canViewReactions() const {
 
 QString HistoryItem::chosenReaction() const {
 	return _reactions ? _reactions->chosen() : QString();
+}
+
+QString HistoryItem::lookupHisReaction() const {
+	if (!_reactions) {
+		return QString();
+	}
+	const auto &list = _reactions->list();
+	if (list.empty()) {
+		return QString();
+	}
+	const auto chosen = _reactions->chosen();
+	const auto &[first, count] = list.front();
+	if (chosen.isEmpty() || first != chosen || count > 1) {
+		return first;
+	} else if (list.size() == 1) {
+		return QString();
+	}
+	return list.back().first;
 }
 
 crl::time HistoryItem::lastReactionsRefreshTime() const {

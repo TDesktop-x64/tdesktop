@@ -57,6 +57,10 @@ struct CloudTheme;
 enum class CloudThemeType;
 } // namespace Data
 
+namespace HistoryView::Reactions {
+class CachedIconFactory;
+} // namespace HistoryView::Reactions
+
 namespace Window {
 
 class MainWindow;
@@ -452,6 +456,11 @@ public:
 		return _chatStyle.get();
 	}
 
+	[[nodiscard]] auto cachedReactionIconFactory() const
+	-> HistoryView::Reactions::CachedIconFactory & {
+		return *_cachedReactionIconFactory;
+	}
+
 	rpl::lifetime &lifetime() {
 		return _lifetime;
 	}
@@ -528,6 +537,9 @@ private:
 	std::weak_ptr<Ui::ChatTheme> _chatStyleTheme;
 	std::deque<std::shared_ptr<Ui::ChatTheme>> _lastUsedCustomChatThemes;
 	rpl::variable<PeerThemeOverride> _peerThemeOverride;
+
+	using ReactionIconFactory = HistoryView::Reactions::CachedIconFactory;
+	std::unique_ptr<ReactionIconFactory> _cachedReactionIconFactory;
 
 	rpl::lifetime _lifetime;
 

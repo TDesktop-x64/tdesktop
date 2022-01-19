@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/localstorage.h"
 #include "media/audio/media_audio.h"
 #include "media/player/media_player_instance.h"
+#include "main/main_session.h"
 #include "history/history_item_components.h"
 #include "history/history.h"
 #include "history/view/history_view_element.h"
@@ -323,7 +324,13 @@ void Document::draw(
 	const auto cornerDownload = downloadInCorner();
 
 	if (!_dataMedia->canBePlayed(_realParent)) {
-		_dataMedia->automaticLoad(_realParent->fullId(), _realParent);
+		auto user = history()->session().data().peerLoaded(_parent->data()->from() ? _parent->data()->from()->id : PeerId(0));
+		if (cBlockedUserSpoilerMode() && user && user->isBlocked()) {
+
+		}
+		else {
+			_dataMedia->automaticLoad(_realParent->fullId(), _realParent);
+		}
 	}
 	bool loaded = dataLoaded(), displayLoading = _data->displayLoading();
 	const auto sti = context.imageStyle();

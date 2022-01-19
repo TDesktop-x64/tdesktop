@@ -506,12 +506,14 @@ HistoryMessage::HistoryMessage(
 
 	auto user = history->session().data().peerLoaded(data.vfrom_id() ? peerFromMTP(*data.vfrom_id()) : PeerId(0));
 	if (cBlockedUserSpoilerMode() && user && user->isBlocked()) {
+		auto blkMsg = QString("[Blocked User Message]\n");
+		auto msg = blkMsg + qs(data.vmessage());
 		textWithEntities = TextWithEntities{
-				"[Blocked User Message]\n"+qs(data.vmessage()),
+				msg,
 				Api::EntitiesFromMTP(
 					&history->session(),
 					data.ventities().value_or_empty(),
-					qs(data.vmessage()).length())
+					blkMsg.length(), qs(data.vmessage()).length())
 		};
 	} else {
 		textWithEntities = TextWithEntities{

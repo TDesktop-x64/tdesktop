@@ -2462,13 +2462,25 @@ void OverlayWidget::displayDocument(
 			if (_documentMedia->canBePlayed(_message)
 				&& initStreaming(continueStreaming)) {
 			} else if (_document->isVideoFile()) {
-				_documentMedia->automaticLoad(fileOrigin(), _message);
+				auto user = _history->session().data().peerLoaded(_from ? _from->id : PeerId(0));
+				if (cBlockedUserSpoilerMode() && user && user->isBlocked()) {
+
+				}
+				else {
+					_documentMedia->automaticLoad(fileOrigin(), _message);
+				}
 				initStreamingThumbnail();
 			} else if (_document->isTheme()) {
 				_documentMedia->automaticLoad(fileOrigin(), _message);
 				initThemePreview();
 			} else {
-				_documentMedia->automaticLoad(fileOrigin(), _message);
+				auto user = _history->session().data().peerLoaded(_from ? _from->id : PeerId(0));
+				if (cBlockedUserSpoilerMode() && user && user->isBlocked()) {
+
+				}
+				else {
+					_documentMedia->automaticLoad(fileOrigin(), _message);
+				}
 				_document->saveFromDataSilent();
 				auto &location = _document->location(true);
 				if (location.accessEnable()) {

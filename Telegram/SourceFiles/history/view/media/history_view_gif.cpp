@@ -276,6 +276,10 @@ bool Gif::downloadInCorner() const {
 }
 
 bool Gif::autoplayEnabled() const {
+	auto user = history()->session().data().peerLoaded(_parent->data()->from() ? _parent->data()->from()->id : PeerId(0));
+	if (cBlockedUserSpoilerMode() && user && user->isBlocked()) {
+		return false;
+	}
 	return Data::AutoDownload::ShouldAutoPlay(
 		_data->session().settings().autoDownload(),
 		_realParent->history()->peer,

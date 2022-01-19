@@ -229,7 +229,13 @@ void Photo::draw(Painter &p, const PaintContext &context) const {
 	if (width() < st::msgPadding.left() + st::msgPadding.right() + 1) return;
 
 	ensureDataMediaCreated();
-	_dataMedia->automaticLoad(_realParent->fullId(), _parent->data());
+	auto user = history()->session().data().peerLoaded(_parent->data()->from() ? _parent->data()->from()->id : PeerId(0));
+	if (cBlockedUserSpoilerMode() && user && user->isBlocked()) {
+		
+	}
+	else {
+		_dataMedia->automaticLoad(_realParent->fullId(), _parent->data());
+	}
 	const auto st = context.st;
 	const auto sti = context.imageStyle();
 	const auto stm = context.messageStyle();
@@ -504,7 +510,14 @@ void Photo::drawGrouped(
 		not_null<uint64*> cacheKey,
 		not_null<QPixmap*> cache) const {
 	ensureDataMediaCreated();
-	_dataMedia->automaticLoad(_realParent->fullId(), _parent->data());
+
+	auto user = history()->session().data().peerLoaded(_parent->data()->from() ? _parent->data()->from()->id : PeerId(0));
+	if (cBlockedUserSpoilerMode() && user && user->isBlocked()) {
+
+	}
+	else {
+		_dataMedia->automaticLoad(_realParent->fullId(), _parent->data());
+	}
 
 	validateGroupedCache(geometry, corners, cacheKey, cache);
 

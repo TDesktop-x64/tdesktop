@@ -988,7 +988,13 @@ void Document::paint(Painter &p, const QRect &clip, TextSelection selection, con
 
 	const auto cornerDownload = downloadInCorner();
 
-	_dataMedia->automaticLoad(parent()->fullId(), parent());
+	auto user = parent()->history()->session().data().peerLoaded(parent()->from() ? parent()->from()->id : PeerId(0));
+	if (cBlockedUserSpoilerMode() && user && user->isBlocked()) {
+
+	}
+	else {
+		_dataMedia->automaticLoad(parent()->fullId(), parent());
+	}
 	const auto loaded = dataLoaded();
 	const auto displayLoading = _data->displayLoading();
 

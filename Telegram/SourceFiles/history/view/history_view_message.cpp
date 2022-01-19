@@ -2025,6 +2025,10 @@ Reactions::ButtonParameters Message::reactionButtonParameters(
 	return result;
 }
 
+int Message::reactionsOptimalWidth() const {
+	return _reactions ? _reactions->countNiceWidth() : 0;
+}
+
 void Message::drawInfo(
 		Painter &p,
 		const PaintContext &context,

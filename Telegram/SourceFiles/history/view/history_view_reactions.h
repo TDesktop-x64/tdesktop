@@ -34,6 +34,7 @@ struct InlineListData {
 	enum class Flag : uchar {
 		InBubble  = 0x01,
 		OutLayout = 0x02,
+		Flipped   = 0x04,
 	};
 	friend inline constexpr bool is_flag_type(Flag) { return true; };
 	using Flags = base::flags<Flag>;
@@ -55,6 +56,7 @@ public:
 
 	void update(Data &&data, int availableWidth);
 	QSize countCurrentSize(int newWidth) override;
+	[[nodiscard]] int countNiceWidth() const;
 	[[nodiscard]] int placeAndResizeGetHeight(QRect available);
 	void flipToRight();
 

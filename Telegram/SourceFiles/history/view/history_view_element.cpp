@@ -1028,6 +1028,10 @@ Reactions::ButtonParameters Element::reactionButtonParameters(
 	return {};
 }
 
+int Element::reactionsOptimalWidth() const {
+	return 0;
+}
+
 void Element::clickHandlerActiveChanged(
 		const ClickHandlerPtr &handler,
 		bool active) {

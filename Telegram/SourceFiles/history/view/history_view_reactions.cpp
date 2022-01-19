@@ -26,6 +26,7 @@ namespace {
 constexpr auto kInNonChosenOpacity = 0.12;
 constexpr auto kOutNonChosenOpacity = 0.18;
 constexpr auto kMaxRecentUserpics = 3;
+constexpr auto kMaxNicePerRow = 5;
 
 [[nodiscard]] QColor AdaptChosenServiceFg(QColor serviceBg) {
 	serviceBg.setAlpha(std::max(serviceBg.alpha(), 192));
@@ -128,7 +129,7 @@ void InlineList::setButtonUserpics(
 	if (!button.userpics) {
 		button.userpics = std::make_unique<Userpics>();
 	}
-	const auto count = int(users.size());
+	const auto count = button.count = int(users.size());
 	auto &list = button.userpics->list;
 	const auto regenerate = [&] {
 		if (list.size() != count) {
@@ -200,6 +201,7 @@ QSize InlineList::countOptimalSize() {
 }
 
 QSize InlineList::countCurrentSize(int newWidth) {
+	_data.flags &= ~Data::Flag::Flipped;
 	if (_buttons.empty()) {
 		return optimalSize();
 	}
@@ -225,7 +227,27 @@ QSize InlineList::countCurrentSize(int newWidth) {
 	return { newWidth, height + add };
 }
 
+int InlineList::countNiceWidth() const {
+	const auto count = _data.reactions.size();
+	const auto rows = (count + kMaxNicePerRow - 1) / kMaxNicePerRow;
+	const auto columns = (count + rows - 1) / rows;
+	const auto between = st::reactionInlineBetween;
+	auto result = 0;
+	auto inrow = 0;
+	auto x = 0;
+	for (auto &button : _buttons) {
+		if (inrow++ >= columns) {
+			x = 0;
+			inrow = 0;
+		}
+		x += button.geometry.width() + between;
+		accumulate_max(result, x - between);
+	}
+	return result;
+}
+
 void InlineList::flipToRight() {
+	_data.flags |= Data::Flag::Flipped;
 	for (auto &button : _buttons) {
 		button.geometry.moveLeft(
 			width() - button.geometry.x() - button.geometry.width());
@@ -254,38 +276,57 @@ void InlineList::paint(
 	const auto animated = (_animation && context.reactionEffects)
 		? _animation->playingAroundEmoji()
 		: QString();
+	const auto flipped = (_data.flags & Data::Flag::Flipped);
 	if (_animation && context.reactionEffects && animated.isEmpty()) {
 		_animation = nullptr;
 	}
 	p.setFont(st::semiboldFont);
 	for (const auto &button : _buttons) {
+		const auto &geometry = button.geometry;
 		const auto mine = (_data.chosenReaction == button.emoji);
 		const auto withoutMine = button.count - (mine ? 1 : 0);
 		const auto animating = (animated == button.emoji);
 		const auto skipImage = animating
 			&& (withoutMine < 1 || !_animation->flying());
-		const auto skipBubble = skipImage && _animation->flying();
-		const auto &geometry = button.geometry;
+		const auto bubbleProgress = skipImage
+			? _animation->flyingProgress()
+			: 1.;
+		const auto bubbleReady = (bubbleProgress == 1.);
+		const auto bubbleSkip = anim::interpolate(
+			geometry.height() - geometry.width(),
+			0,
+			bubbleProgress);
 		const auto inner = geometry.marginsRemoved(padding);
 		const auto chosen = mine
-			&& (!animating || !_animation->flying());
-		if (!skipBubble) {
+			&& (!animating || !_animation->flying() || skipImage);
+		if (bubbleProgress > 0.) {
 			auto hq = PainterHighQualityEnabler(p);
 			p.setPen(Qt::NoPen);
 			if (inbubble) {
 				if (!chosen) {
-					p.setOpacity(context.outbg
+					p.setOpacity(bubbleProgress * (context.outbg
 						? kOutNonChosenOpacity
-						: kInNonChosenOpacity);
+						: kInNonChosenOpacity));
+				} else if (!bubbleReady) {
+					p.setOpacity(bubbleProgress);
 				}
 				p.setBrush(stm->msgFileBg);
 			} else {
+				if (!bubbleReady) {
+					p.setOpacity(bubbleProgress);
+				}
 				p.setBrush(chosen ? st->msgServiceFg() : st->msgServiceBg());
 			}
 			const auto radius = geometry.height() / 2.;
-			p.drawRoundedRect(geometry, radius, radius);
+			const auto fill = geometry.marginsAdded({
+				flipped ? bubbleSkip : 0,
+				0,
+				flipped ? 0 : bubbleSkip,
+				0,
+			});
+			p.drawRoundedRect(fill, radius, radius);
 			if (inbubble && !chosen) {
-				p.setOpacity(1.);
+				p.setOpacity(bubbleProgress);
 			}
 		}
 		if (button.image.isNull()) {
@@ -304,13 +345,14 @@ void InlineList::paint(
 				return _animation->paintGetArea(p, QPoint(), image);
 			};
 		}
-		if (skipBubble) {
+		if (bubbleProgress == 0.) {
 			continue;
 		}
 		resolveUserpicsImage(button);
+		const auto left = inner.x() + (flipped ? 0 : bubbleSkip);
 		if (button.userpics) {
 			p.drawImage(
-				inner.x() + size + st::reactionInlineUserpicsPadding.left(),
+				left + size + st::reactionInlineUserpicsPadding.left(),
 				geometry.y() + st::reactionInlineUserpicsPadding.top(),
 				button.userpics->image);
 		} else {
@@ -330,9 +372,12 @@ void InlineList::paint(
 			const auto textTop = geometry.y()
 				+ ((geometry.height() - st::semiboldFont->height) / 2);
 			p.drawText(
-				inner.x() + size + st::reactionInlineSkip,
+				left + size + st::reactionInlineSkip,
 				textTop + st::semiboldFont->ascent,
 				button.countText);
+		}
+		if (!bubbleReady) {
+			p.setOpacity(1.);
 		}
 	}
 }
@@ -429,6 +474,7 @@ InlineListData InlineListDataFromMessage(not_null<Message*> message) {
 				|| sum > kMaxRecentUserpics) {
 				return false;
 			}
+			++b;
 		}
 		return true;
 	}();

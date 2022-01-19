@@ -61,8 +61,8 @@ Panel::Panel(not_null<Call*> call)
 , _user(call->user())
 , _layerBg(std::make_unique<Ui::LayerManager>(widget()))
 #ifndef Q_OS_MAC
-, _controls(std::make_unique<Ui::Platform::TitleControls>(
-	widget(),
+, _controls(Ui::Platform::SetupSeparateTitleControls(
+	window(),
 	st::callTitle,
 	[=](bool maximized) { toggleFullScreen(maximized); }))
 #endif // !Q_OS_MAC
@@ -154,7 +154,7 @@ void Panel::initWindow() {
 			return Flag::None | Flag(0);
 		}
 #ifndef Q_OS_MAC
-		if (_controls->geometry().contains(widgetPoint)) {
+		if (_controls->controls.geometry().contains(widgetPoint)) {
 			return Flag::None | Flag(0);
 		}
 #endif // !Q_OS_MAC
@@ -560,7 +560,7 @@ void Panel::initLayout() {
 	}, widget()->lifetime());
 
 #ifndef Q_OS_MAC
-	_controls->raise();
+	_controls->wrap.raise();
 #endif // !Q_OS_MAC
 }
 
@@ -638,7 +638,7 @@ void Panel::updateControlsGeometry() {
 	}
 	if (_fingerprint) {
 #ifndef Q_OS_MAC
-		const auto controlsGeometry = _controls->geometry();
+		const auto controlsGeometry = _controls->controls.geometry();
 		const auto halfWidth = widget()->width() / 2;
 		const auto minLeft = (controlsGeometry.center().x() < halfWidth)
 			? (controlsGeometry.width() + st::callFingerprintTop)

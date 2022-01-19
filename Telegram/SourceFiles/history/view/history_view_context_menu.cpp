@@ -969,17 +969,13 @@ base::unique_qptr<Ui::PopupMenu> FillContextMenu(
 	const auto view = request.view;
 	const auto item = request.item;
 	const auto itemId = item ? item->fullId() : FullMsgId();
-	const auto lnkPhotoId = PhotoId(link
-		? link->property(kPhotoLinkMediaIdProperty).toULongLong()
-		: 0);
-	const auto lnkDocumentId = DocumentId(link
-		? link->property(kDocumentLinkMediaIdProperty).toULongLong()
-		: 0);
-	const auto photo = lnkPhotoId
-		? list->session().data().photo(lnkPhotoId).get()
+	const auto lnkPhoto = link
+		? reinterpret_cast<PhotoData*>(
+			link->property(kPhotoLinkMediaProperty).toULongLong())
 		: nullptr;
-	const auto document = lnkDocumentId
-		? list->session().data().document(lnkDocumentId).get()
+	const auto lnkDocument = link
+		? reinterpret_cast<DocumentData*>(
+			link->property(kDocumentLinkMediaProperty).toULongLong())
 		: nullptr;
 	const auto poll = item
 		? (item->media() ? item->media()->poll() : nullptr)
@@ -1004,10 +1000,10 @@ base::unique_qptr<Ui::PopupMenu> FillContextMenu(
 	}
 
 	AddTopMessageActions(result, request, list);
-	if (photo) {
-		AddPhotoActions(result, photo, item, list);
-	} else if (document) {
-		AddDocumentActions(result, document, item, list);
+	if (lnkPhoto) {
+		AddPhotoActions(result, lnkPhoto, item, list);
+	} else if (lnkDocument) {
+		AddDocumentActions(result, lnkDocument, item, list);
 	} else if (poll) {
 		AddPollActions(result, poll, item, list->elementContext());
 	} else if (!request.overSelection && view && !hasSelection) {
@@ -1128,6 +1124,7 @@ void AddWhoReactedAction(
 		not_null<QWidget*> context,
 		not_null<HistoryItem*> item,
 		not_null<Window::SessionController*> controller) {
+	const auto whoReadIds = std::make_shared<Api::WhoReadList>();
 	const auto participantChosen = [=](uint64 id) {
 		controller->showPeerInfo(PeerId(id));
 	};
@@ -1141,12 +1138,13 @@ void AddWhoReactedAction(
 			controller->window().show(ReactionsListBox(
 				controller,
 				item,
-				QString()));
+				QString(),
+				whoReadIds));
 		}
 	};
 	menu->addAction(Ui::WhoReactedContextAction(
 		menu.get(),
-		Api::WhoReacted(item, context, st::defaultWhoRead),
+		Api::WhoReacted(item, context, st::defaultWhoRead, whoReadIds),
 		participantChosen,
 		showAllChosen));
 	if (!menu->empty()) {
@@ -1176,10 +1174,8 @@ void ShowWhoReactedMenu(
 	const auto reactions = &controller->session().data().reactions();
 	const auto &list = reactions->list(
 		Data::Reactions::Type::Active);
-	const auto active = ranges::contains(
-		list,
-		emoji,
-		&Data::Reaction::emoji);
+	const auto activeNonQuick = (emoji != reactions->favorite())
+		&& ranges::contains(list, emoji, &Data::Reaction::emoji);
 	const auto filler = lifetime.make_state<Ui::WhoReactedListMenu>(
 		participantChosen,
 		showAllChosen);
@@ -1193,7 +1189,7 @@ void ShowWhoReactedMenu(
 	}) | rpl::start_with_next([=, &lifetime](Ui::WhoReadContent &&content) {
 		const auto creating = !*menu;
 		const auto refill = [=] {
-			if (active) {
+			if (activeNonQuick) {
 				(*menu)->addAction(tr::lng_context_set_as_quick(tr::now), [=] {
 					reactions->setFavorite(emoji);
 				}, &st::menuIconFave);

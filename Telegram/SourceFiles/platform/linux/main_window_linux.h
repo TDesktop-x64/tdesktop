@@ -8,11 +8,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "platform/platform_main_window.h"
-#include "base/unique_qptr.h"
 
-namespace Ui {
-class PopupMenu;
-} // namespace Ui
+class QMenuBar;
 
 namespace Platform {
 
@@ -21,10 +18,6 @@ public:
 	explicit MainWindow(not_null<Window::Controller*> controller);
 
 	void psShowTrayMenu();
-
-	bool trayAvailable() {
-		return _sniAvailable || QSystemTrayIcon::isSystemTrayAvailable();
-	}
 
 	bool isActiveForTrayMenu() override;
 
@@ -52,10 +45,7 @@ private:
 	friend class Private;
 	const std::unique_ptr<Private> _private;
 
-	bool _sniAvailable = false;
-	base::unique_qptr<Ui::PopupMenu> _trayIconMenuXEmbed;
-
-	QMenu *psMainMenu = nullptr;
+	QMenuBar *psMainMenu = nullptr;
 	QAction *psLogout = nullptr;
 	QAction *psUndo = nullptr;
 	QAction *psRedo = nullptr;

@@ -22,6 +22,7 @@
     "lng_settings_other": "Other",
     "lng_settings_hide_all_chats": "Hide \"All chats\" folder",
     "lng_settings_disable_link_warning": "Disable open link warning",
+    "lng_settings_hide_messages": "Hide messages from blocked user",
     "lng_settings_restart_hint": "WARNING: Changing options that are colored in red will take effect only after the app restarts.",
 
     "lng_settings_skip_message": "Skip to next unread chat",
@@ -32,6 +33,7 @@
     "lng_show_emoji_button_as_text_desc": "Note: If you can't see an emoji button, please turn on this option.",
     "lng_radio_controller_desc": "Note: Radio controller is an experimental bot for controlling your music streaming session.",
     "lng_auto_unmute_desc": "Note: Auto unmute when you've joined the voice chat.",
+    "lng_settings_hide_messages_desc": "Note: IT IS NOT REALLY HIDE! Messages are still available to view, but text will be converted to Spoiler and media won't auto download.",
 
     "lng_net_speed_boost_default": "Disabled",
     "lng_net_speed_boost_slight": "Slight",

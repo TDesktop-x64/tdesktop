@@ -484,6 +484,63 @@ void History::destroyMessagesByDates(TimeId minDate, TimeId maxDate) {
 	}
 }
 
+void History::editHistoryMessages(PeerData* peer, bool isHide) {
+	for (const auto& message : _messages) {
+		if (message->isRegular() && !message->isService() && message->from() == peer) {
+			if (isHide) {
+				hideMessage(message.get());
+			} else {
+				unhideMessage(message.get());
+			}
+		}
+	}
+}
+
+void History::unhideMessage(not_null<HistoryItem*> item) {
+	auto text = item->originalText();
+	auto blkMsg = QString("[Blocked User Message]");
+
+	if (text.text.contains(blkMsg)) {
+		text.text.remove(blkMsg);
+		if (text.text.startsWith('\n')) {
+			text.text.remove(0, 1);
+		}
+
+		if (text.entities.length() > 0 && text.entities.at(0).type() == EntityType::Bold) text.entities.removeFirst(); // Remove Bold
+		if (text.entities.length() > 0 && text.entities.at(0).type() == EntityType::Spoiler) text.entities.removeFirst(); // Remove Spoiler
+		for (auto& entity : text.entities) {
+			entity.shiftLeft(23);
+		}
+
+		item->setText(text);
+		if (item->media()) {
+			owner().requestItemTextRefresh(item);
+		} else {
+			owner().requestItemResize(item);
+		}
+	}
+}
+
+void History::hideMessage(not_null<HistoryItem*> item) {
+	auto text = item->originalText();
+	auto blkMsg = QString("[Blocked User Message]\n");
+
+	for (auto& entity : text.entities) {
+		entity.shiftRight(23);
+	}
+	text.entities.insert(0, EntityInText(EntityType::Bold, 0, 22)); // Add Bold
+	text.entities.insert(1, EntityInText(EntityType::Spoiler, 23, text.text.length())); // Add Spoiler
+
+	text.text = blkMsg + text.text;
+
+	item->setText(text);
+	if (item->media()) {
+		owner().requestItemTextRefresh(item);
+	} else {
+		owner().requestItemResize(item);
+	}
+}
+
 void History::unpinAllMessages() {
 	session().storage().remove(
 		Storage::SharedMediaRemoveAll(

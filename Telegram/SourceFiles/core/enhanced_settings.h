@@ -20,6 +20,10 @@ namespace EnhancedSettings {
 
 		void write(bool force = false);
 
+		void addIdToBlocklist(int64 userId);
+
+		void removeIdFromBlocklist(int64 userId);
+
 	public Q_SLOTS:
 
 		void writeTimeout();
@@ -30,6 +34,8 @@ namespace EnhancedSettings {
 		void writeCurrentSettings();
 
 		bool readCustomFile();
+
+		void readBlocklist();
 
 		void writing();
 

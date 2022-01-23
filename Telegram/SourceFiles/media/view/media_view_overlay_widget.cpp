@@ -2462,11 +2462,9 @@ void OverlayWidget::displayDocument(
 			if (_documentMedia->canBePlayed(_message)
 				&& initStreaming(continueStreaming)) {
 			} else if (_document->isVideoFile()) {
+				auto peerId = _from ? _from->id : PeerId(0);
 				auto user = _history->session().data().peerLoaded(_from ? _from->id : PeerId(0));
-				if (cBlockedUserSpoilerMode() && user && user->isBlocked()) {
-
-				}
-				else {
+				if (!blockExist(int64(peerId.value)) || !cBlockedUserSpoilerMode() && user && !user->isBlocked()) {
 					_documentMedia->automaticLoad(fileOrigin(), _message);
 				}
 				initStreamingThumbnail();
@@ -2474,11 +2472,9 @@ void OverlayWidget::displayDocument(
 				_documentMedia->automaticLoad(fileOrigin(), _message);
 				initThemePreview();
 			} else {
+				auto peerId = _from ? _from->id : PeerId(0);
 				auto user = _history->session().data().peerLoaded(_from ? _from->id : PeerId(0));
-				if (cBlockedUserSpoilerMode() && user && user->isBlocked()) {
-
-				}
-				else {
+				if (!blockExist(int64(peerId.value)) || !cBlockedUserSpoilerMode() && user && !user->isBlocked()) {
 					_documentMedia->automaticLoad(fileOrigin(), _message);
 				}
 				_document->saveFromDataSilent();

@@ -25,9 +25,15 @@ namespace Settings {
 		void SetupEnhancedButton(not_null<Ui::VerticalLayout *> container);
 		void SetupEnhancedVoiceChat(not_null<Ui::VerticalLayout *> container);
 		void SetupEnhancedOthers(not_null<Window::SessionController*> controller, not_null<Ui::VerticalLayout *> container);
+		void reqBlocked(int offset);
+		void writeBlocklistFile();
 
 		rpl::event_stream<QString> _AlwaysDeleteChanged;
 		rpl::event_stream<QString> _BitrateChanged;
+
+		mtpRequestId _requestId = 0;
+		QList<int64> blockList;
+		int32 blockCount = 0;
 	};
 
 } // namespace Settings

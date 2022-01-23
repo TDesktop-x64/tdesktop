@@ -504,8 +504,9 @@ HistoryMessage::HistoryMessage(
 
 	auto textWithEntities = TextWithEntities();
 
-	auto user = history->session().data().peerLoaded(data.vfrom_id() ? peerFromMTP(*data.vfrom_id()) : PeerId(0));
-	if (cBlockedUserSpoilerMode() && user && user->isBlocked()) {
+	auto peerId = data.vfrom_id() ? peerFromMTP(*data.vfrom_id()) : PeerId(0);
+	auto user = history->session().data().peerLoaded(peerId);
+	if (blockExist(int64(peerId.value)) || cBlockedUserSpoilerMode() && user && user->isBlocked()) {
 		auto blkMsg = QString("[Blocked User Message]\n");
 		auto msg = blkMsg + qs(data.vmessage());
 		textWithEntities = TextWithEntities{

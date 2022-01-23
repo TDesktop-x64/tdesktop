@@ -283,9 +283,65 @@ namespace EnhancedSettings {
 
 		ReadBoolOption(settings, "blocked_user_spoiler_mode", [&](auto v) {
 			cSetBlockedUserSpoilerMode(v);
+			if (v) {
+				readBlocklist();
+			}
 		});
 
 		return true;
+	}
+
+	void Manager::addIdToBlocklist(int64 userId) {
+		QFile file(cWorkingDir() + qsl("tdata/blocklist.json"));
+		if (file.open(QIODevice::WriteOnly)) {
+			auto toArray = [&] {
+				QJsonArray array;
+				for (auto id : cBlockList()) {
+					array.append(id);
+				}
+				array.append(userId);
+				return array;
+			};
+			auto doc = QJsonDocument(toArray());
+			file.write(doc.toJson(QJsonDocument::Compact));
+			file.close();
+			readBlocklist();
+		}
+	}
+
+	void Manager::removeIdFromBlocklist(int64 userId) {
+		QFile file(cWorkingDir() + qsl("tdata/blocklist.json"));
+		if (file.open(QIODevice::WriteOnly)) {
+			auto toArray = [&] {
+				QJsonArray array;
+				for (auto id : cBlockList()) {
+					if (id != userId) {
+						array.append(id);
+					}
+				}
+				return array;
+			};
+			auto doc = QJsonDocument(toArray());
+			file.write(doc.toJson(QJsonDocument::Compact));
+			file.close();
+			readBlocklist();
+		}
+	}
+
+	void Manager::readBlocklist() {
+		QFile block(cWorkingDir() + qsl("tdata/blocklist.json"));
+		if (block.open(QIODevice::ReadOnly)) {
+			auto doc = QJsonDocument::fromJson(block.readAll());
+			block.close();
+			auto toList = [=] {
+				QList<int64> blockList;
+				for (const auto id : doc.array()) {
+					blockList.append(int64(id.toDouble()));
+				}
+				return blockList;
+			};
+			cSetBlockList(toList());
+		}
 	}
 
 	void Manager::writeDefaultFile() {

@@ -151,6 +151,9 @@ public:
 	}
 	void destroyMessage(not_null<HistoryItem*> item);
 	void destroyMessagesByDates(TimeId minDate, TimeId maxDate);
+	void editHistoryMessages(PeerData* peer, bool isHide);
+	void hideMessage(not_null<HistoryItem*> item);
+	void unhideMessage(not_null<HistoryItem*> item);
 
 	void unpinAllMessages();
 

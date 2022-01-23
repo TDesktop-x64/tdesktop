@@ -7,6 +7,8 @@ https://github.com/TDesktop-x64/tdesktop/blob/dev/LEGAL
 #include <base/timer_rpl.h>
 #include <ui/toast/toast.h>
 #include <mainwindow.h>
+#include <QJsonArray>
+#include <QJsonDocument>
 #include "settings/settings_enhanced.h"
 
 #include "settings/settings_common.h"
@@ -35,6 +37,8 @@ https://github.com/TDesktop-x64/tdesktop/blob/dev/LEGAL
 #include "facades.h"
 #include "app.h"
 #include "styles/style_settings.h"
+#include "apiwrap.h"
+#include "api/api_blocked_peers.h"
 
 namespace Settings {
 
@@ -61,6 +65,49 @@ namespace Settings {
 		});
 
 		AddSkip(container);
+	}
+
+	void Enhanced::writeBlocklistFile() {
+		QFile file(cWorkingDir() + qsl("tdata/blocklist.json"));
+		if (file.open(QIODevice::WriteOnly)) {
+			auto toArray = [&] {
+				QJsonArray array;
+				for (auto id : blockList) {
+					array.append(id);
+				}
+				return array;
+			};
+			auto doc = QJsonDocument(toArray());
+			file.write(doc.toJson(QJsonDocument::Compact));
+			file.close();
+			Ui::Toast::Show("Restart in 3 seconds!");
+			QTimer::singleShot(3 * 1000, []{ App::restart(); });
+		} else {
+			Ui::Toast::Show("Failed to save blocklist.");
+		}
+	}
+
+	void Enhanced::reqBlocked(int offset) {
+		if (_requestId) {
+			return;
+		}
+		_requestId = App::wnd()->sessionController()->session().api().request(MTPcontacts_GetBlocked(
+				MTP_int(offset),
+				MTP_int(100)
+		)).done([=](const MTPcontacts_Blocked &result) {
+			_requestId = 0;
+			blockCount = result.c_contacts_blockedSlice().vcount().v;
+			for (const auto& user : result.c_contacts_blockedSlice().vusers().v) {
+				blockList.append(int64(UserId(user.c_user().vid().v).bare));
+			}
+			if (blockCount > blockList.length()) {
+				reqBlocked(offset+100);
+			} else {
+				writeBlocklistFile();
+			}
+		}).fail([=] {
+			_requestId = 0;
+		}).send();
 	}
 
 	void Enhanced::SetupEnhancedMessages(not_null<Ui::VerticalLayout *> container) {
@@ -186,6 +233,35 @@ namespace Settings {
 			cSetDisableLinkWarning(toggled);
 			EnhancedSettings::Write();
 		}, container->lifetime());
+
+		AddButton(
+				inner,
+				tr::lng_settings_hide_messages(),
+				st::settingsButton
+		)->toggleOn(
+				rpl::single(cBlockedUserSpoilerMode())
+		)->toggledChanges(
+		) | rpl::filter([=](bool toggled) {
+			return (toggled != cBlockedUserSpoilerMode());
+		}) | rpl::start_with_next([=](bool toggled) {
+			cSetBlockedUserSpoilerMode(toggled);
+			EnhancedSettings::Write();
+			if (toggled) {
+				Ui::Toast::Show("Please wait a moment, fetching blocklist...");
+
+				App::wnd()->sessionController()->session().api().blockedPeers().slice() | rpl::take(
+					1
+				) | rpl::start_with_next([&](const Api::BlockedPeers::Slice &result) {
+					if (blockList.length() == result.total) {
+						return;
+					}
+					blockList = QList<int64>();
+					reqBlocked(0);
+				}, lifetime());
+			}
+		}, container->lifetime());
+
+		AddDividerText(inner, tr::lng_settings_hide_messages_desc());
 	}
 
 	void Enhanced::SetupEnhancedButton(not_null<Ui::VerticalLayout *> container) {

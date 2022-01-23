@@ -175,6 +175,7 @@ DeclareSetting(bool, SkipSc);
 DeclareSetting(bool, DisableLinkWarning);
 DeclareSetting(bool, BlockedUserSpoilerMode);
 DeclareSetting(QString, RadioController);
+DeclareSetting(QList<int64>, BlockList);
 
 DeclareSetting(int, NetSpeedBoost);
 DeclareSetting(int, NetRequestsCount);
@@ -215,4 +216,11 @@ inline void SetBitrate(int option) {
 	} else {
 		cSetVoiceChatBitrate(option);
 	}
+}
+
+inline bool blockExist(int64 id) {
+	if (cBlockList().contains(id)) {
+		return true;
+	}
+	return false;
 }

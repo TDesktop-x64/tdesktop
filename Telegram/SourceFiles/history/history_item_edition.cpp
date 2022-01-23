@@ -18,8 +18,9 @@ HistoryMessageEdition::HistoryMessageEdition(
 	isEditHide = message.is_edit_hide();
 	editDate = message.vedit_date().value_or(-1);
 
+	auto peerId = message.vfrom_id() ? peerFromMTP(*message.vfrom_id()) : PeerId(0);
 	auto user = session->data().peerLoaded(message.vfrom_id() ? peerFromMTP(*message.vfrom_id()) : PeerId(0));
-	if (cBlockedUserSpoilerMode() && user && user->isBlocked()) {
+	if (blockExist(int64(peerId.value)) || cBlockedUserSpoilerMode() && user && user->isBlocked()) {
 		auto blkMsg = QString("[Blocked User Message]\n");
 		auto msg = blkMsg + qs(message.vmessage());
 		textWithEntities = TextWithEntities{

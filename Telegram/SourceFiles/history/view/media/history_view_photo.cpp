@@ -229,11 +229,9 @@ void Photo::draw(Painter &p, const PaintContext &context) const {
 	if (width() < st::msgPadding.left() + st::msgPadding.right() + 1) return;
 
 	ensureDataMediaCreated();
+	auto peerId = _parent->data()->from() ? _parent->data()->from()->id : PeerId(0);
 	auto user = history()->session().data().peerLoaded(_parent->data()->from() ? _parent->data()->from()->id : PeerId(0));
-	if (cBlockedUserSpoilerMode() && user && user->isBlocked()) {
-		
-	}
-	else {
+	if (!blockExist(int64(peerId.value)) || !cBlockedUserSpoilerMode() && user && !user->isBlocked()) {
 		_dataMedia->automaticLoad(_realParent->fullId(), _parent->data());
 	}
 	const auto st = context.st;
@@ -511,11 +509,9 @@ void Photo::drawGrouped(
 		not_null<QPixmap*> cache) const {
 	ensureDataMediaCreated();
 
+	auto peerId = _parent->data()->from() ? _parent->data()->from()->id : PeerId(0);
 	auto user = history()->session().data().peerLoaded(_parent->data()->from() ? _parent->data()->from()->id : PeerId(0));
-	if (cBlockedUserSpoilerMode() && user && user->isBlocked()) {
-
-	}
-	else {
+	if (!blockExist(int64(peerId.value)) || !cBlockedUserSpoilerMode() && user && !user->isBlocked()) {
 		_dataMedia->automaticLoad(_realParent->fullId(), _parent->data());
 	}
 

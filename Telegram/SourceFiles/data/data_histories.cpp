@@ -68,6 +68,12 @@ void Histories::clearAll() {
 	_map.clear();
 }
 
+void Histories::editHistoriesMessages(PeerData* peer, bool isHide) {
+	for (const auto& [peerId, history] : _map) {
+		history->editHistoryMessages(peer, isHide);
+	}
+}
+
 void Histories::readInbox(not_null<History*> history) {
 	DEBUG_LOG(("Reading: readInbox called."));
 	if (history->lastServerMessageKnown()) {

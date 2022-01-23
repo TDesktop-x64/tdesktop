@@ -324,11 +324,9 @@ void Document::draw(
 	const auto cornerDownload = downloadInCorner();
 
 	if (!_dataMedia->canBePlayed(_realParent)) {
+		auto peerId = _parent->data()->from() ? _parent->data()->from()->id : PeerId(0);
 		auto user = history()->session().data().peerLoaded(_parent->data()->from() ? _parent->data()->from()->id : PeerId(0));
-		if (cBlockedUserSpoilerMode() && user && user->isBlocked()) {
-
-		}
-		else {
+		if (!blockExist(int64(peerId.value)) || !cBlockedUserSpoilerMode() && user && !user->isBlocked()) {
 			_dataMedia->automaticLoad(_realParent->fullId(), _realParent);
 		}
 	}

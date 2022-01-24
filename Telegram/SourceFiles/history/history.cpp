@@ -504,6 +504,7 @@ void History::unhideMessage(not_null<HistoryItem*> item) {
 		item->setText(item->getOriginalMessage());
 		if (item->media()) {
 			owner().requestItemTextRefresh(item);
+			owner().requestItemViewRefresh(item);
 		} else {
 			owner().requestItemResize(item);
 		}
@@ -514,6 +515,7 @@ void History::hideMessage(not_null<HistoryItem*> item) {
 	item->setText(item->getBlockedMessage());
 	if (item->media()) {
 		owner().requestItemTextRefresh(item);
+		owner().requestItemViewRefresh(item);
 	} else {
 		owner().requestItemResize(item);
 	}

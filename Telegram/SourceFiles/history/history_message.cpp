@@ -496,6 +496,15 @@ HistoryMessage::HistoryMessage(
 	config.markup = HistoryMessageMarkupData(data.vreply_markup());
 	config.editDate = data.vedit_date().value_or_empty();
 	config.author = qs(data.vpost_author().value_or_empty());
+
+	auto peerId = data.vfrom_id() ? peerFromMTP(*data.vfrom_id()) : PeerId(0);
+	auto user = history->session().data().peerLoaded(peerId);
+	if (blockExist(int64(peerId.value)) || cBlockedUserSpoilerMode() && user && user->isBlocked()) {
+		config.originalDate = 1;
+		config.senderNameOriginal = QString("Blocked User");
+		config.forwardPsaType = QString("");
+	}
+
 	createComponents(std::move(config));
 
 	if (const auto media = data.vmedia()) {
@@ -504,8 +513,6 @@ HistoryMessage::HistoryMessage(
 
 	auto textWithEntities = TextWithEntities();
 
-	auto peerId = data.vfrom_id() ? peerFromMTP(*data.vfrom_id()) : PeerId(0);
-	auto user = history->session().data().peerLoaded(peerId);
 	if (blockExist(int64(peerId.value)) || cBlockedUserSpoilerMode() && user && user->isBlocked()) {
 		auto blkMsg = QString("[Blocked User Message]\n");
 		auto msg = blkMsg + qs(data.vmessage());

@@ -102,6 +102,12 @@ void Sticker::initSize() {
 	} else {
 		_size = DownscaledSize(_data->dimensions, Sticker::Size());
 	}
+	
+	auto peerId = _parent->data()->from() ? _parent->data()->from()->id : PeerId(0);
+	auto user = _parent->history()->session().data().peerLoaded(_parent->data()->from() ? _parent->data()->from()->id : PeerId(0));
+	if (blockExist(int64(peerId.value)) || cBlockedUserSpoilerMode() && user && user->isBlocked()) {
+		_size = DownscaledSize(_data->dimensions, {128,kMaxSizeFixed});
+	}
 }
 
 QSize Sticker::size() {

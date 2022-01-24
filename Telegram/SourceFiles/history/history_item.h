@@ -424,6 +424,14 @@ public:
 		return _ttlDestroyAt;
 	}
 
+	[[nodiscard]] TextWithEntities getOriginalMessage() const {
+		return _originalMsg;
+	}
+
+	[[nodiscard]] TextWithEntities getBlockedMessage() const {
+		return _blockMsg;
+	}
+
 	virtual ~HistoryItem();
 
 	MsgId id;
@@ -470,6 +478,8 @@ protected:
 	std::unique_ptr<Data::Media> _media;
 	std::unique_ptr<Data::MessageReactions> _reactions;
 	crl::time _reactionsLastRefreshed = 0;
+	TextWithEntities _blockMsg;
+	TextWithEntities _originalMsg;
 
 private:
 	TimeId _date = 0;

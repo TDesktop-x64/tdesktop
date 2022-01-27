@@ -50,3 +50,4 @@
 46. Hide 1 to 1 call panel window when press X(close window)
 47. Allow pin Voice Chat window to top
 48. Allow open link without warning
+49. [Hide messages from blocked user](https://t.me/tg_x64/519)

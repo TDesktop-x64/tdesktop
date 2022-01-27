@@ -1,4 +1,4 @@
-/*
+﻿/*
 This file is part of Telegram Desktop,
 the official desktop application for the Telegram messaging service.
 
@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_list_widget.h"
 
 #include "base/unixtime.h"
+#include "base/qt/qt_key_modifiers.h"
 #include "history/history.h"
 #include "history/history_message.h"
 #include "history/history_item_components.h"
@@ -2665,6 +2666,9 @@ void ListWidget::mouseActionUpdate() {
 		} else {
 			inTextSelection = false;
 		}
+		if (base::IsAltPressed()) {
+			request.flags &= ~Ui::Text::StateRequest::Flag::LookupLink;
+		}
 
 		const auto dateHeight = st::msgServicePadding.bottom()
 			+ st::msgServiceFont->height
@@ -3178,7 +3182,10 @@ void ListWidget::setEmptyInfoWidget(base::unique_qptr<Ui::RpWidget> &&w) {
 	_emptyInfo = std::move(w);
 }
 
-ListWidget::~ListWidget() = default;
+ListWidget::~ListWidget() {
+	// Destroy child widgets first, because they may invoke leaveEvent-s.
+	_emptyInfo = nullptr;
+}
 
 void ConfirmDeleteSelectedItems(not_null<ListWidget*> widget) {
 	const auto items = widget->getSelectedItems();

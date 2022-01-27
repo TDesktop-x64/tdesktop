@@ -1,4 +1,4 @@
-/*
+﻿/*
 This file is part of Telegram Desktop,
 the official desktop application for the Telegram messaging service.
 
@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/text_entity.h"
 #include "ui/toast/toast.h"
 #include "base/qthelp_regex.h"
+#include "base/qt/qt_key_modifiers.h"
 #include "storage/storage_account.h"
 #include "history/history.h"
 #include "history/view/history_view_element.h"
@@ -25,8 +26,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_session.h"
 #include "window/window_session_controller.h"
 #include "facades.h"
-
-#include <QtGui/QGuiApplication>
 
 namespace {
 
@@ -101,8 +100,7 @@ void HiddenUrlClickHandler::Open(QString url, QVariant context) {
 		open();
 	} else {
 		const auto parsedUrl = QUrl::fromUserInput(url);
-		if (!cDisableLinkWarning() && UrlRequiresConfirmation(parsedUrl)
-			&& QGuiApplication::keyboardModifiers() != Qt::ControlModifier) {
+		if (!cDisableLinkWarning() && UrlRequiresConfirmation(parsedUrl) && !base::IsCtrlPressed()) {
 			Core::App().hideMediaView();
 			const auto displayed = parsedUrl.isValid()
 				? parsedUrl.toDisplayString()

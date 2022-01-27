@@ -26,7 +26,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/ui_integration.h"
 #include "chat_helpers/emoji_keywords.h"
 #include "chat_helpers/stickers_emoji_image_loader.h"
-#include "base/qt_adapters.h"
+#include "base/qt/qt_common_adapters.h"
 #include "base/platform/base_platform_url_scheme.h"
 #include "base/platform/base_platform_last_input.h"
 #include "base/platform/base_platform_info.h"
@@ -84,7 +84,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/connection_box.h"
 #include "ui/boxes/confirm_box.h"
 #include "boxes/share_box.h"
-#include "app.h"
 
 #include <QtCore/QMimeDatabase>
 #include <QtGui/QGuiApplication>
@@ -96,6 +95,8 @@ namespace {
 constexpr auto kQuitPreventTimeoutMs = crl::time(1500);
 constexpr auto kAutoLockTimeoutLateMs = crl::time(3000);
 constexpr auto kClearEmojiImageSourceTimeout = 10 * crl::time(1000);
+
+LaunchState GlobalLaunchState/* = LaunchState::Running*/;
 
 void SetCrashAnnotationsGL() {
 #ifdef Q_OS_WIN
@@ -238,7 +239,7 @@ void Application::run() {
 
 	if (cLaunchMode() == LaunchModeAutoStart && Platform::AutostartSkip()) {
 		Platform::AutostartToggle(false);
-		App::quit();
+		Quit();
 		return;
 	}
 
@@ -343,7 +344,7 @@ void Application::showOpenGLCrashNotification() {
 		Ui::GL::CrashCheckFinish();
 		Core::App().settings().setDisableOpenGL(false);
 		Local::writeSettings();
-		App::restart();
+		Restart();
 	};
 	const auto keepDisabled = [=] {
 		Ui::GL::ForceDisable(true);
@@ -642,6 +643,24 @@ void Application::logout(Main::Account *account) {
 	}
 }
 
+void Application::logoutWithChecks(Main::Account *account) {
+	const auto weak = base::make_weak(account);
+	const auto retry = [=] {
+		if (const auto account = weak.get()) {
+			logoutWithChecks(account);
+		}
+	};
+	if (!account || !account->sessionExists()) {
+		logout(account);
+	} else if (_exportManager->inProgress(&account->session())) {
+		_exportManager->stopWithConfirmation(retry);
+	} else if (account->session().uploadsInProgress()) {
+		account->session().uploadsStopWithConfirmation(retry);
+	} else {
+		logout(account);
+	}
+}
+
 void Application::forceLogOut(
 		not_null<Main::Account*> account,
 		const TextWithEntities &explanation) {
@@ -706,7 +725,7 @@ void Application::switchDebugMode() {
 	if (Logs::DebugEnabled()) {
 		Logs::SetDebugEnabled(false);
 		_launcher->writeDebugModeSetting();
-		App::restart();
+		Restart();
 	} else {
 		Logs::SetDebugEnabled(true);
 		_launcher->writeDebugModeSetting();
@@ -727,7 +746,7 @@ void Application::switchFreeType() {
 		}
 		cSetUseFreeType(true);
 	}
-	App::restart();
+	Restart();
 }
 
 void Application::writeInstallBetaVersionsSetting() {
@@ -745,9 +764,43 @@ Main::Session *Application::maybeActiveSession() const {
 bool Application::exportPreventsQuit() {
 	if (_exportManager->inProgress()) {
 		_exportManager->stopWithConfirmation([] {
-			App::quit();
+			Quit();
 		});
 		return true;
+	}
+	return false;
+}
+
+bool Application::uploadPreventsQuit() {
+	if (!_domain->started()) {
+		return false;
+	}
+	for (const auto &[index, account] : _domain->accounts()) {
+		if (!account->sessionExists()) {
+			continue;
+		}
+		if (account->session().uploadsInProgress()) {
+			account->session().uploadsStopWithConfirmation([=] {
+				for (const auto &[index, account] : _domain->accounts()) {
+					if (account->sessionExists()) {
+						account->session().uploadsStop();
+					}
+				}
+				Quit();
+			});
+			return true;
+		}
+	}
+	return false;
+}
+
+bool Application::preventsQuit(QuitReason reason) {
+	if (exportPreventsQuit() || uploadPreventsQuit()) {
+		return true;
+	} else if (const auto window = activeWindow()) {
+		if (window->widget()->isActive()) {
+			return window->widget()->preventsQuit(reason);
+		}
 	}
 	return false;
 }
@@ -957,7 +1010,7 @@ void Application::localPasscodeChanged() {
 }
 
 bool Application::hasActiveWindow(not_null<Main::Session*> session) const {
-	if (App::quitting() || !_primaryWindow) {
+	if (Quitting() || !_primaryWindow) {
 		return false;
 	} else if (_calls->hasActivePanel(session)) {
 		return true;
@@ -1131,9 +1184,10 @@ void Application::refreshGlobalProxy() {
 	Sandbox::Instance().refreshGlobalProxy();
 }
 
-void Application::QuitAttempt() {
+void QuitAttempt() {
+	const auto savingSession = Sandbox::Instance().isSavingSession();
 	if (!IsAppLaunched()
-		|| Sandbox::Instance().isSavingSession()
+		|| savingSession
 		|| App().readyToQuit()) {
 		Sandbox::QuitWhenStarted();
 	}
@@ -1164,12 +1218,18 @@ bool Application::readyToQuit() {
 }
 
 void Application::quitPreventFinished() {
-	if (App::quitting()) {
+	if (Quitting()) {
 		QuitAttempt();
 	}
 }
 
 void Application::quitDelayed() {
+	if (_primaryWindow) {
+		_primaryWindow->widget()->hide();
+	}
+	for (const auto &[history, window] : _secondaryWindows) {
+		window->widget()->hide();
+	}
 	if (!_private->quitTimer.isActive()) {
 		_private->quitTimer.setCallback([] { Sandbox::QuitWhenStarted(); });
 		_private->quitTimer.callOnce(kQuitPreventTimeoutMs);
@@ -1192,7 +1252,7 @@ void Application::startShortcuts() {
 	) | rpl::start_with_next([=](not_null<Shortcuts::Request*> request) {
 		using Command = Shortcuts::Command;
 		request->check(Command::Quit) && request->handle([] {
-			App::quit();
+			Quit();
 			return true;
 		});
 		request->check(Command::Lock) && request->handle([=] {
@@ -1232,6 +1292,41 @@ Application &App() {
 	Expects(Application::Instance != nullptr);
 
 	return *Application::Instance;
+}
+
+void Quit(QuitReason reason) {
+   if (Quitting()) {
+	   return;
+   } else if (IsAppLaunched() && App().preventsQuit(reason)) {
+	   return;
+   }
+   SetLaunchState(LaunchState::QuitRequested);
+
+   QuitAttempt();
+}
+
+bool Quitting() {
+   return GlobalLaunchState != LaunchState::Running;
+}
+
+LaunchState CurrentLaunchState() {
+   return GlobalLaunchState;
+}
+
+void SetLaunchState(LaunchState state) {
+   GlobalLaunchState = state;
+}
+
+void Restart() {
+   const auto updateReady = !UpdaterDisabled()
+	   && (UpdateChecker().state() == UpdateChecker::State::Ready);
+   if (updateReady) {
+	   cSetRestartingUpdate(true);
+   } else {
+	   cSetRestarting(true);
+	   cSetRestartingToSettings(true);
+   }
+   Quit();
 }
 
 } // namespace Core

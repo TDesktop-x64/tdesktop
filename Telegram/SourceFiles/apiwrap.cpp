@@ -51,7 +51,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "base/unixtime.h"
 #include "base/random.h"
-#include "base/qt_adapters.h"
+#include "base/qt/qt_common_adapters.h"
 #include "base/call_delayed.h"
 #include "lang/lang_keys.h"
 #include "mainwindow.h"
@@ -87,7 +87,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/storage_media_prepare.h"
 #include "storage/storage_account.h"
 #include "facades.h"
-#include "app.h" // App::quitting
 
 namespace {
 
@@ -2127,7 +2126,7 @@ bool ApiWrap::isQuitPrevent() {
 
 void ApiWrap::checkQuitPreventFinished() {
 	if (_draftsSaveRequestIds.empty()) {
-		if (App::quitting()) {
+		if (Core::Quitting()) {
 			LOG(("ApiWrap doesn't prevent quit any more."));
 		}
 		Core::App().quitPreventFinished();

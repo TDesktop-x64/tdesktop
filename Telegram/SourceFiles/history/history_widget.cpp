@@ -47,6 +47,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "inline_bots/inline_bot_result.h"
 #include "base/event_filter.h"
 #include "base/qt_signal_producer.h"
+#include "base/qt/qt_key_modifiers.h"
 #include "base/unixtime.h"
 #include "base/call_delayed.h"
 #include "data/data_changes.h"
@@ -141,7 +142,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "dialogs/dialogs_key.h"
 #include "calls/calls_instance.h"
 #include "facades.h"
-#include "app.h"
 #include "styles/style_chat.h"
 #include "styles/style_dialogs.h"
 #include "styles/style_window.h"
@@ -150,7 +150,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat_helpers.h"
 #include "styles/style_info.h"
 
-#include <QGuiApplication> // keyboardModifiers()
 #include <QtGui/QWindow>
 #include <QtCore/QMimeData>
 
@@ -2153,7 +2152,7 @@ void HistoryWidget::showHistory(
 		Assert(_list == nullptr);
 	}
 
-	App::clearMousedItems();
+	HistoryView::Element::ClearGlobal();
 
 	_saveEditMsgRequestId = 0;
 	_replyEditMsg = nullptr;
@@ -3457,7 +3456,7 @@ void HistoryWidget::windowIsVisibleChanged() {
 }
 
 void HistoryWidget::historyDownClicked() {
-	if (QGuiApplication::keyboardModifiers() == Qt::ControlModifier) {
+	if (base::IsCtrlPressed()) {
 		showHistory(_peer->id, ShowAtUnreadMsgId);
 	} else if (_replyReturn && _replyReturn->history() == _history) {
 		showHistory(_peer->id, _replyReturn->id);
@@ -4134,8 +4133,8 @@ bool HistoryWidget::insertBotCommand(const QString &cmd) {
 	if (!toInsert.isEmpty() && !insertingInlineBot) {
 		auto bot = _peer->isUser()
 			? _peer
-			: (App::hoveredLinkItem()
-				? App::hoveredLinkItem()->data()->fromOriginal().get()
+			: (HistoryView::Element::HoveredLink()
+				? HistoryView::Element::HoveredLink()->data()->fromOriginal().get()
 				: nullptr);
 		if (bot && (!bot->isUser() || !bot->asUser()->isBot())) {
 			bot = nullptr;

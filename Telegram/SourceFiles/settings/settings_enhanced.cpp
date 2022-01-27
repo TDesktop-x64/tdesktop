@@ -96,15 +96,22 @@ namespace Settings {
 				MTP_int(100)
 		)).done([=](const MTPcontacts_Blocked &result) {
 			_requestId = 0;
-			blockCount = result.c_contacts_blockedSlice().vcount().v;
-			for (const auto& user : result.c_contacts_blockedSlice().vusers().v) {
-				blockList.append(int64(UserId(user.c_user().vid().v).bare));
-			}
-			if (blockCount > blockList.length()) {
-				reqBlocked(offset+100);
-			} else {
+			result.match([&](const MTPDcontacts_blockedSlice& data) { // Incomplete list of blocked users response.
+				blockCount = data.vcount().v;
+				for (const auto& user : data.vusers().v) {
+					blockList.append(int64(UserId(user.c_user().vid().v).bare));
+				}
+				if (blockCount > blockList.length()) {
+					reqBlocked(offset+100);
+				} else {
+					writeBlocklistFile();
+				}
+			}, [&](const MTPDcontacts_blocked& data) { // 	Full list of blocked users response.
+				for (const auto& user : data.vusers().v) {
+					blockList.append(int64(UserId(user.c_user().vid().v).bare));
+				}
 				writeBlocklistFile();
-			}
+			});
 		}).fail([=] {
 			_requestId = 0;
 		}).send();

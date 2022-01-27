@@ -35,7 +35,6 @@ https://github.com/TDesktop-x64/tdesktop/blob/dev/LEGAL
 #include "main/main_session.h"
 #include "layout/layout_item_base.h"
 #include "facades.h"
-#include "app.h"
 #include "styles/style_settings.h"
 #include "apiwrap.h"
 #include "api/api_blocked_peers.h"
@@ -81,7 +80,7 @@ namespace Settings {
 			file.write(doc.toJson(QJsonDocument::Compact));
 			file.close();
 			Ui::Toast::Show("Restart in 3 seconds!");
-			QTimer::singleShot(3 * 1000, []{ App::restart(); });
+			QTimer::singleShot(3 * 1000, []{ Core::Restart(); });
 		} else {
 			Ui::Toast::Show("Failed to save blocklist.");
 		}
@@ -142,7 +141,7 @@ namespace Settings {
 		}) | rpl::start_with_next([=](bool toggled) {
 			cSetShowMessagesID(toggled);
 			EnhancedSettings::Write();
-			App::restart();
+			Core::Restart();
 		}, container->lifetime());
 
 		AddButton(
@@ -298,7 +297,7 @@ namespace Settings {
 		}) | rpl::start_with_next([=](bool toggled) {
 			cSetShowEmojiButtonAsText(toggled);
 			EnhancedSettings::Write();
-			App::restart();
+			Core::Restart();
 		}, container->lifetime());
 
 		AddDividerText(inner, tr::lng_show_emoji_button_as_text_desc());

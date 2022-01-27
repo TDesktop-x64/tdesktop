@@ -15,9 +15,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_layers.h"
 #include "styles/style_boxes.h"
 #include "ui/boxes/confirm_box.h"
+#include "core/application.h"
 #include "core/enhanced_settings.h"
 #include "settings/settings_enhanced.h"
-#include "app.h"
 
 NetBoostBox::NetBoostBox(QWidget *parent) {
 }
@@ -72,7 +72,7 @@ void NetBoostBox::save() {
 	const auto changeBoost = [=] {
 		SetNetworkBoost(_boostGroup->value());
 		EnhancedSettings::Write();
-		App::restart();
+		Core::Restart();
 	};
 
 	const auto box = std::make_shared<QPointer<BoxContent>>();

@@ -241,11 +241,13 @@ namespace Settings {
 			EnhancedSettings::Write();
 		}, container->lifetime());
 
-		AddButton(
-				inner,
-				tr::lng_settings_hide_messages(),
-				st::settingsButton
-		)->toggleOn(
+		auto hideBtn = AddButton(
+			inner,
+			tr::lng_settings_hide_messages(),
+			st::settingsButton
+		);
+		hideBtn->setColorOverride(QColor(255, 0, 0));
+		hideBtn->toggleOn(
 				rpl::single(cBlockedUserSpoilerMode())
 		)->toggledChanges(
 		) | rpl::filter([=](bool toggled) {

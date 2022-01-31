@@ -86,11 +86,13 @@ void BlockedPeers::block(not_null<PeerData*> peer) {
 			_blockRequests.erase(peer);
 			peer->setIsBlocked(true);
 
-			if (!blockExist(int64(peer->id.value))) {
-				EnhancedSettings::Manager().addIdToBlocklist(int64(peer->id.value));
+			if (cBlockedUserSpoilerMode()) {
+				if (!blockExist(int64(peer->id.value))) {
+					EnhancedSettings::Manager().addIdToBlocklist(int64(peer->id.value));
+				}
+				auto &histories = _session->data().histories();
+				histories.editHistoriesMessages(peer, true);
 			}
-			auto& histories = _session->data().histories();
-			histories.editHistoriesMessages(peer, true);
 
 			if (_slice) {
 				_slice->list.insert(
@@ -122,11 +124,13 @@ void BlockedPeers::unblock(not_null<PeerData*> peer, Fn<void()> onDone) {
 		_blockRequests.erase(peer);
 		peer->setIsBlocked(false);
 
-		if (blockExist(int64(peer->id.value))) {
-			EnhancedSettings::Manager().removeIdFromBlocklist(int64(peer->id.value));
+		if (cBlockedUserSpoilerMode()) {
+			if (blockExist(int64(peer->id.value))) {
+				EnhancedSettings::Manager().removeIdFromBlocklist(int64(peer->id.value));
+			}
+			auto& histories = _session->data().histories();
+			histories.editHistoriesMessages(peer, false);
 		}
-		auto& histories = _session->data().histories();
-		histories.editHistoriesMessages(peer, false);
 
 		if (_slice) {
 			auto &list = _slice->list;

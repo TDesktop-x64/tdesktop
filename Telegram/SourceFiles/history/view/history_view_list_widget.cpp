@@ -354,7 +354,7 @@ ListWidget::ListWidget(
 			return;
 		} else if (const auto view = viewForItem(item)) {
 			if (const auto top = itemTop(view); top >= 0) {
-				view->animateSendReaction({
+				view->animateReaction({
 					.emoji = reaction.emoji,
 					.flyIcon = reaction.icon,
 					.flyFrom = reaction.geometry.translated(0, -top),
@@ -1747,8 +1747,8 @@ void ListWidget::paintEvent(QPaintEvent *e) {
 		p.translate(0, top);
 		for (auto i = from; i != to; ++i) {
 			const auto view = *i;
-			context.reactionEffects
-				= _reactionsManager->currentReactionEffect();
+			context.reactionInfo
+				= _reactionsManager->currentReactionPaintInfo();
 			context.outbg = view->hasOutLayout();
 			context.selection = itemRenderSelection(view);
 			view->draw(p, context);

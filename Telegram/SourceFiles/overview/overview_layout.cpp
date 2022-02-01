@@ -1901,7 +1901,7 @@ QSize Gif::countFrameSize() const {
 void Gif::clipCallback(Media::Clip::Notification notification) {
 	using namespace Media::Clip;
 	switch (notification) {
-	case NotificationReinit: {
+	case Notification::Reinit: {
 		if (_gif) {
 			if (_gif->state() == State::Error) {
 				_gif.setBad();
@@ -1912,14 +1912,10 @@ void Gif::clipCallback(Media::Clip::Notification notification) {
 						_gif->height());
 					_gif.reset();
 				} else {
-					auto height = st::inlineMediaHeight;
-					auto frame = countFrameSize();
-					_gif->start(
-						frame.width(),
-						frame.height(),
-						_width,
-						height,
-						ImageRoundRadius::None, RectPart::None);
+					_gif->start({
+						.frame = countFrameSize(),
+						.outer = { _width, st::inlineMediaHeight },
+					});
 				}
 			} else if (_gif->autoPausedGif()
 					&& !delegate()->itemVisible(this)) {
@@ -1930,7 +1926,7 @@ void Gif::clipCallback(Media::Clip::Notification notification) {
 		update();
 	} break;
 
-	case NotificationRepaint: {
+	case Notification::Repaint: {
 		if (_gif && !_gif->currentDisplayed()) {
 			update();
 		}
@@ -2001,26 +1997,20 @@ void Gif::paint(
 	}
 	const auto radial = isRadialAnimation();
 
-	int32 height = st::inlineMediaHeight;
-	QSize frame = countFrameSize();
-
-	QRect r(0, 0, _width, height);
+	const auto frame = countFrameSize();
+	const auto r = QRect(0, 0, _width, st::inlineMediaHeight);
 	if (animating) {
-		const auto pixmap = _gif->current(
-			frame.width(),
-			frame.height(),
-			_width,
-			height,
-			ImageRoundRadius::None,
-			RectPart::None,
-			/*context->paused ? 0 : */context->ms);
+		const auto pixmap = _gif->current({
+			.frame = frame,
+			.outer = r.size(),
+		}, /*context->paused ? 0 : */context->ms);
 		if (_thumb.isNull()) {
 			_thumb = pixmap;
 			_thumbGood = true;
 		}
 		p.drawPixmap(r.topLeft(), pixmap);
 	} else {
-		prepareThumbnail({ _width, height }, frame);
+		prepareThumbnail(r.size(), frame);
 		if (_thumb.isNull()) {
 			p.fillRect(r, st::overviewPhotoBg);
 		} else {
@@ -2048,7 +2038,11 @@ void Gif::paint(
 			return &st::historyFileInDownload;
 		}();
 		const auto size = st::overviewVideoRadialSize;
-		QRect inner((_width - size) / 2, (height - size) / 2, size, size);
+		QRect inner(
+			(r.width() - size) / 2,
+			(r.height() - size) / 2,
+			size,
+			size);
 		icon->paintInCenter(p, inner);
 		if (radial) {
 			p.setOpacity(1);

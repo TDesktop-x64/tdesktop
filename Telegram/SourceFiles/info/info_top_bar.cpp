@@ -1,4 +1,4 @@
-/*
+﻿/*
 This file is part of Telegram Desktop,
 the official desktop application for the Telegram messaging service.
 
@@ -643,6 +643,8 @@ rpl::producer<QString> TitleValue(
 			return tr::lng_settings_section_call_settings();
 		case Section::SettingsType::Enhanced:
 			return tr::lng_settings_enhanced();
+		case Section::SettingsType::Experimental:
+			return tr::lng_settings_experimental();
 		}
 		Unexpected("Bad settings type in Info::TitleValue()");
 

@@ -21,14 +21,14 @@ class Reactions;
 
 namespace HistoryView {
 namespace Reactions {
-class SendAnimation;
+class Animation;
 } // namespace Reactions
 
 using PaintContext = Ui::ChatPaintContext;
 
 class Message;
 struct TextState;
-struct SendReactionAnimationArgs;
+struct ReactionAnimationArgs;
 
 class BottomInfo final : public Object {
 public:
@@ -74,16 +74,18 @@ public:
 		bool inverted,
 		const PaintContext &context) const;
 
-	void animateReactionSend(
-		SendReactionAnimationArgs &&args,
+	void animateReaction(
+		ReactionAnimationArgs &&args,
 		Fn<void()> repaint);
-	[[nodiscard]] auto takeSendReactionAnimation()
-		-> std::unique_ptr<Reactions::SendAnimation>;
-	void continueSendReactionAnimation(
-		std::unique_ptr<Reactions::SendAnimation> animation);
+	[[nodiscard]] auto takeReactionAnimations()
+		-> base::flat_map<QString, std::unique_ptr<Reactions::Animation>>;
+	void continueReactionAnimations(base::flat_map<
+		QString,
+		std::unique_ptr<Reactions::Animation>> animations);
 
 private:
 	struct Reaction {
+		mutable std::unique_ptr<Reactions::Animation> animation;
 		mutable QImage image;
 		QString emoji;
 		QString countText;
@@ -125,7 +127,6 @@ private:
 	Ui::Text::String _replies;
 	std::vector<Reaction> _reactions;
 	mutable ClickHandlerPtr _revokeLink;
-	mutable std::unique_ptr<Reactions::SendAnimation> _reactionAnimation;
 	int _reactionsMaxWidth = 0;
 	int _dateWidth = 0;
 	bool _authorElided = false;

@@ -1,4 +1,4 @@
-/*
+﻿/*
 This file is part of Telegram Desktop,
 the official desktop application for the Telegram messaging service.
 
@@ -16,6 +16,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/settings_folders.h"
 #include "settings/settings_calls.h"
 #include "settings/settings_enhanced.h"
+#include "settings/settings_experimental.h"
+#include "core/application.h"
 #include "ui/wrap/padding_wrap.h"
 #include "ui/wrap/vertical_layout.h"
 #include "ui/widgets/labels.h"
@@ -62,6 +64,8 @@ object_ptr<Section> CreateSection(
 		return object_ptr<Calls>(parent, controller);
 	case Type::Enhanced:
 		return object_ptr<Enhanced>(parent, controller);
+	case Type::Experimental:
+		return object_ptr<Experimental>(parent, controller);
 	}
 	Unexpected("Settings section type in Widget::createInnerWidget.");
 }

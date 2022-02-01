@@ -389,8 +389,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_auto_start_disabled_uwp" = "Starting with the system was disabled in Windows Settings.\n\nPlease enable Telegram Desktop in the Startup Apps Settings.";
 "lng_settings_open_system_settings" = "Open Settings";
 "lng_settings_add_sendto" = "Place Telegram in \"Send to\" menu";
+"lng_settings_mac_warn_before_quit" = "Show warning before quitting with {text}";
 "lng_settings_section_scale" = "Interface Scale";
 "lng_settings_scale_auto" = "Auto ({cur})";
+
+"lng_settings_experimental" = "Experimental settings";
+"lng_settings_experimental_about" = "Warning! Those are experimental settings. Some may not work. Others may break the app. Any of them may disappear in the next version without a trace. Use at your own risk.";
 
 "lng_settings_section_chat_settings" = "Chat Settings";
 "lng_settings_replace_emojis" = "Replace emoji";
@@ -1756,6 +1760,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_context_mark_read_all" = "Mark all chats as read";
 "lng_context_mark_read_all_sure" = "Are you sure you want to mark all chats as read?";
 "lng_context_mark_read_mentions_all" = "Mark all mentions as read";
+"lng_context_mark_read_reactions_all" = "Read all reactions";
 "lng_context_archive_expand" = "Expand";
 "lng_context_archive_collapse" = "Collapse";
 "lng_context_archive_to_menu" = "Move to main menu";
@@ -3071,6 +3076,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_mac_menu_preferences" = "Preferences...";
 "lng_mac_menu_quit_telegram" = "Quit {telegram}";
 "lng_mac_menu_about_telegram" = "About {telegram}";
+//"lng_mac_menu_warn_before_quit" = "Warn Before Quitting ({text})";
 "lng_mac_menu_file" = "File";
 "lng_mac_menu_logout" = "Log Out";
 "lng_mac_menu_edit" = "Edit";

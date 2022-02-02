@@ -523,25 +523,28 @@ HistoryMessage::HistoryMessage(
 	auto blkMsg = QString("[Blocked User Message]\n");
 	auto msg = blkMsg + qs(data.vmessage());
 
-	_blockMsg = TextWithEntities{
-			msg,
-			Api::EntitiesFromMTP(
-					&history->session(),
-					data.ventities().value_or_empty(),
-					blkMsg.length(), qs(data.vmessage()).length())
-	};
-
-	_originalMsg = TextWithEntities{
-			qs(data.vmessage()),
-			Api::EntitiesFromMTP(
-					&history->session(),
-					data.ventities().value_or_empty())
-	};
-
 	if (cBlockedUserSpoilerMode() && blockExist(int64(peerId.value)) || cBlockedUserSpoilerMode() && user && user->isBlocked()) {
+		_blockMsg = TextWithEntities{
+				msg,
+				Api::EntitiesFromMTP(
+						&history->session(),
+						data.ventities().value_or_empty(),
+						blkMsg.length(), qs(data.vmessage()).length())
+		};
+		_originalMsg = TextWithEntities{
+				qs(data.vmessage()),
+				Api::EntitiesFromMTP(
+						&history->session(),
+						data.ventities().value_or_empty())
+		};
 		textWithEntities = _blockMsg;
 	} else {
-		textWithEntities = _originalMsg;
+		textWithEntities = TextWithEntities{
+				qs(data.vmessage()),
+				Api::EntitiesFromMTP(
+						&history->session(),
+						data.ventities().value_or_empty())
+		};
 	}
 
 	setText(_media ? textWithEntities : EnsureNonEmpty(textWithEntities));

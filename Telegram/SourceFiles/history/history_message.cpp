@@ -366,12 +366,12 @@ void FastShareMessage(not_null<HistoryItem*> item) {
 		.submitCallback = std::move(submitCallback),
 		.filterCallback = std::move(filterCallback),
 		.navigation = App::wnd()->sessionController(),
-		.title = tr::lng_share_title() }));
+		.title = tr::lng_share_title(),
 		.forwardOptions = {
 			.messagesCount = int(data->msgIds.size()),
 			.show = !hasOnlyForcedForwardedInfo,
 			.hasCaptions = hasCaptions,
-		},
+		}
 	}));
 }
 

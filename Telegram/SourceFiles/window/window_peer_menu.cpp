@@ -1246,7 +1246,8 @@ QPointer<Ui::RpWidget> ShowNewForwardMessagesBox(
 	auto submitCallback = [=](
 			std::vector<not_null<PeerData*>> &&result,
 			TextWithTags &&comment,
-			Api::SendOptions options) {
+			Api::SendOptions options,
+			Data::ForwardOptions forwardOptions) {
 		if (!data->requests.empty()) {
 			return; // Share clicked already.
 		}
@@ -1375,7 +1376,8 @@ QPointer<Ui::RpWidget> ShowForwardNoQuoteMessagesBox(
 	auto submitCallback = [=](
 			std::vector<not_null<PeerData*>> &&result,
 			TextWithTags &&comment,
-			Api::SendOptions options) {
+			Api::SendOptions options,
+			Data::ForwardOptions forwardOptions) {
 		if (!data->requests.empty()) {
 			return; // Share clicked already.
 		}

@@ -12,6 +12,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/openssl_help.h"
 #include "lang/lang_keys.h"
 #include "ui/boxes/confirm_box.h"
+#include "base/options.h"
 #include "boxes/delete_messages_box.h"
 #include "boxes/max_invite_box.h"
 #include "boxes/mute_settings_box.h"
@@ -81,10 +82,20 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <history/view/history_view_pinned_section.h>
 
 namespace Window {
+
+const char kOptionViewProfileInChatsListContextMenu[] =
+	"view-profile-in-chats-list-context-menu";
+
 namespace {
 
 constexpr auto kArchivedToastDuration = crl::time(5000);
 constexpr auto kMaxUnreadWithoutConfirmation = 10000;
+
+base::options::toggle ViewProfileInChatsListContextMenu({
+	.id = kOptionViewProfileInChatsListContextMenu,
+	.name = "Add \"View Profile\"",
+	.description = "Add \"View Profile\" to context menu in chats list",
+});
 
 void SetActionText(not_null<QAction*> action, rpl::producer<QString> &&text) {
 	const auto lifetime = Ui::CreateChild<rpl::lifetime>(action.get());
@@ -804,6 +815,9 @@ void Filler::fillChatsListActions() {
 	addInfo();
 	addToggleArchive();
 	addTogglePin();
+	if (ViewProfileInChatsListContextMenu.value()) {
+		addInfo();
+	}
 	addToggleMute();
 	addToggleUnreadMark();
 	// addToFolder();

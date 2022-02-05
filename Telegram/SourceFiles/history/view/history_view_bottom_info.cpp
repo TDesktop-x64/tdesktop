@@ -115,10 +115,15 @@ TextState BottomInfo::textState(
 		result.link = link;
 		return result;
 	}
+	const auto textWidth = _authorEditedDate.maxWidth();
+	auto withTicksWidth = textWidth;
+	if (_data.flags & (Data::Flag::OutLayout | Data::Flag::Sending)) {
+		withTicksWidth += st::historySendStateSpace;
+	}
 	const auto inTime = QRect(
-		width() - _dateWidth,
+		width() - withTicksWidth,
 		0,
-		_dateWidth,
+		withTicksWidth,
 		st::msgDateFont->height
 	).contains(position);
 	if (inTime) {
@@ -412,7 +417,6 @@ void BottomInfo::layoutDateText() {
 	const auto author = _data.author;
 	const auto prefix = !author.isEmpty() ? qsl(", ") : QString();
 	const auto date = edited + _data.date.toString(cTimeFormat()) + _data.msgId;
-	_dateWidth = st::msgDateFont->width(date);
 	const auto afterAuthor = prefix + date;
 	const auto afterAuthorWidth = st::msgDateFont->width(afterAuthor);
 	const auto authorWidth = st::msgDateFont->width(author);
@@ -424,7 +428,11 @@ void BottomInfo::layoutDateText() {
 		: author;
 	const auto full = (_data.flags & Data::Flag::Sponsored)
 		? tr::lng_sponsored(tr::now)
-		: name.isEmpty() ? date : (name + afterAuthor);
+		: (_data.flags & Data::Flag::Imported)
+		? (date + ' ' + tr::lng_imported(tr::now))
+		: name.isEmpty()
+		? date
+		: (name + afterAuthor);
 	_authorEditedDate.setText(
 		st::msgDateTextStyle,
 		full,
@@ -604,6 +612,10 @@ BottomInfo::Data BottomInfoDataFromMessage(not_null<Message*> message) {
 	}
 	if (item->isSending() || item->hasFailed()) {
 		result.flags |= Flag::Sending;
+	}
+	const auto forwarded = item->Get<HistoryMessageForwarded>();
+	if (forwarded && forwarded->imported) {
+		result.flags |= Flag::Imported;
 	}
 	// We don't want to pass and update it in Date for now.
 	//if (item->unread()) {

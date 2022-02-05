@@ -60,6 +60,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_session_controller.h"
 #include "window/window_controller.h"
 #include "base/platform/base_platform_info.h"
+#include "base/power_save_blocker.h"
 #include "base/random.h"
 #include "base/unixtime.h"
 #include "base/qt_signal_producer.h"
@@ -227,6 +228,7 @@ struct OverlayWidget::Streamed {
 
 	Streaming::Instance instance;
 	PlaybackControls controls;
+	std::unique_ptr<base::PowerSaveBlocker> powerSaveBlocker;
 
 	bool withSound = false;
 	bool pausedBySeek = false;
@@ -2799,6 +2801,22 @@ bool OverlayWidget::createStreamingObjects() {
 	return true;
 }
 
+void OverlayWidget::updatePowerSaveBlocker(
+		const Player::TrackState &state) {
+	Expects(_streamed != nullptr);
+
+	const auto block = (_document != nullptr)
+		&& _document->isVideoFile()
+		&& !IsPausedOrPausing(state.state)
+		&& !IsStoppedOrStopping(state.state);
+	base::UpdatePowerSaveBlocker(
+		_streamed->powerSaveBlocker,
+		block,
+		base::PowerSaveBlockType::PreventDisplaySleep,
+		[] { return u"Video playback is active"_q; },
+		[=] { return window(); });
+}
+
 QImage OverlayWidget::transformedShownContent() const {
 	return transformShownContent(
 		videoShown() ? currentVideoFrameImage() : _staticContent,
@@ -3267,6 +3285,7 @@ void OverlayWidget::updatePlaybackState() {
 	const auto state = _streamed->instance.player().prepareLegacyState();
 	if (state.position != kTimeUnknown && state.length != kTimeUnknown) {
 		_streamed->controls.updatePlayback(state);
+		updatePowerSaveBlocker(state);
 		_touchbarTrackState.fire_copy(state);
 	}
 }

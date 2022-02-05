@@ -286,19 +286,6 @@ RUN make DESTDIR="$LibrariesPath/libXfixes-cache" install
 WORKDIR ..
 RUN rm -rf libxfixes
 
-FROM builder AS libXv
-COPY --from=libXext ${LibrariesPath}/libXext-cache /
-
-RUN git clone -b libXv-1.0.11 --depth=1 $GIT_FREEDESKTOP/libxv.git
-
-WORKDIR libxv
-RUN ./autogen.sh --enable-static
-RUN make -j$(nproc)
-RUN make DESTDIR="$LibrariesPath/libXv-cache" install
-
-WORKDIR ..
-RUN rm -rf libxv
-
 FROM builder AS libXrandr
 RUN git clone -b libXrandr-1.5.2 --depth=1 $GIT_FREEDESKTOP/libxrandr.git
 
@@ -367,9 +354,6 @@ FROM builder AS ffmpeg
 
 COPY --from=opus ${LibrariesPath}/opus-cache /
 COPY --from=libvpx ${LibrariesPath}/libvpx-cache /
-COPY --from=libXext ${LibrariesPath}/libXext-cache /
-COPY --from=libXfixes ${LibrariesPath}/libXfixes-cache /
-COPY --from=libXv ${LibrariesPath}/libXv-cache /
 
 RUN mkdir ffmpeg
 WORKDIR ffmpeg
@@ -389,7 +373,6 @@ RUN ./configure \
 	--disable-everything \
 	--enable-libopus \
 	--enable-libvpx \
-	--enable-xlib \
 	--enable-protocol=file \
 	--enable-decoder=aac \
 	--enable-decoder=aac_fixed \
@@ -704,6 +687,7 @@ WORKDIR ..
 
 FROM builder AS webrtc
 
+COPY --from=libepoxy ${LibrariesPath}/libepoxy-cache /
 COPY --from=mozjpeg ${LibrariesPath}/mozjpeg-cache /
 COPY --from=opus ${LibrariesPath}/opus-cache /
 COPY --from=libvpx ${LibrariesPath}/libvpx-cache /
@@ -716,7 +700,7 @@ RUN mkdir tg_owt
 WORKDIR tg_owt
 RUN git init
 RUN git remote add origin $GIT/desktop-app/tg_owt.git
-RUN git fetch --depth=1 origin 1fd131d37777c445b58cad3889313a7c26ffc2ee
+RUN git fetch --depth=1 origin 25c8637f5975db830cc5d74477641a8b609e248d
 RUN git reset --hard FETCH_HEAD
 RUN git submodule init
 RUN git submodule update
@@ -760,7 +744,6 @@ COPY --from=xcb-keysyms ${LibrariesPath}/xcb-keysyms-cache /
 COPY --from=xcb-render-util ${LibrariesPath}/xcb-render-util-cache /
 COPY --from=libXext ${LibrariesPath}/libXext-cache /
 COPY --from=libXfixes ${LibrariesPath}/libXfixes-cache /
-COPY --from=libXv ${LibrariesPath}/libXv-cache /
 COPY --from=libXtst ${LibrariesPath}/libXtst-cache /
 COPY --from=libXrandr ${LibrariesPath}/libXrandr-cache /
 COPY --from=libXrender ${LibrariesPath}/libXrender-cache /

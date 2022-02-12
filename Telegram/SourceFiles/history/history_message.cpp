@@ -568,7 +568,12 @@ HistoryMessage::HistoryMessage(
 	if (cBlockedUserSpoilerMode() && blockExist(int64(peerId.value)) || cBlockedUserSpoilerMode() && user && user->isBlocked()) {
 		textWithEntities = _blockMsg;
 	} else {
-		textWithEntities = _originalMsg;
+		textWithEntities = TextWithEntities{
+				qs(data.vmessage()),
+				Api::EntitiesFromMTP(
+						&history->session(),
+						data.ventities().value_or_empty())
+		};
 	}
 
 	setText(_media ? textWithEntities : EnsureNonEmpty(textWithEntities));

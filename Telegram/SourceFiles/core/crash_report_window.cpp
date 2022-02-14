@@ -233,7 +233,7 @@ LastCrashedWindow::LastCrashedWindow(
 , _yourReportName(this)
 , _minidump(this)
 , _report(this)
-, _send(this)
+//, _send(this)
 , _sendSkip(this, false)
 , _networkSettings(this)
 , _continue(this)
@@ -399,7 +399,7 @@ LastCrashedWindow::LastCrashedWindow(
 		}
 	}
 
-	_pleaseSendReport.setText(qsl("Please send us a crash report."));
+	_pleaseSendReport.setText(qsl("Please send a crash report to 64Gram Chat."));
 	_yourReportName.setText(qsl("Your Report Tag: %1\nYour User Tag: %2").arg(QString(_minidumpName).replace(".dmp", "")).arg(launcher->installationTag(), 0, 16));
 	_yourReportName.setCursor(style::cur_text);
 	_yourReportName.setTextInteractionFlags(Qt::TextSelectableByMouse);
@@ -420,8 +420,8 @@ LastCrashedWindow::LastCrashedWindow(
 		QDesktopServices::openUrl(qsl("https://github.com/TDesktop-x64/tdesktop"));
 	});
 
-	_send.setText(qsl("SEND CRASH REPORT"));
-	connect(&_send, &QPushButton::clicked, [=] { sendReport(); });
+	//_send.setText(qsl("SEND CRASH REPORT"));
+	//connect(&_send, &QPushButton::clicked, [=] { sendReport(); });
 
 	_sendSkip.setText(qsl("SKIP"));
 	connect(&_sendSkip, &QPushButton::clicked, [=] { processContinue(); });
@@ -638,7 +638,7 @@ void LastCrashedWindow::updateControls() {
 			_networkSettings.show();
 			_updaterData->check.show();
 			_updaterData->skip.show();
-			_send.hide();
+			//_send.hide();
 			_sendSkip.hide();
 			_continue.hide();
 			_pleaseSendReport.hide();
@@ -671,7 +671,7 @@ void LastCrashedWindow::updateControls() {
 					_report.hide();
 					_minidump.hide();
 					_saveReport.hide();
-					_send.hide();
+					//_send.hide();
 					_sendSkip.hide();
 					_continue.show();
 				} else {
@@ -703,7 +703,7 @@ void LastCrashedWindow::updateControls() {
 						_report.hide();
 						_minidump.hide();
 						_saveReport.hide();
-						_send.hide();
+						//_send.hide();
 						_sendSkip.hide();
 						_continue.show();
 					} else {
@@ -733,15 +733,15 @@ void LastCrashedWindow::updateControls() {
 							}
 						}
 						if (_sendingState == SendingTooMany || _sendingState == SendingDone) {
-							_send.hide();
+							//_send.hide();
 							_sendSkip.hide();
 							_continue.show();
 						} else {
-							if (_sendingState == SendingProgress || _sendingState == SendingUploading) {
-								_send.hide();
-							} else {
-								_send.show();
-							}
+							//if (_sendingState == SendingProgress || _sendingState == SendingUploading) {
+							//	_send.hide();
+							//} else {
+							//	_send.show();
+							//}
 							_sendSkip.show();
 							_continue.hide();
 						}
@@ -756,7 +756,7 @@ void LastCrashedWindow::updateControls() {
 				_report.hide();
 				_minidump.hide();
 				_saveReport.hide();
-				_send.hide();
+				//_send.hide();
 				_sendSkip.hide();
 				_continue.hide();
 			}
@@ -771,7 +771,7 @@ void LastCrashedWindow::updateControls() {
 		}
 	} else {
 		h += _networkSettings.height() + padding;
-		h += padding + _send.height() + padding;
+		h += padding /*+ _send.height() + padding*/;
 		if (_sendingState == SendingNoReport) {
 			_pleaseSendReport.hide();
 			_yourReportName.hide();
@@ -780,7 +780,7 @@ void LastCrashedWindow::updateControls() {
 			_report.hide();
 			_minidump.hide();
 			_saveReport.hide();
-			_send.hide();
+			//_send.hide();
 			_sendSkip.hide();
 			_continue.show();
 			_networkSettings.hide();
@@ -819,16 +819,16 @@ void LastCrashedWindow::updateControls() {
 				}
 			}
 			if (_sendingState == SendingDone) {
-				_send.hide();
+				//_send.hide();
 				_sendSkip.hide();
 				_continue.show();
 				_networkSettings.hide();
 			} else {
-				if (_sendingState == SendingProgress || _sendingState == SendingUploading) {
-					_send.hide();
-				} else {
-					_send.show();
-				}
+				//if (_sendingState == SendingProgress || _sendingState == SendingUploading) {
+				//	_send.hide();
+				//} else {
+				//	_send.show();
+				//}
 				_sendSkip.show();
 				if (_sendingState == SendingFail) {
 					_networkSettings.show();
@@ -1024,11 +1024,11 @@ void LastCrashedWindow::resizeEvent(QResizeEvent *e) {
 	int padding = _size;
 	_label.move(padding, padding + (_networkSettings.height() - _label.height()) / 2);
 
-	_send.move(width() - padding - _send.width(), height() - padding - _send.height());
+	//_send.move(width() - padding - _send.width(), height() - padding - _send.height());
 	if (_sendingState == SendingProgress || _sendingState == SendingUploading) {
 		_sendSkip.move(width() - padding - _sendSkip.width(), height() - padding - _sendSkip.height());
 	} else {
-		_sendSkip.move(width() - padding - _send.width() - padding - _sendSkip.width(), height() - padding - _sendSkip.height());
+		_sendSkip.move(width() - padding - /*_send.width() - padding -*/ _sendSkip.width(), height() - padding - _sendSkip.height());
 	}
 
 	_updating.move(padding, padding * 2 + _networkSettings.height() + (_networkSettings.height() - _updating.height()) / 2);

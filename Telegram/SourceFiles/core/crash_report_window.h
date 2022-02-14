@@ -137,7 +137,7 @@ private:
 
 	PreLaunchLabel _label, _pleaseSendReport, _yourReportName, _minidump;
 	PreLaunchLog _report;
-	PreLaunchButton _send, _sendSkip, _networkSettings, _continue, _showReport, _saveReport, _getApp;
+	PreLaunchButton /*_send,*/ _sendSkip, _networkSettings, _continue, _showReport, _saveReport, _getApp;
 	PreLaunchCheckbox _includeUsername;
 
 	QString _minidumpName, _minidumpFull, _reportText;

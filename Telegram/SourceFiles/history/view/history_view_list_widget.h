@@ -639,6 +639,7 @@ private:
 };
 
 void ConfirmDeleteSelectedItems(not_null<ListWidget*> widget);
+void ConfirmOldForwardSelectedItems(not_null<ListWidget*> widget);
 void ConfirmForwardSelectedItems(not_null<ListWidget*> widget);
 void ConfirmForwardNoQuoteSelectedItems(not_null<ListWidget*> widget);
 void ConfirmForwardSelectedToSavedMessagesItems(not_null<ListWidget*> widget);

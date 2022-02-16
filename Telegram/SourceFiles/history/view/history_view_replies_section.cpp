@@ -201,6 +201,10 @@ RepliesWidget::RepliesWidget(
 	) | rpl::start_with_next([=] {
 		confirmDeleteSelected();
 	}, _topBar->lifetime());
+	_topBar->oldForwardSelectionRequest(
+	) | rpl::start_with_next([=] {
+		confirmOldForwardSelected();
+	}, _topBar->lifetime());
 	_topBar->forwardSelectionRequest(
 	) | rpl::start_with_next([=] {
 		confirmForwardSelected();
@@ -1941,6 +1945,10 @@ auto RepliesWidget::listAllowedReactionsValue()
 
 void RepliesWidget::confirmDeleteSelected() {
 	ConfirmDeleteSelectedItems(_inner);
+}
+
+void RepliesWidget::confirmOldForwardSelected() {
+	ConfirmOldForwardSelectedItems(_inner);
 }
 
 void RepliesWidget::confirmForwardSelected() {

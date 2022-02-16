@@ -134,6 +134,10 @@ PinnedWidget::PinnedWidget(
 	) | rpl::start_with_next([=] {
 		confirmDeleteSelected();
 	}, _topBar->lifetime());
+	_topBar->oldForwardSelectionRequest(
+	) | rpl::start_with_next([=] {
+		confirmOldForwardSelected();
+	}, _topBar->lifetime());
 	_topBar->forwardSelectionRequest(
 	) | rpl::start_with_next([=] {
 		confirmForwardSelected();
@@ -698,6 +702,10 @@ auto PinnedWidget::listAllowedReactionsValue()
 
 void PinnedWidget::confirmDeleteSelected() {
 	ConfirmDeleteSelectedItems(_inner);
+}
+
+void PinnedWidget::confirmOldForwardSelected() {
+	ConfirmOldForwardSelectedItems(_inner);
 }
 
 void PinnedWidget::confirmForwardSelected() {

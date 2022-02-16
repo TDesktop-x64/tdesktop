@@ -142,6 +142,7 @@ private:
 	void updateScrollDownPosition();
 
 	void confirmDeleteSelected();
+	void confirmOldForwardSelected();
 	void confirmForwardSelected();
 	void confirmForwardNoQuoteSelected();
 	void confirmForwardSelectedToSavedMessages();

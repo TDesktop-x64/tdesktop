@@ -457,7 +457,11 @@ not_null<UserData*> Session::processUser(const MTPUser &data) {
 			if (const auto restriction = data.vrestriction_reason()) {
 				result->setUnavailableReasons(
 					ExtractUnavailableReasons(restriction->v));
-				result->restriction_reason = QString::fromStdString(restriction->v[0].c_restrictionReason().vplatform().v.toStdString()) + "-" + QString::fromStdString(restriction->v[0].c_restrictionReason().vreason().v.toStdString());
+				QString reason;
+				for (const auto v : restriction->v) {
+					reason += QString("%1-%2: %3\n").arg(v.c_restrictionReason().vreason().v.constData()).arg(v.c_restrictionReason().vplatform().v.constData()).arg(v.c_restrictionReason().vtext().v.constData());
+				}
+				result->restriction_reason = reason;
 			} else {
 				result->setUnavailableReasons({});
 				result->restriction_reason = "";
@@ -724,7 +728,11 @@ not_null<PeerData*> Session::processChat(const MTPChat &data) {
 			if (const auto restriction = data.vrestriction_reason()) {
 				channel->setUnavailableReasons(
 					ExtractUnavailableReasons(restriction->v));
-				channel->restriction_reason = QString("%1-%2: %3").arg(restriction->v[0].c_restrictionReason().vreason().v.constData()).arg(restriction->v[0].c_restrictionReason().vplatform().v.constData()).arg(restriction->v[0].c_restrictionReason().vtext().v.constData());
+				QString reason;
+				for (const auto v : restriction->v) {
+					reason += QString("%1-%2: %3\n").arg(v.c_restrictionReason().vreason().v.constData()).arg(v.c_restrictionReason().vplatform().v.constData()).arg(v.c_restrictionReason().vtext().v.constData());
+				}
+				channel->restriction_reason = reason;
 			} else {
 				channel->setUnavailableReasons({});
 				channel->restriction_reason = "";

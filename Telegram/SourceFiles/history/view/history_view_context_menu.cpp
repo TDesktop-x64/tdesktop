@@ -206,10 +206,9 @@ void AddSaveDocumentAction(
 	if (list->hasCopyRestriction(item)) {
 		return;
 	}
-	const auto origin = Data::FileOrigin(
-		item ? item->fullId() : FullMsgId());
+	const auto origin = item ? item->fullId() : FullMsgId();
 	const auto save = [=] {
-		DocumentSaveClickHandler::Save(
+		DocumentSaveClickHandler::SaveAndTrack(
 			origin,
 			document,
 			DocumentSaveClickHandler::Mode::ToNewFile);
@@ -1083,11 +1082,12 @@ void StopPoll(not_null<Main::Session*> session, FullMsgId itemId) {
 			session->api().polls().close(item);
 		}
 	};
-	Ui::show(Box<Ui::ConfirmBox>(
-		tr::lng_polls_stop_warning(tr::now),
-		tr::lng_polls_stop_sure(tr::now),
-		tr::lng_cancel(tr::now),
-		stop));
+	Ui::show(Ui::MakeConfirmBox({
+		.text = tr::lng_polls_stop_warning(),
+		.confirmed = stop,
+		.confirmText = tr::lng_polls_stop_sure(),
+		.cancelText = tr::lng_cancel(),
+	}));
 }
 
 void AddPollActions(
@@ -1278,6 +1278,11 @@ void SendReport(
 		case Reason::Violence: return MTP_inputReportReasonViolence();
 		case Reason::ChildAbuse: return MTP_inputReportReasonChildAbuse();
 		case Reason::Pornography: return MTP_inputReportReasonPornography();
+		case Reason::Copyright: return MTP_inputReportReasonCopyright();
+		case Reason::IllegalDrugs:
+			return MTP_inputReportReasonIllegalDrugs();
+		case Reason::PersonalDetails:
+			return MTP_inputReportReasonPersonalDetails();
 		case Reason::Other: return MTP_inputReportReasonOther();
 		}
 		Unexpected("Bad reason group value.");

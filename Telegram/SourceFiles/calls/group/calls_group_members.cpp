@@ -1191,7 +1191,8 @@ base::unique_qptr<Ui::PopupMenu> Members::Controller::createRowContextMenu(
 	const auto muted = (muteState == Row::State::Muted)
 		|| (muteState == Row::State::RaisedHand);
 	const auto addCover = true;
-	const auto addVolumeItem = !muted || isMe(participantPeer);
+	const auto addVolumeItem = !_call->rtmp()
+		&& (!muted || isMe(participantPeer));
 	const auto admin = IsGroupCallAdmin(_peer, participantPeer);
 	const auto session = &_peer->session();
 	const auto getCurrentWindow = [=]() -> Window::SessionController* {
@@ -1263,7 +1264,9 @@ base::unique_qptr<Ui::PopupMenu> Members::Controller::createRowContextMenu(
 				participantPeer
 			) | rpl::map([](const auto &text) { return text.text; }),
 			PrepareShortInfoStatus(participantPeer),
-			PrepareShortInfoUserpic(participantPeer)));
+			PrepareShortInfoUserpic(
+				participantPeer,
+				st::groupCallMenuCover)));
 
 		if (const auto about = participantPeer->about(); !about.isEmpty()) {
 			result->addAction(base::make_unique_q<AboutItem>(
@@ -1428,7 +1431,8 @@ void Members::Controller::addMuteActionsToContextMenu(
 
 	auto mutesFromVolume = rpl::never<bool>() | rpl::type_erased();
 
-	const auto addVolumeItem = !muted || isMe(participantPeer);
+	const auto addVolumeItem = !_call->rtmp()
+		&& (!muted || isMe(participantPeer));
 	if (addVolumeItem) {
 		auto otherParticipantStateValue
 			= _call->otherParticipantStateValue(
@@ -1490,6 +1494,7 @@ void Members::Controller::addMuteActionsToContextMenu(
 
 	const auto muteAction = [&]() -> QAction* {
 		if (muteState == Row::State::Invited
+			|| _call->rtmp()
 			|| isMe(participantPeer)
 			|| (muteState == Row::State::Inactive
 				&& participantIsCallAdmin
@@ -1683,9 +1688,7 @@ void Members::setupAddMember(not_null<GroupCall*> call) {
 			_layout.get(),
 			tr::lng_group_call_invite(),
 			st::groupCallAddMember,
-			&st::groupCallAddMemberIcon,
-			st::groupCallAddMemberIconLeft,
-			&st::groupCallMemberInactiveIcon);
+			{ .icon = &st::groupCallAddMemberIcon });
 		addMember->clicks(
 		) | rpl::to_empty | rpl::start_to_stream(
 			_addMemberRequests,
@@ -1702,6 +1705,13 @@ void Members::setupAddMember(not_null<GroupCall*> call) {
 
 Row *Members::lookupRow(not_null<PeerData*> peer) const {
 	return _listController->findRow(peer);
+}
+
+not_null<MembersRow*> Members::rtmpFakeRow(not_null<PeerData*> peer) const {
+	if (!_rtmpFakeRow) {
+		_rtmpFakeRow = std::make_unique<Row>(_listController.get(), peer);
+	}
+	return _rtmpFakeRow.get();
 }
 
 void Members::setMode(PanelMode mode) {

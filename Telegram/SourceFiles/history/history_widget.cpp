@@ -34,6 +34,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/labels.h"
 #include "ui/widgets/shadow.h"
 #include "ui/effects/ripple_animation.h"
+#include "ui/effects/message_sending_animation_controller.h"
 #include "ui/text/text_utilities.h" // Ui::Text::ToUpper
 #include "ui/text/format_values.h"
 #include "ui/chat/forward_options_box.h"
@@ -497,7 +498,10 @@ HistoryWidget::HistoryWidget(
 
 	_fieldAutocomplete->stickerChosen(
 	) | rpl::start_with_next([=](FieldAutocomplete::StickerChosen data) {
-		sendExistingDocument(data.sticker, data.options);
+		controller->sendingAnimation().appendSending(
+			data.messageSendingFrom);
+		const auto localId = data.messageSendingFrom.localId;
+		sendExistingDocument(data.sticker, data.options, localId);
 	}, lifetime());
 
 	_fieldAutocomplete->setModerateKeyActivateCallback([=](int key) {
@@ -804,7 +808,7 @@ HistoryWidget::HistoryWidget(
 			const auto unavailable = _peer->computeUnavailableReason();
 			if (!unavailable.isEmpty()) {
 				controller->showBackFromStack();
-				controller->show(Box<Ui::InformBox>(unavailable));
+				controller->show(Ui::MakeInformBox(unavailable));
 				return;
 			}
 		}
@@ -917,7 +921,7 @@ HistoryWidget::HistoryWidget(
 			action.replyTo));
 		if (action.options.scheduled) {
 			cancelReply(lastKeyboardUsed);
-			crl::on_main(this, [=, history = action.history]{
+			crl::on_main(this, [=, history = action.history] {
 				controller->showSection(
 					std::make_shared<HistoryView::ScheduledMemento>(history));
 			});
@@ -1005,7 +1009,7 @@ void HistoryWidget::initVoiceRecordBar() {
 			? Data::RestrictionError(_peer, ChatRestriction::SendMedia)
 			: std::nullopt;
 		if (error) {
-			controller()->show(Box<Ui::InformBox>(*error));
+			controller()->show(Ui::MakeInformBox(*error));
 			return true;
 		} else if (showSlowmodeError()) {
 			return true;
@@ -1109,7 +1113,12 @@ void HistoryWidget::initTabbedSelector() {
 
 	selector->fileChosen(
 	) | filter | rpl::start_with_next([=](Selector::FileChosen data) {
-		sendExistingDocument(data.document, data.options);
+		controller()->sendingAnimation().appendSending(
+			data.messageSendingFrom);
+		sendExistingDocument(
+			data.document,
+			data.options,
+			data.messageSendingFrom.localId);
 	}, lifetime());
 
 	selector->photoChosen(
@@ -1592,11 +1601,11 @@ void HistoryWidget::orderWidgets() {
 	if (_pinnedBar) {
 		_pinnedBar->raise();
 	}
-	if (_groupCallBar) {
-		_groupCallBar->raise();
-	}
 	if (_requestsBar) {
 		_requestsBar->raise();
+	}
+	if (_groupCallBar) {
+		_groupCallBar->raise();
 	}
 	if (_chooseTheme) {
 		_chooseTheme->raise();
@@ -2095,6 +2104,7 @@ void HistoryWidget::showHistory(
 	}
 
 	clearHighlightMessages();
+	controller()->sendingAnimation().clear();
 	hideInfoTooltip(anim::type::instant);
 	if (_history) {
 		if (_peer->id == peerId && !reload) {
@@ -3658,8 +3668,7 @@ void HistoryWidget::saveEditMsg() {
 			Box<DeleteMessagesBox>(item, suggestModerateActions));
 		return;
 	} else if (!left.text.isEmpty()) {
-		controller()->show(Box<Ui::InformBox>(
-			tr::lng_edit_too_long(tr::now)));
+		controller()->show(Ui::MakeInformBox(tr::lng_edit_too_long()));
 		return;
 	}
 
@@ -3693,16 +3702,14 @@ void HistoryWidget::saveEditMsg() {
 			}
 			const auto &err = error.type();
 			if (ranges::contains(Api::kDefaultEditMessagesErrors, err)) {
-				controller()->show(
-					Box<Ui::InformBox>(tr::lng_edit_error(tr::now)));
+				controller()->show(Ui::MakeInformBox(tr::lng_edit_error()));
 			} else if (err == u"MESSAGE_NOT_MODIFIED"_q) {
 				cancelEdit();
 			} else if (err == u"MESSAGE_EMPTY"_q) {
 				_field->selectAll();
 				_field->setFocus();
 			} else {
-				controller()->show(
-					Box<Ui::InformBox>(tr::lng_edit_error(tr::now)));
+				controller()->show(Ui::MakeInformBox(tr::lng_edit_error()));
 			}
 			update();
 		})();
@@ -4110,8 +4117,7 @@ void HistoryWidget::cornerButtonsAnimationFinish() {
 
 void HistoryWidget::chooseAttach() {
 	if (_editMsgId) {
-		controller()->show(
-			Box<Ui::InformBox>(tr::lng_edit_caption_attach(tr::now)));
+		controller()->show(Ui::MakeInformBox(tr::lng_edit_caption_attach()));
 		return;
 	}
 
@@ -4957,8 +4963,7 @@ bool HistoryWidget::confirmSendingFiles(
 		return false;
 	}
 	if (_editMsgId) {
-		controller()->show(
-			Box<Ui::InformBox>(tr::lng_edit_caption_attach(tr::now)));
+		controller()->show(Ui::MakeInformBox(tr::lng_edit_caption_attach()));
 		return false;
 	}
 
@@ -5326,6 +5331,9 @@ int HistoryWidget::countInitialScrollTop() {
 		const auto itemTop = _list->itemTop(item);
 		if (itemTop < 0) {
 			setMsgId(0);
+			Ui::ShowMultilineToast({
+				.text = { tr::lng_message_not_found(tr::now) },
+			});
 			return countInitialScrollTop();
 		} else {
 			const auto view = item->mainView();
@@ -5530,6 +5538,7 @@ void HistoryWidget::startItemRevealAnimations() {
 		if (const auto view = item->mainView()) {
 			if (const auto top = _list->itemTop(view); top >= 0) {
 				if (const auto height = view->height()) {
+					startMessageSendingAnimation(item);
 					if (!_itemRevealAnimations.contains(item)) {
 						auto &animation = _itemRevealAnimations[item];
 						animation.startHeight = height;
@@ -5548,6 +5557,38 @@ void HistoryWidget::startItemRevealAnimations() {
 			}
 		}
 	}
+}
+
+void HistoryWidget::startMessageSendingAnimation(
+		not_null<HistoryItem*> item) {
+	auto &sendingAnimation = controller()->sendingAnimation();
+	if (!sendingAnimation.hasLocalMessage(item->fullId().msg)) {
+		return;
+	}
+	Assert(item->mainView() != nullptr);
+	Assert(item->mainView()->media() != nullptr);
+
+	auto globalEndTopLeft = rpl::merge(
+		_scroll->innerResizes() | rpl::to_empty,
+		session().data().newItemAdded() | rpl::to_empty,
+		geometryValue() | rpl::to_empty,
+		_scroll->geometryValue() | rpl::to_empty,
+		_list->geometryValue() | rpl::to_empty
+	) | rpl::map([=] {
+		const auto view = item->mainView();
+		const auto additional = (_list->height() == _scroll->height())
+			? view->height()
+			: 0;
+		return _list->mapToGlobal(QPoint(
+			0,
+			_list->itemTop(view) - additional));
+	});
+
+	sendingAnimation.startAnimation({
+		.globalEndTopLeft = std::move(globalEndTopLeft),
+		.view = [=] { return item->mainView(); },
+		.paintContext = [=] { return _list->preparePaintContext({}); },
+	});
 }
 
 void HistoryWidget::updateListSize() {
@@ -6179,13 +6220,20 @@ void HistoryWidget::sendInlineResult(InlineBots::ResultSelected result) {
 
 	auto errorText = result.result->getErrorOnSend(_history);
 	if (!errorText.isEmpty()) {
-		controller()->show(Box<Ui::InformBox>(errorText));
+		controller()->show(Ui::MakeInformBox(errorText));
 		return;
 	}
 
+	controller()->sendingAnimation().appendSending(
+		result.messageSendingFrom);
+
 	auto action = prepareSendAction(result.options);
 	action.generateLocal = true;
-	session().api().sendInlineResult(result.bot, result.result, action);
+	session().api().sendInlineResult(
+		result.bot,
+		result.result,
+		action,
+		result.messageSendingFrom.localId);
 
 	clearFieldText();
 	_saveDraftText = true;
@@ -6520,7 +6568,7 @@ void HistoryWidget::setupGroupCallBar() {
 	) | rpl::start_with_next([=] {
 		const auto peer = _history->peer;
 		if (peer->groupCall()) {
-			controller()->startOrJoinGroupCall(peer);
+			controller()->startOrJoinGroupCall(peer, {});
 		}
 	}, _groupCallBar->lifetime());
 
@@ -6600,13 +6648,14 @@ void HistoryWidget::requestMessageData(MsgId msgId) {
 
 bool HistoryWidget::sendExistingDocument(
 		not_null<DocumentData*> document,
-		Api::SendOptions options) {
+		Api::SendOptions options,
+		std::optional<MsgId> localId) {
 	const auto error = _peer
 		? Data::RestrictionError(_peer, ChatRestriction::SendStickers)
 		: std::nullopt;
 	if (error) {
 		controller()->show(
-			Box<Ui::InformBox>(*error),
+			Ui::MakeInformBox(*error),
 			Ui::LayerOption::KeepOther);
 		return false;
 	} else if (!_peer || !_peer->canWrite()) {
@@ -6617,7 +6666,8 @@ bool HistoryWidget::sendExistingDocument(
 
 	Api::SendExistingDocument(
 		Api::MessageToSend(prepareSendAction(options)),
-		document);
+		document,
+		localId);
 
 	if (_fieldAutocomplete->stickersShown()) {
 		clearFieldText();
@@ -6641,7 +6691,7 @@ bool HistoryWidget::sendExistingPhoto(
 		: std::nullopt;
 	if (error) {
 		controller()->show(
-			Box<Ui::InformBox>(*error),
+			Ui::MakeInformBox(*error),
 			Ui::LayerOption::KeepOther);
 		return false;
 	} else if (!_peer || !_peer->canWrite()) {
@@ -6724,19 +6774,19 @@ void HistoryWidget::replyToMessage(not_null<HistoryItem*> item) {
 		return;
 	} else if (item->history() == _migrated) {
 		if (item->isService()) {
-			controller()->show(Box<Ui::InformBox>(
-				tr::lng_reply_cant(tr::now)));
+			controller()->show(Ui::MakeInformBox(tr::lng_reply_cant()));
 		} else {
 			const auto itemId = item->fullId();
 			controller()->show(
-				Box<Ui::ConfirmBox>(
-					tr::lng_reply_cant_forward(tr::now),
-					tr::lng_selected_forward(tr::now),
-					crl::guard(this, [=] {
+				Ui::MakeConfirmBox({
+					.text = tr::lng_reply_cant_forward(),
+					.confirmed = crl::guard(this, [=] {
 						controller()->content()->setForwardDraft(
 							_peer->id,
 							{ .ids = { 1, itemId } });
-					})));
+					}),
+					.confirmText = tr::lng_selected_forward(),
+				}));
 		}
 		return;
 	}
@@ -6787,7 +6837,7 @@ void HistoryWidget::editMessage(not_null<HistoryItem*> item) {
 		toggleChooseChatTheme(_peer);
 	} else if (_voiceRecordBar->isActive()) {
 		controller()->show(
-			Box<Ui::InformBox>(tr::lng_edit_caption_voice(tr::now)));
+			Ui::MakeInformBox(tr::lng_edit_caption_voice()));
 		return;
 	}
 
@@ -7296,16 +7346,17 @@ void HistoryWidget::escape() {
 	} else if (_editMsgId) {
 		if (_replyEditMsg
 			&& PrepareEditText(_replyEditMsg) != _field->getTextWithTags()) {
-			controller()->show(Box<Ui::ConfirmBox>(
-				tr::lng_cancel_edit_post_sure(tr::now),
-				tr::lng_cancel_edit_post_yes(tr::now),
-				tr::lng_cancel_edit_post_no(tr::now),
-				crl::guard(this, [this] {
+			controller()->show(Ui::MakeConfirmBox({
+				.text = tr::lng_cancel_edit_post_sure(),
+				.confirmed = crl::guard(this, [this] {
 					if (_editMsgId) {
 						cancelEdit();
 						Ui::hideLayer();
 					}
-				})));
+				}),
+				.confirmText = tr::lng_cancel_edit_post_yes(),
+				.cancelText = tr::lng_cancel_edit_post_no(),
+			}));
 		} else {
 			cancelEdit();
 		}

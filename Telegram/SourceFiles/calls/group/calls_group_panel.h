@@ -131,7 +131,8 @@ private:
 
 	bool handleClose();
 	void startScheduledNow();
-	void trackControls(bool track);
+	void toggleFullScreen(bool fullscreen);
+	void trackControls(bool track, bool force = false);
 	void raiseControls();
 	void enlargeVideo();
 	void minimizeVideo();
@@ -160,6 +161,8 @@ private:
 	void refreshVideoButtons(
 		std::optional<bool> overrideWideMode = std::nullopt);
 	void refreshTopButton();
+	void createPinOnTop();
+	void setupEmptyRtmp();
 	void toggleWideControls(bool shown);
 	void updateWideControlsVisibility();
 	[[nodiscard]] bool videoButtonInNarrowMode() const;
@@ -198,9 +201,10 @@ private:
 	Ui::GL::Window _window;
 	const std::unique_ptr<Ui::LayerManager> _layerBg;
 	rpl::variable<PanelMode> _mode;
+	rpl::variable<bool> _fullScreen = false;
 
 #ifndef Q_OS_MAC
-	std::unique_ptr<Ui::Platform::SeparateTitleControls> _controls;
+	const std::unique_ptr<Ui::Platform::SeparateTitleControls> _controls;
 #endif // !Q_OS_MAC
 
 	const std::unique_ptr<base::PowerSaveBlocker> _powerSaveBlocker;
@@ -211,18 +215,19 @@ private:
 	object_ptr<Ui::FlatLabel> _subtitle = { nullptr };
 	object_ptr<Ui::AbstractButton> _recordingMark = { nullptr };
 	object_ptr<Ui::IconButton> _menuToggle = { nullptr };
+	object_ptr<Ui::IconButton> _pinOnTop = { nullptr };
 	object_ptr<Ui::DropdownMenu> _menu = { nullptr };
 	rpl::variable<bool> _wideMenuShown = false;
 	object_ptr<Ui::AbstractButton> _joinAsToggle = { nullptr };
 	object_ptr<Members> _members = { nullptr };
 	std::unique_ptr<Viewport> _viewport;
-	rpl::lifetime _trackControlsLifetime;
 	rpl::lifetime _trackControlsOverStateLifetime;
 	rpl::lifetime _trackControlsMenuLifetime;
 	object_ptr<Ui::FlatLabel> _startsIn = { nullptr };
 	object_ptr<Ui::RpWidget> _countdown = { nullptr };
 	std::shared_ptr<Ui::GroupCallScheduledLeft> _countdownData;
 	object_ptr<Ui::FlatLabel> _startsWhen = { nullptr };
+	object_ptr<Ui::FlatLabel> _emptyRtmp = { nullptr };
 	ChooseJoinAsProcess _joinAsProcess;
 	std::optional<QRect> _lastSmallGeometry;
 	std::optional<QRect> _lastLargeGeometry;

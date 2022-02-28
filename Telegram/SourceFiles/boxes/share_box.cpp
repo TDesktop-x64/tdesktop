@@ -554,7 +554,7 @@ void ShareBox::createButtons() {
 }
 
 void ShareBox::applyFilterUpdate(const QString &query) {
-	onScrollToY(0);
+	scrollToY(0);
 	_inner->updateFilter(query);
 }
 
@@ -625,7 +625,7 @@ void ShareBox::selectedChanged() {
 }
 
 void ShareBox::scrollTo(Ui::ScrollToRequest request) {
-	onScrollToY(request.ymin, request.ymax);
+	scrollToY(request.ymin, request.ymax);
 	//auto scrollTop = scrollArea()->scrollTop(), scrollBottom = scrollTop + scrollArea()->height();
 	//auto from = scrollTop, to = scrollTop;
 	//if (scrollTop > top) {
@@ -1250,20 +1250,22 @@ QString AppendShareGameScoreUrl(
 }
 
 void ShareGameScoreByHash(
-		not_null<Main::Session*> session,
+		not_null<Window::SessionController*> controller,
 		const QString &hash) {
+	auto &session = controller->session();
 	auto key128Size = 0x10;
 
 	auto hashEncrypted = QByteArray::fromBase64(hash.toLatin1(), QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals);
 	if (hashEncrypted.size() <= key128Size || (hashEncrypted.size() != key128Size + 0x20)) {
-		Ui::show(Box<Ui::InformBox>(
-			tr::lng_confirm_phone_link_invalid(tr::now)));
+		controller->show(
+			Ui::MakeInformBox(tr::lng_confirm_phone_link_invalid()),
+			Ui::LayerOption::CloseOther);
 		return;
 	}
 
 	// Decrypt data.
 	auto hashData = QByteArray(hashEncrypted.size() - key128Size, Qt::Uninitialized);
-	if (!session->local().decrypt(hashEncrypted.constData() + key128Size, hashData.data(), hashEncrypted.size() - key128Size, hashEncrypted.constData())) {
+	if (!session.local().decrypt(hashEncrypted.constData() + key128Size, hashData.data(), hashEncrypted.size() - key128Size, hashEncrypted.constData())) {
 		return;
 	}
 
@@ -1283,13 +1285,17 @@ void ShareGameScoreByHash(
 
 	// Check 128 bits of SHA1() of data.
 	if (memcmp(dataSha1, hashEncrypted.constData(), key128Size) != 0) {
-		Ui::show(Box<Ui::InformBox>(tr::lng_share_wrong_user(tr::now)));
+		controller->show(
+			Ui::MakeInformBox(tr::lng_share_wrong_user()),
+			Ui::LayerOption::CloseOther);
 		return;
 	}
 
 	auto hashDataInts = reinterpret_cast<uint64*>(hashData.data());
-	if (hashDataInts[0] != session->userId().bare) {
-		Ui::show(Box<Ui::InformBox>(tr::lng_share_wrong_user(tr::now)));
+	if (hashDataInts[0] != session.userId().bare) {
+		controller->show(
+			Ui::MakeInformBox(tr::lng_share_wrong_user()),
+			Ui::LayerOption::CloseOther);
 		return;
 	}
 
@@ -1297,33 +1303,43 @@ void ShareGameScoreByHash(
 	const auto channelAccessHash = hashDataInts[3];
 	if (!peerIsChannel(peerId) && channelAccessHash) {
 		// If there is no channel id, there should be no channel access_hash.
-		Ui::show(Box<Ui::InformBox>(tr::lng_share_wrong_user(tr::now)));
+		controller->show(
+			Ui::MakeInformBox(tr::lng_share_wrong_user()),
+			Ui::LayerOption::CloseOther);
 		return;
 	}
 
 	const auto msgId = MsgId(int64(hashDataInts[2]));
-	if (const auto item = session->data().message(peerId, msgId)) {
+	if (const auto item = session.data().message(peerId, msgId)) {
 		FastShareMessage(item);
 	} else {
-		auto resolveMessageAndShareScore = [=](PeerData *peer) {
-			session->api().requestMessageData(peer, msgId, [=] {
-				const auto item = session->data().message(peerId, msgId);
+		const auto weak = base::make_weak(controller.get());
+		const auto resolveMessageAndShareScore = crl::guard(weak, [=](
+				PeerData *peer) {
+			auto done = crl::guard(weak, [=] {
+				const auto item = weak->session().data().message(
+					peerId,
+					msgId);
 				if (item) {
 					FastShareMessage(item);
 				} else {
-					Ui::show(Box<Ui::InformBox>(
-						tr::lng_edit_deleted(tr::now)));
+					weak->show(
+						Ui::MakeInformBox(tr::lng_edit_deleted()),
+						Ui::LayerOption::CloseOther);
 				}
 			});
-		};
+			auto &api = weak->session().api();
+			api.requestMessageData(peer, msgId, std::move(done));
+		});
 
 		const auto peer = peerIsChannel(peerId)
-			? session->data().peerLoaded(peerId)
+			? controller->session().data().peerLoaded(peerId)
 			: nullptr;
 		if (peer || !peerIsChannel(peerId)) {
 			resolveMessageAndShareScore(peer);
 		} else {
-			session->api().request(MTPchannels_GetChannels(
+			const auto owner = &controller->session().data();
+			controller->session().api().request(MTPchannels_GetChannels(
 				MTP_vector<MTPInputChannel>(
 					1,
 					MTP_inputChannel(
@@ -1331,9 +1347,9 @@ void ShareGameScoreByHash(
 						MTP_long(channelAccessHash)))
 			)).done([=](const MTPmessages_Chats &result) {
 				result.match([&](const auto &data) {
-					session->data().processChats(data.vchats());
+					owner->processChats(data.vchats());
 				});
-				if (const auto peer = session->data().peerLoaded(peerId)) {
+				if (const auto peer = owner->peerLoaded(peerId)) {
 					resolveMessageAndShareScore(peer);
 				}
 			}).send();

@@ -22,6 +22,7 @@ class Session;
 namespace Ui {
 class PopupMenu;
 class ChatTheme;
+struct ChatPaintContext;
 } // namespace Ui
 
 namespace Window {
@@ -376,6 +377,8 @@ private:
 	void saveScrollState();
 	void restoreScrollState();
 
+	Ui::ChatPaintContext preparePaintContext(const QRect &clip) const;
+
 	Element *viewForItem(FullMsgId itemId) const;
 	Element *viewForItem(const HistoryItem *item) const;
 	not_null<Element*> enforceViewForItem(not_null<HistoryItem*> item);
@@ -504,6 +507,8 @@ private:
 	void startItemRevealAnimations();
 	void revealItemsCallback();
 
+	void startMessageSendingAnimation(not_null<HistoryItem*> item);
+
 	void updateHighlightedMessage();
 	void clearHighlightedMessage();
 
@@ -559,6 +564,9 @@ private:
 	base::flat_map<
 		not_null<PeerData*>,
 		std::shared_ptr<Data::CloudImageView>> _userpics, _userpicsCache;
+	base::flat_map<
+		MsgId,
+		std::shared_ptr<Data::CloudImageView>> _sponsoredUserpics;
 
 	const std::unique_ptr<Ui::PathShiftGradient> _pathGradient;
 

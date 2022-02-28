@@ -1,4 +1,4 @@
-/*
+﻿/*
 This file is part of Telegram Desktop,
 the official desktop application for the Telegram messaging service.
 
@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/input_fields.h"
+#include "ui/widgets/dropdown_menu.h"
 #include "ui/wrap/slide_wrap.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toasts/common_toasts.h"
@@ -33,6 +34,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_channel.h"
 #include "data/data_chat.h"
 #include "data/data_group_call.h"
+#include "calls/group/calls_group_rtmp.h"
+#include "ui/toast/toast.h"
 #include "data/data_changes.h"
 #include "core/application.h"
 #include "ui/boxes/single_choice_box.h"
@@ -158,7 +161,10 @@ object_ptr<ShareBox> ShareInviteLinkBox(
 			}
 			text.append(error.first);
 			if (const auto weak = *box) {
-				weak->getDelegate()->show(ConfirmBox({ .text = text }));
+				weak->getDelegate()->show(ConfirmBox({
+					.text = text,
+					.inform = true,
+				}));
 			}
 			return;
 		}
@@ -234,6 +240,7 @@ void SettingsBox(
 	const auto peer = call->peer();
 	const auto state = box->lifetime().make_state<State>();
 	const auto real = peer->groupCall();
+	const auto rtmp = call->rtmp();
 	const auto id = call->id();
 	const auto goodReal = (real && real->id() == id);
 
@@ -273,58 +280,59 @@ void SettingsBox(
 		}), &st::groupCallCheckbox, &st::groupCallRadio));
 	});
 
-	AddButtonWithLabel(
-		layout,
-		tr::lng_group_call_microphone(),
-		rpl::single(
-			CurrentAudioInputName()
-		) | rpl::then(
-			state->inputNameStream.events()
-		),
-		st::groupCallSettingsButton
-	)->addClickHandler([=] {
-		box->getDelegate()->show(ChooseAudioInputBox(crl::guard(box, [=](
-				const QString &id,
-				const QString &name) {
-			state->inputNameStream.fire_copy(name);
-			if (state->micTester) {
-				state->micTester->setDeviceId(id);
-			}
-		}), &st::groupCallCheckbox, &st::groupCallRadio));
-	});
+	if (!rtmp) {
+		AddButtonWithLabel(
+			layout,
+			tr::lng_group_call_microphone(),
+			rpl::single(
+				CurrentAudioInputName()
+			) | rpl::then(
+				state->inputNameStream.events()
+			),
+			st::groupCallSettingsButton
+		)->addClickHandler([=] {
+			box->getDelegate()->show(ChooseAudioInputBox(crl::guard(box, [=](
+					const QString &id,
+					const QString &name) {
+				state->inputNameStream.fire_copy(name);
+				if (state->micTester) {
+					state->micTester->setDeviceId(id);
+				}
+			}), &st::groupCallCheckbox, &st::groupCallRadio));
+		});
 
-	state->micTestLevel = box->addRow(
-		object_ptr<Ui::LevelMeter>(
-			box.get(),
-			st::groupCallLevelMeter),
-		st::settingsLevelMeterPadding);
-	state->micTestLevel->resize(QSize(0, st::defaultLevelMeter.height));
+		state->micTestLevel = box->addRow(
+			object_ptr<Ui::LevelMeter>(
+				box.get(),
+				st::groupCallLevelMeter),
+			st::settingsLevelMeterPadding);
+		state->micTestLevel->resize(QSize(0, st::defaultLevelMeter.height));
 
-	state->levelUpdateTimer.setCallback([=] {
-		const auto was = state->micLevel;
-		state->micLevel = state->micTester->getAndResetLevel();
-		state->micLevelAnimation.start([=] {
-			state->micTestLevel->setValue(
-				state->micLevelAnimation.value(state->micLevel));
-		}, was, state->micLevel, kMicTestAnimationDuration);
-	});
+		state->levelUpdateTimer.setCallback([=] {
+			const auto was = state->micLevel;
+			state->micLevel = state->micTester->getAndResetLevel();
+			state->micLevelAnimation.start([=] {
+				state->micTestLevel->setValue(
+					state->micLevelAnimation.value(state->micLevel));
+			}, was, state->micLevel, kMicTestAnimationDuration);
+		});
 
-	AddSkip(layout);
-	//AddDivider(layout);
-	//AddSkip(layout);
+		AddSkip(layout);
+		//AddDivider(layout);
+		//AddSkip(layout);
 
-	AddButton(
-		layout,
-		tr::lng_group_call_noise_suppression(),
-		st::groupCallSettingsButton
-	)->toggleOn(rpl::single(
-		settings.groupCallNoiseSuppression()
-	))->toggledChanges(
-	) | rpl::start_with_next([=](bool enabled) {
-		Core::App().settings().setGroupCallNoiseSuppression(enabled);
-		call->setNoiseSuppression(enabled);
-		Core::App().saveSettingsDelayed();
-	}, layout->lifetime());
+		AddButton(
+			layout,
+			tr::lng_group_call_noise_suppression(),
+			st::groupCallSettingsButton
+		)->toggleOn(rpl::single(
+			settings.groupCallNoiseSuppression()
+		))->toggledChanges(
+		) | rpl::start_with_next([=](bool enabled) {
+			Core::App().settings().setGroupCallNoiseSuppression(enabled);
+			call->setNoiseSuppression(enabled);
+			Core::App().saveSettingsDelayed();
+		}, layout->lifetime());
 
 	AddButton(
 		layout,
@@ -344,228 +352,226 @@ void SettingsBox(
 		cSetStereoMode(toggled);
 		EnhancedSettings::Write();
 	}, layout->lifetime());
-
-	using GlobalShortcut = base::GlobalShortcut;
-	struct PushToTalkState {
-		rpl::variable<QString> recordText = tr::lng_group_call_ptt_shortcut();
-		rpl::variable<QString> shortcutText;
-		rpl::event_stream<bool> pushToTalkToggles;
-		std::shared_ptr<base::GlobalShortcutManager> manager;
-		GlobalShortcut shortcut;
-		crl::time delay = 0;
-		bool recording = false;
-	};
-	if (base::GlobalShortcutsAvailable()) {
-		const auto state = box->lifetime().make_state<PushToTalkState>();
-		if (!base::GlobalShortcutsAllowed()) {
-			Core::App().settings().setGroupCallPushToTalk(false);
-		}
-		const auto tryFillFromManager = [=] {
-			state->shortcut = state->manager
-				? state->manager->shortcutFromSerialized(
-					Core::App().settings().groupCallPushToTalkShortcut())
+		using GlobalShortcut = base::GlobalShortcut;
+		struct PushToTalkState {
+			rpl::variable<QString> recordText = tr::lng_group_call_ptt_shortcut();
+			rpl::variable<QString> shortcutText;
+			rpl::event_stream<bool> pushToTalkToggles;
+			std::shared_ptr<base::GlobalShortcutManager> manager;
+			GlobalShortcut shortcut;
+			crl::time delay = 0;
+			bool recording = false;
+		};
+		if (base::GlobalShortcutsAvailable()) {
+			const auto state = box->lifetime().make_state<PushToTalkState>();
+			if (!base::GlobalShortcutsAllowed()) {
+				Core::App().settings().setGroupCallPushToTalk(false);
+			}
+			const auto tryFillFromManager = [=] {
+				state->shortcut = state->manager
+					? state->manager->shortcutFromSerialized(
+						Core::App().settings().groupCallPushToTalkShortcut())
+					: nullptr;
+				state->shortcutText = state->shortcut
+					? state->shortcut->toDisplayString()
+					: QString();
+			};
+			state->manager = settings.groupCallPushToTalk()
+				? call->ensureGlobalShortcutManager()
 				: nullptr;
-			state->shortcutText = state->shortcut
-				? state->shortcut->toDisplayString()
-				: QString();
-		};
-		state->manager = settings.groupCallPushToTalk()
-			? call->ensureGlobalShortcutManager()
-			: nullptr;
-		tryFillFromManager();
+			tryFillFromManager();
 
-		state->delay = settings.groupCallPushToTalkDelay();
-		const auto pushToTalk = AddButton(
-			layout,
-			tr::lng_group_call_push_to_talk(),
-			st::groupCallSettingsButton
-		)->toggleOn(rpl::single(
-			settings.groupCallPushToTalk()
-		) | rpl::then(state->pushToTalkToggles.events()));
-		const auto pushToTalkWrap = layout->add(
-			object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+			state->delay = settings.groupCallPushToTalkDelay();
+			const auto pushToTalk = AddButton(
 				layout,
-				object_ptr<Ui::VerticalLayout>(layout)));
-		const auto pushToTalkInner = pushToTalkWrap->entity();
-		const auto recording = pushToTalkInner->add(
-			object_ptr<Button>(
-				layout,
+				tr::lng_group_call_push_to_talk(),
+				st::groupCallSettingsButton
+			)->toggleOn(rpl::single(
+				settings.groupCallPushToTalk()
+			) | rpl::then(state->pushToTalkToggles.events()));
+			const auto pushToTalkWrap = layout->add(
+				object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+					layout,
+					object_ptr<Ui::VerticalLayout>(layout)));
+			const auto pushToTalkInner = pushToTalkWrap->entity();
+			const auto recording = AddButton(
+				pushToTalkInner,
 				state->recordText.value(),
-				st::groupCallSettingsButton));
-		CreateRightLabel(
-			recording,
-			state->shortcutText.value(),
-			st::groupCallSettingsButton,
-			state->recordText.value());
+				st::groupCallSettingsButton);
+			CreateRightLabel(
+				recording,
+				state->shortcutText.value(),
+				st::groupCallSettingsButton,
+				state->recordText.value());
 
-		const auto applyAndSave = [=] {
-			call->applyGlobalShortcutChanges();
-			Core::App().saveSettingsDelayed();
-		};
-		const auto showPrivacyRequest = [=] {
+			const auto applyAndSave = [=] {
+				call->applyGlobalShortcutChanges();
+				Core::App().saveSettingsDelayed();
+			};
+			const auto showPrivacyRequest = [=] {
 #ifdef Q_OS_MAC
-			if (!Platform::IsMac10_14OrGreater()) {
-				return;
-			}
-			const auto requestInputMonitoring = Platform::IsMac10_15OrGreater();
-			box->getDelegate()->show(Box([=](not_null<Ui::GenericBox*> box) {
-				box->addRow(
-					object_ptr<Ui::FlatLabel>(
-						box.get(),
-						rpl::combine(
-							tr::lng_group_call_mac_access(),
-							(requestInputMonitoring
-								? tr::lng_group_call_mac_input()
-								: tr::lng_group_call_mac_accessibility())
-						) | rpl::map([](QString a, QString b) {
-							auto result = Ui::Text::RichLangValue(a);
-							result.append("\n\n").append(Ui::Text::RichLangValue(b));
-							return result;
-						}),
-						st::groupCallBoxLabel),
-					style::margins(
-						st::boxRowPadding.left(),
-						st::boxPadding.top(),
-						st::boxRowPadding.right(),
-						st::boxPadding.bottom()));
-				box->addButton(tr::lng_group_call_mac_settings(), [=] {
-					if (requestInputMonitoring) {
-						Platform::OpenInputMonitoringPrivacySettings();
-					} else {
-						Platform::OpenAccessibilityPrivacySettings();
-					}
-				});
-				box->addButton(tr::lng_cancel(), [=] { box->closeBox(); });
-
-				if (!requestInputMonitoring) {
-					// Accessibility is enabled without app restart, so short-poll it.
-					base::timer_each(
-						kCheckAccessibilityInterval
-					) | rpl::filter([] {
-						return base::GlobalShortcutsAllowed();
-					}) | rpl::start_with_next([=] {
-						box->closeBox();
-					}, box->lifetime());
+				if (!Platform::IsMac10_14OrGreater()) {
+					return;
 				}
-			}));
+				const auto requestInputMonitoring = Platform::IsMac10_15OrGreater();
+				box->getDelegate()->show(Box([=](not_null<Ui::GenericBox*> box) {
+					box->addRow(
+						object_ptr<Ui::FlatLabel>(
+							box.get(),
+							rpl::combine(
+								tr::lng_group_call_mac_access(),
+								(requestInputMonitoring
+									? tr::lng_group_call_mac_input()
+									: tr::lng_group_call_mac_accessibility())
+							) | rpl::map([](QString a, QString b) {
+								auto result = Ui::Text::RichLangValue(a);
+								result.append("\n\n").append(Ui::Text::RichLangValue(b));
+								return result;
+							}),
+							st::groupCallBoxLabel),
+						style::margins(
+							st::boxRowPadding.left(),
+							st::boxPadding.top(),
+							st::boxRowPadding.right(),
+							st::boxPadding.bottom()));
+					box->addButton(tr::lng_group_call_mac_settings(), [=] {
+						if (requestInputMonitoring) {
+							Platform::OpenInputMonitoringPrivacySettings();
+						} else {
+							Platform::OpenAccessibilityPrivacySettings();
+						}
+					});
+					box->addButton(tr::lng_cancel(), [=] { box->closeBox(); });
+
+					if (!requestInputMonitoring) {
+						// Accessibility is enabled without app restart, so short-poll it.
+						base::timer_each(
+							kCheckAccessibilityInterval
+						) | rpl::filter([] {
+							return base::GlobalShortcutsAllowed();
+						}) | rpl::start_with_next([=] {
+							box->closeBox();
+						}, box->lifetime());
+					}
+				}));
 #endif // Q_OS_MAC
-		};
-		const auto ensureManager = [=] {
-			if (state->manager) {
-				return true;
-			} else if (base::GlobalShortcutsAllowed()) {
-				state->manager = call->ensureGlobalShortcutManager();
-				tryFillFromManager();
-				return true;
-			}
-			showPrivacyRequest();
-			return false;
-		};
-		const auto stopRecording = [=] {
-			state->recording = false;
-			state->recordText = tr::lng_group_call_ptt_shortcut();
-			state->shortcutText = state->shortcut
-				? state->shortcut->toDisplayString()
-				: QString();
-			recording->setColorOverride(std::nullopt);
-			if (state->manager) {
-				state->manager->stopRecording();
-			}
-		};
-		const auto startRecording = [=] {
-			if (!ensureManager()) {
-				state->pushToTalkToggles.fire(false);
-				pushToTalkWrap->hide(anim::type::instant);
-				return;
-			}
-			state->recording = true;
-			state->recordText = tr::lng_group_call_ptt_recording();
-			recording->setColorOverride(
-				st::groupCallSettingsAttentionButton.textFg->c);
-			auto progress = crl::guard(box, [=](GlobalShortcut shortcut) {
-				state->shortcutText = shortcut->toDisplayString();
+			};
+			const auto ensureManager = [=] {
+				if (state->manager) {
+					return true;
+				} else if (base::GlobalShortcutsAllowed()) {
+					state->manager = call->ensureGlobalShortcutManager();
+					tryFillFromManager();
+					return true;
+				}
+				showPrivacyRequest();
+				return false;
+			};
+			const auto stopRecording = [=] {
+				state->recording = false;
+				state->recordText = tr::lng_group_call_ptt_shortcut();
+				state->shortcutText = state->shortcut
+					? state->shortcut->toDisplayString()
+					: QString();
+				recording->setColorOverride(std::nullopt);
+				if (state->manager) {
+					state->manager->stopRecording();
+				}
+			};
+			const auto startRecording = [=] {
+				if (!ensureManager()) {
+					state->pushToTalkToggles.fire(false);
+					pushToTalkWrap->hide(anim::type::instant);
+					return;
+				}
+				state->recording = true;
+				state->recordText = tr::lng_group_call_ptt_recording();
+				recording->setColorOverride(
+					st::groupCallSettingsAttentionButton.textFg->c);
+				auto progress = crl::guard(box, [=](GlobalShortcut shortcut) {
+					state->shortcutText = shortcut->toDisplayString();
+				});
+				auto done = crl::guard(box, [=](GlobalShortcut shortcut) {
+					state->shortcut = shortcut;
+					Core::App().settings().setGroupCallPushToTalkShortcut(shortcut
+						? shortcut->serialize()
+						: QByteArray());
+					applyAndSave();
+					stopRecording();
+				});
+				state->manager->startRecording(std::move(progress), std::move(done));
+			};
+			recording->addClickHandler([=] {
+				if (state->recording) {
+					stopRecording();
+				} else {
+					startRecording();
+				}
 			});
-			auto done = crl::guard(box, [=](GlobalShortcut shortcut) {
-				state->shortcut = shortcut;
-				Core::App().settings().setGroupCallPushToTalkShortcut(shortcut
-					? shortcut->serialize()
-					: QByteArray());
+
+			const auto label = pushToTalkInner->add(
+				object_ptr<Ui::LabelSimple>(
+					pushToTalkInner,
+					st::groupCallDelayLabel),
+				st::groupCallDelayLabelMargin);
+			const auto value = std::clamp(
+				state->delay,
+				crl::time(0),
+				DelayByIndex(kDelaysCount - 1));
+			const auto callback = [=](crl::time delay) {
+				state->delay = delay;
+				label->setText(tr::lng_group_call_ptt_delay(
+					tr::now,
+					lt_delay,
+					FormatDelay(delay)));
+				if (Core::App().settings().groupCallPushToTalkDelay() != delay) {
+					Core::App().settings().setGroupCallPushToTalkDelay(delay);
+					applyAndSave();
+				}
+			};
+			callback(value);
+			const auto slider = pushToTalkInner->add(
+				object_ptr<Ui::MediaSlider>(
+					pushToTalkInner,
+					st::groupCallDelaySlider),
+				st::groupCallDelayMargin);
+			slider->resize(st::groupCallDelaySlider.seekSize);
+			slider->setPseudoDiscrete(
+				kDelaysCount,
+				DelayByIndex,
+				value,
+				callback);
+
+			pushToTalkWrap->toggle(
+				settings.groupCallPushToTalk(),
+				anim::type::instant);
+			pushToTalk->toggledChanges(
+			) | rpl::start_with_next([=](bool toggled) {
+				if (!toggled) {
+					stopRecording();
+				} else if (!ensureManager()) {
+					state->pushToTalkToggles.fire(false);
+					pushToTalkWrap->hide(anim::type::instant);
+					return;
+				}
+				Core::App().settings().setGroupCallPushToTalk(toggled);
 				applyAndSave();
-				stopRecording();
-			});
-			state->manager->startRecording(std::move(progress), std::move(done));
-		};
-		recording->addClickHandler([=] {
-			if (state->recording) {
-				stopRecording();
-			} else {
-				startRecording();
-			}
-		});
+				pushToTalkWrap->toggle(toggled, anim::type::normal);
+			}, pushToTalk->lifetime());
 
-		const auto label = pushToTalkInner->add(
-			object_ptr<Ui::LabelSimple>(
-				pushToTalkInner,
-				st::groupCallDelayLabel),
-			st::groupCallDelayLabelMargin);
-		const auto value = std::clamp(
-			state->delay,
-			crl::time(0),
-			DelayByIndex(kDelaysCount - 1));
-		const auto callback = [=](crl::time delay) {
-			state->delay = delay;
-			label->setText(tr::lng_group_call_ptt_delay(
-				tr::now,
-				lt_delay,
-				FormatDelay(delay)));
-			if (Core::App().settings().groupCallPushToTalkDelay() != delay) {
-				Core::App().settings().setGroupCallPushToTalkDelay(delay);
-				applyAndSave();
-			}
-		};
-		callback(value);
-		const auto slider = pushToTalkInner->add(
-			object_ptr<Ui::MediaSlider>(
-				pushToTalkInner,
-				st::groupCallDelaySlider),
-			st::groupCallDelayMargin);
-		slider->resize(st::groupCallDelaySlider.seekSize);
-		slider->setPseudoDiscrete(
-			kDelaysCount,
-			DelayByIndex,
-			value,
-			callback);
+			auto boxKeyFilter = [=](not_null<QEvent*> e) {
+				return (e->type() == QEvent::KeyPress && state->recording)
+					? base::EventFilterResult::Cancel
+					: base::EventFilterResult::Continue;
+			};
+			box->lifetime().make_state<base::unique_qptr<QObject>>(
+				base::install_event_filter(box, std::move(boxKeyFilter)));
+		}
 
-		pushToTalkWrap->toggle(
-			settings.groupCallPushToTalk(),
-			anim::type::instant);
-		pushToTalk->toggledChanges(
-		) | rpl::start_with_next([=](bool toggled) {
-			if (!toggled) {
-				stopRecording();
-			} else if (!ensureManager()) {
-				state->pushToTalkToggles.fire(false);
-				pushToTalkWrap->hide(anim::type::instant);
-				return;
-			}
-			Core::App().settings().setGroupCallPushToTalk(toggled);
-			applyAndSave();
-			pushToTalkWrap->toggle(toggled, anim::type::normal);
-		}, pushToTalk->lifetime());
-
-		auto boxKeyFilter = [=](not_null<QEvent*> e) {
-			return (e->type() == QEvent::KeyPress && state->recording)
-				? base::EventFilterResult::Cancel
-				: base::EventFilterResult::Continue;
-		};
-		box->lifetime().make_state<base::unique_qptr<QObject>>(
-			base::install_event_filter(box, std::move(boxKeyFilter)));
+		AddSkip(layout);
+		//AddDivider(layout);
+		//AddSkip(layout);
 	}
-
-	AddSkip(layout);
-	//AddDivider(layout);
-	//AddSkip(layout);
-
 	auto shareLink = Fn<void()>();
 	if (peer->isChannel()
 		&& peer->asChannel()->hasUsername()
@@ -642,6 +648,96 @@ void SettingsBox(
 			st::groupCallSettingsButton
 		)->addClickHandler(std::move(shareLink));
 	}
+	if (rtmp) {
+		struct State {
+			base::unique_qptr<Ui::DropdownMenu> menu;
+			mtpRequestId requestId;
+			rpl::event_stream<StartRtmpProcess::Data> data;
+		};
+		const auto top = box->addTopButton(st::groupCallMenuToggle);
+		const auto state = top->lifetime().make_state<State>();
+		const auto revoke = [=] {
+			if (state->requestId) {
+				return;
+			}
+			const auto session = &peer->session();
+			state->requestId = session->api().request(
+				MTPphone_GetGroupCallStreamRtmpUrl(
+					peer->input,
+					MTP_bool(true)
+			)).done([=](const MTPphone_GroupCallStreamRtmpUrl &result) {
+				auto data = result.match([&](
+						const MTPDphone_groupCallStreamRtmpUrl &data) {
+					return StartRtmpProcess::Data{
+						.url = qs(data.vurl()),
+						.key = qs(data.vkey()),
+					};
+				});
+				state->data.fire(std::move(data));
+			}).fail([=] {
+				state->requestId = 0;
+			}).send();
+		};
+		top->setClickedCallback([=] {
+			state->menu = base::make_unique_q<Ui::DropdownMenu>(
+				box,
+				st::groupCallDropdownMenu);
+			state->menu->addAction(
+				tr::lng_group_call_rtmp_revoke(tr::now),
+				revoke);
+			state->menu->moveToRight(
+				st::groupCallRtmpTopBarMenuPosition.x(),
+				st::groupCallRtmpTopBarMenuPosition.y());
+			state->menu->showAnimated(
+				Ui::PanelAnimation::Origin::TopRight);
+			const auto raw = state->menu.get();
+			raw->setHiddenCallback([=] {
+				raw->deleteLater();
+				if (state->menu == raw) {
+					state->menu = nullptr;
+					if (top) {
+						top->setForceRippled(false);
+					}
+				}
+			});
+			raw->setShowStartCallback([=] {
+				if (state->menu == raw) {
+					if (top) {
+						top->setForceRippled(true);
+					}
+				}
+			});
+			raw->setHideStartCallback([=] {
+				if (state->menu == raw) {
+					if (top) {
+						top->setForceRippled(false);
+					}
+				}
+			});
+			top->installEventFilter(state->menu);
+			return true;
+		});
+
+
+		StartRtmpProcess::FillRtmpRows(
+			box->verticalLayout(),
+			false,
+			true,
+			[=](object_ptr<Ui::BoxContent> &&object) {
+				box->getDelegate()->show(std::move(object));
+			},
+			[=](QString text) {
+				Ui::Toast::Show(
+					box->getDelegate()->outerContainer(),
+					text);
+			},
+			state->data.events(),
+			&st::groupCallBoxLabel,
+			&st::groupCallSettingsRtmpShowButton,
+			&st::groupCallSubsectionTitle,
+			&st::groupCallAttentionBoxButton);
+		state->data.fire({ call->rtmpUrl(), call->rtmpKey() });
+	}
 
 	if (peer->canManageGroupCall()) {
 		AddButton(
@@ -662,15 +758,17 @@ void SettingsBox(
 		});
 	}
 
-	box->setShowFinishedCallback([=] {
-		// Means we finished showing the box.
-		crl::on_main(box, [=] {
-			state->micTester = std::make_unique<Webrtc::AudioInputTester>(
-				Core::App().settings().callAudioBackend(),
-				Core::App().settings().callInputDeviceId());
-			state->levelUpdateTimer.callEach(kMicTestUpdateInterval);
+	if (!rtmp) {
+		box->setShowFinishedCallback([=] {
+			// Means we finished showing the box.
+			crl::on_main(box, [=] {
+				state->micTester = std::make_unique<Webrtc::AudioInputTester>(
+					Core::App().settings().callAudioBackend(),
+					Core::App().settings().callInputDeviceId());
+				state->levelUpdateTimer.callEach(kMicTestUpdateInterval);
+			});
 		});
-	});
+	}
 
 	box->setTitle(tr::lng_group_call_settings_title());
 	box->boxClosing(

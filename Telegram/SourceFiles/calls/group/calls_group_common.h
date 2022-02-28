@@ -51,7 +51,9 @@ struct JoinInfo {
 	not_null<PeerData*> joinAs;
 	std::vector<not_null<PeerData*>> possibleJoinAs;
 	QString joinHash;
+	QString rtmpUrl, rtmpKey;
 	TimeId scheduleDate = 0;
+	bool rtmp = false;
 };
 
 enum class PanelMode {

@@ -282,6 +282,8 @@ PRIVATE
     calls/group/calls_group_menu.h
     calls/group/calls_group_panel.cpp
     calls/group/calls_group_panel.h
+    calls/group/calls_group_rtmp.cpp
+    calls/group/calls_group_rtmp.h
     calls/group/calls_group_settings.cpp
     calls/group/calls_group_settings.h
     calls/group/calls_group_toasts.cpp
@@ -428,6 +430,8 @@ PRIVATE
     data/data_document_media.h
     data/data_document_resolver.cpp
     data/data_document_resolver.h
+    data/data_download_manager.cpp
+    data/data_download_manager.h
     data/data_drafts.cpp
     data/data_drafts.h
     data/data_folder.cpp
@@ -714,13 +718,25 @@ PRIVATE
     info/common_groups/info_common_groups_inner_widget.h
     info/common_groups/info_common_groups_widget.cpp
     info/common_groups/info_common_groups_widget.h
+    info/downloads/info_downloads_inner_widget.cpp
+    info/downloads/info_downloads_inner_widget.h
+    info/downloads/info_downloads_provider.cpp
+    info/downloads/info_downloads_provider.h
+    info/downloads/info_downloads_widget.cpp
+    info/downloads/info_downloads_widget.h
     info/media/info_media_buttons.h
+    info/media/info_media_common.cpp
+    info/media/info_media_common.h
     info/media/info_media_empty_widget.cpp
     info/media/info_media_empty_widget.h
     info/media/info_media_inner_widget.cpp
     info/media/info_media_inner_widget.h
+    info/media/info_media_list_section.cpp
+    info/media/info_media_list_section.h
     info/media/info_media_list_widget.cpp
     info/media/info_media_list_widget.h
+    info/media/info_media_provider.cpp
+    info/media/info_media_provider.h
     info/media/info_media_widget.cpp
     info/media/info_media_widget.h
     info/members/info_members_widget.cpp
@@ -1117,6 +1133,9 @@ PRIVATE
     ui/chat/choose_theme_controller.h
     ui/effects/fireworks_animation.cpp
     ui/effects/fireworks_animation.h
+    ui/effects/message_sending_animation_common.h
+    ui/effects/message_sending_animation_controller.cpp
+    ui/effects/message_sending_animation_controller.h
     ui/effects/round_checkbox.cpp
     ui/effects/round_checkbox.h
     ui/effects/send_action_animations.cpp
@@ -1177,8 +1196,6 @@ PRIVATE
     window/window_main_menu.h
     window/window_media_preview.cpp
     window/window_media_preview.h
-    window/window_outdated_bar.cpp
-    window/window_outdated_bar.h
     window/window_peer_menu.cpp
     window/window_peer_menu.h
     window/window_section_common.h

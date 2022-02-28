@@ -10,59 +10,85 @@ using "ui/widgets/widgets.style";
 using "info/info.style";
 using "boxes/boxes.style";
 
-settingsSectionButton: SettingsButton(infoProfileButton) {
+settingsButton: SettingsButton(infoProfileButton) {
 	font: boxTextFont;
-	padding: margins(79px, 13px, 22px, 11px);
+	padding: margins(60px, 10px, 22px, 10px);
+	iconLeft: 20px;
 }
-settingsButton: SettingsButton(settingsSectionButton) {
+settingsButtonNoIcon: SettingsButton(settingsButton) {
 	padding: margins(22px, 10px, 22px, 8px);
 }
-settingsAttentionButton: SettingsButton(settingsButton) {
+settingsAttentionButton: SettingsButton(settingsButtonNoIcon) {
 	textFg: attentionButtonFg;
 	textFgOver: attentionButtonFgOver;
 }
-settingsOptionDisabled: SettingsButton(settingsButton) {
+settingsOptionDisabled: SettingsButton(settingsButtonNoIcon) {
 	textFg: windowSubTextFg;
 	textFgOver: windowSubTextFg;
 	textBg: windowBg;
 	textBgOver: windowBg;
 	toggleOver: infoProfileToggle;
 }
-settingsSectionSkip: 9px;
-settingsSectionIconLeft: 22px;
+settingsSectionSkip: 6px;
 settingsSeparatorPadding: margins(22px, infoProfileSkip, 0px, infoProfileSkip);
-settingsButtonRightSkip: 28px;
-settingsScalePadding: margins(79px, 10px, 28px, 8px);
-settingsBigScalePadding: margins(22px, 10px, 22px, 8px);
+settingsButtonRightSkip: 23px;
+settingsScalePadding: margins(63px, 7px, 21px, 4px);
+settingsBigScalePadding: margins(21px, 7px, 21px, 4px);
 settingsSlider: SettingsSlider(defaultSettingsSlider) {
 	barFg: windowBgOver;
 	labelFg: windowSubTextFg;
 	labelFgActive: windowActiveTextFg;
 }
-settingsUpdateToggle: SettingsButton(settingsButton) {
+settingsUpdateToggle: SettingsButton(settingsButtonNoIcon) {
 	height: 40px;
 	padding: margins(22px, 8px, 22px, 8px);
 }
 settingsUpdateState: FlatLabel(defaultFlatLabel) {
 	textFg: windowSubTextFg;
 }
-settingsUpdate: SettingsButton(infoMainButton, settingsButton) {
+settingsUpdate: SettingsButton(infoMainButton, settingsButtonNoIcon) {
 }
 settingsUpdateStatePosition: point(22px, 29px);
-settingsDividerLabelPadding: margins(22px, 10px, 22px, 19px);
+settingsDividerLabelPadding: margins(22px, 8px, 22px, 16px);
 
-settingsIconInformation: icon {{ "settings/settings_information", menuIconFg }};
-settingsIconNotifications: icon {{ "settings/settings_notifications", menuIconFg }};
-settingsIconChat: icon {{ "settings/settings_chat", menuIconFg }};
-settingsIconFolders: icon {{ "settings/settings_folders", menuIconFg }};
-settingsIconGeneral: icon {{ "settings/settings_advanced", menuIconFg }};
-settingsIconPrivacySecurity: icon {{ "settings/settings_privacy_security", menuIconFg }};
-settingsIconLanguage: icon {{ "settings/settings_language", menuIconFg }};
-settingsIconInterfaceScale: icon {{ "settings/settings_interface_scale", menuIconFg }};
-settingsIconFaq: icon {{ "settings/settings_faq", menuIconFg }};
-settingsIconStickers: icon {{ "settings/settings_stickers", menuIconFg }};
-settingsIconEmoji: icon {{ "settings/settings_emoji", menuIconFg }};
-settingsIconThemes: icon {{ "settings/settings_themes", menuIconFg }};
+settingsIconAccount: icon {{ "settings/account", settingsIconFg }};
+settingsIconNotifications: icon {{ "settings/notifications", settingsIconFg }};
+settingsIconChat: icon {{ "settings/chat", settingsIconFg }};
+settingsIconFolders: icon {{ "settings/folders", settingsIconFg }};
+settingsIconGeneral: icon {{ "settings/advanced", settingsIconFg }};
+settingsIconLock: icon {{ "settings/lock", settingsIconFg }};
+settingsIconLanguage: icon {{ "settings/language", settingsIconFg }};
+settingsIconInterfaceScale: icon {{ "settings/interface_scale", settingsIconFg }};
+settingsIconFaq: icon {{ "settings/faq", settingsIconFg }};
+settingsIconCalls: icon {{ "settings/calls", settingsIconFg }};
+settingsIconAskQuestion: icon {{ "settings/ask_question", settingsIconFg }};
+settingsIconTips: icon {{ "settings/tips", settingsIconFg }};
+settingsIconStickers: icon {{ "settings/stickers", settingsIconFg }};
+settingsIconEmoji: icon {{ "settings/emoji", settingsIconFg }};
+settingsIconThemes: icon {{ "settings/palette", settingsIconFg }};
+settingsIconGroup: icon {{ "settings/group", settingsIconFg }};
+settingsIconChannel: icon {{ "settings/channel", settingsIconFg }};
+settingsIconUser: icon {{ "settings/user", settingsIconFg }};
+settingsIconSavedMessages: icon {{ "settings/saved_messages", settingsIconFg }};
+settingsIconKey: icon {{ "settings/key", settingsIconFg }};
+settingsIconReload: icon {{ "settings/reload", settingsIconFg }};
+settingsIconNight: icon {{ "settings/night", settingsIconFg }};
+settingsIconSettings: icon {{ "settings/settings", settingsIconFg }};
+settingsIconArchive: icon {{ "settings/archive", settingsIconFg }};
+settingsIconPlus: icon {{ "settings/plus", settingsIconFg }};
+settingsIconMinus: icon {{ "settings/minus", settingsIconFg }};
+settingsIconTimer: icon {{ "settings/timer", settingsIconFg }};
+settingsIconLaptop: icon {{ "settings/laptop", settingsIconFg }};
+settingsIconArrows: icon {{ "settings/arrows", settingsIconFg }};
+settingsIconOnline: icon {{ "settings/online", settingsIconFg }};
+settingsIconVideoCalls: icon {{ "settings/video_calls", settingsIconFg }};
+settingsIconEmail: icon {{ "settings/email", settingsIconFg }};
+settingsIconForward: icon {{ "settings/forward", settingsIconFg }};
+settingsIconSound: icon {{ "settings/sound", settingsIconFg }};
+settingsIconDock: icon {{ "settings/dock", settingsIconFg }};
+settingsIconPosition: icon {{ "settings/position", settingsIconFg }};
+settingsIconPin: icon {{ "settings/pin", settingsIconFg }};
+settingsIconDownload: icon {{ "settings/download", settingsIconFg }};
 
 settingsSetPhotoSkip: 7px;
 
@@ -98,8 +124,12 @@ settingsBackgroundPadding: margins(22px, 11px, 10px, 12px);
 settingsTileSkip: 15px;
 settingsFromGalleryTop: 2px;
 settingsFromFileTop: 14px;
+settingsPrivacyOption: Checkbox(settingsCheckbox) {
+	textPosition: point(13px, 1px);
+}
 settingsPrivacySecurityPadding: 12px;
 settingsPrivacySkip: 14px;
+settingsPrivacySkipTop: 4px;
 
 settingsCloudPasswordLabel: FlatLabel(defaultFlatLabel) {
 	textFg: windowSubTextFg;
@@ -118,7 +148,7 @@ settingsInfoPhotoTop: 17px;
 settingsInfoPhotoSkip: 16px;
 settingsInfoPhotoSet: defaultActiveButton;
 
-settingsInfoRow: SettingsButton(settingsButton) {
+settingsInfoRow: SettingsButton(settingsButtonNoIcon) {
 	height: 62px;
 	padding: margins(0px, 0px, 0px, 0px);
 }
@@ -166,11 +196,6 @@ settingsBioLabelPadding: margins(22px, 11px, 22px, 0px);
 
 settingsPrivacyEditLabelPadding: margins(22px, 11px, 22px, 11px);
 
-settingsChatButton: SettingsButton(settingsSectionButton) {
-	padding: margins(59px, 13px, 22px, 11px);
-}
-settingsChatIconLeft: 19px;
-
 settingsThemesTopSkip: 10px;
 settingsThemesBottomSkip: 8px;
 settingsTheme: Checkbox(defaultCheckbox) {
@@ -199,7 +224,7 @@ settingsThemeMinSkip: 4px;
 settingsThemeNotSupportedBg: windowBgOver;
 settingsThemeNotSupportedIcon: icon {{ "theme_preview", menuIconFg }};
 
-autoDownloadLimitButton: SettingsButton(settingsButton) {
+autoDownloadLimitButton: SettingsButton(settingsButtonNoIcon) {
 	padding: margins(22px, 10px, 22px, 0px);
 }
 settingsAudioVolumeSlider: MediaSlider(defaultContinuousSlider) {
@@ -213,10 +238,10 @@ settingsAudioVolumeLabel: LabelSimple(defaultLabelSimple) {
 settingsAudioVolumeLabelPadding: margins(22px, 11px, 22px, 11px);
 settingsLevelMeterPadding: margins(22px, 10px, 20px, 10px);
 
-settingsForwardPrivacyPadding: 8px;
+settingsForwardPrivacyPadding: 10px;
 settingsForwardPrivacyArrowSkip: 32px;
-settingsForwardPrivacyArrowSize: 6px;
-settingsForwardPrivacyTooltipPadding: margins(8px, 6px, 8px, 6px);
+settingsForwardPrivacyArrowSize: 7px;
+settingsForwardPrivacyTooltipPadding: margins(12px, 7px, 12px, 7px);
 
 settingsAccentColorSize: 24px;
 settingsAccentColorSkip: 4px;
@@ -247,15 +272,6 @@ dictionariesSectionButton: SettingsButton(settingsUpdateToggle) {
 
 sessionsScroll: boxScroll;
 sessionsHeight: 350px;
-sessionsTerminateAll: SettingsButton(defaultSettingsButton) {
-	textFg: attentionButtonFg;
-	textFgOver: attentionButtonFgOver;
-	font: font(boxFontSize semibold);
-	height: 20px;
-	padding: margins(77px, 12px, 22px, 10px);
-}
-sessionsTerminateAllIcon: icon {{ "settings/devices/terminate_all", attentionButtonFg }};
-sessionsTerminateAllIconLeft: 30px;
 sessionLocationTop: 54px;
 sessionCurrentSkip: 8px;
 sessionSubtitleSkip: 14px;
@@ -326,8 +342,8 @@ sessionListItem: PeerListItem(defaultPeerListItem) {
 	nameStyle: TextStyle(defaultTextStyle) {
 		font: msgNameFont;
 	}
-	namePosition: point(77px, 11px);
-	statusPosition: point(77px, 32px);
+	namePosition: point(78px, 11px);
+	statusPosition: point(78px, 32px);
 	photoSize: 42px;
 	statusFg: boxTextFg;
 	statusFgOver: boxTextFg;
@@ -336,6 +352,16 @@ sessionList: PeerList(defaultPeerList) {
 	item: sessionListItem;
 	padding: margins(0px, 4px, 0px, 0px);
 }
-sessionListThreeDotsIcon: icon {{ "info/edit/dotsmini", dialogsMenuIconFg }};
-sessionListThreeDotsIconOver: icon {{ "info/edit/dotsmini", dialogsMenuIconFgOver }};
-sessionListThreeDotsSkip: 12px;
+
+settingsPhotoLeft: 22px;
+settingsPhotoTop: 8px;
+settingsPhotoBottom: 16px;
+settingsNameLeft: 112px;
+settingsNameTop: 12px;
+settingsPhoneLeft: settingsNameLeft;
+settingsPhoneTop: 37px;
+settingsUsernameLeft: settingsNameLeft;
+settingsUsernameTop: 58px;
+settingsPeerToPeerSkip: 9px;
+
+settingsIconRadius: 6px;

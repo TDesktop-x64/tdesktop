@@ -192,6 +192,8 @@ PRIVATE
     ui/controls/call_mute_button.h
     ui/controls/delete_message_context_action.cpp
     ui/controls/delete_message_context_action.h
+    ui/controls/download_bar.cpp
+    ui/controls/download_bar.h
     ui/controls/emoji_button.cpp
     ui/controls/emoji_button.h
     ui/controls/invite_link_buttons.cpp
@@ -204,6 +206,8 @@ PRIVATE
     ui/controls/send_button.h
     ui/controls/who_reacted_context_action.cpp
     ui/controls/who_reacted_context_action.h
+    ui/controls/window_outdated_bar.cpp
+    ui/controls/window_outdated_bar.h
     ui/text/format_song_name.cpp
     ui/text/format_song_name.h
     ui/text/format_values.cpp

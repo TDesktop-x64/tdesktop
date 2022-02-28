@@ -80,6 +80,7 @@ auto AddActionButton(
 		Text &&text,
 		ToggleOn &&toggleOn,
 		Callback &&callback,
+		const style::icon *icon,
 		const style::SettingsButton &st
 			= st::infoSharedMediaButton) {
 	auto result = parent->add(object_ptr<Ui::SlideWrap<Ui::SettingsButton>>(
@@ -95,6 +96,12 @@ auto AddActionButton(
 		std::move(toggleOn)
 	)->entity()->addClickHandler(std::move(callback));
 	result->finishAnimating();
+	if (icon) {
+		object_ptr<Profile::FloatingIcon>(
+			result,
+			*icon,
+			st::infoSharedMediaButtonIconPosition);
+	}
 	return result;
 };
 
@@ -110,6 +117,7 @@ auto AddMainButton(
 		std::move(text) | Ui::Text::ToUpper(),
 		std::move(toggleOn),
 		std::move(callback),
+		nullptr,
 		st::infoMainButton));
 }
 
@@ -164,8 +172,6 @@ private:
 	void addShareContactAction(not_null<UserData*> user);
 	void addEditContactAction(not_null<UserData*> user);
 	void addDeleteContactAction(not_null<UserData*> user);
-	void addClearHistoryAction(not_null<UserData*> user);
-	void addDeleteConversationAction(not_null<UserData*> user);
 	void addBotCommandActions(not_null<UserData*> user);
 	void addReportAction();
 	void addBlockAction(not_null<UserData*> user);
@@ -226,6 +232,8 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 		} else if (SetClickContext<HashtagClickHandler>(handler, context)) {
 			return false;
 		} else if (SetClickContext<CashtagClickHandler>(handler, context)) {
+			return false;
+		} else if (SetClickContext<UrlClickHandler>(handler, context)) {
 			return false;
 		}
 		return true;
@@ -513,7 +521,8 @@ void ActionsFiller::addInviteToGroupAction(
 		_wrap,
 		tr::lng_profile_invite_to_group(),
 		CanInviteBotToGroupValue(user),
-		[=] { AddBotToGroupBoxController::Start(user); });
+		[=] { AddBotToGroupBoxController::Start(user); },
+		&st::infoIconRequests);
 }
 
 void ActionsFiller::addShareContactAction(not_null<UserData*> user) {
@@ -522,7 +531,8 @@ void ActionsFiller::addShareContactAction(not_null<UserData*> user) {
 		_wrap,
 		tr::lng_info_share_contact(),
 		CanShareContactValue(user),
-		[=] { Window::PeerMenuShareContactBox(controller, user); });
+		[=] { Window::PeerMenuShareContactBox(controller, user); },
+		&st::infoIconShare);
 }
 
 void ActionsFiller::addEditContactAction(not_null<UserData*> user) {
@@ -531,7 +541,8 @@ void ActionsFiller::addEditContactAction(not_null<UserData*> user) {
 		_wrap,
 		tr::lng_info_edit_contact(),
 		IsContactValue(user),
-		[=] { controller->window().show(Box(EditContactBox, controller, user)); });
+		[=] { controller->window().show(Box(EditContactBox, controller, user)); },
+		&st::infoIconEdit);
 }
 
 void ActionsFiller::addDeleteContactAction(
@@ -540,24 +551,8 @@ void ActionsFiller::addDeleteContactAction(
 		_wrap,
 		tr::lng_info_delete_contact(),
 		IsContactValue(user),
-		[user] { Window::PeerMenuDeleteContact(user); });
-}
-
-void ActionsFiller::addClearHistoryAction(not_null<UserData*> user) {
-	AddActionButton(
-		_wrap,
-		tr::lng_profile_clear_history(),
-		rpl::single(true),
-		Window::ClearHistoryHandler(user));
-}
-
-void ActionsFiller::addDeleteConversationAction(
-		not_null<UserData*> user) {
-	AddActionButton(
-		_wrap,
-		tr::lng_profile_delete_conversation(),
-		rpl::single(true),
-		Window::DeleteAndLeaveHandler(user));
+		[user] { Window::PeerMenuDeleteContact(user); },
+		&st::infoIconDelete);
 }
 
 void ActionsFiller::addBotCommandActions(not_null<UserData*> user) {
@@ -599,14 +594,19 @@ void ActionsFiller::addBotCommandActions(not_null<UserData*> user) {
 	};
 	auto addBotCommand = [=](
 			rpl::producer<QString> text,
-			const QString &command) {
+			const QString &command,
+			const style::icon *icon = nullptr) {
 		AddActionButton(
 			_wrap,
 			std::move(text),
 			hasBotCommandValue(command),
-			[=] { sendBotCommand(command); });
+			[=] { sendBotCommand(command); },
+			icon);
 	};
-	addBotCommand(tr::lng_profile_bot_help(), qsl("help"));
+	addBotCommand(
+		tr::lng_profile_bot_help(),
+		qsl("help"),
+		&st::infoIconInformation);
 	addBotCommand(tr::lng_profile_bot_settings(), qsl("settings"));
 	addBotCommand(tr::lng_profile_bot_privacy(), qsl("privacy"));
 }
@@ -622,6 +622,7 @@ void ActionsFiller::addReportAction() {
 		tr::lng_profile_report(),
 		rpl::single(true),
 		report,
+		&st::infoIconReport,
 		st::infoBlockButton);
 }
 
@@ -673,6 +674,7 @@ void ActionsFiller::addBlockAction(not_null<UserData*> user) {
 		rpl::duplicate(text),
 		std::move(toggleOn),
 		std::move(callback),
+		&st::infoIconBlock,
 		st::infoBlockButton);
 }
 
@@ -682,7 +684,8 @@ void ActionsFiller::addLeaveChannelAction(
 		_wrap,
 		tr::lng_profile_leave_channel(),
 		AmInChannelValue(channel),
-		Window::DeleteAndLeaveHandler(channel));
+		Window::DeleteAndLeaveHandler(channel),
+		&st::infoIconLeave);
 }
 
 void ActionsFiller::addJoinChannelAction(
@@ -695,7 +698,8 @@ void ActionsFiller::addJoinChannelAction(
 		_wrap,
 		tr::lng_profile_join_channel(),
 		rpl::duplicate(joinVisible),
-		[=] { channel->session().api().joinChannel(channel); });
+		[=] { channel->session().api().joinChannel(channel); },
+		&st::infoIconRequests);
 	_wrap->add(object_ptr<Ui::SlideWrap<Ui::FixedHeightWidget>>(
 		_wrap,
 		CreateSkipWidget(
@@ -717,8 +721,6 @@ void ActionsFiller::fillUserActions(not_null<UserData*> user) {
 		addEditContactAction(user);
 		addDeleteContactAction(user);
 	}
-	addClearHistoryAction(user);
-	addDeleteConversationAction(user);
 	if (!user->isSelf() && !user->isSupport()) {
 		if (user->isBot()) {
 			addBotCommandActions(user);
@@ -750,10 +752,6 @@ object_ptr<Ui::RpWidget> ActionsFiller::fill() {
 		_wrap->add(CreateSkipWidget(_wrap));
 		callback();
 		_wrap->add(CreateSkipWidget(_wrap));
-		object_ptr<FloatingIcon>(
-			_wrap,
-			st::infoIconActions,
-			st::infoIconPosition);
 		return std::move(_wrap);
 	};
 	if (auto user = _peer->asUser()) {
@@ -853,7 +851,8 @@ object_ptr<Ui::RpWidget> SetupChannelMembers(
 		members,
 		std::move(membersText),
 		rpl::single(true),
-		std::move(membersCallback))->entity();
+		std::move(membersCallback),
+		nullptr)->entity();
 
 	SetupAddChannelMember(controller, button, channel);
 

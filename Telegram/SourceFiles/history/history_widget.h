@@ -269,7 +269,8 @@ public:
 	[[nodiscard]] SendMenu::Type sendMenuType() const;
 	bool sendExistingDocument(
 		not_null<DocumentData*> document,
-		Api::SendOptions options);
+		Api::SendOptions options,
+		std::optional<MsgId> localId = std::nullopt);
 	bool sendExistingPhoto(
 		not_null<PhotoData*> photo,
 		Api::SendOptions options);
@@ -560,6 +561,8 @@ private:
 	void updateListSize();
 	void startItemRevealAnimations();
 	void revealItemsCallback();
+
+	void startMessageSendingAnimation(not_null<HistoryItem*> item);
 
 	// Does any of the shown histories has this flag set.
 	bool hasPendingResizedItems() const;

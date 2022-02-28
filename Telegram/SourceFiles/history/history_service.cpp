@@ -105,7 +105,7 @@ QString GenerateServiceTime(TimeId date) {
 					return;
 				}
 			}
-			windows.front()->startOrJoinGroupCall(peer);
+			windows.front()->startOrJoinGroupCall(peer, {});
 		}
 	});
 }

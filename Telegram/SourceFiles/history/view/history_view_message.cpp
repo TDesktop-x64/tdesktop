@@ -1396,8 +1396,10 @@ bool Message::hasFromPhoto() const {
 	case Context::Pinned:
 	case Context::Replies: {
 		const auto item = message();
-		if (item->isPost()
-			|| item->isEmpty()
+		if (item->isPost()) {
+			return item->isSponsored();
+		}
+		if (item->isEmpty()
 			|| (context() == Context::Replies && item->isDiscussionPost())) {
 			return false;
 		} else if (delegate()->elementIsChatWide()) {
@@ -1592,7 +1594,12 @@ TextState Message::textState(
 	}
 
 	if (keyboard && item->isHistoryEntry()) {
-		auto keyboardTop = g.top() + g.height() + st::msgBotKbButton.margin;
+		const auto keyboardTop = g.top()
+			+ g.height()
+			+ st::msgBotKbButton.margin
+			+ ((_reactions && !reactionsInBubble)
+				? (st::mediaInBubbleSkip + _reactions->height())
+				: 0);
 		if (QRect(g.left(), keyboardTop, g.width(), keyboardHeight).contains(point)) {
 			result.link = keyboard->getLink(point - QPoint(g.left(), keyboardTop));
 			return result;
@@ -2752,6 +2759,42 @@ TextSelection Message::skipTextSelection(TextSelection selection) const {
 
 TextSelection Message::unskipTextSelection(TextSelection selection) const {
 	return HistoryView::ShiftItemSelection(selection, message()->_text);
+}
+
+QRect Message::innerGeometry() const {
+	auto result = countGeometry();
+	if (!hasOutLayout()) {
+		const auto w = std::max(
+			(media() ? media()->resolveCustomInfoRightBottom().x() : 0),
+			result.width());
+		result.setWidth(std::min(
+			w + rightActionSize().value_or(QSize(0, 0)).width() * 2,
+			width()));
+	}
+	if (hasBubble()) {
+		result.translate(0, st::msgPadding.top() + st::mediaInBubbleSkip);
+
+		if (displayFromName()) {
+			// See paintFromName().
+			result.translate(0, st::msgNameFont->height);
+		}
+		// Skip displayForwardedFrom() until there are no animations for it.
+		if (displayedReply()) {
+			// See paintReplyInfo().
+			result.translate(
+				0,
+				st::msgReplyPadding.top()
+					+ st::msgReplyBarSize.height()
+					+ st::msgReplyPadding.bottom());
+		}
+		if (!displayFromName() && !displayForwardedFrom()) {
+			// See paintViaBotIdInfo().
+			if (message()->Has<HistoryMessageVia>()) {
+				result.translate(0, st::msgServiceNameFont->height);
+			}
+		}
+	}
+	return result;
 }
 
 QRect Message::countGeometry() const {

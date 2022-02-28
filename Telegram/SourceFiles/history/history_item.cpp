@@ -27,11 +27,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/file_upload.h"
 #include "storage/storage_facade.h"
 #include "storage/storage_shared_media.h"
+#include "main/main_account.h"
+#include "main/main_domain.h"
 #include "main/main_session.h"
 #include "apiwrap.h"
 #include "media/audio/media_audio.h"
 #include "core/application.h"
 #include "mainwindow.h"
+#include "window/window_controller.h"
 #include "window/window_session_controller.h"
 #include "core/crash_reports.h"
 #include "base/unixtime.h"
@@ -1017,6 +1020,10 @@ FullMsgId HistoryItem::fullId() const {
 	return FullMsgId(_history->peer->id, id);
 }
 
+GlobalMsgId HistoryItem::globalId() const {
+	return { fullId(), _history->session().uniqueId() };
+}
+
 Data::MessagePosition HistoryItem::position() const {
 	return { .fullId = fullId(), .date = date() };
 }
@@ -1301,6 +1308,28 @@ HistoryItem::~HistoryItem() {
 	applyTTL(0);
 }
 
+Main::Session *SessionByUniqueId(uint64 sessionUniqueId) {
+	if (!sessionUniqueId) {
+		return nullptr;
+	}
+	for (const auto &[index, account] : Core::App().domain().accounts()) {
+		if (const auto session = account->maybeSession()) {
+			if (session->uniqueId() == sessionUniqueId) {
+				return session;
+			}
+		}
+	}
+	return nullptr;
+}
+
+HistoryItem *MessageByGlobalId(GlobalMsgId globalId) {
+	const auto sessionId = globalId.itemId ? globalId.sessionUniqueId : 0;
+	if (const auto session = SessionByUniqueId(sessionId)) {
+		return session->data().message(globalId.itemId);
+	}
+	return nullptr;
+}
+
 QDateTime ItemDateTime(not_null<const HistoryItem*> item) {
 	return base::unixtime::parse(item->date());
 }
@@ -1334,16 +1363,18 @@ ClickHandlerPtr goToMessageClickHandler(
 		MsgId msgId,
 		FullMsgId returnToId) {
 	return std::make_shared<LambdaClickHandler>([=] {
-		if (const auto main = App::main()) { // multi good
-			if (&main->session() == &peer->session()) {
-				auto params = Window::SectionShow{
-					Window::SectionShow::Way::Forward
-				};
-				params.origin = Window::SectionShow::OriginMessage{
-					returnToId
-				};
-				main->controller()->showPeerHistory(peer, params, msgId);
-			}
+		const auto separate = Core::App().separateWindowForPeer(peer);
+		const auto controller = separate
+			? separate->sessionController()
+			: peer->session().tryResolveWindow();
+		if (controller) {
+			auto params = Window::SectionShow{
+				Window::SectionShow::Way::Forward
+			};
+			params.origin = Window::SectionShow::OriginMessage{
+				returnToId
+			};
+			controller->showPeerHistory(peer, params, msgId);
 		}
 	});
 }

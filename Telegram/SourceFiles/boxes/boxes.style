@@ -139,8 +139,8 @@ contactUserIcon: icon {{ "settings/settings_name", menuIconFg }};
 contactPhoneIcon: icon {{ "settings/settings_phone_number", menuIconFg }};
 contactIconPosition: point(-5px, 23px);
 
-contactPadding: margins(49px, 2px, 0px, 12px);
-contactSkip: 6px;
+contactPadding: margins(49px, 2px, 0px, 14px);
+contactSkip: 9px;
 contactPhoneSkip: 30px;
 
 contactsPhotoSize: 42px;
@@ -467,7 +467,7 @@ calendarPrevious: IconButton {
 	icon: icon {{ "calendar_down-flip_vertical", boxTitleFg }};
 	iconPosition: point(-1px, -1px);
 
-	rippleAreaPosition: point(6px, 6px);
+	rippleAreaPosition: point(2px, 2px);
 	rippleAreaSize: 44px;
 	ripple: RippleAnimation(defaultRippleAnimation) {
 		color: windowBgOver;
@@ -508,10 +508,12 @@ passcodeTextStyle: TextStyle(defaultTextStyle) {
 	lineHeight: 20px;
 }
 
-usernamePadding: margins(22px, 6px, 21px, 12px);
-usernameSkip: 49px;
-usernameTextStyle: TextStyle(boxTextStyle, passcodeTextStyle) {
+defaultBoxLabel: FlatLabel(defaultFlatLabel) {
+	minWidth: 272px;
 }
+usernamePadding: margins(24px, 2px, 24px, 10px);
+usernameSkip: 44px;
+usernameTextStyle: defaultTextStyle;
 usernameDefaultFg: windowSubTextFg;
 
 editMediaLabelMargins: margins(0px, 11px, 0px, 0px);
@@ -580,7 +582,7 @@ rightsCheckbox: Checkbox(defaultCheckbox) {
 rightsToggle: Toggle(defaultToggle) {
 	toggledFg: windowBgActive;
 	untoggledFg: attentionButtonFg;
-	lockIcon: icon {{ "info_rights_lock", windowBgActive }};
+	lockIcon: icon {{ "info/info_rights_lock", windowBgActive }};
 	xsize: 8px;
 	vsize: 5px;
 	vshift: 1px;
@@ -774,7 +776,7 @@ createPollOptionRemove: CrossButton {
 	cross: CrossAnimation {
 		size: 22px;
 		skip: 6px;
-		stroke: 1px;
+		stroke: 1.;
 		minScale: 0.3;
 	}
 	crossFg: boxTitleCloseFg;

@@ -278,7 +278,7 @@ void FastShareMessage(not_null<HistoryItem*> item) {
 			}
 			text.append(error.first);
 			Ui::show(
-				Box<Ui::InformBox>(text),
+				Ui::MakeInformBox(text),
 				Ui::LayerOption::KeepOther);
 			return;
 		}
@@ -2032,6 +2032,11 @@ void HistoryMessage::setSponsoredFrom(const Data::SponsoredFrom &from) {
 	sponsored->sender = std::make_unique<HiddenSenderInfo>(
 		from.title,
 		false);
+	if (from.userpic.location.valid()) {
+		sponsored->sender->customUserpic.set(
+			&history()->session(),
+			from.userpic);
+	}
 
 	using Type = HistoryMessageSponsored::Type;
 	sponsored->type = from.isExactPost

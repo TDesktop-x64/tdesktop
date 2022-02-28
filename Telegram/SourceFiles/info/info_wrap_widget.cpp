@@ -38,6 +38,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_info.h"
 #include "styles/style_profile.h"
 #include "styles/style_menu_icons.h"
+#include "styles/style_layers.h"
 
 namespace Info {
 namespace {
@@ -199,8 +200,10 @@ Key WrapWidget::key() const {
 
 Dialogs::RowDescriptor WrapWidget::activeChat() const {
 	if (const auto peer = key().peer()) {
-		return Dialogs::RowDescriptor(peer->owner().history(peer), FullMsgId());
-	} else if (key().settingsSelf() || key().poll()) {
+		return Dialogs::RowDescriptor(
+			peer->owner().history(peer),
+			FullMsgId());
+	} else if (key().settingsSelf() || key().isDownloads() || key().poll()) {
 		return Dialogs::RowDescriptor();
 	}
 	Unexpected("Owner in WrapWidget::activeChat().");
@@ -342,9 +345,9 @@ void WrapWidget::createTopBar() {
 		_controller.get(),
 		TopBarStyle(wrapValue),
 		std::move(selectedItems));
-	_topBar->cancelSelectionRequests(
-	) | rpl::start_with_next([this] {
-		_content->cancelSelection();
+	_topBar->selectionActionRequests(
+	) | rpl::start_with_next([=](SelectionAction action) {
+		_content->selectionAction(action);
 	}, _topBar->lifetime());
 
 	_topBar->setTitle(TitleValue(
@@ -390,14 +393,10 @@ void WrapWidget::createTopBar() {
 		&& (wrapValue != Wrap::Side || hasStackHistory())) {
 		addTopBarMenuButton();
 		addProfileCallsButton();
-//		addProfileNotificationsButton();
 	} else if (section.type() == Section::Type::Settings
 		&& (section.settingsType() == Section::SettingsType::Main
 			|| section.settingsType() == Section::SettingsType::Chat)) {
 		addTopBarMenuButton();
-	} else if (section.type() == Section::Type::Settings
-		&& section.settingsType() == Section::SettingsType::Information) {
-		addContentSaveButton();
 	}
 
 	_topBar->lower();
@@ -407,18 +406,8 @@ void WrapWidget::createTopBar() {
 }
 
 void WrapWidget::checkBeforeClose(Fn<void()> close) {
-	const auto confirmed = [=] {
-		Ui::hideLayer();
-		close();
-	};
-	if (_controller->canSaveChangesNow()) {
-		Ui::show(Box<Ui::ConfirmBox>(
-			tr::lng_settings_close_sure(tr::now),
-			tr::lng_close(tr::now),
-			confirmed));
-	} else {
-		confirmed();
-	}
+	Ui::hideLayer();
+	close();
 }
 
 void WrapWidget::addTopBarMenuButton() {
@@ -435,25 +424,8 @@ void WrapWidget::addTopBarMenuButton() {
 	});
 }
 
-void WrapWidget::addContentSaveButton() {
-	Expects(_topBar != nullptr);
-
-	_topBar->addButtonWithVisibility(
-		base::make_unique_q<Ui::IconButton>(
-			_topBar,
-			(wrap() == Wrap::Layer
-				? st::infoLayerTopBarSave
-				: st::infoTopBarSave)),
-		_controller->canSaveChanges()
-	)->addClickHandler([=] {
-		_content->saveChanges(crl::guard(_content.data(), [=] {
-			_controller->showBackFromStack();
-		}));
-	});
-}
-
 bool WrapWidget::closeByOutsideClick() const {
-	return !_controller->canSaveChangesNow();
+	return true;
 }
 
 void WrapWidget::addProfileCallsButton() {
@@ -461,9 +433,7 @@ void WrapWidget::addProfileCallsButton() {
 
 	const auto peer = key().peer();
 	const auto user = peer ? peer->asUser() : nullptr;
-	if (!user
-		|| user->sharedMediaInfo()
-		|| !user->session().serverConfig().phoneCallsEnabled.current()) {
+	if (!user || user->sharedMediaInfo()) {
 		return;
 	}
 
@@ -489,39 +459,6 @@ void WrapWidget::addProfileCallsButton() {
 	if (user && user->callsStatus() == UserData::CallsStatus::Unknown) {
 		user->updateFull();
 	}
-}
-
-void WrapWidget::addProfileNotificationsButton() {
-	Expects(_topBar != nullptr);
-
-	const auto peer = key().peer();
-	if (!peer) {
-		return;
-	}
-	auto notifications = _topBar->addButton(
-		base::make_unique_q<Ui::IconButton>(
-			_topBar,
-			(wrap() == Wrap::Layer
-				? st::infoLayerTopBarNotifications
-				: st::infoTopBarNotifications)));
-	notifications->addClickHandler([=] {
-		const auto muteForSeconds = peer->owner().notifyIsMuted(peer)
-			? 0
-			: Data::NotifySettings::kDefaultMutePeriod;
-		peer->owner().updateNotifySettings(peer, muteForSeconds);
-	});
-	Profile::NotificationsEnabledValue(
-		peer
-	) | rpl::start_with_next([notifications](bool enabled) {
-		const auto iconOverride = enabled
-			? &st::infoNotificationsActive
-			: nullptr;
-		const auto rippleOverride = enabled
-			? &st::lightButtonBgOver
-			: nullptr;
-		notifications->setIconOverride(iconOverride, iconOverride);
-		notifications->setRippleColorOverride(rippleOverride);
-	}, notifications->lifetime());
 }
 
 void WrapWidget::showTopBarMenu() {
@@ -921,7 +858,9 @@ void WrapWidget::showNewContent(
 			&& newContent->hasTopBarShadow();
 		animationParams.oldContentCache = grabForShowAnimation(
 			animationParams);
-		animationParams.withFade = (wrap() == Wrap::Layer);
+		const auto layer = (wrap() == Wrap::Layer);
+		animationParams.withFade = layer;
+		animationParams.topSkip = layer ? st::boxRadius : 0;
 	}
 	if (saveToStack) {
 		auto item = StackItem();
@@ -934,13 +873,19 @@ void WrapWidget::showNewContent(
 		_historyStack.clear();
 	}
 
-	_controller = std::move(newController);
-	if (newContent) {
-		setupTop();
-		showContent(std::move(newContent));
-	} else {
-		showNewContent(memento);
+	{
+		// Let old controller outlive old content widget.
+		const auto oldController = std::exchange(
+			_controller,
+			std::move(newController));
+		if (newContent) {
+			setupTop();
+			showContent(std::move(newContent));
+		} else {
+			showNewContent(memento);
+		}
 	}
+
 	if (animationParams) {
 		if (Ui::InFocusChain(this)) {
 			setFocus();

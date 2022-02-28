@@ -95,47 +95,15 @@ struct JoinVideoEndpoint {
 };
 
 struct JoinBroadcastStream {
+	bool rtmp = false;
+	QString rtmpUrl;
+	QString rtmpKey;
 };
 
 using JoinClientFields = std::variant<
 	v::null_t,
 	JoinVideoEndpoint,
 	JoinBroadcastStream>;
-
-class RequestCurrentTimeTask final : public tgcalls::BroadcastPartTask {
-public:
-	RequestCurrentTimeTask(
-		base::weak_ptr<GroupCall> call,
-		Fn<void(int64)> done);
-
-	void done(int64 value);
-	void cancel() override;
-
-private:
-	const base::weak_ptr<GroupCall> _call;
-	Fn<void(int64)> _done;
-	QMutex _mutex;
-
-};
-
-RequestCurrentTimeTask::RequestCurrentTimeTask(
-	base::weak_ptr<GroupCall> call,
-	Fn<void(int64)> done)
-: _call(call)
-, _done(std::move(done)) {
-}
-
-void RequestCurrentTimeTask::done(int64 value) {
-	QMutexLocker lock(&_mutex);
-	if (_done) {
-		base::take(_done)(value);
-	}
-}
-
-void RequestCurrentTimeTask::cancel() {
-	QMutexLocker lock(&_mutex);
-	_done = nullptr;
-}
 
 [[nodiscard]] JoinClientFields ParseJoinResponse(const QByteArray &json) {
 	auto error = QJsonParseError{ 0, QJsonParseError::NoError };
@@ -151,7 +119,11 @@ void RequestCurrentTimeTask::cancel() {
 		return {};
 	}
 	if (document.object().value("stream").toBool()) {
-		return JoinBroadcastStream{};
+		return JoinBroadcastStream{
+			.rtmp = document.object().value("rtmp").toBool(),
+			.rtmpUrl = document.object().value("rtmp_stream_url").toString(),
+			.rtmpKey = document.object().value("rtmp_stream_key").toString(),
+		};
 	}
 	const auto video = document.object().value("video").toObject();
 	return JoinVideoEndpoint{
@@ -237,6 +209,23 @@ private:
 
 };
 
+class GroupCall::RequestCurrentTimeTask final
+	: public tgcalls::BroadcastPartTask {
+public:
+	RequestCurrentTimeTask(
+		base::weak_ptr<GroupCall> call,
+		Fn<void(int64)> done);
+
+	void done(int64 value);
+	void cancel() override;
+
+private:
+	const base::weak_ptr<GroupCall> _call;
+	Fn<void(int64)> _done;
+	QMutex _mutex;
+
+};
+
 struct GroupCall::SinkPointer {
 	std::weak_ptr<Webrtc::SinkInterface> data;
 };
@@ -286,6 +275,10 @@ GroupCall::VideoTrack::VideoTrack(
 		}
 	}
 	return false;
+}
+
+bool VideoEndpoint::rtmp() const noexcept {
+	return (id == Data::RtmpEndpointId());
 }
 
 struct VideoParams {
@@ -546,6 +539,25 @@ void GroupCall::MediaChannelDescriptionsTask::cancel() {
 	}
 }
 
+GroupCall::RequestCurrentTimeTask::RequestCurrentTimeTask(
+	base::weak_ptr<GroupCall> call,
+	Fn<void(int64)> done)
+: _call(call)
+, _done(std::move(done)) {
+}
+
+void GroupCall::RequestCurrentTimeTask::done(int64 value) {
+	QMutexLocker lock(&_mutex);
+	if (_done) {
+		base::take(_done)(value);
+	}
+}
+
+void GroupCall::RequestCurrentTimeTask::cancel() {
+	QMutexLocker lock(&_mutex);
+	_done = nullptr;
+}
+
 not_null<PeerData*> GroupCall::TrackPeer(
 		const std::unique_ptr<VideoTrack> &track) {
 	return track->peer;
@@ -572,6 +584,8 @@ GroupCall::GroupCall(
 , _joinAs(info.joinAs)
 , _possibleJoinAs(std::move(info.possibleJoinAs))
 , _joinHash(info.joinHash)
+, _rtmpUrl(info.rtmpUrl)
+, _rtmpKey(info.rtmpKey)
 , _canManage(Data::CanManageGroupCallValue(_peer))
 , _id(inputCall.c_inputGroupCall().vid().v)
 , _scheduleDate(info.scheduleDate)
@@ -579,6 +593,8 @@ GroupCall::GroupCall(
 , _checkJoinedTimer([=] { checkJoined(); })
 , _pushToTalkCancelTimer([=] { pushToTalkCancel(); })
 , _connectingSoundTimer([=] { playConnectingSoundOnce(); })
+, _listenersHidden(info.rtmp)
+, _rtmp(info.rtmp)
 , _mediaDevices(CreateMediaDevices()) {
 	_muted.value(
 	) | rpl::combine_previous(
@@ -635,7 +651,7 @@ GroupCall::GroupCall(
 	if (_id) {
 		join(inputCall);
 	} else {
-		start(info.scheduleDate);
+		start(info.scheduleDate, info.rtmp);
 	}
 	if (_scheduleDate) {
 		saveDefaultJoinAs(joinAs());
@@ -689,7 +705,9 @@ bool GroupCall::screenSharingWithAudio() const {
 
 bool GroupCall::mutedByAdmin() const {
 	const auto mute = muted();
-	return mute == MuteState::ForceMuted || mute == MuteState::RaisedHand;
+	return _rtmp
+		|| (mute == MuteState::ForceMuted)
+		|| (mute == MuteState::RaisedHand);
 }
 
 bool GroupCall::canManage() const {
@@ -752,6 +770,8 @@ void GroupCall::setScheduledDate(TimeId date) {
 }
 
 void GroupCall::subscribeToReal(not_null<Data::GroupCall*> real) {
+	_listenersHidden = real->listenersHidden();
+
 	real->scheduleDateValue(
 	) | rpl::start_with_next([=](TimeId date) {
 		setScheduledDate(date);
@@ -981,9 +1001,10 @@ void GroupCall::playConnectingSoundOnce() {
 }
 
 bool GroupCall::showChooseJoinAs() const {
-	return (_possibleJoinAs.size() > 1)
-		|| (_possibleJoinAs.size() == 1
-			&& !_possibleJoinAs.front()->isSelf());
+	return !_rtmp
+		&& ((_possibleJoinAs.size() > 1)
+			|| (_possibleJoinAs.size() == 1
+				&& !_possibleJoinAs.front()->isSelf()));
 }
 
 bool GroupCall::scheduleStartSubscribed() const {
@@ -991,6 +1012,30 @@ bool GroupCall::scheduleStartSubscribed() const {
 		return real->scheduleStartSubscribed();
 	}
 	return false;
+}
+
+bool GroupCall::rtmp() const {
+	return _rtmp;
+}
+
+bool GroupCall::listenersHidden() const {
+	return _listenersHidden;
+}
+
+bool GroupCall::emptyRtmp() const {
+	return _emptyRtmp.current();
+}
+
+rpl::producer<bool> GroupCall::emptyRtmpValue() const {
+	return _emptyRtmp.value();
+}
+
+QString GroupCall::rtmpUrl() const {
+	return _rtmpUrl;
+}
+
+QString GroupCall::rtmpKey() const {
+	return _rtmpKey;
 }
 
 Data::GroupCall *GroupCall::lookupReal() const {
@@ -1005,10 +1050,11 @@ rpl::producer<not_null<Data::GroupCall*>> GroupCall::real() const {
 	return _realChanges.events();
 }
 
-void GroupCall::start(TimeId scheduleDate) {
+void GroupCall::start(TimeId scheduleDate, bool rtmp) {
 	using Flag = MTPphone_CreateGroupCall::Flag;
 	_createRequestId = _api.request(MTPphone_CreateGroupCall(
-		MTP_flags(scheduleDate ? Flag::f_schedule_date : Flag(0)),
+		MTP_flags((scheduleDate ? Flag::f_schedule_date : Flag(0))
+			| (rtmp ? Flag::f_rtmp_stream : Flag(0))),
 		_peer->input,
 		MTP_int(base::RandomValue<int32>()),
 		MTPstring(), // title
@@ -1790,11 +1836,13 @@ void GroupCall::handlePossibleCreateOrJoinResponse(
 				data.vid(),
 				data.vaccess_hash());
 			const auto scheduleDate = data.vschedule_date().value_or_empty();
+			const auto rtmp = data.is_rtmp_stream();
+			_rtmp = rtmp;
 			setScheduledDate(scheduleDate);
 			if (const auto chat = _peer->asChat()) {
-				chat->setGroupCall(input, scheduleDate);
+				chat->setGroupCall(input, scheduleDate, rtmp);
 			} else if (const auto group = _peer->asChannel()) {
-				group->setGroupCall(input, scheduleDate);
+				group->setGroupCall(input, scheduleDate, rtmp);
 			} else {
 				Unexpected("Peer type in GroupCall::join.");
 			}
@@ -1835,11 +1883,17 @@ void GroupCall::handlePossibleCreateOrJoinResponse(
 		data.vparams().match([&](const MTPDdataJSON &data) {
 			const auto json = data.vdata().v;
 			const auto response = ParseJoinResponse(json);
+			const auto stream = std::get_if<JoinBroadcastStream>(&response);
 			const auto endpoint = std::get_if<JoinVideoEndpoint>(&response);
-			if (v::is<JoinBroadcastStream>(response)) {
+			if (stream) {
 				if (!_broadcastDcId) {
 					LOG(("Api Error: Empty stream_dc_id in groupCall."));
 					_broadcastDcId = _peer->session().mtp().mainDcId();
+				}
+				if (stream->rtmp) {
+					_rtmp = true;
+					_rtmpUrl = stream->rtmpUrl;
+					_rtmpKey = stream->rtmpKey;
 				}
 				setInstanceMode(InstanceMode::Stream);
 			} else {
@@ -1960,7 +2014,8 @@ void GroupCall::applySelfUpdate(const MTPDgroupCallParticipant &data) {
 		}
 		return;
 	} else if (data.vsource().v != _joinState.ssrc) {
-		if (!_mySsrcs.contains(data.vsource().v)) {
+		const auto ssrc = uint32(data.vsource().v);
+		if (!_mySsrcs.contains(ssrc)) {
 			// I joined from another device, hangup.
 			LOG(("Call Info: "
 				"Hangup after '!left' with ssrc %1, my %2."
@@ -2348,7 +2403,7 @@ bool GroupCall::tryCreateController() {
 				call,
 				std::move(done));
 			crl::on_main(weak, [=] {
-				result->done(approximateServerTimeInMs());
+				requestCurrentTimeStart(std::move(result));
 			});
 			return result;
 		},
@@ -2607,6 +2662,62 @@ void GroupCall::mediaChannelDescriptionsCancel(
 	}
 }
 
+void GroupCall::requestCurrentTimeStart(
+		std::shared_ptr<RequestCurrentTimeTask> task) {
+	if (!_rtmp) {
+		task->done(approximateServerTimeInMs());
+		return;
+	}
+	_requestCurrentTimes.emplace(std::move(task));
+	if (_requestCurrentTimeRequestId) {
+		return;
+	}
+	const auto finish = [=](int64 value) {
+		_requestCurrentTimeRequestId = 0;
+		for (const auto &task : base::take(_requestCurrentTimes)) {
+			task->done(value);
+		}
+	};
+	_requestCurrentTimeRequestId = _api.request(
+		MTPphone_GetGroupCallStreamChannels(inputCall())
+	).done([=](const MTPphone_GroupCallStreamChannels &result) {
+		result.match([&](const MTPDphone_groupCallStreamChannels &data) {
+			const auto &list = data.vchannels().v;
+			const auto empty = list.isEmpty();
+			if (!empty) {
+				const auto &first = list.front();
+				first.match([&](const MTPDgroupCallStreamChannel &data) {
+					finish(data.vlast_timestamp_ms().v);
+				});
+			} else {
+				finish(0);
+			}
+			_emptyRtmp = empty;
+		});
+	}).fail([=](const MTP::Error &error) {
+		finish(0);
+
+		if (error.type() == u"GROUPCALL_JOIN_MISSING"_q
+			|| error.type() == u"GROUPCALL_FORBIDDEN"_q) {
+			for (const auto &[task, part] : _broadcastParts) {
+				_api.request(part.requestId).cancel();
+			}
+			setState(State::Joining);
+			rejoin();
+		}
+	}).handleAllErrors().toDC(
+		MTP::groupCallStreamDcId(_broadcastDcId)
+	).send();
+}
+
+void GroupCall::requestCurrentTimeCancel(
+		not_null<RequestCurrentTimeTask*> task) {
+	const auto i = _requestCurrentTimes.find(task.get());
+	if (i != end(_requestCurrentTimes)) {
+		_requestCurrentTimes.erase(i);
+	}
+}
+
 int64 GroupCall::approximateServerTimeInMs() const {
 	Expects(_serverTimeMs != 0);
 
@@ -2630,6 +2741,15 @@ void GroupCall::updateRequestedVideoChannels() {
 	for (const auto &[endpoint, video] : _activeVideoTracks) {
 		const auto &endpointId = endpoint.id;
 		if (endpointId == camera || endpointId == screen) {
+			continue;
+		} else if (endpointId == Data::RtmpEndpointId()) {
+			channels.push_back({
+				.endpointId = endpointId,
+				.minQuality = (video->quality == Group::VideoQuality::Full
+					? Quality::Full
+					: Quality::Thumbnail),
+				.maxQuality = Quality::Full,
+			});
 			continue;
 		}
 		const auto participant = real->participantByEndpoint(endpointId);
@@ -2725,6 +2845,17 @@ void GroupCall::updateRequestedVideoChannelsDelayed() {
 void GroupCall::fillActiveVideoEndpoints() {
 	const auto real = lookupReal();
 	Assert(real != nullptr);
+
+	if (_rtmp) {
+		_videoIsWorking = true;
+		markEndpointActive({
+			VideoEndpointType::Screen,
+			_peer,
+			Data::RtmpEndpointId(),
+		}, true, false);
+		updateRequestedVideoChannels();
+		return;
+	}
 
 	const auto me = real->participantByPeer(joinAs());
 	if (me && me->videoJoined) {
@@ -3060,7 +3191,7 @@ void GroupCall::setInstanceMode(InstanceMode mode) {
 		case InstanceMode::Stream: return Mode::GroupConnectionModeBroadcast;
 		}
 		Unexpected("Mode in GroupCall::setInstanceMode.");
-	}(), true);
+	}(), true, _rtmp);
 }
 
 void GroupCall::setScreenInstanceMode(InstanceMode mode) {
@@ -3076,7 +3207,7 @@ void GroupCall::setScreenInstanceMode(InstanceMode mode) {
 		case InstanceMode::Stream: return Mode::GroupConnectionModeBroadcast;
 		}
 		Unexpected("Mode in GroupCall::setInstanceMode.");
-	}(), true);
+	}(), true, false);
 }
 
 void GroupCall::maybeSendMutedUpdate(MuteState previous) {

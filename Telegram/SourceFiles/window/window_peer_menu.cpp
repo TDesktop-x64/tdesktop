@@ -234,7 +234,7 @@ bool PinnedLimitReached(Dialogs::Key key, FilterId filterId) {
 				tr::now,
 				lt_count,
 				pinnedMax);
-		Ui::show(Box<Ui::InformBox>(errorText));
+		Ui::show(Ui::MakeInformBox(errorText));
 	}
 	return true;
 }
@@ -940,10 +940,11 @@ void PeerMenuDeleteContact(not_null<UserData*> user) {
 			user->session().api().applyUpdates(result);
 		}).send();
 	};
-	Ui::show(Box<Ui::ConfirmBox>(
-		text,
-		tr::lng_box_delete(tr::now),
-		deleteSure));
+	Ui::show(Ui::MakeConfirmBox({
+		.text = text,
+		.confirmed = deleteSure,
+		.confirmText = tr::lng_box_delete(),
+	}));
 }
 
 void PeerMenuShareContactBox(
@@ -952,8 +953,8 @@ void PeerMenuShareContactBox(
 	const auto weak = std::make_shared<QPointer<PeerListBox>>();
 	auto callback = [=](not_null<PeerData*> peer) {
 		if (!peer->canWrite()) {
-			Ui::show(Box<Ui::InformBox>(
-				tr::lng_forward_share_cant(tr::now)),
+			Ui::show(
+				Ui::MakeInformBox(tr::lng_forward_share_cant()),
 				Ui::LayerOption::KeepOther);
 			return;
 		} else if (peer->isSelf()) {
@@ -969,19 +970,25 @@ void PeerMenuShareContactBox(
 		auto recipient = peer->isUser()
 			? peer->name
 			: '\xAB' + peer->name + '\xBB';
-		Ui::show(Box<Ui::ConfirmBox>(
-			tr::lng_forward_share_contact(tr::now, lt_recipient, recipient),
-			tr::lng_forward_send(tr::now),
-			[peer, user, navigation] {
-				const auto history = peer->owner().history(peer);
-				navigation->showPeerHistory(
-					history,
-					Window::SectionShow::Way::ClearStack,
-					ShowAtTheEndMsgId);
-				auto action = Api::SendAction(history);
-				action.clearDraft = false;
-				user->session().api().shareContact(user, action);
-			}), Ui::LayerOption::KeepOther);
+		Ui::show(
+			Ui::MakeConfirmBox({
+				.text = tr::lng_forward_share_contact(
+					tr::now,
+					lt_recipient,
+					recipient),
+				.confirmed = [peer, user, navigation] {
+					const auto history = peer->owner().history(peer);
+					navigation->showPeerHistory(
+						history,
+						Window::SectionShow::Way::ClearStack,
+						ShowAtTheEndMsgId);
+					auto action = Api::SendAction(history);
+					action.clearDraft = false;
+					user->session().api().shareContact(user, action);
+				},
+				.confirmText = tr::lng_forward_send(),
+			}),
+			Ui::LayerOption::KeepOther);
 	};
 	*weak = Ui::show(Box<PeerListBox>(
 		std::make_unique<ChooseRecipientBoxController>(
@@ -1091,7 +1098,11 @@ void PeerMenuBlockUserBox(
 	const auto allFromUser = v::is<ClearReply>(suggestClear)
 		? box->addRow(object_ptr<Ui::Checkbox>(
 			box,
-			tr::lng_delete_all_from(tr::now),
+			tr::lng_delete_all_from_user(
+				tr::now,
+				lt_user,
+				Ui::Text::Bold(peer->name),
+				Ui::Text::WithEntities),
 			true,
 			st::defaultBoxCheckbox))
 		: nullptr;
@@ -1168,7 +1179,7 @@ void BlockSenderFromRepliesBox(
 		Window::ClearReply{ id });
 }
 
-QPointer<Ui::RpWidget> ShowOldForwardMessagesBox(
+QPointer<Ui::BoxContent> ShowOldForwardMessagesBox(
 		not_null<Window::SessionNavigation*> navigation,
 		Data::ForwardDraft &&draft,
 		FnMut<void()> &&successCallback) {
@@ -1223,7 +1234,7 @@ Api::SendAction prepareSendAction(
 }
 
 // Source from kotatogram
-QPointer<Ui::RpWidget> ShowNewForwardMessagesBox(
+QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 		not_null<Window::SessionNavigation*> navigation,
 		MessageIdsList &&items,
 		FnMut<void()> &&successCallback) {
@@ -1352,7 +1363,7 @@ QPointer<Ui::RpWidget> ShowNewForwardMessagesBox(
 	return weak->data();
 }
 
-QPointer<Ui::RpWidget> ShowForwardNoQuoteMessagesBox(
+QPointer<Ui::BoxContent> ShowForwardNoQuoteMessagesBox(
 		not_null<Window::SessionNavigation*> navigation,
 		MessageIdsList &&items,
 		FnMut<void()> &&successCallback) {
@@ -1450,7 +1461,6 @@ QPointer<Ui::RpWidget> ShowForwardNoQuoteMessagesBox(
 	return weak->data();
 }
 
-QPointer<Ui::RpWidget> ShowForwardMessagesBox(
 		not_null<Window::SessionNavigation*> navigation,
 		MessageIdsList &&items,
 		FnMut<void()> &&successCallback) {
@@ -1460,11 +1470,11 @@ QPointer<Ui::RpWidget> ShowForwardMessagesBox(
 		std::move(successCallback));
 }
 
-QPointer<Ui::RpWidget> ShowSendNowMessagesBox(
+QPointer<Ui::BoxContent> ShowSendNowMessagesBox(
 		not_null<Window::SessionNavigation*> navigation,
 		not_null<History*> history,
 		MessageIdsList &&items,
-		FnMut<void()> &&successCallback) {
+		Fn<void()> &&successCallback) {
 	const auto session = &navigation->session();
 	const auto text = (items.size() > 1)
 		? tr::lng_scheduled_send_now_many(tr::now, lt_count, items.size())
@@ -1484,7 +1494,7 @@ QPointer<Ui::RpWidget> ShowSendNowMessagesBox(
 		=,
 		list = std::move(items),
 		callback = std::move(successCallback)
-	](Fn<void()> &&close) mutable {
+	](Fn<void()> &&close) {
 		close();
 		auto ids = QVector<MTPint>();
 		for (const auto item : session->data().idsToItems(list)) {
@@ -1506,7 +1516,11 @@ QPointer<Ui::RpWidget> ShowSendNowMessagesBox(
 		}
 	};
 	return Ui::show(
-		Box<Ui::ConfirmBox>(text, tr::lng_send_button(tr::now), std::move(done)),
+		Ui::MakeConfirmBox({
+			.text = text,
+			.confirmed = std::move(done),
+			.confirmText = tr::lng_send_button(),
+		}),
 		Ui::LayerOption::KeepOther).data();
 }
 
@@ -1567,10 +1581,11 @@ void ToggleMessagePinned(
 				session->api().applyUpdates(result);
 			}).send();
 		});
-		Ui::show(Box<Ui::ConfirmBox>(
-			tr::lng_pinned_unpin_sure(tr::now),
-			tr::lng_pinned_unpin(tr::now),
-			callback));
+		Ui::show(Ui::MakeConfirmBox({
+			.text = tr::lng_pinned_unpin_sure(),
+			.confirmed = callback,
+			.confirmText = tr::lng_pinned_unpin(),
+		}));
 	}
 }
 
@@ -1598,10 +1613,11 @@ void HidePinnedBar(
 			session.api().requestFullPeer(peer);
 		}
 	});
-	Ui::show(Box<Ui::ConfirmBox>(
-		tr::lng_pinned_hide_all_sure(tr::now),
-		tr::lng_pinned_hide_all_hide(tr::now),
-		callback));
+	Ui::show(Ui::MakeConfirmBox({
+		.text = tr::lng_pinned_hide_all_sure(),
+		.confirmed = callback,
+		.confirmText = tr::lng_pinned_hide_all_hide(),
+	}));
 }
 
 void UnpinAllMessages(
@@ -1625,10 +1641,11 @@ void UnpinAllMessages(
 		};
 		sendRequest(sendRequest);
 	});
-	Ui::show(Box<Ui::ConfirmBox>(
-		tr::lng_pinned_unpin_all_sure(tr::now),
-		tr::lng_pinned_unpin(tr::now),
-		callback));
+	Ui::show(Ui::MakeConfirmBox({
+		.text = tr::lng_pinned_unpin_all_sure(),
+		.confirmed = callback,
+		.confirmText = tr::lng_pinned_unpin(),
+	}));
 }
 
 void PeerMenuAddMuteAction(
@@ -1668,9 +1685,10 @@ void MenuAddMarkAsReadAllChatsAction(
 				MarkAsReadChatList(folder->chatsList());
 			}
 		};
-		Ui::show(Box<Ui::ConfirmBox>(
-			tr::lng_context_mark_read_all_sure(tr::now),
-			std::move(boxCallback)));
+		Ui::show(Ui::MakeConfirmBox({
+			tr::lng_context_mark_read_all_sure(),
+			std::move(boxCallback)
+		}));
 	};
 	addAction(
 		tr::lng_context_mark_read_all(tr::now),
@@ -1692,9 +1710,10 @@ void MenuAddMarkAsReadChatListAction(
 				MarkAsReadChatList(list());
 				close();
 			};
-			Ui::show(Box<Ui::ConfirmBox>(
-				tr::lng_context_mark_read_sure(tr::now),
-				std::move(boxCallback)));
+			Ui::show(Ui::MakeConfirmBox({
+				tr::lng_context_mark_read_sure(),
+				std::move(boxCallback)
+			}));
 		} else {
 			MarkAsReadChatList(list());
 		}

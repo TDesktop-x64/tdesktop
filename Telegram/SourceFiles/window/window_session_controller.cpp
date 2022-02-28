@@ -52,6 +52,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/chat/message_bubble.h"
 #include "ui/chat/chat_style.h"
 #include "ui/chat/chat_theme.h"
+#include "ui/effects/message_sending_animation_controller.h"
 #include "ui/style/style_palette_colorizer.h"
 #include "ui/toast/toast.h"
 #include "ui/toasts/common_toasts.h"
@@ -211,7 +212,7 @@ void SessionNavigation::resolveUsername(
 	}).fail([=](const MTP::Error &error) {
 		_resolveRequestId = 0;
 		if (error.code() == 400) {
-			show(Box<Ui::InformBox>(
+			show(Ui::MakeInformBox(
 				tr::lng_username_not_found(tr::now, lt_user, username)));
 		}
 	}).send();
@@ -281,8 +282,7 @@ void SessionNavigation::showPeerByLinkResolved(
 			const auto join = [=] {
 				parentController()->startOrJoinGroupCall(
 					peer,
-					hash,
-					SessionController::GroupCallJoinConfirm::Always);
+					{ hash, Calls::StartGroupCallArgs::JoinConfirm::Always });
 			};
 			if (call->loaded()) {
 				join();
@@ -526,6 +526,8 @@ SessionController::SessionController(
 , _window(window)
 , _emojiInteractions(
 	std::make_unique<ChatHelpers::EmojiInteractions>(session))
+, _sendingAnimation(
+	std::make_unique<Ui::MessageSendingAnimationController>(this))
 , _tabbedSelector(
 	std::make_unique<ChatHelpers::TabbedSelector>(
 		_window->widget(),
@@ -625,6 +627,11 @@ bool SessionController::isPrimary() const {
 
 not_null<::MainWindow*> SessionController::widget() const {
 	return _window->widget();
+}
+
+auto SessionController::sendingAnimation() const
+-> Ui::MessageSendingAnimationController & {
+	return *_sendingAnimation;
 }
 
 auto SessionController::tabbedSelector() const
@@ -1145,16 +1152,20 @@ void SessionController::showPeer(not_null<PeerData*> peer, MsgId msgId) {
 
 void SessionController::startOrJoinGroupCall(
 		not_null<PeerData*> peer,
-		QString joinHash,
-		GroupCallJoinConfirm confirm) {
+		const Calls::StartGroupCallArgs &args) {
+	using JoinConfirm = Calls::StartGroupCallArgs::JoinConfirm;
 	auto &calls = Core::App().calls();
 	const auto askConfirmation = [&](QString text, QString button) {
-		show(Box<Ui::ConfirmBox>(text, button, crl::guard(this, [=] {
-			Ui::hideLayer();
-			startOrJoinGroupCall(peer, joinHash, GroupCallJoinConfirm::None);
-		})));
+		show(Ui::MakeConfirmBox({
+			.text = text,
+			.confirmed = crl::guard(this, [=, hash = args.joinHash] {
+				Ui::hideLayer();
+				startOrJoinGroupCall(peer, { hash, JoinConfirm::None });
+			}),
+			.confirmText = button,
+		}));
 	};
-	if (confirm != GroupCallJoinConfirm::None && calls.inCall()) {
+	if (args.confirm != JoinConfirm::None && calls.inCall()) {
 		// Do you want to leave your active voice chat
 		// to join a voice chat in this group?
 		askConfirmation(
@@ -1162,13 +1173,13 @@ void SessionController::startOrJoinGroupCall(
 				? tr::lng_call_leave_to_other_sure_channel
 				: tr::lng_call_leave_to_other_sure)(tr::now),
 			tr::lng_call_bar_hangup(tr::now));
-	} else if (confirm != GroupCallJoinConfirm::None
+	} else if (args.confirm != JoinConfirm::None
 		&& calls.inGroupCall()) {
 		const auto now = calls.currentGroupCall()->peer();
 		if (now == peer) {
-			calls.activateCurrentCall(joinHash);
+			calls.activateCurrentCall(args.joinHash);
 		} else if (calls.currentGroupCall()->scheduleDate()) {
-			calls.startOrJoinGroupCall(peer, joinHash);
+			calls.startOrJoinGroupCall(peer, { args.joinHash });
 		} else {
 			askConfirmation(
 				((peer->isBroadcast() && now->isBroadcast())
@@ -1181,8 +1192,7 @@ void SessionController::startOrJoinGroupCall(
 				tr::lng_group_call_leave(tr::now));
 		}
 	} else {
-		const auto confirmNeeded = (confirm == GroupCallJoinConfirm::Always);
-		calls.startOrJoinGroupCall(peer, joinHash, confirmNeeded);
+		calls.startOrJoinGroupCall(peer, args);
 	}
 }
 
@@ -1396,12 +1406,13 @@ void SessionController::cancelUploadLayer(not_null<HistoryItem*> item) {
 		session().uploader().unpause();
 	};
 
-	show(Box<Ui::ConfirmBox>(
-		tr::lng_selected_cancel_sure_this(tr::now),
-		tr::lng_selected_upload_stop(tr::now),
-		tr::lng_continue(tr::now),
-		stopUpload,
-		continueUpload));
+	show(Ui::MakeConfirmBox({
+		.text = tr::lng_selected_cancel_sure_this(),
+		.confirmed = stopUpload,
+		.cancelled = continueUpload,
+		.confirmText = tr::lng_selected_upload_stop(),
+		.cancelText = tr::lng_continue(),
+	}));
 }
 
 void SessionController::showSection(

@@ -29,6 +29,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/text_utilities.h"
 #include "ui/chat/attach/attach_prepare.h"
 #include "ui/chat/attach/attach_send_files_way.h"
+#include "ui/effects/message_sending_animation_controller.h"
 #include "ui/special_buttons.h"
 #include "ui/ui_utility.h"
 #include "ui/toasts/common_toasts.h"
@@ -335,6 +336,7 @@ RepliesWidget::~RepliesWidget() {
 	_history->owner().sendActionManager().repliesPainterRemoved(
 		_history,
 		_rootId);
+	controller()->sendingAnimation().clear();
 }
 
 void RepliesWidget::orderWidgets() {
@@ -558,7 +560,12 @@ void RepliesWidget::setupComposeControls() {
 
 	_composeControls->fileChosen(
 	) | rpl::start_with_next([=](Selector::FileChosen chosen) {
-		sendExistingDocument(chosen.document, chosen.options);
+		controller()->sendingAnimation().appendSending(
+			chosen.messageSendingFrom);
+		sendExistingDocument(
+			chosen.document,
+			chosen.options,
+			chosen.messageSendingFrom.localId);
 	}, lifetime());
 
 	_composeControls->photoChosen(
@@ -568,7 +575,10 @@ void RepliesWidget::setupComposeControls() {
 
 	_composeControls->inlineResultChosen(
 	) | rpl::start_with_next([=](Selector::InlineChosen chosen) {
-		sendInlineResult(chosen.result, chosen.bot, chosen.options);
+		controller()->sendingAnimation().appendSending(
+			chosen.messageSendingFrom);
+		const auto localId = chosen.messageSendingFrom.localId;
+		sendInlineResult(chosen.result, chosen.bot, chosen.options, localId);
 	}, lifetime());
 
 	_composeControls->scrollRequests(
@@ -1019,8 +1029,7 @@ void RepliesWidget::edit(
 		}
 		return;
 	} else if (!left.text.isEmpty()) {
-		controller()->show(Box<Ui::InformBox>(
-			tr::lng_edit_too_long(tr::now)));
+		controller()->show(Ui::MakeInformBox(tr::lng_edit_too_long()));
 		return;
 	}
 
@@ -1045,15 +1054,13 @@ void RepliesWidget::edit(
 
 		const auto &err = error.type();
 		if (ranges::contains(Api::kDefaultEditMessagesErrors, err)) {
-			controller()->show(Box<Ui::InformBox>(
-				tr::lng_edit_error(tr::now)));
+			controller()->show(Ui::MakeInformBox(tr::lng_edit_error()));
 		} else if (err == u"MESSAGE_NOT_MODIFIED"_q) {
 			_composeControls->cancelEditMessage();
 		} else if (err == u"MESSAGE_EMPTY"_q) {
 			doSetInnerFocus();
 		} else {
-			controller()->show(Box<Ui::InformBox>(
-				tr::lng_edit_error(tr::now)));
+			controller()->show(Ui::MakeInformBox(tr::lng_edit_error()));
 		}
 		update();
 		return true;
@@ -1072,7 +1079,7 @@ void RepliesWidget::edit(
 
 void RepliesWidget::sendExistingDocument(
 		not_null<DocumentData*> document) {
-	sendExistingDocument(document, {});
+	sendExistingDocument(document, {}, std::nullopt);
 	// #TODO replies schedule
 	//const auto callback = [=](Api::SendOptions options) {
 	//	sendExistingDocument(document, options);
@@ -1084,13 +1091,14 @@ void RepliesWidget::sendExistingDocument(
 
 bool RepliesWidget::sendExistingDocument(
 		not_null<DocumentData*> document,
-		Api::SendOptions options) {
+		Api::SendOptions options,
+		std::optional<MsgId> localId) {
 	const auto error = Data::RestrictionError(
 		_history->peer,
 		ChatRestriction::SendStickers);
 	if (error) {
 		controller()->show(
-			Box<Ui::InformBox>(*error),
+			Ui::MakeInformBox(*error),
 			Ui::LayerOption::KeepOther);
 		return false;
 	} else if (showSlowmodeError()) {
@@ -1099,7 +1107,8 @@ bool RepliesWidget::sendExistingDocument(
 
 	Api::SendExistingDocument(
 		Api::MessageToSend(prepareSendAction(options)),
-		document);
+		document,
+		localId);
 
 	_composeControls->cancelReplyMessage();
 	finishSending();
@@ -1125,7 +1134,7 @@ bool RepliesWidget::sendExistingPhoto(
 		ChatRestriction::SendMedia);
 	if (error) {
 		controller()->show(
-			Box<Ui::InformBox>(*error),
+			Ui::MakeInformBox(*error),
 			Ui::LayerOption::KeepOther);
 		return false;
 	} else if (showSlowmodeError()) {
@@ -1146,10 +1155,10 @@ void RepliesWidget::sendInlineResult(
 		not_null<UserData*> bot) {
 	const auto errorText = result->getErrorOnSend(_history);
 	if (!errorText.isEmpty()) {
-		controller()->show(Box<Ui::InformBox>(errorText));
+		controller()->show(Ui::MakeInformBox(errorText));
 		return;
 	}
-	sendInlineResult(result, bot, {});
+	sendInlineResult(result, bot, {}, std::nullopt);
 	//const auto callback = [=](Api::SendOptions options) {
 	//	sendInlineResult(result, bot, options);
 	//};
@@ -1161,10 +1170,11 @@ void RepliesWidget::sendInlineResult(
 void RepliesWidget::sendInlineResult(
 		not_null<InlineBots::Result*> result,
 		not_null<UserData*> bot,
-		Api::SendOptions options) {
+		Api::SendOptions options,
+		std::optional<MsgId> localMessageId) {
 	auto action = prepareSendAction(options);
 	action.generateLocal = true;
-	session().api().sendInlineResult(bot, result, action);
+	session().api().sendInlineResult(bot, result, action, localMessageId);
 
 	_composeControls->clear();
 	//_saveDraftText = true;
@@ -1356,7 +1366,7 @@ bool RepliesWidget::showAtPositionNow(
 }
 
 void RepliesWidget::updateScrollDownVisibility() {
-	if (animating()) {
+	if (animatingShow()) {
 		return;
 	}
 
@@ -1629,7 +1639,7 @@ void RepliesWidget::updateControlsGeometry() {
 }
 
 void RepliesWidget::paintEvent(QPaintEvent *e) {
-	if (animating()) {
+	if (animatingShow()) {
 		SectionWidget::paintEvent(e);
 		return;
 	} else if (Ui::skipPaintEvent(this, e)) {
@@ -1679,28 +1689,28 @@ void RepliesWidget::updatePinnedVisibility() {
 }
 
 void RepliesWidget::setPinnedVisibility(bool shown) {
-	if (!animating()) {
-		if (!_rootViewInited) {
-			const auto height = shown ? st::historyReplyHeight : 0;
-			if (const auto delta = height - _rootViewHeight) {
-				_rootViewHeight = height;
-				if (_scroll->scrollTop() == _scroll->scrollTopMax()) {
-					setGeometryWithTopMoved(geometry(), delta);
-				} else {
-					updateControlsGeometry();
-				}
-			}
-			if (shown) {
-				_rootView->show();
+	if (animatingShow()) {
+		return;
+	} else if (!_rootViewInited) {
+		const auto height = shown ? st::historyReplyHeight : 0;
+		if (const auto delta = height - _rootViewHeight) {
+			_rootViewHeight = height;
+			if (_scroll->scrollTop() == _scroll->scrollTopMax()) {
+				setGeometryWithTopMoved(geometry(), delta);
 			} else {
-				_rootView->hide();
+				updateControlsGeometry();
 			}
-			_rootVisible = shown;
-			_rootView->finishAnimating();
-			_rootViewInited = true;
-		} else {
-			_rootVisible = shown;
 		}
+		if (shown) {
+			_rootView->show();
+		} else {
+			_rootView->hide();
+		}
+		_rootVisible = shown;
+		_rootView->finishAnimating();
+		_rootViewInited = true;
+	} else {
+		_rootVisible = shown;
 	}
 }
 

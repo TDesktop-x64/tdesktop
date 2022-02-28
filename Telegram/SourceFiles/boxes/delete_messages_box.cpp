@@ -199,7 +199,11 @@ void DeleteMessagesBox::prepare() {
 				)).done([=](const MTPmessages_Messages &result) {
 					const auto count = result.c_messages_channelMessages().vcount().v;
 					if (count > 0) {
-						_deleteAll->setText(tr::lng_delete_all_from(tr::now) + QString(" (%1)").arg(count));
+						_deleteAll->setText(tr::lng_delete_all_from_user(
+							tr::now,
+							lt_user,
+							Ui::Text::Bold(_moderateFrom->name + QString(" (%1)").arg(count)),
+							Ui::Text::WithEntities).text);
 					}
 				}).fail([=](const MTP::Error &error) {
 					// if failed, then no any changes :)

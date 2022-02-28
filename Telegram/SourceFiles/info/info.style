@@ -724,8 +724,8 @@ topBarInfo: IconButton(topBarSearch) {
 	iconOver: icon {{ "top_bar_profile", menuIconFgOver }};
 }
 topBarRecentActions: IconButton(topBarSearch) {
-	icon: icon {{ "info_recent_actions", menuIconFg }};
-	iconOver: icon {{ "info_recent_actions", menuIconFgOver }};
+	icon: icon {{ "info/edit/group_manage_actions", menuIconFg }};
+	iconOver: icon {{ "info/edit/group_manage_actions", menuIconFgOver }};
 }
 topBarAdmins: IconButton(topBarSearch) {
 	icon: icon {{ "info/edit/group_manage_admins", menuIconFg }};

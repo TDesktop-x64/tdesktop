@@ -87,7 +87,7 @@ private:
 	not_null<Ui::FlatLabel*> _telegram;
 	not_null<Ui::FlatLabel*> _version;
 	QPointer<Ui::SettingsButton> _nightThemeToggle;
-	std::shared_ptr<QPointer<QAction>> _showPhoneAction;
+	QPointer<Ui::SettingsButton> _showPhoneToggle;
 	rpl::event_stream<bool> _nightThemeSwitches;
 	base::Timer _nightThemeSwitch;
 	base::unique_qptr<Ui::PopupMenu> _contextMenu;

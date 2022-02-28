@@ -69,7 +69,7 @@ QString NetBoostBox::BoostLabel(int boost) {
 }
 
 void NetBoostBox::save() {
-	const auto changeBoost = [=] {
+	const auto changeBoost = [=](Fn<void()> &&close) {
 		SetNetworkBoost(_boostGroup->value());
 		EnhancedSettings::Write();
 		Core::Restart();
@@ -78,11 +78,12 @@ void NetBoostBox::save() {
 	const auto box = std::make_shared<QPointer<BoxContent>>();
 
 	*box = getDelegate()->show(
-			Box<Ui::ConfirmBox>(
-					tr::lng_net_boost_restart_desc(tr::now),
-					tr::lng_settings_restart_now(tr::now),
-					tr::lng_cancel(tr::now),
-					changeBoost));
+		Ui::MakeConfirmBox({
+				.text = tr::lng_net_boost_restart_desc(tr::now),
+				.confirmed = changeBoost,
+				.confirmText = tr::lng_settings_restart_now(tr::now),
+				.cancelText = tr::lng_cancel(tr::now),
+		}));
 }
 
 AlwaysDeleteBox::AlwaysDeleteBox(QWidget *parent) {

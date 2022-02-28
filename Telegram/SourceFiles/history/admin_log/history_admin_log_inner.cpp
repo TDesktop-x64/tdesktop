@@ -1470,24 +1470,17 @@ void InnerWidget::suggestRestrictParticipant(
 		}
 		const auto text = tr::lng_profile_sure_kick(tr::now, lt_user, sender->name);
 		auto editRestrictions = [=](bool hasAdminRights, ChatRestrictionsInfo currentRights) {
-			auto weak = QPointer<InnerWidget>(this);
-			auto weakBox = std::make_shared<QPointer<Ui::ConfirmBox>>();
-			auto box = Box<Ui::ConfirmBox>(
-				text,
-				tr::lng_box_remove(tr::now),
-				crl::guard(this, [=] {
-					if (weak) {
+			Ui::show(
+				Ui::MakeConfirmBox({
+					.text = text,
+					.confirmed = crl::guard(this, [=] {
 						restrictParticipant(
 							participant,
 							ChatRestrictionsInfo(),
 							ChannelData::KickedRestrictedRights(participant));
-					}
-					if (*weakBox) {
-						(*weakBox)->closeBox();
-					}
-				}));
-			*weakBox = Ui::show(
-				std::move(box),
+					}),
+					.confirmText = text,
+				}),
 				Ui::LayerOption::KeepOther);
 		};
 		if (base::contains(_admins, sender)) {

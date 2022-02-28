@@ -782,7 +782,7 @@ void GroupInfoBox::createChannel(
 				Ui::LayerOption::CloseOther);
 		} else if (type == u"CHANNELS_TOO_MUCH"_q) {
 			controller->show(
-				Box<Ui::InformBox>(tr::lng_join_channel_error(tr::now)),
+				Ui::MakeInformBox(tr::lng_join_channel_error(tr::now)),
 				Ui::LayerOption::CloseOther); // TODO
 		}
 	}).send();

@@ -967,9 +967,12 @@ void MainMenu::setupMenu() {
 		)->setClickedCallback([=] {
 			controller->showNewGroup();
 		});
-		_menu->addAction(tr::lng_create_supergroup_title(tr::now), [=] {
+		addAction(
+			tr::lng_create_supergroup_title(),
+			{ &st::settingsIconGroup, kIconLightBlue }
+		)->setClickedCallback([=] {
 			controller->showNewSupergroup();
-		}, &st::mainMenuNewGroup, &st::mainMenuNewGroupOver);
+		});
 		addAction(
 			tr::lng_create_channel_title(),
 			{ &st::settingsIconChannel, kIconLightOrange }
@@ -1057,27 +1060,19 @@ void MainMenu::setupMenu() {
 			toggle);
 	}, _nightThemeToggle->lifetime());
 
+	_showPhoneToggle = addAction(
+		tr::lng_settings_show_phone_number(),
+		{ &st::settingsIconCalls, kIconDarkBlue }
+	)->toggleOn(rpl::single(cShowPhoneNumber()));
 
-	_showPhoneAction = std::make_shared<QPointer<QAction>>();
-	auto phoneCallback = [=] {
-		if (auto action2 = *_showPhoneAction) {
-			cSetShowPhoneNumber(!action2->isChecked());
-			action2->setChecked(!action2->isChecked());
-			EnhancedSettings::Write();
-			updatePhone();
-		}
-	};
-	auto item2 = base::make_unique_q<Ui::Menu::Toggle>(
-			_menu,
-			st::mainMenu,
-			tr::lng_settings_show_phone_number(tr::now),
-			std::move(phoneCallback),
-			&st::mainMenuCalls,
-			&st::mainMenuCallsOver);
-	auto action2 = _menu->addAction(std::move(item2));
-	*_showPhoneAction = action2;
-	action2->setCheckable(true);
-	action2->setChecked(cShowPhoneNumber());
+	_showPhoneToggle->toggledChanges(
+	) | rpl::filter([=](bool showPhone) {
+		return (showPhone != cShowPhoneNumber());
+	}) | rpl::start_with_next([=](bool showPhone) {
+		cSetShowPhoneNumber(!cShowPhoneNumber());
+		EnhancedSettings::Write();
+		updatePhone();
+	}, _showPhoneToggle->lifetime());
 
 	Core::App().settings().systemDarkModeValue(
 	) | rpl::start_with_next([=](std::optional<bool> darkMode) {

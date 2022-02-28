@@ -449,7 +449,7 @@ bool HandleOpenMessage(
 		return true;
 	}
 	Core::App().hideMediaView();
-	Ui::show(Box<Ui::InformBox>(tr::lng_user_not_found(tr::now)));
+	Ui::show(Ui::MakeInformBox(tr::lng_user_not_found(tr::now)));
 	return false;
 }
 
@@ -473,7 +473,7 @@ bool HandleUser(
 		return true;
 	}
 	Core::App().hideMediaView();
-	Ui::show(Box<Ui::InformBox>(tr::lng_user_not_found(tr::now)));
+	Ui::show(Ui::MakeInformBox(tr::lng_user_not_found(tr::now)));
 	return false;
 }
 

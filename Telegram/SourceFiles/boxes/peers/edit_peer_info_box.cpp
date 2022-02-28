@@ -1665,11 +1665,11 @@ void Controller::upgradeWithConfirmation() {
 		Ui::hideLayer();
 	});
 	Ui::show(
-		Box<Ui::ConfirmBox>(
-			text,
-			tr::lng_profile_convert_confirm(tr::now),
-			st::attentionBoxButton,
-			upgradedCallback),
+			Ui::MakeConfirmBox({
+				.text = text,
+				.confirmed = upgradedCallback,
+				.confirmText = tr::lng_profile_convert_confirm(),
+			}),
 		Ui::LayerOption::KeepOther);
 }
 

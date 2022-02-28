@@ -104,11 +104,6 @@ Fn<void()> DeleteAndLeaveHandler(not_null<PeerData*> peer);
 [[nodiscard]] Api::SendAction prepareSendAction(
 		History *history, Api::SendOptions options);
 
-QPointer<Ui::BoxContent> ShowOldForwardMessagesBox(
-	not_null<Window::SessionNavigation*> navigation,
-	Data::ForwardDraft &&draft,
-	FnMut<void()> &&successCallback = nullptr);
-
 QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 	not_null<Window::SessionNavigation*> navigation,
 	MessageIdsList &&items,

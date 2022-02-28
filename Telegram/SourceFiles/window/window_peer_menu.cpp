@@ -1287,9 +1287,7 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 				).append("\n\n");
 			}
 			text.append(error.first);
-			Ui::show(
-				Box<Ui::InformBox>(text),
-				Ui::LayerOption::KeepOther);
+			Ui::show(Ui::MakeInformBox(text), Ui::LayerOption::KeepOther);
 			return;
 		}
 
@@ -1417,9 +1415,7 @@ QPointer<Ui::BoxContent> ShowForwardNoQuoteMessagesBox(
 				).append("\n\n");
 			}
 			text.append(error.first);
-			Ui::show(
-				Box<Ui::InformBox>(text),
-				Ui::LayerOption::KeepOther);
+			Ui::show(Ui::MakeInformBox(text), Ui::LayerOption::KeepOther);
 			return;
 		}
 
@@ -1461,6 +1457,7 @@ QPointer<Ui::BoxContent> ShowForwardNoQuoteMessagesBox(
 	return weak->data();
 }
 
+QPointer<Ui::BoxContent> ShowForwardMessagesBox(
 		not_null<Window::SessionNavigation*> navigation,
 		MessageIdsList &&items,
 		FnMut<void()> &&successCallback) {

@@ -304,6 +304,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_username_bad_symbols" = "Only a-z, 0-9, and underscores allowed.";
 "lng_username_available" = "This username is available.";
 "lng_username_not_found" = "User @{user} not found.";
+"lng_username_by_phone_not_found" = "User {phone} not found.";
 "lng_username_link_willbe" = "This link will open a chat with you:";
 "lng_username_link" = "This link opens a chat with you:";
 "lng_username_copied" = "Link copied to clipboard.";
@@ -368,6 +369,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_section_general" = "General";
 "lng_settings_change_lang" = "Change language";
 "lng_languages" = "Languages";
+"lng_languages_none" = "No languages found.";
 "lng_sure_save_language" = "Telegram will restart in order to change language";
 "lng_settings_update_automatically" = "Update automatically";
 "lng_settings_install_beta" = "Install beta versions";
@@ -1850,6 +1852,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_downloads_delete_sure_one" = "Do you want to delete this file?";
 "lng_downloads_delete_sure#one" = "Do you want to delete {count} file?";
 "lng_downloads_delete_sure#other" = "Do you want to delete {count} files?";
+"lng_downloads_delete_in_cloud_one" = "It will be deleted from your disk, but will remain accessible in the cloud.";
+"lng_downloads_delete_in_cloud" = "They will be deleted from your disk, but will remain accessible in the cloud.";
 
 "lng_send_image_empty" = "Could not send an empty file: {name}";
 "lng_send_image_too_large" = "Could not send a file, because it is larger than 1500 MB: {name}";
@@ -2411,7 +2415,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_group_call_rtmp_key_copy" = "Copy Stream Key";
 "lng_group_call_rtmp_key_copied" = "Stream Key copied to clipboard.";
 "lng_group_call_rtmp_key_warning" = "**Never share your Stream Key with anyone or show it on stream!**";
-"lng_group_call_rtmp_info" = "To stream video with another app, enter these Server URL and Stream Key in your streaming app.\n\nOnce you start broadcasting in your streaming app, tap Start Streaming below";
+"lng_group_call_rtmp_info" = "To stream video with another app, enter these Server URL and Stream Key in your streaming app.\n\nOnce you start broadcasting in your streaming app, tap Start Streaming below.";
 "lng_group_call_rtmp_start" = "Start Streaming";
 "lng_group_call_rtmp_revoke" = "Revoke Stream Key";
 "lng_group_call_rtmp_revoke_sure" = "Are you sure you want to revoke your Server URL and Stream Key?";

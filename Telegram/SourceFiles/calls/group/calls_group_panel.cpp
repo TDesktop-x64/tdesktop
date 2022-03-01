@@ -71,6 +71,7 @@ constexpr auto kRecordingOpacity = 0.6;
 constexpr auto kStartNoConfirmation = TimeId(10);
 constexpr auto kControlsBackgroundOpacity = 0.8;
 constexpr auto kOverrideActiveColorBgAlpha = 172;
+constexpr auto kHideControlsTimeout = 5 * crl::time(1000);
 
 } // namespace
 
@@ -121,7 +122,8 @@ Panel::Panel(not_null<GroupCall*> call)
 , _hangup(widget(), st::groupCallHangup)
 , _stickedTooltipsShown(Core::App().settings().hiddenGroupCallTooltips()
 	& ~StickedTooltip::Microphone) // Always show tooltip about mic.
-, _toasts(std::make_unique<Toasts>(this)) {
+, _toasts(std::make_unique<Toasts>(this))
+, _hideControlsTimer([=] { toggleWideControls(false); }) {
 	_layerBg->setStyleOverrides(&st::groupCallBox, &st::groupCallLayerBox);
 	_layerBg->setHideByBackgroundClick(true);
 
@@ -1157,7 +1159,7 @@ void Panel::subscribeToChanges(not_null<Data::GroupCall*> real) {
 }
 
 void Panel::createPinOnTop() {
-	_pinOnTop.create(window(), st::groupCallPinOnTop);
+	_pinOnTop.create(widget(), st::groupCallPinOnTop);
 	const auto pinned = [=] {
 		const auto handle = window()->windowHandle();
 		return handle && (handle->flags() & Qt::WindowStaysOnTopHint);
@@ -1180,6 +1182,17 @@ void Panel::createPinOnTop() {
 		_pinOnTop->setVisible(!fullscreen);
 		if (fullscreen) {
 			pin(false);
+
+			_viewport->rp()->events(
+			) | rpl::filter([](not_null<QEvent*> event) {
+				return (event->type() == QEvent::MouseMove);
+			}) | rpl::start_with_next([=] {
+				_hideControlsTimer.callOnce(kHideControlsTimeout);
+				toggleWideControls(true);
+			}, _hideControlsTimerLifetime);
+		} else {
+			_hideControlsTimerLifetime.destroy();
+			_hideControlsTimer.cancel();
 		}
 	}, _pinOnTop->lifetime());
 
@@ -1613,25 +1626,51 @@ void Panel::setupEmptyRtmp() {
 		if (!empty) {
 			_emptyRtmp.destroy();
 			return;
-		} else if (_emptyRtmp || _call->hasVideoWithFrames()) {
+		} else if (_emptyRtmp) {
 			return;
 		}
-		auto text = _call->rtmpUrl().isEmpty()
-			? tr::lng_group_call_no_stream(
-				lt_group,
-				rpl::single(_peer->name))
-			: tr::lng_group_call_no_stream_admin();
-		_emptyRtmp.create(
-			widget(),
-			std::move(text),
-			st::groupCallVideoLimitLabel);
+		struct Label {
+			Label(QWidget *parent, rpl::producer<QString> text)
+			: widget(parent, std::move(text), st::groupCallVideoLimitLabel)
+			, color([] {
+				auto result = st::groupCallBg->c;
+				result.setAlphaF(kControlsBackgroundOpacity);
+				return result;
+			})
+			, corners(st::groupCallControlsBackRadius, color.color()) {
+			}
+
+			Ui::FlatLabel widget;
+			style::complex_color color;
+			Ui::RoundRect corners;
+		};
+		_emptyRtmp.create(widget());
+		const auto label = _emptyRtmp->lifetime().make_state<Label>(
+			_emptyRtmp.data(),
+			(_call->rtmpInfo().url.isEmpty()
+				? tr::lng_group_call_no_stream(
+					lt_group,
+					rpl::single(_peer->name))
+				: tr::lng_group_call_no_stream_admin()));
+		_emptyRtmp->setAttribute(Qt::WA_TransparentForMouseEvents);
 		_emptyRtmp->show();
+		_emptyRtmp->paintRequest(
+		) | rpl::start_with_next([=] {
+			auto p = QPainter(_emptyRtmp.data());
+			label->corners.paint(p, _emptyRtmp->rect());
+		}, _emptyRtmp->lifetime());
+
 		widget()->sizeValue(
 		) | rpl::start_with_next([=](QSize size) {
+			const auto padding = st::groupCallWidth / 30;
 			const auto width = std::min(
-				size.width() - st::groupCallWidth / 10,
+				size.width() - padding * 4,
 				st::groupCallWidth);
-			_emptyRtmp->resizeToWidth(width);
+			label->widget.resizeToWidth(width);
+			label->widget.move(padding, padding);
+			_emptyRtmp->resize(
+				width + 2 * padding,
+				label->widget.height() + 2 * padding);
 			_emptyRtmp->move(
 				(size.width() - _emptyRtmp->width()) / 2,
 				(size.height() - _emptyRtmp->height()) / 3);

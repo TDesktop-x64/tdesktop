@@ -250,6 +250,14 @@ void SettingsBox(
 	const auto joinMuted = goodReal ? real->joinMuted() : false;
 	const auto canChangeJoinMuted = (goodReal && real->canChangeJoinMuted());
 	const auto addCheck = (peer->canManageGroupCall() && canChangeJoinMuted);
+
+	const auto addDivider = [&] {
+		layout->add(object_ptr<Ui::BoxContentDivider>(
+			layout,
+			st::boxDividerHeight,
+			st::groupCallDividerBg));
+	};
+
 	if (addCheck) {
 		AddSkip(layout);
 	}
@@ -648,11 +656,15 @@ void SettingsBox(
 			st::groupCallSettingsButton
 		)->addClickHandler(std::move(shareLink));
 	}
-	if (rtmp) {
+	if (rtmp && !call->rtmpInfo().url.isEmpty()) {
+		AddSkip(layout);
+		addDivider();
+		AddSkip(layout);
+
 		struct State {
 			base::unique_qptr<Ui::PopupMenu> menu;
 			mtpRequestId requestId;
-			rpl::event_stream<StartRtmpProcess::Data> data;
+			rpl::event_stream<RtmpInfo> data;
 		};
 		const auto top = box->addTopButton(st::groupCallMenuToggle);
 		const auto state = top->lifetime().make_state<State>();
@@ -665,14 +677,13 @@ void SettingsBox(
 			)).done([=](const MTPphone_GroupCallStreamRtmpUrl &result) {
 				auto data = result.match([&](
 						const MTPDphone_groupCallStreamRtmpUrl &data) {
-					return StartRtmpProcess::Data{
+					return RtmpInfo{
 						.url = qs(data.vurl()),
 						.key = qs(data.vkey()),
 					};
 				});
 				if (const auto call = weakCall.get()) {
-					call->setRtmpUrl(data.url);
-					call->setRtmpKey(data.key);
+					call->setRtmpInfo(data);
 				}
 				if (!top) {
 					return;
@@ -704,20 +715,24 @@ void SettingsBox(
 			state->menu->addAction(
 				tr::lng_group_call_rtmp_revoke(tr::now),
 				revoke);
-			state->menu->moveToRight(
-				st::groupCallRtmpTopBarMenuPosition.x(),
-				st::groupCallRtmpTopBarMenuPosition.y());
 			state->menu->setForcedOrigin(
 				Ui::PanelAnimation::Origin::TopRight);
-			state->menu->popup(QCursor::pos());
+			top->setForceRippled(true);
+			const auto raw = state->menu.get();
+			raw->setDestroyedCallback([=] {
+				if ((state->menu == raw) && top) {
+					top->setForceRippled(false);
+				}
+			});
+			state->menu->popup(
+				top->mapToGlobal(QPoint(top->width() / 2, top->height())));
 			return true;
 		});
 
 
 		StartRtmpProcess::FillRtmpRows(
-			box->verticalLayout(),
+			layout,
 			false,
-			true,
 			[=](object_ptr<Ui::BoxContent> &&object) {
 				box->getDelegate()->show(std::move(object));
 			},
@@ -730,8 +745,12 @@ void SettingsBox(
 			&st::groupCallBoxLabel,
 			&st::groupCallSettingsRtmpShowButton,
 			&st::groupCallSubsectionTitle,
-			&st::groupCallAttentionBoxButton);
-		state->data.fire({ call->rtmpUrl(), call->rtmpKey() });
+			&st::groupCallAttentionBoxButton,
+			&st::groupCallPopupMenu);
+		state->data.fire(call->rtmpInfo());
+
+		addDivider();
+		AddSkip(layout);
 	}
 
 	if (peer->canManageGroupCall()) {

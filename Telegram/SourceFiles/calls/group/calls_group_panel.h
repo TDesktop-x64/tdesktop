@@ -227,7 +227,7 @@ private:
 	object_ptr<Ui::RpWidget> _countdown = { nullptr };
 	std::shared_ptr<Ui::GroupCallScheduledLeft> _countdownData;
 	object_ptr<Ui::FlatLabel> _startsWhen = { nullptr };
-	object_ptr<Ui::FlatLabel> _emptyRtmp = { nullptr };
+	object_ptr<Ui::RpWidget> _emptyRtmp = { nullptr };
 	ChooseJoinAsProcess _joinAsProcess;
 	std::optional<QRect> _lastSmallGeometry;
 	std::optional<QRect> _lastLargeGeometry;
@@ -256,6 +256,9 @@ private:
 	base::weak_ptr<Ui::Toast::Instance> _lastToast;
 
 	std::unique_ptr<MicLevelTester> _micLevelTester;
+
+	base::Timer _hideControlsTimer;
+	rpl::lifetime _hideControlsTimerLifetime;
 
 	rpl::lifetime _peerLifetime;
 

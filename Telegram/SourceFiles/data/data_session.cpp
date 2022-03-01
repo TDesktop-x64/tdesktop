@@ -926,6 +926,18 @@ void Session::unregisterInvitedToCallUser(
 	}
 }
 
+UserData *Session::userByPhone(const QString &phone) const {
+	const auto pname = phone.trimmed();
+	for (const auto &[peerId, peer] : _peers) {
+		if (const auto user = peer->asUser()) {
+			if (user->phone() == pname) {
+				return user;
+			}
+		}
+	}
+	return nullptr;
+}
+
 PeerData *Session::peerByUsername(const QString &username) const {
 	const auto uname = username.trimmed();
 	for (const auto &[peerId, peer] : _peers) {
@@ -1281,21 +1293,19 @@ void Session::requestPollViewRepaint(not_null<const PollData*> poll) {
 
 void Session::documentLoadProgress(not_null<DocumentData*> document) {
 	requestDocumentViewRepaint(document);
-	session().documentUpdated.notify(document, true);
-
-	if (document->isAudioFile()) {
-		::Media::Player::instance()->documentLoadProgress(document);
-	}
+	_documentLoadProgress.fire_copy(document);
 }
 
 void Session::documentLoadDone(not_null<DocumentData*> document) {
 	notifyDocumentLayoutChanged(document);
+	_documentLoadProgress.fire_copy(document);
 }
 
 void Session::documentLoadFail(
 		not_null<DocumentData*> document,
 		bool started) {
 	notifyDocumentLayoutChanged(document);
+	_documentLoadProgress.fire_copy(document);
 }
 
 void Session::photoLoadProgress(not_null<PhotoData*> photo) {

@@ -8,7 +8,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "calls/group/calls_group_rtmp.h"
 
 #include "apiwrap.h"
-#include "base/event_filter.h"
 #include "calls/group/calls_group_common.h"
 #include "data/data_peer.h"
 #include "lang/lang_keys.h"
@@ -42,7 +41,7 @@ void StartWithBox(
 		Fn<void()> revoke,
 		Fn<void(object_ptr<Ui::BoxContent>)> showBox,
 		Fn<void(QString)> showToast,
-		rpl::producer<StartRtmpProcess::Data> &&data) {
+		rpl::producer<RtmpInfo> &&data) {
 	struct State {
 		base::unique_qptr<Ui::PopupMenu> menu;
 	};
@@ -51,14 +50,14 @@ void StartWithBox(
 	StartRtmpProcess::FillRtmpRows(
 		box->verticalLayout(),
 		true,
-		false,
 		std::move(showBox),
 		std::move(showToast),
 		std::move(data),
 		&st::boxLabel,
 		&st::groupCallRtmpShowButton,
 		&st::settingsSubsectionTitle,
-		&st::attentionBoxButton);
+		&st::attentionBoxButton,
+		&st::defaultPopupMenu);
 
 	box->setTitle(tr::lng_group_call_rtmp_title());
 
@@ -68,7 +67,7 @@ void StartWithBox(
 
 	box->addButton(tr::lng_group_call_rtmp_start(), done);
 	box->addButton(tr::lng_cancel(), [=] { box->closeBox(); });
-	box->setWidth(st::infoDesiredWidth);
+	box->setWidth(st::boxWideWidth);
 	{
 		const auto top = box->addTopButton(st::infoTopBarMenu);
 		top->setClickedCallback([=] {
@@ -79,12 +78,16 @@ void StartWithBox(
 				tr::lng_group_invite_context_revoke(tr::now),
 				revoke,
 				&st::menuIconRemove);
-			state->menu->moveToRight(
-				st::groupCallRtmpTopBarMenuPosition.x(),
-				st::groupCallRtmpTopBarMenuPosition.y());
 			state->menu->setForcedOrigin(
 				Ui::PanelAnimation::Origin::TopRight);
-			state->menu->popup(QCursor::pos());
+			top->setForceRippled(true);
+			const auto raw = state->menu.get();
+			raw->setDestroyedCallback([=] {
+				if ((state->menu == raw) && top) {
+					top->setForceRippled(false);
+				}
+			});
+			state->menu->popup(top->mapToGlobal(top->rect().center()));
 			return true;
 		});
 	}
@@ -139,7 +142,7 @@ void StartRtmpProcess::requestUrl(bool revoke) {
 	)).done([=](const MTPphone_GroupCallStreamRtmpUrl &result) {
 		auto data = result.match([&](
 				const MTPDphone_groupCallStreamRtmpUrl &data) {
-			return Data{ .url = qs(data.vurl()), .key = qs(data.vkey()) };
+			return RtmpInfo{ .url = qs(data.vurl()), .key = qs(data.vkey()) };
 		});
 		processUrl(std::move(data));
 	}).fail([=] {
@@ -147,7 +150,7 @@ void StartRtmpProcess::requestUrl(bool revoke) {
 	}).send();
 }
 
-void StartRtmpProcess::processUrl(Data data) {
+void StartRtmpProcess::processUrl(RtmpInfo data) {
 	if (!_request->box) {
 		createBox();
 	}
@@ -159,8 +162,7 @@ void StartRtmpProcess::finish(JoinInfo info) {
 	const auto box = _request->box;
 	const auto current = _request->data.current();
 	_request = nullptr;
-	info.rtmpUrl = current.url;
-	info.rtmpKey = current.key;
+	info.rtmpInfo = current;
 	done(std::move(info));
 	if (const auto strong = box.data()) {
 		strong->closeBox();
@@ -201,14 +203,14 @@ void StartRtmpProcess::createBox() {
 void StartRtmpProcess::FillRtmpRows(
 		not_null<Ui::VerticalLayout*> container,
 		bool divider,
-		bool disabledMenuForLabels,
 		Fn<void(object_ptr<Ui::BoxContent>)> showBox,
 		Fn<void(QString)> showToast,
-		rpl::producer<StartRtmpProcess::Data> &&data,
+		rpl::producer<RtmpInfo> &&data,
 		const style::FlatLabel *labelStyle,
 		const style::IconButton *showButtonStyle,
 		const style::FlatLabel *subsectionTitleStyle,
-		const style::RoundButton *attentionButtonStyle) {
+		const style::RoundButton *attentionButtonStyle,
+		const style::PopupMenu *popupMenuStyle) {
 	struct State {
 		rpl::variable<bool> hidden = true;
 		rpl::variable<QString> key;
@@ -246,7 +248,9 @@ void StartRtmpProcess::FillRtmpRows(
 				QGuiApplication::clipboard()->setText(state->url.current());
 				showToast(tr::lng_group_call_rtmp_url_copied(tr::now));
 			}));
+		Settings::AddSkip(container, st::groupCallRtmpCopyButtonTopSkip);
 		const auto weak = container->add(std::move(wrap), rowPadding);
+		Settings::AddSkip(container, st::groupCallRtmpCopyButtonBottomSkip);
 		button->heightValue(
 		) | rpl::start_with_next([=](int height) {
 			weak->resize(weak->width(), height);
@@ -254,41 +258,29 @@ void StartRtmpProcess::FillRtmpRows(
 		return weak;
 	};
 
-	const auto addLabel = [&](
-			rpl::producer<QString> &&text,
-			const style::FlatLabel &st) {
+	const auto addLabel = [&](rpl::producer<QString> &&text) {
 		const auto label = container->add(
-			object_ptr<Ui::FlatLabel>(container, std::move(text), st),
+			object_ptr<Ui::FlatLabel>(
+				container,
+				std::move(text),
+				*labelStyle,
+				*popupMenuStyle),
 			st::boxRowPadding + QMargins(0, 0, showButtonStyle->width, 0));
 		label->setSelectable(true);
 		label->setBreakEverywhere(true);
-		if (disabledMenuForLabels) {
-			base::install_event_filter(label, [=](not_null<QEvent*> e) {
-				return (e->type() == QEvent::ContextMenu)
-					? base::EventFilterResult::Cancel
-					: base::EventFilterResult::Continue;
-			});
-		}
 		return label;
 	};
 
 	// Server URL.
-	{
-		// Settings::AddSubsectionTitle
-		container->add(
-			object_ptr<Ui::FlatLabel>(
-				container,
-				tr::lng_group_call_rtmp_url_subtitle(),
-				*subsectionTitleStyle),
-			st::settingsSubsectionTitlePadding
-				+ st::groupCallRtmpSubsectionTitleAddPadding);
-	}
+	Settings::AddSubsectionTitle(
+		container,
+		tr::lng_group_call_rtmp_url_subtitle(),
+		st::groupCallRtmpSubsectionTitleAddPadding,
+		subsectionTitleStyle);
 
 	auto urlLabelContent = state->url.value();
-	addLabel(std::move(urlLabelContent), *labelStyle);
-	container->add(object_ptr<Ui::FixedHeightWidget>(
-		container,
-		st::groupCallRtmpUrlSkip));
+	addLabel(std::move(urlLabelContent));
+	Settings::AddSkip(container, st::groupCallRtmpUrlSkip);
 	addButton(false, tr::lng_group_call_rtmp_url_copy());
 	//
 
@@ -297,20 +289,13 @@ void StartRtmpProcess::FillRtmpRows(
 	}
 
 	// Stream Key.
-	container->add(object_ptr<Ui::FixedHeightWidget>(
-		container,
-		st::groupCallRtmpKeySubsectionTitleSkip));
+	Settings::AddSkip(container, st::groupCallRtmpKeySubsectionTitleSkip);
 
-	{
-		// Settings::AddSubsectionTitle
-		container->add(
-			object_ptr<Ui::FlatLabel>(
-				container,
-				tr::lng_group_call_rtmp_key_subtitle(),
-				*subsectionTitleStyle),
-			st::settingsSubsectionTitlePadding
-				+ st::groupCallRtmpSubsectionTitleAddPadding);
-	}
+	Settings::AddSubsectionTitle(
+		container,
+		tr::lng_group_call_rtmp_key_subtitle(),
+		st::groupCallRtmpSubsectionTitleAddPadding,
+		subsectionTitleStyle);
 
 	auto keyLabelContent = rpl::combine(
 		state->hidden.value(),
@@ -324,9 +309,7 @@ void StartRtmpProcess::FillRtmpRows(
 	}) | rpl::after_next([=] {
 		container->resizeToWidth(container->widthNoMargins());
 	});
-	const auto streamKeyLabel = addLabel(
-		std::move(keyLabelContent),
-		*labelStyle);
+	const auto streamKeyLabel = addLabel(std::move(keyLabelContent));
 	streamKeyLabel->setSelectable(false);
 	const auto streamKeyButton = Ui::CreateChild<Ui::IconButton>(
 		container.get(),

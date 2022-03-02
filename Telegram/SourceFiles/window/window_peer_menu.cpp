@@ -1431,7 +1431,7 @@ QPointer<Ui::BoxContent> ShowForwardNoQuoteMessagesBox(
 				api.sendMessage(std::move(message));
 			}
 
-			auto action = Api::SendAction(_history, Api::SendOptions{.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer)});
+			auto action = Api::SendAction(_history, Api::SendOptions{.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer), .scheduled = options.scheduled});
 			action.clearDraft = false;
 			if (_history->peer->isUser() || _history->peer->isChannel()) {
 				action.options.sendAs = nullptr;

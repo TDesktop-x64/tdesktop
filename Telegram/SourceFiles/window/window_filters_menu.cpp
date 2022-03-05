@@ -361,6 +361,7 @@ void FiltersMenu::showMenu(QPoint position, FilterId id) {
 		return _session->session().data().chatsFilters().chatsList(id);
 	};
 	Window::MenuAddMarkAsReadChatListAction(
+		_session,
 		std::move(filteredChats),
 		addAction);
 

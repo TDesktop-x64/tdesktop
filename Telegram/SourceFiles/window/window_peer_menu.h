@@ -49,21 +49,25 @@ void FillDialogsEntryMenu(
 	const PeerMenuCallback &addAction);
 
 void PeerMenuAddMuteAction(
+	not_null<Window::SessionController*> controller,
 	not_null<PeerData*> peer,
 	const PeerMenuCallback &addAction);
 
 void MenuAddMarkAsReadAllChatsAction(
-	not_null<Data::Session*> data,
+	not_null<Window::SessionController*> controller,
 	const PeerMenuCallback &addAction);
 
 void MenuAddMarkAsReadChatListAction(
+	not_null<Window::SessionController*> controller,
 	Fn<not_null<Dialogs::MainList*>()> &&list,
 	const PeerMenuCallback &addAction);
 
 void PeerMenuHidePinnedMessage(not_null<PeerData*> peer);
 void PeerMenuUnhidePinnedMessage(not_null<PeerData*> peer);
 void PeerMenuExportChat(not_null<PeerData*> peer);
-void PeerMenuDeleteContact(not_null<UserData*> user);
+void PeerMenuDeleteContact(
+	not_null<Window::SessionController*> controller,
+	not_null<UserData*> user);
 void PeerMenuShareContactBox(
 	not_null<Window::SessionNavigation*> navigation,
 	not_null<UserData*> user);
@@ -98,8 +102,12 @@ void BlockSenderFromRepliesBox(
 	FullMsgId id);
 
 void ToggleHistoryArchived(not_null<History*> history, bool archived);
-Fn<void()> ClearHistoryHandler(not_null<PeerData*> peer);
-Fn<void()> DeleteAndLeaveHandler(not_null<PeerData*> peer);
+Fn<void()> ClearHistoryHandler(
+	not_null<Window::SessionController*> controller,
+	not_null<PeerData*> peer);
+Fn<void()> DeleteAndLeaveHandler(
+	not_null<Window::SessionController*> controller,
+	not_null<PeerData*> peer);
 
 [[nodiscard]] Api::SendAction prepareSendAction(
 		History *history, Api::SendOptions options);

@@ -131,11 +131,10 @@ private:
 
 	bool handleClose();
 	void startScheduledNow();
-	void toggleFullScreen(bool fullscreen);
+	void toggleFullScreen();
 	void trackControls(bool track, bool force = false);
 	void raiseControls();
 	void enlargeVideo();
-	void minimizeVideo();
 
 	void trackControl(Ui::RpWidget *widget, rpl::lifetime &lifetime);
 	void trackControlOver(not_null<Ui::RpWidget*> control, bool over);
@@ -154,6 +153,7 @@ private:
 	void updateButtonsStyles();
 	void updateMembersGeometry();
 	void refreshControlsBackground();
+	void refreshTitleBackground();
 	void setupControlsBackgroundWide();
 	void setupControlsBackgroundNarrow();
 	void showControls();
@@ -201,7 +201,7 @@ private:
 	Ui::GL::Window _window;
 	const std::unique_ptr<Ui::LayerManager> _layerBg;
 	rpl::variable<PanelMode> _mode;
-	rpl::variable<bool> _fullScreen = false;
+	rpl::variable<bool> _fullScreenOrMaximized = false;
 
 #ifndef Q_OS_MAC
 	const std::unique_ptr<Ui::Platform::SeparateTitleControls> _controls;
@@ -211,6 +211,7 @@ private:
 
 	rpl::lifetime _callLifetime;
 
+	object_ptr<Ui::RpWidget> _titleBackground = { nullptr };
 	object_ptr<Ui::FlatLabel> _title = { nullptr };
 	object_ptr<Ui::FlatLabel> _subtitle = { nullptr };
 	object_ptr<Ui::AbstractButton> _recordingMark = { nullptr };
@@ -257,6 +258,7 @@ private:
 
 	std::unique_ptr<MicLevelTester> _micLevelTester;
 
+	style::complex_color _controlsBackgroundColor;
 	base::Timer _hideControlsTimer;
 	rpl::lifetime _hideControlsTimerLifetime;
 

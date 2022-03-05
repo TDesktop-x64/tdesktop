@@ -410,9 +410,14 @@ void EditCaptionBox::setupPhotoEditorEventHandler() {
 			controller->session().settings().incrementPhotoEditorHintShown();
 			controller->session().saveSettings();
 		};
+		const auto clearError = [=] {
+			_error = QString();
+			update();
+		};
 		const auto previewWidth = st::sendMediaPreviewSize;
 		if (!_preparedList.files.empty()) {
 			increment();
+			clearError();
 			Editor::OpenWithPreparedFile(
 				this,
 				controller,
@@ -425,6 +430,7 @@ void EditCaptionBox::setupPhotoEditorEventHandler() {
 				return;
 			}
 			increment();
+			clearError();
 			auto callback = [=](const Editor::PhotoModifications &mods) {
 				if (!mods || !_photoMedia) {
 					return;
@@ -580,6 +586,7 @@ void EditCaptionBox::captionResized() {
 
 void EditCaptionBox::updateBoxSize() {
 	auto footerHeight = 0;
+	footerHeight += st::normalFont->height + errorTopSkip();
 	if (_field) {
 		footerHeight += st::boxPhotoCaptionSkip + _field->height();
 	}
@@ -613,8 +620,24 @@ void EditCaptionBox::paintEvent(QPaintEvent *e) {
 void EditCaptionBox::resizeEvent(QResizeEvent *e) {
 	BoxContent::resizeEvent(e);
 
+	const auto errorHeight = st::normalFont->height + errorTopSkip();
 	auto bottom = height();
+	{
+		const auto resultScrollHeight = bottom
+			- _field->height()
+			- st::boxPhotoCaptionSkip
+			- (_controls->isHidden() ? 0 : _controls->heightNoMargins())
+			- st::boxPhotoPadding.top()
+			- errorHeight;
+		const auto minThumbH = st::sendBoxAlbumGroupSize.height()
+			+ st::sendBoxAlbumGroupSkipTop * 2;
+		const auto diff = resultScrollHeight - minThumbH;
+		if (diff < 0) {
+			bottom -= diff;
+		}
+	}
 
+	bottom -= errorHeight;
 	_field->resize(st::sendMediaPreviewSize, _field->height());
 	_field->moveToLeft(
 		st::boxPhotoPadding.left(),
@@ -670,6 +693,13 @@ void EditCaptionBox::save() {
 	options.scheduled = item->isScheduled() ? item->date() : 0;
 
 	if (!_preparedList.files.empty()) {
+		if ((_albumType != Ui::AlbumType::None)
+				&& !_preparedList.files.front().canBeInAlbumType(
+					_albumType)) {
+			_error = tr::lng_edit_media_album_error(tr::now);
+			update();
+			return;
+		}
 		auto action = Api::SendAction(item->history(), options);
 		action.replaceMediaOf = item->fullId().msg;
 

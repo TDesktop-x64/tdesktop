@@ -73,9 +73,6 @@ class HistoryWidget;
 class HistoryInner
 	: public Ui::RpWidget
 	, public Ui::AbstractTooltipShower {
-	// The Q_OBJECT meta info is used for qobject_cast!
-	Q_OBJECT
-
 public:
 	using Element = HistoryView::Element;
 

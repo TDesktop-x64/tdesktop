@@ -13,6 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/timer.h"
 #include "dialogs/dialogs_key.h"
 #include "ui/layers/layer_widget.h"
+#include "ui/layers/show.h"
 #include "window/window_adaptive.h"
 
 class PhotoData;
@@ -295,6 +296,8 @@ public:
 		Ui::LayerOptions options = Ui::LayerOption::KeepOther,
 		anim::type animated = anim::type::normal);
 
+	void hideLayer(anim::type animated = anim::type::normal);
+
 	[[nodiscard]] auto sendingAnimation() const
 	-> Ui::MessageSendingAnimationController &;
 	[[nodiscard]] auto tabbedSelector() const
@@ -569,5 +572,21 @@ private:
 };
 
 void ActivateWindow(not_null<SessionController*> controller);
+
+class Show : public Ui::Show {
+public:
+	explicit Show(not_null<SessionNavigation*> navigation);
+	explicit Show(not_null<Controller*> window);
+	~Show();
+	void showBox(
+		object_ptr<Ui::BoxContent> content,
+		Ui::LayerOptions options = Ui::LayerOption::KeepOther) const override;
+	void hideLayer() const override;
+	[[nodiscard]] not_null<QWidget*> toastParent() const override;
+	[[nodiscard]] bool valid() const override;
+	operator bool() const override;
+private:
+	const base::weak_ptr<Controller> _window;
+};
 
 } // namespace Window

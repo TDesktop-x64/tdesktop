@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/themes/window_theme.h"
 #include "window/window_peer_menu.h"
 #include "window/window_session_controller.h"
+#include "window/window_controller.h"
 #include "ui/chat/chat_theme.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/labels.h"
@@ -208,6 +209,7 @@ void AddUnreadBadge(
 
 [[nodiscard]] object_ptr<Ui::SettingsButton> MakeAccountButton(
 		QWidget *parent,
+		not_null<Window::SessionController*> window,
 		not_null<Main::Account*> account,
 		Fn<void()> callback) {
 	const auto active = (account == &Core::App().activeAccount());
@@ -306,7 +308,7 @@ void AddUnreadBadge(
 			state->menu = base::make_unique_q<Ui::PopupMenu>(
 				raw,
 				st::popupMenuWithIcons);
-			MenuAddMarkAsReadAllChatsAction(&session->data(), addAction);
+			MenuAddMarkAsReadAllChatsAction(window, addAction);
 			state->menu->popup(QCursor::pos());
 			return;
 		}
@@ -325,12 +327,14 @@ void AddUnreadBadge(
 				close();
 				Core::App().logoutWithChecks(&session->account());
 			};
-			Ui::show(Ui::MakeConfirmBox({
-				.text = tr::lng_sure_logout(),
-				.confirmed = crl::guard(session, callback),
-				.confirmText = tr::lng_settings_logout(),
-				.confirmStyle = &st::attentionBoxButton,
-			}));
+			window->show(
+				Ui::MakeConfirmBox({
+					.text = tr::lng_sure_logout(),
+					.confirmed = crl::guard(session, callback),
+					.confirmText = tr::lng_settings_logout(),
+					.confirmStyle = &st::attentionBoxButton,
+				}),
+				Ui::LayerOption::CloseOther);
 		}, &st::menuIconLeave);
 		state->menu->popup(QCursor::pos());
 	}, raw->lifetime());
@@ -667,7 +671,7 @@ void MainMenu::setupArchive() {
 	const auto showArchive = [=] {
 		if (const auto f = folder()) {
 			controller->openFolder(f);
-			Ui::hideSettingsAndLayer();
+			controller->window().hideSettingsAndLayer();
 		}
 	};
 	const auto checkArchive = [=] {
@@ -717,7 +721,7 @@ void MainMenu::setupArchive() {
 		const auto hide = [=] {
 			controller->session().settings().setArchiveInMainMenu(false);
 			controller->session().saveSettingsDelayed();
-			Ui::hideSettingsAndLayer();
+			controller->window().hideSettingsAndLayer();
 		};
 		addAction(
 			tr::lng_context_archive_to_list(tr::now),
@@ -725,6 +729,7 @@ void MainMenu::setupArchive() {
 			&st::menuIconFromMainMenu);
 
 		MenuAddMarkAsReadChatListAction(
+			controller,
 			[f = folder()] { return f->chatsList(); },
 			addAction);
 
@@ -861,7 +866,7 @@ void MainMenu::rebuildAccounts() {
 		if (!account->sessionExists()) {
 			button = nullptr;
 		} else if (!button) {
-			button.reset(inner->add(MakeAccountButton(inner, account, [=] {
+			auto callback = [=] {
 				if (_reordering) {
 					return;
 				}
@@ -879,7 +884,12 @@ void MainMenu::rebuildAccounts() {
 					st::defaultRippleAnimation.hideDuration,
 					account,
 					std::move(activate));
-			})));
+			};
+			button.reset(inner->add(MakeAccountButton(
+				inner,
+				_controller,
+				account,
+				std::move(callback))));
 		}
 	}
 	inner->resizeToWidth(_accounts->width());

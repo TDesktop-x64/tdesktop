@@ -174,7 +174,7 @@ void EditLinkBox(
 				}
 			}
 		}
-		_callback(linkText, linkUrl);
+		callback(linkText, linkUrl);
 		if (weak) {
 			box->closeBox();
 		}

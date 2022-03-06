@@ -232,7 +232,7 @@ void searchByHashtag(const QString &tag, PeerData *inPeer, PeerData *from) {
 		if (m->controller()->openedFolder().current()) {
 			m->controller()->closeFolder();
 		}
-		Ui::hideSettingsAndLayer();
+		App::wnd()->ui_hideSettingsAndLayer(anim::type::instant);
 		Core::App().hideMediaView();
 		if (tag.startsWith("#")) {
 			m->searchMessages(

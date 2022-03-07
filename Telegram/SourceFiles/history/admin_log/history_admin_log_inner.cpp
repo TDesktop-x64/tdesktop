@@ -1473,11 +1473,12 @@ void InnerWidget::suggestRestrictParticipant(
 			Ui::show(
 				Ui::MakeConfirmBox({
 					.text = text,
-					.confirmed = crl::guard(this, [=] {
+					.confirmed = crl::guard(this, [=](Fn<void()> &&close) {
 						restrictParticipant(
 							participant,
 							ChatRestrictionsInfo(),
 							ChannelData::KickedRestrictedRights(participant));
+						close();
 					}),
 					.confirmText = text,
 				}),

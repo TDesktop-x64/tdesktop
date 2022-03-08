@@ -1379,7 +1379,6 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 		.session = session,
 		.submitCallback = std::move(submitCallback),
 		.filterCallback = std::move(filterCallback),
-		.navigation = App::wnd()->sessionController(),
 		.title = tr::lng_title_multiple_forward()}));
 	return weak->data();
 }
@@ -1475,7 +1474,6 @@ QPointer<Ui::BoxContent> ShowForwardNoQuoteMessagesBox(
 		.session = session,
 		.submitCallback = std::move(submitCallback),
 		.filterCallback = std::move(filterCallback),
-		.navigation = App::wnd()->sessionController(),
 		.title = tr::lng_title_forward_as_copy()}));
 	return weak->data();
 }

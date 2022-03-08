@@ -1917,6 +1917,9 @@ void Widget::onDialogMoved(int movedFrom, int movedTo) {
 
 Widget::~Widget() {
 	cancelSearchRequest();
+
+	// Destructor may hide the bar and attempt to double-destroy it.
+	base::take(_downloadBar);
 }
 
 } // namespace Dialogs

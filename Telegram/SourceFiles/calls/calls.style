@@ -504,8 +504,9 @@ callErrorToast: Toast(defaultToast) {
 groupCallWidth: 380px;
 groupCallHeight: 580px;
 groupCallWidthRtmp: 720px;
+groupCallWidthRtmpMin: 240px;
 groupCallHeightRtmp: 580px;
-groupCallHeightRtmpMin: 280px;
+groupCallHeightRtmpMin: 160px;
 
 groupCallRipple: RippleAnimation(defaultRippleAnimation) {
 	color: groupCallMembersBgRipple;
@@ -783,6 +784,7 @@ groupCallTitleLabel: FlatLabel(groupCallSubtitleLabel) {
 		linkFontOver: font(semibold 14px);
 	}
 }
+groupCallTitleSeparator: 4px;
 groupCallVideoLimitLabel: FlatLabel(defaultFlatLabel) {
 	align: align(top);
 	textFg: groupCallMemberNotJoinedStatus;
@@ -1427,3 +1429,49 @@ groupCallRtmpKeyLabel: FlatLabel(boxLabel) {
 	minWidth: 230px;
 }
 groupCallDividerBg: groupCallMembersBgRipple;
+
+groupCallScheduleDateField: InputField(groupCallField) {
+	textMargins: margins(2px, 0px, 2px, 0px);
+	placeholderScale: 0.;
+	heightMin: 30px;
+	textAlign: align(top);
+	font: font(14px);
+}
+groupCallScheduleTimeField: InputField(groupCallScheduleDateField) {
+	textBg: groupCallMembersBg;
+	border: 0px;
+	borderActive: 0px;
+	heightMin: 28px;
+	placeholderFont: font(14px);
+}
+
+//
+groupCallCalendarPreviousDisabled: icon {{ "calendar_down-flip_vertical", groupCallMemberNotJoinedStatus }};
+groupCallCalendarNextDisabled: icon {{ "calendar_down", groupCallMemberNotJoinedStatus }};
+groupCallCalendarPrevious: IconButton(calendarPrevious) {
+	icon: icon {{ "calendar_down-flip_vertical", groupCallMembersFg }};
+	ripple: RippleAnimation(defaultRippleAnimation) {
+		color: groupCallMembersBgRipple;
+	}
+}
+groupCallCalendarNext: IconButton(groupCallCalendarPrevious) {
+	icon: icon {{ "calendar_down", groupCallMembersFg }};
+}
+groupCallCalendarColors: CalendarColors {
+	dayTextColor: groupCallMembersFg;
+	dayTextGrayedOutColor: groupCallMemberNotJoinedStatus;
+
+	iconButtonNext: groupCallCalendarNext;
+	iconButtonNextDisabled: groupCallCalendarNextDisabled;
+	iconButtonPrevious: groupCallCalendarPrevious;
+	iconButtonPreviousDisabled: groupCallCalendarPreviousDisabled;
+
+	iconButtonRippleColorDisabled: groupCallMembersBgRipple;
+
+	rippleColor: groupCallMembersBgRipple;
+	rippleColorHighlighted: groupCallMembersBgRipple;
+	rippleGrayedOutColor: groupCallMembersBgRipple;
+
+	titleTextColor: groupCallMembersFg;
+}
+//

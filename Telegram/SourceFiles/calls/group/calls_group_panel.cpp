@@ -219,6 +219,8 @@ void Panel::migrate(not_null<ChannelData*> channel) {
 	_peerLifetime.destroy();
 	subscribeToPeerChanges();
 	_title.destroy();
+	_titleSeparator.destroy();
+	_viewers.destroy();
 	refreshTitle();
 }
 
@@ -935,6 +937,10 @@ void Panel::raiseControls() {
 	if (_title) {
 		_title->raise();
 	}
+	if (_viewers) {
+		_titleSeparator->raise();
+		_viewers->raise();
+	}
 	if (_recordingMark) {
 		_recordingMark->raise();
 	}
@@ -1449,6 +1455,12 @@ void Panel::showBox(
 		Ui::LayerOptions options,
 		anim::type animated) {
 	hideStickedTooltip(StickedTooltipHide::Unavailable);
+	if (window()->width() < st::groupCallWidth
+		|| window()->height() < st::groupCallWidth) {
+		window()->resize(
+			std::max(window()->width(), st::groupCallWidth),
+			std::max(window()->height(), st::groupCallWidth));
+	}
 	_layerBg->showBox(std::move(box), options, animated);
 }
 
@@ -1512,17 +1524,20 @@ void Panel::initGeometry() {
 	const auto height = _call->rtmp()
 		? st::groupCallHeightRtmp
 		: st::groupCallHeight;
-	const auto minHeight = (_call->rtmp() && !_call->canManage())
+	const auto minWidth = _call->rtmp()
+		? st::groupCallWidthRtmpMin
+		: st::groupCallWidth;
+	const auto minHeight = _call->rtmp()
 		? st::groupCallHeightRtmpMin
 		: st::groupCallHeight;
 	const auto rect = QRect(0, 0, width, height);
 	window()->setGeometry(rect.translated(center - rect.center()));
-	window()->setMinimumSize({ st::groupCallWidth, minHeight });
+	window()->setMinimumSize({ minWidth, minHeight });
 	window()->show();
 }
 
 QRect Panel::computeTitleRect() const {
-	const auto skip = st::groupCallTitleTop;
+	const auto skip = st::groupCallTitleSeparator;
 	const auto remove = skip
 		+ (_menuToggle
 			? (_menuToggle->width() + st::groupCallMenuTogglePosition.x())
@@ -1565,11 +1580,7 @@ bool Panel::updateMode() {
 		_niceTooltip.destroy();
 	}
 	_mode = mode;
-	if (_title) {
-		_title->setTextColorOverride(wide
-			? std::make_optional(st::groupCallMemberNotJoinedStatus->c)
-			: std::nullopt);
-	}
+	refreshTitleColors();
 	if (wide && _subtitle) {
 		_subtitle.destroy();
 	} else if (!wide && !_subtitle) {
@@ -1674,6 +1685,8 @@ void Panel::setupEmptyRtmp() {
 				(size.width() - _emptyRtmp->width()) / 2,
 				(size.height() - _emptyRtmp->height()) / 3);
 		}, _emptyRtmp->lifetime());
+
+		raiseControls();
 	}, lifetime());
 
 }
@@ -2332,6 +2345,38 @@ void Panel::refreshTitle() {
 			st::groupCallTitleLabel);
 		_title->show();
 		_title->setAttribute(Qt::WA_TransparentForMouseEvents);
+		if (_call->rtmp()) {
+			_titleSeparator.create(
+				widget(),
+				rpl::single(QString::fromUtf8("\xE2\x80\xA2")),
+				st::groupCallTitleLabel);
+			_titleSeparator->show();
+			_titleSeparator->setAttribute(Qt::WA_TransparentForMouseEvents);
+			auto countText = _call->real(
+			) | rpl::map([=](not_null<Data::GroupCall*> real) {
+				return tr::lng_group_call_rtmp_viewers(
+					lt_count,
+					real->fullCountValue(
+					) | rpl::map([=](int count) {
+						return std::max(float64(count), 1.);
+					}));
+			}) | rpl::flatten_latest(
+			) | rpl::after_next([=] {
+				refreshTitleGeometry();
+			});
+			_viewers.create(
+				widget(),
+				std::move(countText),
+				st::groupCallTitleLabel);
+			_viewers->show();
+			_viewers->setAttribute(Qt::WA_TransparentForMouseEvents);
+		}
+
+		refreshTitleColors();
+		style::PaletteChanged(
+		) | rpl::start_with_next([=] {
+			refreshTitleColors();
+		}, _title->lifetime());
 	}
 	refreshTitleGeometry();
 	if (!_subtitle && mode() == PanelMode::Default) {
@@ -2382,7 +2427,10 @@ void Panel::refreshTitleGeometry() {
 			fullRect.width() - _recordingMark->width(),
 			fullRect.height())
 		: fullRect;
-	const auto best = _title->naturalWidth();
+	const auto sep = st::groupCallTitleSeparator;
+	const auto best = _title->naturalWidth() + (_viewers
+		? (_titleSeparator->width() + sep * 2 + _viewers->naturalWidth())
+		: 0);
 	const auto from = (widget()->width() - best) / 2;
 	const auto shownTop = (mode() == PanelMode::Default)
 		? st::groupCallTitleTop
@@ -2396,39 +2444,78 @@ void Panel::refreshTitleGeometry() {
 				_wideControlsShown ? 1. : 0.)
 			: 1.));
 	const auto left = titleRect.x();
+
+	const auto notEnough = std::max(0, best - titleRect.width());
+	const auto titleMaxWidth = _title->naturalWidth();
+	const auto viewersMaxWidth = _viewers ? _viewers->naturalWidth() : 0;
+	const auto viewersNotEnough = std::clamp(
+		viewersMaxWidth - titleMaxWidth,
+		0,
+		notEnough
+	) + std::max(
+		(notEnough - std::abs(viewersMaxWidth - titleMaxWidth)) / 2,
+		0);
+	_title->resizeToWidth(
+		_title->naturalWidth() - (notEnough - viewersNotEnough));
+	if (_viewers) {
+		_viewers->resizeToWidth(_viewers->naturalWidth() - viewersNotEnough);
+	}
+	const auto layout = [&](int position) {
+		_title->moveToLeft(position, top);
+		position += _title->width();
+		if (_viewers) {
+			_titleSeparator->moveToLeft(position + sep, top);
+			position += sep + _titleSeparator->width() + sep;
+			_viewers->moveToLeft(position, top);
+			position += _viewers->width();
+		}
+		if (_recordingMark) {
+			const auto markTop = top + st::groupCallRecordingMarkTop;
+			_recordingMark->move(
+				position,
+				markTop - st::groupCallRecordingMarkSkip);
+		}
+		if (_titleBackground) {
+			const auto bottom = _title->y()
+				+ _title->height()
+				+ (st::boxRadius / 2);
+			const auto height = std::max(bottom, st::boxRadius * 2);
+			_titleBackground->setGeometry(
+				_title->x() - st::boxRadius,
+				bottom - height,
+				(position - _title->x()
+					+ st::boxRadius
+					+ (_recordingMark
+						? (_recordingMark->width() + st::boxRadius / 2)
+						: st::boxRadius)),
+				height);
+		}
+	};
+
 	if (from >= left && from + best <= left + titleRect.width()) {
-		_title->resizeToWidth(best);
-		_title->moveToLeft(from, top);
+		layout(from);
 	} else if (titleRect.width() < best) {
-		_title->resizeToWidth(titleRect.width());
-		_title->moveToLeft(left, top);
+		layout(left);
 	} else if (from < left) {
-		_title->resizeToWidth(best);
-		_title->moveToLeft(left, top);
+		layout(left);
 	} else {
-		_title->resizeToWidth(best);
-		_title->moveToLeft(left + titleRect.width() - best, top);
+		layout(left + titleRect.width() - best);
 	}
-	if (_recordingMark) {
-		const auto markTop = top + st::groupCallRecordingMarkTop;
-		_recordingMark->move(
-			_title->x() + _title->width(),
-			markTop - st::groupCallRecordingMarkSkip);
+}
+
+void Panel::refreshTitleColors() {
+	if (!_title) {
+		return;
 	}
-	if (_titleBackground) {
-		const auto bottom = _title->y()
-			+ _title->height()
-			+ (st::boxRadius / 2);
-		const auto height = std::max(bottom, st::boxRadius * 2);
-		_titleBackground->setGeometry(
-			_title->x() - st::boxRadius,
-			bottom - height,
-			(_title->width()
-				+ st::boxRadius
-				+ (_recordingMark
-				   ? (_recordingMark->width() + st::boxRadius / 2)
-				   : st::boxRadius)),
-			height);
+	auto gray = st::groupCallMemberNotJoinedStatus->c;
+	const auto wide = (_mode.current() == PanelMode::Wide);
+	_title->setTextColorOverride(wide
+		? std::make_optional(gray)
+		: std::nullopt);
+	if (_viewers) {
+		_viewers->setTextColorOverride(gray);
+		gray.setAlphaF(gray.alphaF() * 0.5);
+		_titleSeparator->setTextColorOverride(gray);
 	}
 }
 

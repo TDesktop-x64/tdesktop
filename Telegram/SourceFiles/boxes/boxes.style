@@ -503,6 +503,41 @@ calendarScroll: ScrollArea(defaultSolidScroll) {
 	deltax: 3px;
 	hiding: 1000;
 }
+CalendarColors {
+	dayTextColor: color;
+	dayTextGrayedOutColor: color;
+
+	iconButtonNext: IconButton;
+	iconButtonNextDisabled: icon;
+	iconButtonPrevious: IconButton;
+	iconButtonPreviousDisabled: icon;
+
+	iconButtonRippleColorDisabled: color;
+
+	rippleColor: color;
+	rippleColorHighlighted: color;
+	rippleGrayedOutColor: color;
+
+	titleTextColor: color;
+}
+
+defaultCalendarColors: CalendarColors {
+	dayTextColor: boxTextFg;
+	dayTextGrayedOutColor: windowSubTextFg;
+
+	iconButtonNext: calendarNext;
+	iconButtonNextDisabled: calendarNextDisabled;
+	iconButtonPrevious: calendarPrevious;
+	iconButtonPreviousDisabled: calendarPreviousDisabled;
+
+	iconButtonRippleColorDisabled: boxBg;
+
+	rippleColor: windowBgOver;
+	rippleColorHighlighted: dialogsRippleBgActive;
+	rippleGrayedOutColor: windowBgRipple;
+
+	titleTextColor: boxTitleFg;
+}
 
 passcodeTextStyle: TextStyle(defaultTextStyle) {
 	lineHeight: 20px;
@@ -820,14 +855,14 @@ backgroundCheckbox: Checkbox(defaultCheckbox) {
 	width: -50px;
 	margin: margins(0px, 0px, 0px, 0px);
 
-	textPosition: point(0px, 8px);
+	textPosition: point(0px, 6px);
 	checkPosition: point(0px, 0px);
 
 	style: semiboldTextStyle;
 }
 
 backgroundCheck: ServiceCheck {
-	margin: margins(12px, 8px, 8px, 8px);
+	margin: margins(10px, 6px, 8px, 6px);
 	diameter: 18px;
 	shift: 2px;
 	thickness: 2px;

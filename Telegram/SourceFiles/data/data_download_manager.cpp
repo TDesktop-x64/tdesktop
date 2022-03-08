@@ -10,9 +10,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_session.h"
 #include "data/data_photo.h"
 #include "data/data_document.h"
+#include "data/data_document_media.h"
 #include "data/data_changes.h"
 #include "data/data_user.h"
 #include "data/data_channel.h"
+#include "data/data_file_origin.h"
 #include "base/unixtime.h"
 #include "base/random.h"
 #include "main/main_session.h"
@@ -264,6 +266,7 @@ void DownloadManager::addLoaded(
 			.ready = _loadingProgress.current().ready + readyChange,
 			.total = _loadingProgress.current().total + totalChange,
 		};
+		_loadingListChanges.fire({});
 		if (_loading.empty()) {
 			_clearLoadingTimer.callOnce(kClearLoadingTimeout);
 		}
@@ -845,26 +848,114 @@ rpl::producer<Ui::DownloadBarProgress> MakeDownloadBarProgress() {
 }
 
 rpl::producer<Ui::DownloadBarContent> MakeDownloadBarContent() {
-	auto &manager = Core::App().downloadManager();
-	return rpl::single(
-		rpl::empty_value()
-	) | rpl::then(
-		manager.loadingListChanges() | rpl::to_empty
-	) | rpl::map([=, &manager] {
-		auto result = Ui::DownloadBarContent();
-		for (const auto id : manager.loadingList()) {
-			if (result.singleName.text.isEmpty()) {
-				const auto document = id->object.document;
-				result.singleName = Ui::Text::FormatDownloadsName(document);
-				result.singleThumbnail = QImage();
+	return [](auto consumer) {
+		auto lifetime = rpl::lifetime();
+
+		struct State {
+			DocumentData *document = nullptr;
+			std::shared_ptr<Data::DocumentMedia> media;
+			rpl::lifetime downloadTaskLifetime;
+			QImage thumbnail;
+
+			base::has_weak_ptr guard;
+			bool scheduled = false;
+			Fn<void()> push;
+		};
+
+		const auto state = lifetime.make_state<State>();
+		auto &manager = Core::App().downloadManager();
+
+		const auto resolveThumbnailRecursive = [=](auto &&self) -> bool {
+			if (state->document
+				&& (!state->document->hasThumbnail()
+					|| state->document->thumbnailFailed())) {
+				state->media = nullptr;
 			}
-			++result.count;
-			if (id->done) {
-				++result.done;
+			if (!state->media) {
+				state->downloadTaskLifetime.destroy();
+				if (!state->thumbnail.isNull()) {
+					return false;
+				}
+				state->thumbnail = QImage();
+				return true;
 			}
-		}
-		return result;
-	});
+			if (const auto image = state->media->thumbnail()) {
+				state->thumbnail = image->original();
+				state->downloadTaskLifetime.destroy();
+				state->media = nullptr;
+				return true;
+			} else if (const auto embed = state->media->thumbnailInline()) {
+				if (!state->thumbnail.isNull()) {
+					return false;
+				}
+				state->thumbnail = Images::Prepare(embed->original(), 0, {
+					.options = Images::Option::Blur,
+				});
+			}
+			state->document->session().downloaderTaskFinished(
+			) | rpl::filter([=] {
+				return self(self);
+			}) | rpl::start_with_next(
+				state->push,
+				state->downloadTaskLifetime);
+			return !state->thumbnail.isNull();
+		};
+		const auto resolveThumbnail = [=] {
+			return resolveThumbnailRecursive(resolveThumbnailRecursive);
+		};
+
+		const auto notify = [=, &manager] {
+			auto content = Ui::DownloadBarContent();
+			auto single = (const Data::DownloadObject*) nullptr;
+			for (const auto id : manager.loadingList()) {
+				if (!single) {
+					single = &id->object;
+				}
+				++content.count;
+				if (id->done) {
+					++content.done;
+				}
+			}
+			if (content.count == 1) {
+				const auto document = single->document;
+				const auto thumbnailed = (single->item
+					&& document->hasThumbnail())
+					? document
+					: nullptr;
+				if (state->document != thumbnailed) {
+					state->document = thumbnailed;
+					state->media = thumbnailed
+						? thumbnailed->createMediaView()
+						: nullptr;
+					state->media->thumbnailWanted(single->item->fullId());
+					state->thumbnail = QImage();
+					resolveThumbnail();
+				}
+				content.singleName = Ui::Text::FormatDownloadsName(
+					document);
+				content.singleThumbnail = state->thumbnail;
+			}
+			consumer.put_next(std::move(content));
+		};
+		state->push = [=] {
+			if (state->scheduled) {
+				return;
+			}
+			state->scheduled = true;
+			Ui::PostponeCall(&state->guard, [=] {
+				state->scheduled = false;
+				notify();
+			});
+		};
+
+		manager.loadingListChanges(
+		) | rpl::filter([=] {
+			return !state->scheduled;
+		}) | rpl::start_with_next(state->push, lifetime);
+
+		notify();
+		return lifetime;
+	};
 }
 
 } // namespace Data

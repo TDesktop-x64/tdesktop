@@ -1,4 +1,4 @@
-/*
+﻿/*
 This file is part of Telegram Desktop,
 the official desktop application for the Telegram messaging service.
 
@@ -954,7 +954,7 @@ void NativeManager::doShowNotification(NotificationFields &&fields) {
 		&& (item->out() || peer->isSelf())
 		&& item->isFromScheduled();
 	const auto title = options.hideNameAndPhoto
-		? qsl("64Gram Desktop")
+		? AppName.utf16()
 		: (scheduled && peer->isSelf())
 		? tr::lng_notification_reminder(tr::now)
 		: peer->name;

@@ -542,7 +542,9 @@ void LinksController::appendSlice(const InviteLinksSlice &slice) {
 }
 
 void LinksController::rowClicked(not_null<PeerListRow*> row) {
-	ShowInviteLinkBox(_peer, static_cast<Row*>(row.get())->data());
+	delegate()->peerListShowBox(
+		ShowInviteLinkBox(_peer, static_cast<Row*>(row.get())->data()),
+		Ui::LayerOption::KeepOther);
 }
 
 void LinksController::rowRightActionClicked(not_null<PeerListRow*> row) {
@@ -577,23 +579,33 @@ base::unique_qptr<Ui::PopupMenu> LinksController::createRowContextMenu(
 		st::popupMenuWithIcons);
 	if (data.revoked) {
 		result->addAction(tr::lng_group_invite_context_delete(tr::now), [=] {
-			DeleteLink(_peer, _admin, link);
+			delegate()->peerListShowBox(
+				DeleteLinkBox(_peer, _admin, link),
+				Ui::LayerOption::KeepOther);
 		}, &st::menuIconDelete);
 	} else {
 		result->addAction(tr::lng_group_invite_context_copy(tr::now), [=] {
-			CopyInviteLink(link);
+			CopyInviteLink(delegate()->peerListToastParent(), link);
 		}, &st::menuIconCopy);
 		result->addAction(tr::lng_group_invite_context_share(tr::now), [=] {
-			ShareInviteLinkBox(_peer, link);
+			delegate()->peerListShowBox(
+				ShareInviteLinkBox(_peer, link),
+				Ui::LayerOption::KeepOther);
 		}, &st::menuIconShare);
 		result->addAction(tr::lng_group_invite_context_qr(tr::now), [=] {
-			InviteLinkQrBox(link);
+			delegate()->peerListShowBox(
+				InviteLinkQrBox(link),
+				Ui::LayerOption::KeepOther);
 		}, &st::menuIconQrCode);
 		result->addAction(tr::lng_group_invite_context_edit(tr::now), [=] {
-			EditLink(_peer, data);
+			delegate()->peerListShowBox(
+				EditLinkBox(_peer, data),
+				Ui::LayerOption::KeepOther);
 		}, &st::menuIconEdit);
 		result->addAction(tr::lng_group_invite_context_revoke(tr::now), [=] {
-			RevokeLink(_peer, _admin, link);
+			delegate()->peerListShowBox(
+				RevokeLinkBox(_peer, _admin, link),
+				Ui::LayerOption::KeepOther);
 		}, &st::menuIconRemove);
 	}
 	return result;
@@ -824,15 +836,15 @@ struct LinksList {
 };
 
 LinksList AddLinksList(
+		std::shared_ptr<Ui::BoxShow> show,
 		not_null<Ui::VerticalLayout*> container,
 		not_null<PeerData*> peer,
 		not_null<UserData*> admin,
 		int count,
 		bool revoked) {
 	auto &lifetime = container->lifetime();
-	const auto delegate = lifetime.make_state<
-		PeerListContentDelegateSimple
-	>();
+	const auto delegate = lifetime.make_state<PeerListContentDelegateShow>(
+		show);
 	const auto controller = lifetime.make_state<LinksController>(
 		peer,
 		admin,
@@ -849,13 +861,13 @@ LinksList AddLinksList(
 }
 
 not_null<Ui::RpWidget*> AddAdminsList(
+		std::shared_ptr<Ui::BoxShow> show,
 		not_null<Ui::VerticalLayout*> container,
 		not_null<PeerData*> peer,
 		not_null<UserData*> admin) {
 	auto &lifetime = container->lifetime();
-	const auto delegate = lifetime.make_state<
-		PeerListContentDelegateSimple
-	>();
+	const auto delegate = lifetime.make_state<PeerListContentDelegateShow>(
+		show);
 	const auto controller = lifetime.make_state<AdminsController>(
 		peer,
 		admin);
@@ -876,6 +888,8 @@ void ManageInviteLinksBox(
 		int count,
 		int revokedCount) {
 	using namespace Settings;
+
+	const auto show = std::make_shared<Ui::BoxShow>(box);
 
 	box->setTitle(tr::lng_group_invite_title());
 	box->setWidth(st::boxWideWidth);
@@ -899,6 +913,7 @@ void ManageInviteLinksBox(
 
 	AddSubsectionTitle(container, tr::lng_create_permanent_link_title());
 	AddPermanentLinkBlock(
+		show,
 		container,
 		peer,
 		admin,
@@ -909,7 +924,9 @@ void ManageInviteLinksBox(
 	if (admin->isSelf()) {
 		const auto add = AddCreateLinkButton(container);
 		add->setClickedCallback([=] {
-			EditLink(peer, InviteLinkData{ .admin = admin });
+			show->showBox(
+				EditLinkBox(peer, InviteLinkData{ .admin = admin }),
+				Ui::LayerOption::KeepOther);
 		});
 	} else {
 		otherHeader = container->add(object_ptr<Ui::SlideWrap<>>(
@@ -922,6 +939,7 @@ void ManageInviteLinksBox(
 	}
 
 	auto [list, controller] = AddLinksList(
+		show,
 		container,
 		peer,
 		admin,
@@ -955,7 +973,7 @@ void ManageInviteLinksBox(
 			tr::lng_group_invite_other_title(),
 			st::settingsSubsectionTitle),
 		st::inviteLinkRevokedTitlePadding));
-	const auto admins = AddAdminsList(container, peer, admin);
+	const auto admins = AddAdminsList(show, container, peer, admin);
 
 	const auto revokedDivider = container->add(object_ptr<Ui::SlideWrap<>>(
 		container,
@@ -968,6 +986,7 @@ void ManageInviteLinksBox(
 			st::settingsSubsectionTitle),
 		st::inviteLinkRevokedTitlePadding));
 	const auto revoked = AddLinksList(
+		show,
 		container,
 		peer,
 		admin,

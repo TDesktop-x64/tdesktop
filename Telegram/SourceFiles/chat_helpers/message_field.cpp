@@ -95,15 +95,17 @@ void EditLinkBox(
 		not_null<Main::Session*> session,
 		const QString &startText,
 		const QString &startLink,
-		Fn<void(QString, QString)> callback) {
+		Fn<void(QString, QString)> callback,
+		const style::InputField *fieldStyle) {
 	Expects(callback != nullptr);
 
+	const auto &fieldSt = fieldStyle ? *fieldStyle : st::defaultInputField;
 	const auto content = box->verticalLayout();
 
 	const auto text = content->add(
 		object_ptr<Ui::InputField>(
 			content,
-			st::defaultInputField,
+			fieldSt,
 			tr::lng_formatting_link_text(),
 			startText),
 		st::markdownLinkFieldPadding);
@@ -114,7 +116,7 @@ void EditLinkBox(
 		box->getDelegate()->outerContainer(),
 		text,
 		session);
-	InitSpellchecker(std::move(show), session, text);
+	InitSpellchecker(std::move(show), session, text, fieldStyle != nullptr);
 
 	const auto placeholder = content->add(
 		object_ptr<Ui::RpWidget>(content),
@@ -124,7 +126,7 @@ void EditLinkBox(
 		content,
 		object_ptr<Ui::InputField>(
 			content,
-			st::defaultInputField,
+			fieldSt,
 			tr::lng_formatting_link_url(),
 			startLink.trimmed()));
 	url->heightValue(
@@ -267,8 +269,10 @@ Fn<bool(
 	QString text,
 	QString link,
 	EditLinkAction action)> DefaultEditLinkCallback(
-		not_null<Window::SessionController*> controller,
-		not_null<Ui::InputField*> field) {
+		std::shared_ptr<Ui::Show> show,
+		not_null<Main::Session*> session,
+		not_null<Ui::InputField*> field,
+		const style::InputField *fieldStyle) {
 	const auto weak = Ui::MakeWeak(field);
 	return [=](
 			EditLinkSelection selection,
@@ -284,14 +288,15 @@ Fn<bool(
 				strong->commitMarkdownLinkEdit(selection, text, link);
 			}
 		};
-		controller->show(
+		show->showBox(
 			Box(
 				EditLinkBox,
-				std::make_shared<Window::Show>(controller),
-				&controller->session(),
+				show,
+				session,
 				text,
 				link,
-				std::move(callback)),
+				std::move(callback),
+				fieldStyle),
 			Ui::LayerOption::KeepOther);
 		return true;
 	};
@@ -314,21 +319,30 @@ void InitMessageField(
 	field->setInstantReplacesEnabled(
 		Core::App().settings().replaceEmojiValue());
 	field->setMarkdownReplacesEnabled(rpl::single(true));
-	field->setEditLinkCallback(DefaultEditLinkCallback(controller, field));
+	field->setEditLinkCallback(
+		DefaultEditLinkCallback(
+			std::make_shared<Window::Show>(controller),
+			&controller->session(),
+			field));
 }
 
 void InitSpellchecker(
 		std::shared_ptr<Ui::Show> show,
 		not_null<Main::Session*> session,
-		not_null<Ui::InputField*> field) {
+		not_null<Ui::InputField*> field,
+		bool skipDictionariesManager) {
 #ifndef TDESKTOP_DISABLE_SPELLCHECK
-	const auto s = Ui::CreateChild<Spellchecker::SpellingHighlighter>(
-		field.get(),
-		Core::App().settings().spellcheckerEnabledValue(),
-		Spellchecker::SpellingHighlighter::CustomContextMenuItem{
+	using namespace Spellchecker;
+	const auto menuItem = skipDictionariesManager
+		? std::nullopt
+		: std::make_optional(SpellingHighlighter::CustomContextMenuItem{
 			tr::lng_settings_manage_dictionaries(tr::now),
 			[=] { show->showBox(Box<Ui::ManageDictionariesBox>(session)); }
 		});
+	const auto s = Ui::CreateChild<SpellingHighlighter>(
+		field.get(),
+		Core::App().settings().spellcheckerEnabledValue(),
+		menuItem);
 	field->setExtendedContextMenu(s->contextMenuCreated());
 #endif // TDESKTOP_DISABLE_SPELLCHECK
 }

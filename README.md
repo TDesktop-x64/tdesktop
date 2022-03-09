@@ -53,6 +53,11 @@ Then your language translation filename is `en.json` or something like that.
 * [Official Telegram Channel](https://t.me/tg_x64)
 * [Official discussion group](https://t.me/tg_x64_chat)
 
+## Sponsors
+<a href="https://www.jetbrains.com/?from=64Gram">
+     <img src="https://www.jetbrains.com/icon-512.png"  alt="JetBrains" width="150"/>
+</a>
+
 [//]: # (LINKS)
 [license]: LICENSE
 [win32]: docs/building-win.md

@@ -30,6 +30,10 @@ std::map<int, const char*> BetaLogs() {
 		"- Display the file thumbnail in downloads bar.\n"
 		"- Always try to save original photo bytes to disk.\n"
 		"- Fix crash when deleting a user from your contacts list.\n"
+	},
+	{
+		1000022,
+		"-Don't show sponsored ads if chat is supergroup\n"
 	}
 	};
 };

@@ -20,8 +20,6 @@ class SendFilesWay;
 struct PreparedFileInformation {
 	struct Image {
 		QImage data;
-		QByteArray bytes;
-		QByteArray format;
 		bool animated = false;
 		Editor::PhotoModifications modifications;
 	};

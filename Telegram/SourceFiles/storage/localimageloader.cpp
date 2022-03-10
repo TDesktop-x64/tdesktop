@@ -25,7 +25,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item.h"
 #include "boxes/send_files_box.h"
 #include "ui/boxes/confirm_box.h"
-#include "ui/image/image_prepare.h"
 #include "lang/lang_keys.h"
 #include "storage/file_download.h"
 #include "storage/storage_media_prepare.h"
@@ -43,7 +42,6 @@ namespace {
 constexpr auto kThumbnailQuality = 87;
 constexpr auto kThumbnailSize = 320;
 constexpr auto kPhotoUploadPartSize = 32 * 1024;
-constexpr auto kRecompressAfterBpp = 4;
 
 using Ui::ValidateThumbDimensions;
 
@@ -55,7 +53,7 @@ struct PreparedFileThumbnail {
 	MTPPhotoSize mtpSize = MTP_photoSizeEmpty(MTP_string());
 };
 
-[[nodiscard]] PreparedFileThumbnail PrepareFileThumbnail(QImage &&original) {
+PreparedFileThumbnail PrepareFileThumbnail(QImage &&original) {
 	const auto width = original.width();
 	const auto height = original.height();
 	if (!ValidateThumbDimensions(width, height)) {
@@ -89,9 +87,7 @@ struct PreparedFileThumbnail {
 	return result;
 }
 
-[[nodiscard]] bool FileThumbnailUploadRequired(
-		const QString &filemime,
-		int32 filesize) {
+bool FileThumbnailUploadRequired(const QString &filemime, int32 filesize) {
 	constexpr auto kThumbnailUploadBySize = 5 * 1024 * 1024;
 	const auto kThumbnailKnownMimes = {
 		"image/jpeg",
@@ -105,7 +101,7 @@ struct PreparedFileThumbnail {
 			== end(kThumbnailKnownMimes));
 }
 
-[[nodiscard]] PreparedFileThumbnail FinalizeFileThumbnail(
+PreparedFileThumbnail FinalizeFileThumbnail(
 		PreparedFileThumbnail &&prepared,
 		const QString &filemime,
 		int32 filesize,
@@ -119,7 +115,7 @@ struct PreparedFileThumbnail {
 	return std::move(prepared);
 }
 
-[[nodiscard]] auto FindAlbumItem(
+auto FindAlbumItem(
 		std::vector<SendingAlbum::Item> &items,
 		not_null<HistoryItem*> item) {
 	const auto result = ranges::find(
@@ -131,7 +127,7 @@ struct PreparedFileThumbnail {
 	return result;
 }
 
-[[nodiscard]] MTPInputSingleMedia PrepareAlbumItemMedia(
+MTPInputSingleMedia PrepareAlbumItemMedia(
 		not_null<HistoryItem*> item,
 		const MTPInputMedia &media,
 		uint64 randomId) {
@@ -153,7 +149,7 @@ struct PreparedFileThumbnail {
 		sentEntities);
 }
 
-[[nodiscard]] std::vector<not_null<DocumentData*>> ExtractStickersFromScene(
+std::vector<not_null<DocumentData*>> ExtractStickersFromScene(
 		not_null<const Ui::PreparedFileInformation::Image*> info) {
 	const auto allItems = info->modifications.paint->items();
 
@@ -164,33 +160,6 @@ struct PreparedFileThumbnail {
 	}) | ranges::views::transform([](const Editor::Scene::ItemPtr &i) {
 		return static_cast<Editor::ItemSticker*>(i.get())->sticker();
 	}) | ranges::to_vector;
-}
-
-[[nodiscard]] QByteArray ComputePhotoJpegBytes(
-		QImage &full,
-		const QByteArray &bytes,
-		const QByteArray &format) {
-	if (!bytes.isEmpty()
-		&& (bytes.size()
-			<= full.width() * full.height() * kRecompressAfterBpp / 8)
-		&& (format == u"jpeg"_q)
-		&& Images::IsProgressiveJpeg(bytes)) {
-		return bytes;
-	}
-
-	// We have an example of dark .png image that when being sent without
-	// removing its color space is displayed fine on tdesktop, but with
-	// a light gray background on mobile apps.
-	full.setColorSpace(QColorSpace());
-	auto result = QByteArray();
-	QBuffer buffer(&result);
-	QImageWriter writer(&buffer, "JPEG");
-	writer.setQuality(87);
-	writer.setProgressiveScanWrite(true);
-	writer.write(full);
-	buffer.close();
-
-	return result;
 }
 
 } // namespace
@@ -694,23 +663,15 @@ bool FileLoadTask::CheckForImage(
 		return Images::Read({
 			.path = filepath,
 			.content = content,
-			.returnContent = true,
 		});
 	}();
-	return FillImageInformation(
-		std::move(read.image),
-		read.animated,
-		result,
-		std::move(read.content),
-		std::move(read.format));
+	return FillImageInformation(std::move(read.image), read.animated, result);
 }
 
 bool FileLoadTask::FillImageInformation(
 		QImage &&image,
 		bool animated,
-		std::unique_ptr<Ui::PreparedFileInformation> &result,
-		QByteArray content,
-		QByteArray format) {
+		std::unique_ptr<Ui::PreparedFileInformation> &result) {
 	Expects(result != nullptr);
 
 	if (image.isNull()) {
@@ -718,8 +679,6 @@ bool FileLoadTask::FillImageInformation(
 	}
 	auto media = Ui::PreparedFileInformation::Image();
 	media.data = std::move(image);
-	media.bytes = std::move(content);
-	media.format = std::move(format);
 	media.animated = animated;
 	result->media = media;
 	return true;
@@ -744,8 +703,6 @@ void FileLoadTask::process(Args &&args) {
 	auto isSticker = false;
 
 	auto fullimage = QImage();
-	auto fullimagebytes = QByteArray();
-	auto fullimageformat = QByteArray();
 	auto info = _filepath.isEmpty() ? QFileInfo() : QFileInfo(_filepath);
 	if (info.exists()) {
 		if (info.isDir()) {
@@ -767,12 +724,8 @@ void FileLoadTask::process(Args &&args) {
 		if (auto image = std::get_if<Ui::PreparedFileInformation::Image>(
 				&_information->media)) {
 			fullimage = base::take(image->data);
-			fullimagebytes = base::take(image->bytes);
-			fullimageformat = base::take(image->format);
-			if (!Core::IsMimeSticker(filemime)
-				&& fullimageformat != u"jpeg"_q) {
+			if (!Core::IsMimeSticker(filemime)) {
 				fullimage = Images::Opaque(std::move(fullimage));
-				fullimagebytes = fullimageformat = QByteArray();
 			}
 			isAnimation = image->animated;
 		}
@@ -786,16 +739,12 @@ void FileLoadTask::process(Args &&args) {
 				if (auto image = std::get_if<Ui::PreparedFileInformation::Image>(
 						&_information->media)) {
 					fullimage = base::take(image->data);
-					fullimagebytes = base::take(image->bytes);
-					fullimageformat = base::take(image->format);
 				}
 			}
 			const auto mimeType = Core::MimeTypeForData(_content);
 			filemime = mimeType.name();
-			if (!Core::IsMimeSticker(filemime)
-				&& fullimageformat != u"jpeg"_q) {
+			if (!Core::IsMimeSticker(filemime)) {
 				fullimage = Images::Opaque(std::move(fullimage));
-				fullimagebytes = fullimageformat = QByteArray();
 			}
 			if (filemime == "image/jpeg") {
 				filename = filedialogDefaultName(qsl("photo"), qsl(".jpg"), QString(), true);
@@ -815,8 +764,6 @@ void FileLoadTask::process(Args &&args) {
 			if (auto image = std::get_if<Ui::PreparedFileInformation::Image>(
 					&_information->media)) {
 				fullimage = base::take(image->data);
-				fullimagebytes = base::take(image->bytes);
-				fullimageformat = base::take(image->format);
 			}
 		}
 		if (!fullimage.isNull() && fullimage.width() > 0) {
@@ -839,7 +786,6 @@ void FileLoadTask::process(Args &&args) {
 				filesize = _content.size();
 			}
 			fullimage = Images::Opaque(std::move(fullimage));
-			fullimagebytes = fullimageformat = QByteArray();
 		}
 	}
 	_result->filesize = (int32)qMin(filesize, qint64(INT_MAX));
@@ -932,14 +878,18 @@ void FileLoadTask::process(Args &&args) {
 			} else if (filemime.startsWith(u"image/"_q)
 				&& _type != SendMediaType::File) {
 				auto medium = (w > 320 || h > 320) ? fullimage.scaled(320, 320, Qt::KeepAspectRatio, Qt::SmoothTransformation) : fullimage;
-
-				const auto downscaled = (w > 1280 || h > 1280);
-				auto full = downscaled ? fullimage.scaled(1280, 1280, Qt::KeepAspectRatio, Qt::SmoothTransformation) : fullimage;
-				if (downscaled) {
-					fullimagebytes = fullimageformat = QByteArray();
+				auto full = (w > 1280 || h > 1280) ? fullimage.scaled(1280, 1280, Qt::KeepAspectRatio, Qt::SmoothTransformation) : fullimage;
+				{
+					// We have an example of dark .png image that when being sent without
+					// removing its color space is displayed fine on tdesktop, but with
+					// a light gray background on mobile apps.
+					full.setColorSpace(QColorSpace());
+					QBuffer buffer(&filedata);
+					QImageWriter writer(&buffer, "JPEG");
+					writer.setQuality(87);
+					writer.setProgressiveScanWrite(true);
+					writer.write(full);
 				}
-				filedata = ComputePhotoJpegBytes(full, fullimagebytes, fullimageformat);
-
 				photoThumbs.emplace('m', PreparedPhotoThumb{ .image = medium });
 				photoSizes.push_back(MTP_photoSize(MTP_string("m"), MTP_int(medium.width()), MTP_int(medium.height()), MTP_int(0)));
 

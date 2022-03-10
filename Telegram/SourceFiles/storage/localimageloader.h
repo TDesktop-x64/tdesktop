@@ -263,9 +263,7 @@ public:
 	static bool FillImageInformation(
 		QImage &&image,
 		bool animated,
-		std::unique_ptr<Ui::PreparedFileInformation> &result,
-		QByteArray content = {},
-		QByteArray format = {});
+		std::unique_ptr<Ui::PreparedFileInformation> &result);
 
 	FileLoadTask(
 		not_null<Main::Session*> session,

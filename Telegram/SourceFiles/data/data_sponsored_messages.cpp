@@ -86,7 +86,7 @@ bool SponsoredMessages::canHaveFor(not_null<History*> history) const {
 }
 
 void SponsoredMessages::request(not_null<History*> history) {
-	if (!canHaveFor(history)) {
+	if (!canHaveFor(history) || history->peer->isMegagroup()) {
 		return;
 	}
 	auto &request = _requests[history];

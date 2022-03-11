@@ -1484,7 +1484,7 @@ void InnerWidget::suggestRestrictParticipant(
 							ChannelData::KickedRestrictedRights(participant));
 						close();
 					}),
-					.confirmText = text,
+					.confirmText = tr::lng_profile_kick(tr::now),
 				}),
 				Ui::LayerOption::KeepOther);
 		};

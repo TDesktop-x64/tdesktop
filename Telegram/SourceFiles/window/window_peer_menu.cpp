@@ -1262,20 +1262,22 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 		MessageIdsList &&items,
 		FnMut<void()> &&successCallback) {
 	struct ShareData {
-		ShareData(not_null<PeerData*> peer, MessageIdsList &&ids)
+		ShareData(not_null<PeerData*> peer, MessageIdsList &&ids, FnMut<void()> &&callback)
 		: peer(peer)
-		, msgIds(std::move(ids)) {
+		, msgIds(std::move(ids))
+		, submitCallback(std::move(callback)) {
 		}
 		not_null<PeerData*> peer;
 		MessageIdsList msgIds;
 		base::flat_set<mtpRequestId> requests;
+		FnMut<void()> submitCallback;
 	};
 	const auto weak = std::make_shared<QPointer<ShareBox>>();
 	const auto item = App::wnd()->sessionController()->session().data().message(items[0]);
 	const auto history = item->history();
 	const auto owner = &history->owner();
 	const auto session = &history->session();
-	const auto data = std::make_shared<ShareData>(history->peer, std::move(items));
+	const auto data = std::make_shared<ShareData>(history->peer, std::move(items), std::move(successCallback));
 
 	auto submitCallback = [=](
 			std::vector<not_null<PeerData*>> &&result,
@@ -1371,6 +1373,7 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 			});
 			data->requests.insert(history->sendRequestId);
 		}
+		data->submitCallback();
 	};
 	auto filterCallback = [](PeerData *peer) {
 		return peer->canWrite();
@@ -1388,13 +1391,15 @@ QPointer<Ui::BoxContent> ShowForwardNoQuoteMessagesBox(
 		MessageIdsList &&items,
 		FnMut<void()> &&successCallback) {
 	struct ShareData {
-		ShareData(not_null<PeerData*> peer, MessageIdsList &&ids)
+		ShareData(not_null<PeerData*> peer, MessageIdsList &&ids, FnMut<void()> &&callback)
 		: peer(peer)
-		, msgIds(std::move(ids)) {
+		, msgIds(std::move(ids))
+		, submitCallback(std::move(callback)) {
 		}
 		not_null<PeerData*> peer;
 		MessageIdsList msgIds;
 		base::flat_set<mtpRequestId> requests;
+		FnMut<void()> submitCallback;
 	};
 	const auto weak = std::make_shared<QPointer<ShareBox>>();
 	const auto item = App::wnd()->sessionController()->session().data().message(items[0]);
@@ -1402,7 +1407,7 @@ QPointer<Ui::BoxContent> ShowForwardNoQuoteMessagesBox(
 	const auto owner = &history->owner();
 	const auto session = &history->session();
 	const auto isGroup = (owner->groups().find(item) != nullptr);
-	const auto data = std::make_shared<ShareData>(history->peer, std::move(items));
+	const auto data = std::make_shared<ShareData>(history->peer, std::move(items), std::move(successCallback));
 
 	auto submitCallback = [=](
 			std::vector<not_null<PeerData*>> &&result,
@@ -1466,6 +1471,7 @@ QPointer<Ui::BoxContent> ShowForwardNoQuoteMessagesBox(
 				Ui::hideLayer();
 			});
 		}
+		data->submitCallback();
 	};
 	auto filterCallback = [](PeerData *peer) {
 		return peer->canWrite();

@@ -33,7 +33,12 @@ std::map<int, const char*> BetaLogs() {
 	},
 	{
 		1000022,
-		"-Don't show sponsored ads if chat is supergroup\n"
+		"-Don't show sponsored ads if chat is supergroup.\n"
+	},
+	{
+		1000023,
+		"-Change remove user from \"Recent actions\" confirm text.\n"
+		"-Fix selected message can't deselect after forward.\n"
 	}
 	};
 };

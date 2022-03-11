@@ -241,9 +241,7 @@ void AddUnreadBadge(
 	const auto state = raw->lifetime().make_state<State>(raw);
 
 	if (!active) {
-		AddUnreadBadge(raw, rpl::single(
-			rpl::empty_value()
-		) | rpl::then(
+		AddUnreadBadge(raw, rpl::single(rpl::empty) | rpl::then(
 			session->data().unreadBadgeChanges()
 		) | rpl::map([=] {
 			auto &owner = session->data();
@@ -381,9 +379,7 @@ protected:
 
 MainMenu::ToggleAccountsButton::ToggleAccountsButton(QWidget *parent)
 : AbstractButton(parent) {
-	rpl::single(
-		rpl::empty_value()
-	) | rpl::then(
+	rpl::single(rpl::empty) | rpl::then(
 		Core::App().unreadBadgeChanges()
 	) | rpl::start_with_next([=] {
 		_unreadBadgeStale = true;
@@ -744,9 +740,7 @@ void MainMenu::setupArchive() {
 			return folder && (folder->id() == Data::Folder::kId);
 		}) | rpl::take(1);
 
-	AddUnreadBadge(button, rpl::single(
-		rpl::empty_value()
-	) | rpl::then(std::move(
+	AddUnreadBadge(button, rpl::single(rpl::empty) | rpl::then(std::move(
 		folderValue
 	) | rpl::map([=](not_null<Data::Folder*> folder) {
 		return folder->owner().chatsList(folder)->unreadStateChanges();
@@ -790,10 +784,9 @@ void MainMenu::setupAccounts() {
 	_addAccount = setupAddAccount(inner);
 	inner->add(object_ptr<Ui::FixedHeightWidget>(inner, st::mainMenuSkip));
 
-	rpl::single(
-		rpl::empty_value()
-	) | rpl::then(Core::App().domain().accountsChanges(
-	)) | rpl::start_with_next([=] {
+	rpl::single(rpl::empty) | rpl::then(
+		Core::App().domain().accountsChanges()
+	) | rpl::start_with_next([=] {
 		const auto &list = Core::App().domain().accounts();
 		const auto exists = [&](not_null<Main::Account*> account) {
 			for (const auto &[index, existing] : list) {
@@ -1231,12 +1224,9 @@ OthersUnreadState OtherAccountsUnreadStateCurrent() {
 }
 
 rpl::producer<OthersUnreadState> OtherAccountsUnreadState() {
-	return rpl::single(
-		rpl::empty_value()
-	) | rpl::then(
+	return rpl::single(rpl::empty) | rpl::then(
 		Core::App().unreadBadgeChanges()
 	) | rpl::map(OtherAccountsUnreadStateCurrent);
 }
-
 
 } // namespace Window

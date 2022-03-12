@@ -1373,7 +1373,9 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 			});
 			data->requests.insert(history->sendRequestId);
 		}
-		data->submitCallback();
+		if (data->submitCallback) {
+			data->submitCallback();
+		}
 	};
 	auto filterCallback = [](PeerData *peer) {
 		return peer->canWrite();
@@ -1471,7 +1473,9 @@ QPointer<Ui::BoxContent> ShowForwardNoQuoteMessagesBox(
 				Ui::hideLayer();
 			});
 		}
-		data->submitCallback();
+		if (data->submitCallback) {
+			data->submitCallback();
+		}
 	};
 	auto filterCallback = [](PeerData *peer) {
 		return peer->canWrite();

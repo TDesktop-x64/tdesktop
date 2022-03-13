@@ -161,6 +161,10 @@ public:
 
 	std::unique_ptr<Data::UploadState> uploadingData;
 
+	int32 getDC(){
+		return this->_dc;
+	};
+
 private:
 	QByteArray _inlineThumbnailBytes;
 	std::array<Data::CloudFile, Data::kPhotoSizeCount> _images;

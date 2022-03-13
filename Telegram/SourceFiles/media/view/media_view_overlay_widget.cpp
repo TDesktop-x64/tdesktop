@@ -841,6 +841,11 @@ void OverlayWidget::updateControls() {
 		return dNow;
 	}();
 	_dateText = Ui::FormatDateTime(d, cDateFormat(), cTimeFormat());
+	if (_photo) {
+		_dateText += QString(" @ DC%1").arg(_photo->getDC());
+	} else if (_document) {
+		_dateText += QString(" @ DC%1").arg(_document->getDC());
+	}
 	if (!_fromName.isEmpty()) {
 		_fromNameLabel.setText(st::mediaviewTextStyle, _fromName, Ui::NameTextOptions());
 		_nameNav = QRect(st::mediaviewTextLeft, height() - st::mediaviewTextTop, qMin(_fromNameLabel.maxWidth(), width() / 3), st::mediaviewFont->height);

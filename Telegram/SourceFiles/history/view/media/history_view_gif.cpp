@@ -363,6 +363,9 @@ void Gif::draw(Painter &p, const PaintContext &context) const {
 			usex = width() - usew;
 		}
 	}
+	if (isUnwrapped()) {
+		accumulate_min(usew, painth);
+	}
 	if (rtl()) usex = width() - usex - usew;
 
 	QRect rthumb(style::rtlrect(usex + paintx, painty, usew, painth, width()));
@@ -848,6 +851,9 @@ TextState Gif::textState(QPoint point, StateRequest request) const {
 		if (rightAligned) {
 			usex = width() - usew;
 		}
+	}
+	if (isUnwrapped()) {
+		accumulate_min(usew, painth);
 	}
 	if (rtl()) usex = width() - usex - usew;
 

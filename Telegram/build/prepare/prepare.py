@@ -1243,7 +1243,7 @@ mac:
 stage('tg_owt', """
     git clone https://github.com/desktop-app/tg_owt.git
     cd tg_owt
-    git checkout 8d9c724c07
+    git checkout 1fe5e68d99
     git submodule init
     git submodule update src/third_party/libyuv
 win:

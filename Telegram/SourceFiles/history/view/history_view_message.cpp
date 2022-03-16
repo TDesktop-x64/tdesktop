@@ -460,7 +460,7 @@ QSize Message::performCountOptimalSize() {
 			forwarded->create(via);
 		}
 		if (reply) {
-			reply->updateName();
+			reply->updateName(item);
 		}
 
 		auto mediaDisplayed = false;
@@ -937,7 +937,7 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 	}
 
 	if (const auto reply = displayedReply()) {
-		if (reply->isNameUpdated()) {
+		if (reply->isNameUpdated(message())) {
 			const_cast<Message*>(this)->setPendingResize();
 		}
 	}

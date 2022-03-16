@@ -596,6 +596,7 @@ GroupCall::GroupCall(
 , _connectingSoundTimer([=] { playConnectingSoundOnce(); })
 , _listenersHidden(info.rtmp)
 , _rtmp(info.rtmp)
+, _rtmpVolume(Group::kDefaultVolume)
 , _mediaDevices(CreateMediaDevices()) {
 	_muted.value(
 	) | rpl::combine_previous(
@@ -1031,6 +1032,10 @@ rpl::producer<bool> GroupCall::emptyRtmpValue() const {
 	return _emptyRtmp.value();
 }
 
+int GroupCall::rtmpVolume() const {
+	return _rtmpVolume;
+}
+
 Calls::Group::RtmpInfo GroupCall::rtmpInfo() const {
 	return { _rtmpUrl, _rtmpKey };
 }
@@ -1096,7 +1101,7 @@ void GroupCall::join(const MTPInputGroupCall &inputCall) {
 				update.was->ssrc,
 				GetAdditionalAudioSsrc(update.was->videoParams),
 			});
-		} else {
+		} else if (!_rtmp) {
 			updateInstanceVolume(update.was, *update.now);
 		}
 	}, _lifetime);
@@ -2935,9 +2940,14 @@ void GroupCall::updateInstanceVolumes() {
 		return;
 	}
 
-	const auto &participants = real->participants();
-	for (const auto &participant : participants) {
-		updateInstanceVolume(std::nullopt, participant);
+	if (_rtmp) {
+		const auto value = _rtmpVolume / float64(Group::kDefaultVolume);
+		_instance->setVolume(1, value);
+	} else {
+		const auto &participants = real->participants();
+		for (const auto &participant : participants) {
+			updateInstanceVolume(std::nullopt, participant);
+		}
 	}
 }
 
@@ -3339,7 +3349,10 @@ void GroupCall::setCurrentAudioDevice(bool input, const QString &deviceId) {
 }
 
 void GroupCall::toggleMute(const Group::MuteRequest &data) {
-	if (data.locallyOnly) {
+	if (_rtmp) {
+		_rtmpVolume = data.mute ? 0 : Group::kDefaultVolume;
+		updateInstanceVolumes();
+	} else if (data.locallyOnly) {
 		applyParticipantLocally(data.peer, data.mute, std::nullopt);
 	} else {
 		editParticipant(data.peer, data.mute, std::nullopt);
@@ -3347,7 +3360,10 @@ void GroupCall::toggleMute(const Group::MuteRequest &data) {
 }
 
 void GroupCall::changeVolume(const Group::VolumeRequest &data) {
-	if (data.locallyOnly) {
+	if (_rtmp) {
+		_rtmpVolume = data.volume;
+		updateInstanceVolumes();
+	} else if (data.locallyOnly) {
 		applyParticipantLocally(data.peer, false, data.volume);
 	} else {
 		editParticipant(data.peer, false, data.volume);

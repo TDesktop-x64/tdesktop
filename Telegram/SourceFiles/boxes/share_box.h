@@ -88,6 +88,7 @@ public:
 		const style::MultiSelect *stMultiSelect = nullptr;
 		const style::InputField *stComment = nullptr;
 		const style::PeerList *st = nullptr;
+		const style::InputField *stLabel = nullptr;
 		rpl::producer<QString> title;
 		struct {
 			int messagesCount = 0;

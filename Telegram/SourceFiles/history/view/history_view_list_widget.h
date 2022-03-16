@@ -7,9 +7,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "base/timer.h"
 #include "ui/rp_widget.h"
 #include "ui/effects/animations.h"
-#include "ui/chat/select_scroll_manager.h" // Has base/timer.h.
+#include "ui/dragging_scroll_manager.h"
 #include "ui/widgets/tooltip.h"
 #include "mtproto/sender.h"
 #include "data/data_messages.h"
@@ -168,8 +169,7 @@ private:
 class ListWidget final
 	: public Ui::RpWidget
 	, public ElementDelegate
-	, public Ui::AbstractTooltipShower
-	, private base::Subscriber {
+	, public Ui::AbstractTooltipShower {
 public:
 	ListWidget(
 		QWidget *parent,
@@ -635,7 +635,7 @@ private:
 
 	Ui::Animations::Simple _spoilerOpacity;
 
-	Ui::SelectScrollManager _selectScroll;
+	Ui::DraggingScrollManager _selectScroll;
 
 	rpl::event_stream<FullMsgId> _requestedToEditMessage;
 	rpl::event_stream<FullMsgId> _requestedToReplyToMessage;

@@ -39,6 +39,10 @@ std::map<int, const char*> BetaLogs() {
 		1000023,
 		"-Change remove user from \"Recent actions\" confirm text.\n"
 		"-Fix selected message can't deselect after forward.\n"
+	},
+	{
+		1000025,
+		"-Show dc in media viewer\n"
 	}
 	};
 };
@@ -101,19 +105,20 @@ void Changelogs::requestCloudLogs() {
 }
 
 void Changelogs::addLocalLogs() {
-	if (AppBetaVersion || cAlphaVersion()) {
-		addBetaLogs();
-	}
+	//if (AppBetaVersion || cAlphaVersion()) {
+	//	addBetaLogs();
+	//}
 	if (!_addedSomeLocal) {
-		const auto text = tr::lng_new_version_wrap2(
-			tr::now,
-			lt_version,
-			QString::fromLatin1(AppVersionStr),
-			lt_changes,
-			tr::lng_new_version_minor(tr::now),
-			lt_link,
-			Core::App().changelogLink());
-		addLocalLog(text.trimmed());
+		//const auto text = tr::lng_new_version_wrap2(
+		//	tr::now,
+		//	lt_version,
+		//	QString::fromLatin1(AppVersionStr),
+		//	lt_changes,
+		//	tr::lng_new_version_minor(tr::now),
+		//	lt_link,
+		//	Core::App().changelogLink());
+		//addLocalLog(text.trimmed());
+		addBetaLogs();
 	}
 }
 

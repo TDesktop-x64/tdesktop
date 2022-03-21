@@ -109,6 +109,10 @@ bool SendProgressManager::updated(const Key &key, bool doing) {
 }
 
 void SendProgressManager::send(const Key &key, int progress) {
+
+	// Don't send chat actions
+	return; // TODO: Restrict this to developers
+
 	if (skipRequest(key)) {
 		return;
 	}

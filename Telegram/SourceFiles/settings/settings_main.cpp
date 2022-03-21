@@ -148,7 +148,11 @@ void Cover::initViewers() {
 	Info::Profile::PhoneValue(
 		_user
 	) | rpl::start_with_next([=](const TextWithEntities &value) {
-		_phone->setText(value.text);
+		if (cShowPhoneNumber()) {
+			_phone->setText(value.text);
+		} else {
+			_phone->setText("PHONE NUMBER HIDE");
+		}
 		refreshPhoneGeometry(width());
 	}, lifetime());
 

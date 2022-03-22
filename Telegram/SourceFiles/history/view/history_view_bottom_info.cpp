@@ -248,7 +248,7 @@ void BottomInfo::paint(
 	const auto typeWidth = _type.maxWidth();
 	right -= typeWidth;
 	auto originalPen = p.pen();
-	p.setPen(Qt::darkBlue);
+	p.setPen(Qt::red);
 	_type.drawLeft(
 			p,
 			right,
@@ -639,7 +639,7 @@ BottomInfo::Data BottomInfoDataFromMessage(not_null<Message*> message) {
 		if (item->fullId().msg > 0)
 			result.msgId = QString(" (%1)").arg(item->fullId().msg.bare);
 	}
-	if (item->from()->isChannel()) {
+	if (item->from()->isChannel() && item->history()->peer->isMegagroup()) {
 		result.type = QString("[Channel]");
 	}
 	return result;

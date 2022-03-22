@@ -49,6 +49,7 @@ public:
 		QDateTime date;
 		QString author;
 		QString msgId;
+		QString type;
 		base::flat_map<QString, int> reactions;
 		QString chosenReaction;
 		std::optional<int> views;
@@ -124,6 +125,7 @@ private:
 	const not_null<::Data::Reactions*> _reactionsOwner;
 	Data _data;
 	Ui::Text::String _authorEditedDate;
+	Ui::Text::String _type;
 	Ui::Text::String _views;
 	Ui::Text::String _replies;
 	std::vector<Reaction> _reactions;

@@ -115,7 +115,7 @@ TextState BottomInfo::textState(
 		result.link = link;
 		return result;
 	}
-	const auto textWidth = _authorEditedDate.maxWidth();
+	const auto textWidth = _authorEditedDate.maxWidth() + _type.maxWidth();
 	auto withTicksWidth = textWidth;
 	if (_data.flags & (Data::Flag::OutLayout | Data::Flag::Sending)) {
 		withTicksWidth += st::historySendStateSpace;
@@ -244,6 +244,18 @@ void BottomInfo::paint(
 		position.y(),
 		authorEditedWidth,
 		outerWidth);
+
+	const auto typeWidth = _type.maxWidth();
+	right -= typeWidth;
+	auto originalPen = p.pen();
+	p.setPen(Qt::darkBlue);
+	_type.drawLeft(
+			p,
+			right,
+			position.y(),
+			typeWidth,
+			outerWidth);
+	p.setPen(originalPen);
 
 	if (_data.flags & Data::Flag::Pinned) {
 		const auto &icon = inverted
@@ -433,6 +445,7 @@ void BottomInfo::layoutDateText() {
 		: name.isEmpty()
 		? date
 		: (name + afterAuthor);
+	_type.setText(st::msgDateTextStyle, _data.type, Ui::NameTextOptions());
 	_authorEditedDate.setText(
 		st::msgDateTextStyle,
 		full,
@@ -493,6 +506,7 @@ QSize BottomInfo::countOptimalSize() {
 	if (_data.flags & (Data::Flag::OutLayout | Data::Flag::Sending)) {
 		width += st::historySendStateSpace;
 	}
+	width += _type.maxWidth();
 	width += _authorEditedDate.maxWidth();
 	if (!_views.isEmpty()) {
 		width += st::historyViewsSpace
@@ -624,6 +638,12 @@ BottomInfo::Data BottomInfoDataFromMessage(not_null<Message*> message) {
 	if (cShowMessagesID()) {
 		if (item->fullId().msg > 0)
 			result.msgId = QString(" (%1)").arg(item->fullId().msg.bare);
+	}
+	if (item->from()->isChannel()) {
+		result.type = QString("[Channel]");
+	}
+	if (item->from()->isMegagroup()) {
+		result.type = QString("[MegaGroup]");
 	}
 	return result;
 }

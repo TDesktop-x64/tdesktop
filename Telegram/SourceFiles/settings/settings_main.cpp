@@ -151,7 +151,7 @@ void Cover::initViewers() {
 		if (cShowPhoneNumber()) {
 			_phone->setText(value.text);
 		} else {
-			_phone->setText("PHONE NUMBER HIDE");
+			_phone->setText(tr::lng_info_mobile_hidden(tr::now));
 		}
 		refreshPhoneGeometry(width());
 	}, lifetime());

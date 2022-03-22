@@ -642,9 +642,6 @@ BottomInfo::Data BottomInfoDataFromMessage(not_null<Message*> message) {
 	if (item->from()->isChannel()) {
 		result.type = QString("[Channel]");
 	}
-	if (item->from()->isMegagroup()) {
-		result.type = QString("[MegaGroup]");
-	}
 	return result;
 }
 

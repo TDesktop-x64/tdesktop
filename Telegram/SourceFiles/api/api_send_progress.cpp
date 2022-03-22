@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/unixtime.h"
 #include "data/data_peer_values.h"
 #include "apiwrap.h"
+#include <variant>
 
 namespace Api {
 namespace {
@@ -109,14 +110,22 @@ bool SendProgressManager::updated(const Key &key, bool doing) {
 }
 
 void SendProgressManager::send(const Key &key, int progress) {
-
-	// Don't send chat actions
-	return; // TODO: Restrict this to developers
-
 	if (skipRequest(key)) {
-		return;
-	}
-	using Type = SendProgressType;
+                return;
+        }
+        using Type = SendProgressType;
+
+	// https://bugs.telegram.org/c/9068
+	auto stickerChoosingEnabled = []() {
+		return false; // TODO: Add real check here (Toggle-able in Settings >> Privacy and Security)
+	};
+
+	if (key.type == Type::ChooseSticker) {
+                if (!stickerChoosingEnabled()) {
+                        return;
+                }
+        }
+
 	const auto action = [&]() -> MTPsendMessageAction {
 		const auto p = MTP_int(progress);
 		switch (key.type) {

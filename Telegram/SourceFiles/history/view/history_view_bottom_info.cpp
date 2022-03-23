@@ -245,7 +245,7 @@ void BottomInfo::paint(
 		authorEditedWidth,
 		outerWidth);
 
-	const auto typeWidth = _type.maxWidth();
+	const auto typeWidth = _type.maxWidth() + 3;
 	right -= typeWidth;
 	auto originalPen = p.pen();
 	p.setPen(Qt::red);
@@ -506,7 +506,11 @@ QSize BottomInfo::countOptimalSize() {
 	if (_data.flags & (Data::Flag::OutLayout | Data::Flag::Sending)) {
 		width += st::historySendStateSpace;
 	}
-	width += _type.maxWidth();
+	if (!_type.isEmpty()) {
+		width += st::historyViewsSpace
+			+ _type.maxWidth()
+			+ st::historyViewsWidth;
+	}
 	width += _authorEditedDate.maxWidth();
 	if (!_views.isEmpty()) {
 		width += st::historyViewsSpace
@@ -640,7 +644,7 @@ BottomInfo::Data BottomInfoDataFromMessage(not_null<Message*> message) {
 			result.msgId = QString(" (%1)").arg(item->fullId().msg.bare);
 	}
 	if (item->from()->isChannel() && item->history()->peer->isMegagroup()) {
-		result.type = QString("[Channel]");
+		result.type = tr::lng_channel_status(tr::now);
 	}
 	return result;
 }

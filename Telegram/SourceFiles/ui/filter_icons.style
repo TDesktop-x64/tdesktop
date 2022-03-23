@@ -27,6 +27,7 @@ filtersSetup: icon {{ "folders/folders_setup", sideBarIconFg }};
 filtersSetupActive: icon {{ "folders/folders_setup", sideBarIconFgActive }};
 
 filtersEdit: icon {{ "folders/folders_edit", sideBarIconFg }};
+filtersSavedMessage: icon {{ "folders/saved_messages", sideBarIconFg }};
 
 foldersCat: icon {{ "folders/folders_cat", sideBarIconFg }};
 foldersCatActive: icon {{ "folders/folders_cat", sideBarIconFgActive }};

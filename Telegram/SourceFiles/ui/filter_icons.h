@@ -46,6 +46,7 @@ enum class FilterIcon : uchar {
 	Work,
 
 	Edit,
+	SavedMessage,
 };
 
 struct FilterIcons {

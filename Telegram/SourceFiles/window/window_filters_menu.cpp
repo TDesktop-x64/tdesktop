@@ -225,8 +225,8 @@ void FiltersMenu::setupList() {
 	_setup = prepareButton(
 		_container,
 		-1,
-		tr::lng_filters_setup(tr::now),
-		Ui::FilterIcon::Edit);
+		tr::lng_saved_messages(tr::now),
+		Ui::FilterIcon::SavedMessage);
 	_reorder = std::make_unique<Ui::VerticalLayoutReorder>(_list, &_scroll);
 
 	_reorder->updates(
@@ -280,17 +280,18 @@ base::unique_qptr<Ui::SideBarButton> FiltersMenu::prepareButton(
 		} else if (id >= 0) {
 			_session->setActiveChatsFilter(id);
 		} else {
-			const auto filters = &_session->session().data().chatsFilters();
-			if (filters->suggestedLoaded()) {
-				_session->showSettings(Settings::Type::Folders);
-			} else if (!_waitingSuggested) {
-				_waitingSuggested = true;
-				filters->requestSuggested();
-				filters->suggestedUpdated(
-				) | rpl::take(1) | rpl::start_with_next([=] {
-					_session->showSettings(Settings::Type::Folders);
-				}, _outer.lifetime());
-			}
+			_session->showPeerHistory(_session->session().userPeerId());
+//			const auto filters = &_session->session().data().chatsFilters();
+//			if (filters->suggestedLoaded()) {
+//				_session->showSettings(Settings::Type::Folders);
+//			} else if (!_waitingSuggested) {
+//				_waitingSuggested = true;
+//				filters->requestSuggested();
+//				filters->suggestedUpdated(
+//				) | rpl::take(1) | rpl::start_with_next([=] {
+//					_session->showSettings(Settings::Type::Folders);
+//				}, _outer.lifetime());
+//			}
 		}
 	});
 	if (id > 0) {

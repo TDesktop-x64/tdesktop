@@ -245,17 +245,19 @@ void BottomInfo::paint(
 		authorEditedWidth,
 		outerWidth);
 
-	const auto typeWidth = _type.maxWidth() + 3;
-	right -= typeWidth;
-	auto originalPen = p.pen();
-	p.setPen(Qt::red);
-	_type.drawLeft(
-			p,
-			right,
-			position.y(),
-			typeWidth,
-			outerWidth);
-	p.setPen(originalPen);
+	if (!_type.isEmpty()) {
+		const auto typeWidth = _type.maxWidth() + 4;
+		right -= typeWidth;
+		auto originalPen = p.pen();
+		p.setPen(Qt::red);
+		_type.drawLeft(
+				p,
+				right,
+				position.y(),
+				typeWidth,
+				outerWidth);
+		p.setPen(originalPen);
+	}
 
 	if (_data.flags & Data::Flag::Pinned) {
 		const auto &icon = inverted
@@ -445,7 +447,9 @@ void BottomInfo::layoutDateText() {
 		: name.isEmpty()
 		? date
 		: (name + afterAuthor);
-	_type.setText(st::msgDateTextStyle, _data.type, Ui::NameTextOptions());
+	if (!_data.type.isEmpty()) {
+		_type.setText(st::msgDateTextStyle, _data.type, Ui::NameTextOptions());
+	}
 	_authorEditedDate.setText(
 		st::msgDateTextStyle,
 		full,

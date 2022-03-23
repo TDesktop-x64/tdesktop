@@ -2502,21 +2502,21 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 							}
 						}
 					}
-					if (canForward) {
-						fwdSubmenu->addAction(tr::lng_forward_to_saved_message(tr::now), [=] {
-							const auto api = &item->history()->peer->session().api();
-							auto action = Api::SendAction(item->history()->peer->owner().history(api->session().user()->asUser()));
-							action.clearDraft = false;
-							action.generateLocal = false;
+				}
+				if (canForward) {
+					fwdSubmenu->addAction(tr::lng_forward_to_saved_message(tr::now), [=] {
+						const auto api = &item->history()->peer->session().api();
+						auto action = Api::SendAction(item->history()->peer->owner().history(api->session().user()->asUser()));
+						action.clearDraft = false;
+						action.generateLocal = false;
 
-							const auto history = item->history()->peer->owner().history(api->session().user()->asUser());
-							auto resolved = history->resolveForwardDraft(Data::ForwardDraft{.ids = std::move(MessageIdsList(1, itemId))});
+						const auto history = item->history()->peer->owner().history(api->session().user()->asUser());
+						auto resolved = history->resolveForwardDraft(Data::ForwardDraft{.ids = std::move(MessageIdsList(1, itemId))});
 
-							api->forwardMessages(std::move(resolved), action, [] {
-								Ui::Toast::Show(tr::lng_share_done(tr::now));
-							});
-						}, &st::menuIconFave);
-					}
+						api->forwardMessages(std::move(resolved), action, [] {
+							Ui::Toast::Show(tr::lng_share_done(tr::now));
+						});
+					}, &st::menuIconFave);
 				}
 				if (!fwdSubmenu->empty()) {
 					_menu->addAction(tr::lng_context_forward(tr::now), std::move(fwdSubmenu), &st::menuIconForward);

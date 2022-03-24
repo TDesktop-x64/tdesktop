@@ -273,6 +273,10 @@ namespace EnhancedSettings {
 			cSetHideFilterAllChats(v);
 		});
 
+		ReadBoolOption(settings, "replace_edit_button", [&](auto v) {
+			cSetReplaceEditButton(v);
+		});
+
 		ReadBoolOption(settings, "skip_to_next", [&](auto v) {
 			cSetSkipSc(v);
 		});
@@ -372,6 +376,7 @@ namespace EnhancedSettings {
 		settings.insert(qsl("auto_unmute"), false);
 		settings.insert(qsl("bitrate"), 0);
 		settings.insert(qsl("hide_all_chats"), false);
+		settings.insert(qsl("replace_edit_button"), false);
 		settings.insert(qsl("hd_video"), false);
 		settings.insert(qsl("skip_to_next"), false);
 		settings.insert(qsl("disable_link_warning"), false);
@@ -413,6 +418,7 @@ namespace EnhancedSettings {
 		settings.insert(qsl("auto_unmute"), cAutoUnmute());
 		settings.insert(qsl("bitrate"), cVoiceChatBitrate());
 		settings.insert(qsl("hide_all_chats"), cHideFilterAllChats());
+		settings.insert(qsl("replace_edit_button"), cReplaceEditButton());
 		settings.insert(qsl("hd_video"), cHDVideo());
 		settings.insert(qsl("skip_to_next"), cSkipSc());
 		settings.insert(qsl("disable_link_warning"), cDisableLinkWarning());

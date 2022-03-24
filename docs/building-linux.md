@@ -16,26 +16,33 @@ Go to the `tdesktop` directory and run
 
 ### Building the project
 
-Make sure that you're still in the `tdesktop` directory and run (using [your **api_id** and **api_hash**](#obtain-your-api-credentials))
+##### Make sure:
+   - You're still in the `tdesktop` directory
+   - You have atleast 8GB Ram and 10GB Swap
+   - You have `$API_ID` and `$API_HASH` in your environmental variables
 
-    docker run --rm -it \
+#### Release Build
+
+    docker run --rm -it \                 
+        --cpus=$(($(nproc) - 1)) \
         -v $PWD:/usr/src/tdesktop \
         tdesktop:centos_env \
         /usr/src/tdesktop/Telegram/build/docker/centos_env/build.sh \
-        -D TDESKTOP_API_ID=YOUR_API_ID \
-        -D TDESKTOP_API_HASH=YOUR_API_HASH \
+        -D TDESKTOP_API_ID=$API_ID \
+        -D TDESKTOP_API_HASH=$API_HASH \
         -D DESKTOP_APP_USE_PACKAGED=OFF \
         -D DESKTOP_APP_DISABLE_CRASH_REPORTS=OFF
 
-Or, to create a debug build, run (also using [your **api_id** and **api_hash**](#obtain-your-api-credentials))
+#### Debug Build
 
-    docker run --rm -it \
+    docker run --rm -it \                 
+        --cpus=$(($(nproc) - 1)) \
         -v $PWD:/usr/src/tdesktop \
         -e DEBUG=1 \
         tdesktop:centos_env \
         /usr/src/tdesktop/Telegram/build/docker/centos_env/build.sh \
-        -D TDESKTOP_API_ID=YOUR_API_ID \
-        -D TDESKTOP_API_HASH=YOUR_API_HASH \
+        -D TDESKTOP_API_ID=$API_ID \
+        -D TDESKTOP_API_HASH=$API_HASH \
         -D DESKTOP_APP_USE_PACKAGED=OFF \
         -D DESKTOP_APP_DISABLE_CRASH_REPORTS=OFF
 

@@ -425,6 +425,21 @@ namespace Settings {
 
 		AddButton(
 				container,
+				tr::lng_settings_replace_edit_button(),
+				st::settingsButton
+		)->toggleOn(
+				rpl::single(cReplaceEditButton())
+		)->toggledValue(
+		) | rpl::filter([](bool enabled) {
+			return (enabled != cReplaceEditButton());
+		}) | rpl::start_with_next([=](bool enabled) {
+			cSetReplaceEditButton(enabled);
+			EnhancedSettings::Write();
+			controller->reloadFiltersMenu();
+		}, container->lifetime());
+
+		AddButton(
+				container,
 				tr::lng_settings_skip_message(),
 				st::settingsButton
 		)->toggleOn(

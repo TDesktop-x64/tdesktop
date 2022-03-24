@@ -167,6 +167,7 @@ DeclareSetting(bool, HideClassicFwd);
 DeclareSetting(bool, ShowPhoneNumber);
 DeclareSetting(bool, ShowScheduledButton);
 DeclareSetting(bool, HideFilterAllChats);
+DeclareSetting(bool, ReplaceEditButton);
 DeclareSetting(bool, StereoMode);
 DeclareSetting(bool, AutoUnmute);
 DeclareSetting(bool, VoiceChatPinned);

@@ -1,9 +1,9 @@
-#define MyAppShortName "64Gram"
-#define MyAppName "64Gram Desktop"
-#define MyAppPublisher "64Gram"
-#define MyAppURL "https://github.com/TDesktop-x64"
+#define MyAppShortName "Xyrogram"
+#define MyAppName "Xyrogram Desktop"
+#define MyAppPublisher "Xyrogram"
+#define MyAppURL "https://github.com/Xyrogram/Xyrogram-Desktop"
 #define MyAppExeName "Telegram.exe"
-#define MyAppId "9DB6C981-7FD2-41B5-AEF2-20C933FD3F21"
+#define MyAppId "9DB6C981-7FD2-41B5-AEF2-20C933FD3F69"
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application.
@@ -35,10 +35,10 @@ DisableProgramGroupPage=no
 #if MyBuildTarget == "win64"
 ArchitecturesAllowed=x64 arm64
 ArchitecturesInstallIn64BitMode=x64 arm64
-OutputBaseFilename=64Gram-setup-x64-{#MyAppVersionFull}
+OutputBaseFilename=Xyrogram-setup-x64-{#MyAppVersionFull}
 #define ArchModulesFolder "x64"
 #else
-OutputBaseFilename=64Gram-setup.{#MyAppVersionFull}
+OutputBaseFilename=Xyrogram-setup.{#MyAppVersionFull}
 #define ArchModulesFolder "x86"
 #endif
 

@@ -78,7 +78,7 @@ void PreviewWindowTitle(Painter &p, const style::palette &palette, QRect body, i
 	p.setPen(st::titleFgActive[palette]);
 	p.setFont(font);
 
-	p.drawText(titleRect, qsl("64Gram"), style::al_center);
+	p.drawText(titleRect, qsl("Xyrogram"), style::al_center);
 
 	auto isGraphite = ([NSColor currentControlTint] == NSGraphiteControlTint);
 	auto buttonSkip = 8;

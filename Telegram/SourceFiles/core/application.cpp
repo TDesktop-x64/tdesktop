@@ -874,7 +874,7 @@ bool Application::openInternalUrl(const QString &url, QVariant context) {
 }
 
 QString Application::changelogLink() const {
-	const auto base = u"https://github.com/TDesktop-x64/tdesktop/releases"_q;
+	const auto base = u"https://github.com/Xyrogram/Xyrogram-Desktop/releases"_q;
 	const auto languages = {
 		"id",
 		"de",
@@ -1304,7 +1304,7 @@ void Application::RegisterUrlScheme() {
 		.arguments = qsl("-workdir \"%1\"").arg(cWorkingDir()),
 		.protocol = qsl("tg"),
 		.protocolName = qsl("Telegram Link"),
-		.shortAppName = qsl("64gram"),
+		.shortAppName = qsl("Xyrogram"),
 		.longAppName = QCoreApplication::applicationName(),
 		.displayAppName = AppName.utf16(),
 		.displayAppDescription = AppName.utf16(),

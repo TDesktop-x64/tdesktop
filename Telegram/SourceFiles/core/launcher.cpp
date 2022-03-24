@@ -292,7 +292,7 @@ void Launcher::init() {
 	prepareSettings();
 	initQtMessageLogging();
 
-	QApplication::setApplicationName(qsl("64Gram"));
+	QApplication::setApplicationName(qsl("Xyrogram"));
 	QApplication::setAttribute(Qt::AA_DisableHighDpiScaling, true);
 	QApplication::setHighDpiScaleFactorRoundingPolicy(
 		Qt::HighDpiScaleFactorRoundingPolicy::Floor);

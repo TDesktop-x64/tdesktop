@@ -482,7 +482,7 @@ void Updates::differenceDone(const MTPupdates_Difference &result) {
 		stateDone(d.vstate());
 	} break;
 	case mtpc_updates_differenceTooLong: {
-		LOG(("API Error: updates.differenceTooLong is not supported by 64Gram Desktop!"));
+		LOG(("API Error: updates.differenceTooLong is not supported by Xyrogram Desktop!"));
 	} break;
 	};
 }

@@ -1,3 +1,4 @@
+// Don't change this comment
 /*
 This file is part of 64Gram Desktop,
 the unofficial app based on Telegram Desktop.
@@ -354,6 +355,8 @@ namespace EnhancedSettings {
 			return;
 		}
 		const char *defaultHeader = R"HEADER(
+
+// Don't modify "64Gram" name here
 // This is a list of default options for 64Gram Desktop
 // Please don't modify it, its content is not used in any way
 // You can place your own options in the 'enhanced-settings-custom.json' file

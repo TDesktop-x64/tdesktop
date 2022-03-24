@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.5
-Name=64Gram Desktop
-Comment=Unofficial desktop version of Telegram messaging app
+Name=Xyrogram Desktop
+Comment=Modified Telegram Desktop Client For Helping Fellow Developers Around
 TryExec=telegram-desktop
 Exec=telegram-desktop -- %u
 Icon=telegram

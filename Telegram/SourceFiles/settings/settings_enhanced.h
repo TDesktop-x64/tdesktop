@@ -1,3 +1,4 @@
+// Don't modify '64Gram' here
 /*
 This file is part of 64Gram Desktop,
 the unofficial app based on Telegram Desktop.

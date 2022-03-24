@@ -20,10 +20,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // used in Updater.cpp and Setup.iss for Windows
 constexpr auto AppId = "{9DB6C981-7FD2-41B5-AEF2-20C933FD3F21}"_cs;
 constexpr auto AppNameOld = "Telegram Win (Unofficial)"_cs;
-constexpr auto AppName = "64Gram Desktop"_cs;
-constexpr auto AppFile = "64Gram"_cs;
-constexpr auto AppVersion = 1000028;
-constexpr auto AppVersionStr = "1.0.28";
+constexpr auto AppName = "Xyrogram Desktop"_cs;
+constexpr auto AppFile = "Xyrogram"_cs;
+constexpr auto AppVersion = 1000025;
+constexpr auto AppVersionStr = "1.0.25";
 constexpr auto AppBetaVersion = false;
 constexpr auto AppAlphaVersion = TDESKTOP_ALPHA_VERSION;
-constexpr auto UpstreamVersion = "3.6.2";
+constexpr auto UpstreamVersion = "3.6";

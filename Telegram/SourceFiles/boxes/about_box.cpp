@@ -39,11 +39,11 @@ rpl::producer<TextWithEntities> Text2() {
 		lt_gpl_link,
 		rpl::single(Ui::Text::Link(
 			"GNU GPL",
-			"https://github.com/TDesktop-x64/tdesktop/blob/dev/LICENSE")),
+			"https://github.com/Xyrogram/Xyrogram-Desktop/blob/dev/LICENSE")),
 		lt_github_link,
 		rpl::single(Ui::Text::Link(
 			"GitHub",
-			"https://github.com/TDesktop-x64/tdesktop")),
+			"https://github.com/Xyrogram/Xyrogram-Desktop")),
 		Ui::Text::WithEntities);
 }
 
@@ -64,7 +64,7 @@ AboutBox::AboutBox(QWidget *parent)
 }
 
 void AboutBox::prepare() {
-	setTitle(rpl::single(qsl("64Gram Desktop")));
+	setTitle(rpl::single(qsl("Xyrogram Desktop")));
 
 	addButton(tr::lng_close(), [this] { closeBox(); });
 

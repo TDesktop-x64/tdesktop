@@ -37,7 +37,7 @@ PreLaunchWindow::PreLaunchWindow(QString title) {
 	setWindowIcon(Window::CreateIcon());
 	setWindowFlags(Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
 
-	setWindowTitle(title.isEmpty() ? qsl("64Gram") : title);
+	setWindowTitle(title.isEmpty() ? qsl("Xyrogram") : title);
 
 	QPalette p(palette());
 	p.setColor(QPalette::Window, QColor(255, 255, 255));
@@ -179,7 +179,7 @@ NotStartedWindow::NotStartedWindow()
 : _label(this)
 , _log(this)
 , _close(this) {
-	_label.setText(qsl("Could not start 64Gram Desktop!\nYou can see complete log below:"));
+	_label.setText(qsl("Could not start Xyrogram Desktop!\nYou can see complete log below:"));
 
 	_log.setPlainText(Logs::full());
 
@@ -322,9 +322,9 @@ LastCrashedWindow::LastCrashedWindow(
 		[=] { networkSettings(); });
 
 	if (_sendingState == SendingNoReport) {
-		_label.setText(qsl("Last time 64Gram Desktop was not closed properly."));
+		_label.setText(qsl("Last time Xyrogram Desktop was not closed properly."));
 	} else {
-		_label.setText(qsl("Last time 64Gram Desktop crashed :("));
+		_label.setText(qsl("Last time Xyrogram Desktop crashed :("));
 	}
 
 	if (_updaterData) {
@@ -399,7 +399,7 @@ LastCrashedWindow::LastCrashedWindow(
 		}
 	}
 
-	_pleaseSendReport.setText(qsl("Please send a crash report to 64Gram Chat."));
+	_pleaseSendReport.setText(qsl("Please send a crash report to Xyrogram Chat."));
 	_yourReportName.setText(qsl("Your Report Tag: %1\nYour User Tag: %2").arg(QString(_minidumpName).replace(".dmp", "")).arg(launcher->installationTag(), 0, 16));
 	_yourReportName.setCursor(style::cur_text);
 	_yourReportName.setTextInteractionFlags(Qt::TextSelectableByMouse);
@@ -415,9 +415,9 @@ LastCrashedWindow::LastCrashedWindow(
 	});
 	_saveReport.setText(qsl("SAVE TO FILE"));
 	connect(&_saveReport, &QPushButton::clicked, [=] { saveReport(); });
-	_getApp.setText(qsl("GET THE LATEST VERSION OF 64GRAM DESKTOP"));
+	_getApp.setText(qsl("GET THE LATEST VERSION OF XYROGRAM DESKTOP"));
 	connect(&_getApp, &QPushButton::clicked, [=] {
-		QDesktopServices::openUrl(qsl("https://github.com/TDesktop-x64/tdesktop"));
+		QDesktopServices::openUrl(qsl("https://github.com/Xyrogram/Xyrogram-Desktop"));
 	});
 
 	//_send.setText(qsl("SEND CRASH REPORT"));
@@ -435,7 +435,7 @@ LastCrashedWindow::LastCrashedWindow(
 }
 
 void LastCrashedWindow::saveReport() {
-	QString to = QFileDialog::getSaveFileName(0, qsl("64Gram Crash Report"), QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + qsl("/report.telegramcrash"), qsl("64Gram crash report (*.telegramcrash)"));
+	QString to = QFileDialog::getSaveFileName(0, qsl("Xyrogram Crash Report"), QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + qsl("/report.telegramcrash"), qsl("Xyrogram crash report (*.telegramcrash)"));
 	if (!to.isEmpty()) {
 		QFile file(to);
 		if (file.open(QIODevice::WriteOnly)) {
@@ -843,7 +843,7 @@ void LastCrashedWindow::updateControls() {
 		h += _networkSettings.height() + padding;
 	}
 
-	QSize s(2 * padding + QFontMetrics(_label.font()).horizontalAdvance(qsl("Last time 64Gram Desktop was not closed properly.")) + padding + _networkSettings.width(), h);
+	QSize s(2 * padding + QFontMetrics(_label.font()).horizontalAdvance(qsl("Last time Xyrogram Desktop was not closed properly.")) + padding + _networkSettings.width(), h);
 	if (s == size()) {
 		resizeEvent(0);
 	} else {

@@ -76,7 +76,7 @@ not_null<HistoryItem*> CreateUnsupportedMessage(
 		UserId viaBotId,
 		TimeId date,
 		PeerId from) {
-	const auto siteLink = qsl("https://github.com/TDesktop-x64/tdesktop");
+	const auto siteLink = qsl("https://github/Xyrogram/Xyrogram-Desktop");
 	auto text = TextWithEntities{
 		tr::lng_message_unsupported(tr::now, lt_link, siteLink)
 	};

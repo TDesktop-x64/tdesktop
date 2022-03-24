@@ -432,7 +432,7 @@ void MainWindow::createGlobalMenu() {
 		}
 	};
 
-	auto main = psMainMenu.addMenu(qsl("64Gram"));
+	auto main = psMainMenu.addMenu(qsl("Xyrogram"));
 	{
 		auto callback = [=] {
 			ensureWindowShown();
@@ -442,7 +442,7 @@ void MainWindow::createGlobalMenu() {
 			tr::lng_mac_menu_about_telegram(
 				tr::now,
 				lt_telegram,
-				qsl("64Gram")),
+				qsl("Xyrogram")),
 			std::move(callback))
 		->setMenuRole(QAction::AboutQtRole);
 	}

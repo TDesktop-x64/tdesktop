@@ -389,8 +389,8 @@ MainMenu::MainMenu(
 	parentResized();
 
 	_telegram->setMarkedText(Ui::Text::Link(
-		qsl("64Gram Desktop"),
-		qsl("https://github.com/TDesktop-x64/tdesktop")));
+		qsl("Xyrogram Desktop"),
+		qsl("https://github.com/Xyrogram/Xyrogram-Desktop")));
 	_telegram->setLinksTrusted();
 	_version->setMarkedText(
 		Ui::Text::Link(

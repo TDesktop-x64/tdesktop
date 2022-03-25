@@ -1292,6 +1292,12 @@ void Application::startShortcuts() {
 		request->check(Command::Minimize) && request->handle([=] {
 			return minimizeActiveWindow();
 		});
+		request->check(Command::GlobalSearch) && request->handle([=] {
+			auto window = activeWindow();
+			auto mainWidget = window->widget()->sessionContent();
+			mainWidget->dialogsFocus();
+			return true;
+		});
 		request->check(Command::Close) && request->handle([=] {
 			return closeActiveWindow();
 		});

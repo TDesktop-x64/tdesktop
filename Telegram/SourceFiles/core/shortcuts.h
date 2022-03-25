@@ -14,6 +14,7 @@ enum class Command {
 	Lock,
 	Minimize,
 	Quit,
+	GlobalSearch,
 
 	MediaPlay,
 	MediaPause,

@@ -235,6 +235,7 @@ public:
 		const SectionShow &params) const;
 
 	void dialogsCancelled();
+	void dialogsFocus();
 
 protected:
 	void paintEvent(QPaintEvent *e) override;

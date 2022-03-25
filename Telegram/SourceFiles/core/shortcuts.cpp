@@ -59,6 +59,7 @@ const auto CommandByName = base::flat_map<QString, Command>{
 	{ qsl("lock_telegram")     , Command::Lock },
 	{ qsl("minimize_telegram") , Command::Minimize },
 	{ qsl("quit_telegram")     , Command::Quit },
+	{ qsl("global_search")     , Command::GlobalSearch },
 
 	{ qsl("media_play")        , Command::MediaPlay },
 	{ qsl("media_pause")       , Command::MediaPause },
@@ -106,6 +107,7 @@ const auto CommandNames = base::flat_map<Command, QString>{
 	{ Command::Lock           , qsl("lock_telegram") },
 	{ Command::Minimize       , qsl("minimize_telegram") },
 	{ Command::Quit           , qsl("quit_telegram") },
+	{ Command::GlobalSearch   , qsl("global_search") },
 
 	{ Command::MediaPlay      , qsl("media_play") },
 	{ Command::MediaPause     , qsl("media_pause") },
@@ -340,6 +342,7 @@ void Manager::fillDefaults() {
 	set(qsl("ctrl+l"), Command::Lock);
 	set(qsl("ctrl+m"), Command::Minimize);
 	set(qsl("ctrl+q"), Command::Quit);
+	set(qsl("ctrl+t"), Command::GlobalSearch);
 
 	set(qsl("media play"), Command::MediaPlay);
 	set(qsl("media pause"), Command::MediaPause);

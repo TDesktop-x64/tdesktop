@@ -58,6 +58,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/qt/qt_common_adapters.h"
 
 #include <QtCore/QMimeData>
+#include <core/shortcuts.h>
 
 namespace Dialogs {
 namespace {
@@ -388,6 +389,7 @@ Widget::Widget(
 	}, lifetime());
 
 	setupDownloadBar();
+	setupShortcuts(controller);
 }
 
 void Widget::setGeometryWithTopMoved(
@@ -478,6 +480,39 @@ void Widget::setupDownloadBar() {
 				_connecting->raise();
 			}
 		}
+	}, lifetime());
+}
+
+void Widget::setupShortcuts(not_null<Window::SessionController *> controller) {
+	Shortcuts::Requests(
+	) | rpl::filter([=] {
+		return isActiveWindow()
+		       && !Ui::isLayerShown()
+		       && !controller->window().locked();
+	}) | rpl::start_with_next([=](not_null<Shortcuts::Request*> request) {
+		using Command = Shortcuts::Command;
+
+		if (controller->selectingPeer()) {
+			return;
+		}
+		const auto row = controller->activeChatEntryCurrent();
+
+		request->check(Command::GlobalSearch) && request->handle([=] {
+			if (_openedFolder) {
+				controller->closeFolder();
+				setInnerFocus();
+				return true;
+			} else {
+				if (controller->adaptive().isOneColumn()) {
+					controller->clearSectionStack();
+					controller->showBackFromStack();
+				} else {
+					setInnerFocus();
+				}
+				return true;
+			}
+			return false;
+		});
 	}, lifetime());
 }
 

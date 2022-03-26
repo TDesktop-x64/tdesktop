@@ -2685,10 +2685,6 @@ bool MainWidget::isThreeColumn() const {
 	return _controller->adaptive().isThreeColumn();
 }
 
-void MainWidget::dialogsFocus() {
-	return _dialogs->setInnerFocus();
-}
-
 namespace App {
 
 MainWidget *main() {

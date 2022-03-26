@@ -174,6 +174,8 @@ private:
 	void startScrollUpButtonAnimation(bool shown);
 	void updateScrollUpPosition();
 
+	void setupShortcuts(not_null<Window::SessionController *> controller);
+
 	MTP::Sender _api;
 
 	bool _dragInScroll = false;

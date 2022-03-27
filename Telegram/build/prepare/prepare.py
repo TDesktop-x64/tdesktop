@@ -400,7 +400,7 @@ if customRunCommand:
 stage('patches', """
     git clone https://github.com/desktop-app/patches.git
     cd patches
-    git checkout 2ccddbe673
+    git checkout 0947a28160
 """)
 
 stage('depot_tools', """
@@ -689,6 +689,13 @@ depends:yasm/yasm
     make install
 """)
 
+stage('nv-codec-headers', """
+win:
+    git clone https://github.com/FFmpeg/nv-codec-headers.git
+    cd nv-codec-headers
+    git checkout n11.1.5.1
+""")
+
 stage('ffmpeg', """
     git clone https://github.com/FFmpeg/FFmpeg.git ffmpeg
     cd ffmpeg
@@ -734,6 +741,7 @@ depends:yasm/yasm
     --enable-decoder=aasc \
     --enable-decoder=alac \
     --enable-decoder=alac_at \
+    --enable-decoder=av1 \
     --enable-decoder=flac \
     --enable-decoder=gif \
     --enable-decoder=h264 \
@@ -786,6 +794,7 @@ depends:yasm/yasm
     --enable-decoder=pcm_u32le \
     --enable-decoder=pcm_u8 \
     --enable-decoder=vorbis \
+    --enable-decoder=vp8 \
     --enable-decoder=wavpack \
     --enable-decoder=wmalossless \
     --enable-decoder=wmapro \

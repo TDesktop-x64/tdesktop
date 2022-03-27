@@ -76,6 +76,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_inner_widget.h"
 #include "history/history_item_components.h"
 #include "history/history_unread_things.h"
+#include "history/view/controls/history_view_compose_search.h"
 #include "history/view/controls/history_view_voice_record_bar.h"
 #include "history/view/controls/history_view_ttl_button.h"
 #include "history/view/history_view_cursor_state.h"
@@ -103,7 +104,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "chat_helpers/tabbed_section.h"
 #include "chat_helpers/bot_keyboard.h"
 #include "chat_helpers/message_field.h"
-#include "chat_helpers/send_context_menu.h"
+#include "menu/menu_send.h"
 #include "mtproto/mtproto_config.h"
 #include "lang/lang_keys.h"
 #include "mainwidget.h"
@@ -342,10 +343,10 @@ HistoryWidget::HistoryWidget(
 , _botKeyboardHide(this, st::historyBotKeyboardHide)
 , _botCommandStart(this, st::historyBotCommandStart)
 , _voiceRecordBar(std::make_unique<HistoryWidget::VoiceRecordBar>(
-		this,
-		controller,
-		_send,
-		st::historySendSize.height()))
+	this,
+	controller,
+	_send,
+	st::historySendSize.height()))
 , _field(
 	this,
 	st::historyComposeField,
@@ -913,6 +914,10 @@ HistoryWidget::HistoryWidget(
 	_topBar->cancelChooseForReportRequest(
 	) | rpl::start_with_next([=] {
 		setChooseReportMessagesDetails({}, nullptr);
+	}, _topBar->lifetime());
+	_topBar->searchRequest(
+	) | rpl::start_with_next([=] {
+		searchInChat();
 	}, _topBar->lifetime());
 
 	session().api().sendActions(
@@ -1829,7 +1834,9 @@ void HistoryWidget::setInnerFocus() {
 	if (_scroll->isHidden()) {
 		setFocus();
 	} else if (_list) {
-		if (_chooseTheme && _chooseTheme->shouldBeShown()) {
+		if (isSearching()) {
+			_composeSearch->setInnerFocus();
+		} else if (_chooseTheme && _chooseTheme->shouldBeShown()) {
 			_chooseTheme->setFocus();
 		} else if (_nonEmptySelection
 			|| (_list && _list->wasSelectedText())
@@ -1908,7 +1915,7 @@ void HistoryWidget::setupShortcuts() {
 		using Command = Shortcuts::Command;
 		if (_history) {
 			request->check(Command::Search, 1) && request->handle([=] {
-				controller()->content()->searchInChat(_history);
+				searchInChat();
 				return true;
 			});
 			if (session().supportMode()) {
@@ -2185,6 +2192,7 @@ void HistoryWidget::showHistory(
 		} else {
 			session().data().sponsoredMessages().clearItems(_history);
 			session().data().hideShownSpoilers();
+			_composeSearch = nullptr;
 		}
 		session().sendProgressManager().update(
 			_history,
@@ -2639,8 +2647,15 @@ bool HistoryWidget::contentOverlapped(const QRect &globalRect) {
 }
 
 bool HistoryWidget::canWriteMessage() const {
-	if (!_history || !_canSendMessages) return false;
-	if (isBlocked() || isJoinChannel() || isMuteUnmute() || isBotStart()) return false;
+	if (!_history || !_canSendMessages) {
+		return false;
+	}
+	if (isBlocked() || isJoinChannel() || isMuteUnmute() || isBotStart()) {
+		return false;
+	}
+	if (isSearching()) {
+		return false;
+	}
 	return true;
 }
 
@@ -2681,7 +2696,8 @@ void HistoryWidget::updateControlsVisibility() {
 	}
 	if (isChoosingTheme()
 		|| (!editingMessage()
-			&& (isBlocked()
+			&& (isSearching()
+				|| isBlocked()
 				|| isJoinChannel()
 				|| isMuteUnmute()
 				|| isBotStart()
@@ -2875,6 +2891,9 @@ void HistoryWidget::updateControlsVisibility() {
 		}
 		if (_voiceRecordBar) {
 			_voiceRecordBar->hideFast();
+		}
+		if (_composeSearch) {
+			_composeSearch->hideAnimated();
 		}
 		if (_inlineResults) {
 			_inlineResults->hide();
@@ -3746,6 +3765,9 @@ void HistoryWidget::hideChildWidgets() {
 	if (_voiceRecordBar) {
 		_voiceRecordBar->hideFast();
 	}
+	if (_composeSearch) {
+		_composeSearch->hideAnimated();
+	}
 	if (_chooseTheme) {
 		_chooseTheme->hide();
 	}
@@ -4453,6 +4475,10 @@ bool HistoryWidget::isMuteUnmute() const {
 			|| _peer->isRepliesChat());
 }
 
+bool HistoryWidget::isSearching() const {
+	return _composeSearch != nullptr;
+}
+
 bool HistoryWidget::showRecordButton() const {
 	return Media::Capture::instance()->available()
 		&& !_voiceRecordBar->isListenState()
@@ -4507,6 +4533,44 @@ bool HistoryWidget::updateCmdStartShown() {
 		return true;
 	}
 	return false;
+}
+
+void HistoryWidget::searchInChat() {
+	if (!_history) {
+		return;
+	}
+	if (controller()->isPrimary()) {
+		controller()->content()->searchInChat(_history);
+	} else {
+		const auto search = [=] {
+			const auto update = [=] {
+				updateControlsVisibility();
+				updateBotKeyboard();
+				updateFieldPlaceholder();
+
+				updateControlsGeometry();
+			};
+			_composeSearch = std::make_unique<HistoryView::ComposeSearch>(
+				this,
+				controller(),
+				_history);
+
+			update();
+			setInnerFocus();
+			_composeSearch->destroyRequests(
+			) | rpl::take(
+				1
+			) | rpl::start_with_next([=] {
+				_composeSearch = nullptr;
+
+				update();
+				setInnerFocus();
+			}, _composeSearch->lifetime());
+		};
+		if (!preventsClose(search)) {
+			search();
+		}
+	}
 }
 
 bool HistoryWidget::kbWasHidden() const {
@@ -5436,7 +5500,8 @@ void HistoryWidget::updateHistoryGeometry(
 	if (isChoosingTheme()) {
 		newScrollHeight -= _chooseTheme->height();
 	} else if (!editingMessage()
-		&& (isBlocked()
+		&& (isSearching()
+			|| isBlocked()
 			|| isBotStart()
 			|| isJoinChannel()
 			|| isMuteUnmute()
@@ -5708,7 +5773,7 @@ void HistoryWidget::updateBotKeyboard(History *h, bool force) {
 			&& _history->lastKeyboardUsed) {
 			_history->lastKeyboardHiddenId = _history->lastKeyboardId;
 		}
-		if (!isBotStart() && !isBlocked() && _canSendMessages && (wasVisible || (_replyToId && _replyEditMsg) || (!HasSendText(_field) && !kbWasHidden()))) {
+		if (!isSearching() && !isBotStart() && !isBlocked() && _canSendMessages && (wasVisible || (_replyToId && _replyEditMsg) || (!HasSendText(_field) && !kbWasHidden()))) {
 			if (!_a_show.animating()) {
 				if (hasMarkup) {
 					_kbScroll->show();
@@ -6798,6 +6863,9 @@ void HistoryWidget::replyToMessage(not_null<HistoryItem*> item) {
 	}
 
 	session().data().cancelForwarding(_history);
+	if (_composeSearch) {
+		_composeSearch->hideAnimated();
+	}
 
 	if (_editMsgId) {
 		if (auto localDraft = _history->localDraft()) {
@@ -6845,6 +6913,8 @@ void HistoryWidget::editMessage(not_null<HistoryItem*> item) {
 		controller()->show(
 			Ui::MakeInformBox(tr::lng_edit_caption_voice()));
 		return;
+	} else if (_composeSearch) {
+		_composeSearch->hideAnimated();
 	}
 
 	if (isRecording()) {
@@ -7343,7 +7413,9 @@ void HistoryWidget::confirmDeleteSelected() {
 }
 
 void HistoryWidget::escape() {
-	if (_chooseForReport) {
+	if (_composeSearch) {
+		_composeSearch->hideAnimated();
+	} else if (_chooseForReport) {
 		controller()->clearChooseReportMessages();
 	} else if (_nonEmptySelection && _list) {
 		clearSelected();
@@ -7418,6 +7490,10 @@ void HistoryWidget::updateTopBarSelection() {
 		|| selectedState.textSelected;
 	_topBar->showSelected(selectedState);
 
+	if ((selectedState.count > 0) && _composeSearch) {
+		_composeSearch->hideAnimated();
+	}
+
 	const auto transparent = Qt::WA_TransparentForMouseEvents;
 	if (selectedState.count == 0) {
 		_reportMessages->clearState();
@@ -7436,7 +7512,9 @@ void HistoryWidget::updateTopBarSelection() {
 	updateControlsVisibility();
 	updateHistoryGeometry();
 	if (!Ui::isLayerShown() && !Core::App().passcodeLocked()) {
-		if (_nonEmptySelection
+		if (isSearching()) {
+			_composeSearch->setInnerFocus();
+		} else if (_nonEmptySelection
 			|| (_list && _list->wasSelectedText())
 			|| isRecording()
 			|| isBotStart()

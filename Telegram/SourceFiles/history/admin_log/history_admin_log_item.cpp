@@ -1,4 +1,4 @@
-/*
+﻿/*
 This file is part of Telegram Desktop,
 the official desktop application for the Telegram messaging service.
 
@@ -483,7 +483,10 @@ auto GenerateParticipantChangeText(
 				user,
 				ChatRestrictionsInfo(),
 				oldRestrictions);
-		} else if (oldParticipant && oldParticipant->type() == Type::Restricted && (participant.type() == Type::Member || participant.type() == Type::Left)) {
+		} else if (oldParticipant
+				&& oldParticipant->type() == Type::Restricted
+				&& (participant.type() == Type::Member
+						|| participant.type() == Type::Left)) {
 			return GeneratePermissionsChangeText(
 				participantId,
 				user,

@@ -129,6 +129,8 @@ PRIVATE
     api/api_invite_links.h
     api/api_media.cpp
     api/api_media.h
+    api/api_messages_search.cpp
+    api/api_messages_search.h
     api/api_peer_photo.cpp
     api/api_peer_photo.h
     api/api_polls.cpp
@@ -338,8 +340,6 @@ PRIVATE
     chat_helpers/gifs_list_widget.h
     chat_helpers/message_field.cpp
     chat_helpers/message_field.h
-    chat_helpers/send_context_menu.cpp
-    chat_helpers/send_context_menu.h
     chat_helpers/spellchecker_common.cpp
     chat_helpers/spellchecker_common.h
     chat_helpers/stickers_emoji_image_loader.cpp
@@ -570,6 +570,8 @@ PRIVATE
     history/view/controls/compose_controls_common.h
     history/view/controls/history_view_compose_controls.cpp
     history/view/controls/history_view_compose_controls.h
+    history/view/controls/history_view_compose_search.cpp
+    history/view/controls/history_view_compose_search.h
     history/view/controls/history_view_ttl_button.cpp
     history/view/controls/history_view_ttl_button.h
     history/view/controls/history_view_voice_record_bar.cpp
@@ -892,6 +894,8 @@ PRIVATE
     media/view/media_view_playback_progress.cpp
     media/view/media_view_playback_progress.h
     media/view/media_view_open_common.h
+    menu/menu_send.cpp
+    menu/menu_send.h
     mtproto/config_loader.cpp
     mtproto/config_loader.h
     mtproto/connection_abstract.cpp
@@ -1148,8 +1152,6 @@ PRIVATE
     ui/image/image_location_factory.h
     ui/widgets/level_meter.cpp
     ui/widgets/level_meter.h
-    ui/widgets/multi_select.cpp
-    ui/widgets/multi_select.h
     ui/countryinput.cpp
     ui/countryinput.h
     ui/empty_userpic.cpp

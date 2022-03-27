@@ -418,10 +418,7 @@ rpl::producer<> PipPanel::saveGeometryRequests() const {
 }
 
 QScreen *PipPanel::myScreen() const {
-	if (const auto window = widget()->windowHandle()) {
-		return window->screen();
-	}
-	return nullptr;
+	return widget()->screen();
 }
 
 PipPanel::Position PipPanel::countPosition() const {
@@ -464,15 +461,21 @@ PipPanel::Position PipPanel::countPosition() const {
 
 void PipPanel::setPositionDefault() {
 	const auto widgetScreen = [&](auto &&widget) -> QScreen* {
-		if (auto handle = widget ? widget->windowHandle() : nullptr) {
-			return handle->screen();
+		if (!widget) {
+			return nullptr;
 		}
-		return nullptr;
+		if (!Platform::IsWayland()) {
+			if (const auto screen = QGuiApplication::screenAt(
+				widget->geometry().center())) {
+				return screen;
+			}
+		}
+		return widget->screen();
 	};
 	const auto parentScreen = widgetScreen(_parent);
 	const auto myScreen = widgetScreen(widget());
 	if (parentScreen && myScreen && myScreen != parentScreen) {
-		widget()->windowHandle()->setScreen(parentScreen);
+		widget()->setScreen(parentScreen);
 	}
 	const auto screen = parentScreen
 		? parentScreen
@@ -1601,6 +1604,7 @@ void Pip::restartAtSeekPosition(crl::time position) {
 
 	auto options = Streaming::PlaybackOptions();
 	options.position = position;
+	options.hwAllow = true;
 	options.audioId = _instance.player().prepareLegacyState().id;
 
 	Assert(8 && _delegate->pipPlaybackSpeed() >= 0.5

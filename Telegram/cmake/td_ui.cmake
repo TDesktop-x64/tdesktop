@@ -102,6 +102,9 @@ PRIVATE
     media/player/media_player_dropdown.cpp
     media/player/media_player_dropdown.h
 
+    menu/menu_check_item.cpp
+    menu/menu_check_item.h
+
     passport/ui/passport_details_row.cpp
     passport/ui/passport_details_row.h
     passport/ui/passport_form_row.cpp
@@ -221,6 +224,8 @@ PRIVATE
     ui/widgets/continuous_sliders.h
     ui/widgets/discrete_sliders.cpp
     ui/widgets/discrete_sliders.h
+    ui/widgets/multi_select.cpp
+    ui/widgets/multi_select.h
     ui/widgets/sent_code_field.cpp
     ui/widgets/sent_code_field.h
     ui/widgets/separate_panel.cpp

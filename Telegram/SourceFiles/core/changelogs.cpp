@@ -43,6 +43,14 @@ std::map<int, const char*> BetaLogs() {
 	{
 		1000025,
 		"-Show dc in media viewer\n"
+	},
+	{
+		1000026,
+		"-Fix option \"Forward to Saved\" on text only message in channel\n"
+		"-Show Channel label at the bottom of message\n"
+		"-Hide Phone Number in settings\n"
+		"-Add shortcut \"Ctrl+T\" for global search\n"
+		"-[Option] Replace Edit button to Saved messages\n"
 	}
 	};
 };

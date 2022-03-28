@@ -294,7 +294,11 @@ void Message::refreshRightBadge() {
 			}
 		}
 		const auto channel = data()->history()->peer->asMegagroup();
+		const auto isSendAs = data()->history()->peer->isMegagroup() && data()->from()->isChannel();
 		const auto user = data()->author()->asUser();
+		if (isSendAs) {
+			return tr::lng_channel_status(tr::now);
+		}
 		if (!channel || !user) {
 			return QString();
 		}

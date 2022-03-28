@@ -115,7 +115,7 @@ TextState BottomInfo::textState(
 		result.link = link;
 		return result;
 	}
-	const auto textWidth = _authorEditedDate.maxWidth() + _type.maxWidth();
+	const auto textWidth = _authorEditedDate.maxWidth();
 	auto withTicksWidth = textWidth;
 	if (_data.flags & (Data::Flag::OutLayout | Data::Flag::Sending)) {
 		withTicksWidth += st::historySendStateSpace;
@@ -244,20 +244,6 @@ void BottomInfo::paint(
 		position.y(),
 		authorEditedWidth,
 		outerWidth);
-
-	if (!_type.isEmpty()) {
-		const auto typeWidth = _type.maxWidth() + 4;
-		right -= typeWidth;
-		auto originalPen = p.pen();
-		p.setPen(Qt::red);
-		_type.drawLeft(
-				p,
-				right,
-				position.y(),
-				typeWidth,
-				outerWidth);
-		p.setPen(originalPen);
-	}
 
 	if (_data.flags & Data::Flag::Pinned) {
 		const auto &icon = inverted
@@ -447,9 +433,6 @@ void BottomInfo::layoutDateText() {
 		: name.isEmpty()
 		? date
 		: (name + afterAuthor);
-	if (!_data.type.isEmpty()) {
-		_type.setText(st::msgDateTextStyle, _data.type, Ui::NameTextOptions());
-	}
 	_authorEditedDate.setText(
 		st::msgDateTextStyle,
 		full,
@@ -509,11 +492,6 @@ QSize BottomInfo::countOptimalSize() {
 	auto width = 0;
 	if (_data.flags & (Data::Flag::OutLayout | Data::Flag::Sending)) {
 		width += st::historySendStateSpace;
-	}
-	if (!_type.isEmpty()) {
-		width += st::historyViewsSpace
-			+ _type.maxWidth()
-			+ st::historyViewsWidth;
 	}
 	width += _authorEditedDate.maxWidth();
 	if (!_views.isEmpty()) {
@@ -646,9 +624,6 @@ BottomInfo::Data BottomInfoDataFromMessage(not_null<Message*> message) {
 	if (cShowMessagesID()) {
 		if (item->fullId().msg > 0)
 			result.msgId = QString(" (%1)").arg(item->fullId().msg.bare);
-	}
-	if (item->from()->isChannel() && item->history()->peer->isMegagroup()) {
-		result.type = tr::lng_channel_status(tr::now);
 	}
 	return result;
 }

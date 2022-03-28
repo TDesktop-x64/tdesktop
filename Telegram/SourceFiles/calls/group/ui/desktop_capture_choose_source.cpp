@@ -1,4 +1,4 @@
-/*
+﻿/*
 This file is part of Telegram Desktop,
 the official desktop application for the Telegram messaging service.
 
@@ -574,22 +574,17 @@ void ChooseSourceProcess::setupSourcesGeometry() {
 
 void ChooseSourceProcess::setupGeometryWithParent(
 		not_null<QWidget*> parent) {
-	const auto parentScreen = [&] {
-		if (!::Platform::IsWayland()) {
-			if (const auto screen = QGuiApplication::screenAt(
-				parent->geometry().center())) {
-				return screen;
-			}
+	if (const auto handle = parent->windowHandle()) {
+		_window->createWinId();
+		const auto parentScreen = handle->screen();
+		const auto myScreen = _window->screen();
+		if (parentScreen && myScreen != parentScreen) {
+			_window->setScreen(parentScreen);
 		}
-		return parent->screen();
-	}();
-	const auto myScreen = _window->screen();
-	if (parentScreen && myScreen != parentScreen) {
-		_window->setScreen(parentScreen);
+		_window->move(
+			parent->x() + (parent->width() - _window->width()) / 2,
+			parent->y() + (parent->height() - _window->height()) / 2);
 	}
-	_window->move(
-		parent->x() + (parent->width() - _window->width()) / 2,
-		parent->y() + (parent->height() - _window->height()) / 2);
 }
 
 void ChooseSourceProcess::destroy() {

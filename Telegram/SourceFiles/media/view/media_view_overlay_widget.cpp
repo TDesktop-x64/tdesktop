@@ -337,13 +337,8 @@ OverlayWidget::OverlayWidget()
 	) | rpl::start_with_next([=](bool shown) {
 		toggleApplicationEventFilter(shown);
 		if (shown) {
-			const auto geometry = _widget->geometry();
 			const auto screenList = QGuiApplication::screens();
-			DEBUG_LOG(("Viewer Pos: Shown, geometry: %1, %2, %3, %4, screen number: %5")
-				.arg(geometry.x())
-				.arg(geometry.y())
-				.arg(geometry.width())
-				.arg(geometry.height())
+			DEBUG_LOG(("Viewer Pos: Shown, screen number: %1")
 				.arg(screenList.indexOf(_widget->screen())));
 			moveToScreen();
 		} else {
@@ -407,12 +402,17 @@ OverlayWidget::OverlayWidget()
 		return base::EventFilterResult::Continue;
 	});
 
-	if constexpr (Platform::IsMac()) {
+	if (Platform::IsLinux()) {
+		_widget->setWindowFlags(Qt::FramelessWindowHint
+			| Qt::MaximizeUsingFullscreenGeometryHint);
+	} else if (Platform::IsMac()) {
 		// Without Qt::Tool starting with Qt 5.15.1 this widget
 		// when being opened from a fullscreen main window was
 		// opening not as overlay over the main window, but as
 		// a separate fullscreen window with a separate space.
 		_widget->setWindowFlags(Qt::FramelessWindowHint | Qt::Tool);
+	} else {
+		_widget->setWindowFlags(Qt::FramelessWindowHint);
 	}
 	_widget->setAttribute(Qt::WA_NoSystemBackground, true);
 	_widget->setAttribute(Qt::WA_TranslucentBackground, true);
@@ -420,6 +420,13 @@ OverlayWidget::OverlayWidget()
 
 	hide();
 	_widget->createWinId();
+	if (Platform::IsLinux()) {
+		window()->setTransientParent(App::wnd()->windowHandle());
+		_widget->setWindowModality(Qt::WindowModal);
+	}
+	if (!Platform::IsMac()) {
+		_widget->setWindowState(Qt::WindowFullScreen);
+	}
 
 	QObject::connect(
 		window(),
@@ -474,16 +481,10 @@ void OverlayWidget::refreshLang() {
 
 void OverlayWidget::moveToScreen(bool inMove) {
 	const auto widgetScreen = [&](auto &&widget) -> QScreen* {
-		if (!widget) {
-			return nullptr;
+		if (auto handle = widget ? widget->windowHandle() : nullptr) {
+			return widget->screen();
 		}
-		if (!Platform::IsWayland()) {
-			if (const auto screen = QGuiApplication::screenAt(
-				widget->geometry().center())) {
-				return screen;
-			}
-		}
-		return widget->screen();
+		return nullptr;
 	};
 	const auto applicationWindow = Core::App().activeWindow()
 		? Core::App().activeWindow()->widget().get()
@@ -536,8 +537,6 @@ void OverlayWidget::updateGeometry(bool inMove) {
 		.arg(use.width())
 		.arg(use.height()));
 	_widget->setGeometry(use);
-	_widget->setMinimumSize(use.size());
-	_widget->setMaximumSize(use.size());
 	if (useSizeHack) {
 		_widget->setMask(mask);
 	}
@@ -2631,7 +2630,7 @@ void OverlayWidget::displayFinished() {
 		//OverlayParent::setVisibleHook(false);
 		//setAttribute(Qt::WA_DontShowOnScreen, false);
 		Ui::Platform::UpdateOverlayed(_widget);
-		if constexpr (!Platform::IsMac()) {
+		if (Platform::IsLinux()) {
 			_widget->showFullScreen();
 		} else {
 			_widget->show();

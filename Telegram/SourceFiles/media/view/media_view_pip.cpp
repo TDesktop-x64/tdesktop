@@ -1,4 +1,4 @@
-/*
+﻿/*
 This file is part of Telegram Desktop,
 the official desktop application for the Telegram messaging service.
 
@@ -461,16 +461,10 @@ PipPanel::Position PipPanel::countPosition() const {
 
 void PipPanel::setPositionDefault() {
 	const auto widgetScreen = [&](auto &&widget) -> QScreen* {
-		if (!widget) {
-			return nullptr;
+		if (auto handle = widget ? widget->windowHandle() : nullptr) {
+			return widget->screen();
 		}
-		if (!Platform::IsWayland()) {
-			if (const auto screen = QGuiApplication::screenAt(
-				widget->geometry().center())) {
-				return screen;
-			}
-		}
-		return widget->screen();
+		return nullptr;
 	};
 	const auto parentScreen = widgetScreen(_parent);
 	const auto myScreen = widgetScreen(widget());

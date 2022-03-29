@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - id: checkout
+        name: Checkout
+        uses: actions/checkout@v3
+        with:
+          ref: dev
+          submodules: recursive
+          repository: Xyrogram/Xyrogram-Desktop
+
+      - id: build
+        name: Build
+        run: docker run --rm -v $PWD:/usr/src/tdesktop thehamkercat/xyrogram_desktop:centos_env /usr/src/tdesktop/Telegram/build/docker/centos_env/build.sh -D TDESKTOP_API_ID=${{ secrets.TDESKTOP_API_ID }} -D TDESKTOP_API_HASH=${{ secrets.TDESKTOP_API_HASH }} -D DESKTOP_APP_USE_PACKAGED=OFF -D DESKTOP_APP_DISABLE_CRASH_REPORTS=OFF
+
+      - id: strip
+        name: Strip
+        run: |
+          sudo strip -s out/Release/*
+          sudo chmod 777 -R out/Release
+
+      - id: archive
+        name: Archive
+        run: |
+          ARCHIVE_FILE_NAME=xyrogram-linux-amd64.tar.xz
+          mv out/Release Xyrogram
+          tar -caf $ARCHIVE_FILE_NAME Xyrogram
+
+      - id: release
+        name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: xyrogram-linux-amd64.tar.xz

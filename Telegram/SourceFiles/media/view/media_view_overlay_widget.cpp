@@ -407,7 +407,9 @@ OverlayWidget::OverlayWidget()
 		return base::EventFilterResult::Continue;
 	});
 
-	if constexpr (Platform::IsMac()) {
+	if constexpr (Platform::IsWindows()) {
+		_widget->setWindowFlags(Qt::FramelessWindowHint);
+	} else if constexpr (Platform::IsMac()) {
 		// Without Qt::Tool starting with Qt 5.15.1 this widget
 		// when being opened from a fullscreen main window was
 		// opening not as overlay over the main window, but as
@@ -3127,7 +3129,7 @@ void OverlayWidget::restartAtSeekPosition(crl::time position) {
 	}
 	auto options = Streaming::PlaybackOptions();
 	options.position = position;
-	options.hwAllow = true;
+	options.hwAllowed = true;
 	if (!_streamed->withSound) {
 		options.mode = Streaming::Mode::Video;
 		options.loop = true;

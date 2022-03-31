@@ -33,24 +33,28 @@ std::map<int, const char*> BetaLogs() {
 	},
 	{
 		1000022,
-		"-Don't show sponsored ads if chat is supergroup.\n"
+		"- Don't show sponsored ads if chat is supergroup.\n"
 	},
 	{
 		1000023,
-		"-Change remove user from \"Recent actions\" confirm text.\n"
-		"-Fix selected message can't deselect after forward.\n"
+		"- Change remove user from \"Recent actions\" confirm text.\n"
+		"- Fix selected message can't deselect after forward.\n"
 	},
 	{
 		1000025,
-		"-Show dc in media viewer\n"
+		"- Show dc in media viewer\n"
 	},
 	{
 		1000026,
-		"-Fix option \"Forward to Saved\" on text only message in channel\n"
-		"-Show Channel label at the bottom of message\n"
-		"-Hide Phone Number in settings\n"
-		"-Add shortcut \"Ctrl+T\" for global search\n"
-		"-[Option] Replace Edit button to Saved messages\n"
+		"- Fix option \"Forward to Saved\" on text only message in channel\n"
+		"- Show Channel label at the bottom of message\n"
+		"- Hide Phone Number in settings\n"
+		"- Add shortcut \"Ctrl+T\" for global search\n"
+		"- [Option] Replace Edit button to Saved messages\n"
+	},
+	{
+		1000028,
+		"- Fix media viewer\n"
 	}
 	};
 };
@@ -157,7 +161,7 @@ void Changelogs::addBetaLog(int changeVersion, const char *changes) {
 		return result.replace(simple, separator);
 	}();
 	const auto version = FormatVersionDisplay(changeVersion);
-	const auto log = qsl("New in version %1 beta:\n\n").arg(version) + text;
+	const auto log = qsl("New in version %1%2:\n\n").arg(version).arg(cInstallBetaVersion() ? " beta" : "") + text;
 	addLocalLog(log);
 }
 

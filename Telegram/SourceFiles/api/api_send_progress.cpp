@@ -115,6 +115,16 @@ void SendProgressManager::send(const Key &key, int progress) {
         }
         using Type = SendProgressType;
 
+	
+	auto chatActionsEnabled = []() {
+		return false; // TODO: Add real check here, with toggleable
+	};
+	
+	if (!chatActionsEnabled()) {
+		return;
+	}
+
+
 	// https://bugs.telegram.org/c/9068
 	auto stickerChoosingEnabled = []() {
 		return false; // TODO: Add real check here (Toggle-able in Settings >> Privacy and Security)

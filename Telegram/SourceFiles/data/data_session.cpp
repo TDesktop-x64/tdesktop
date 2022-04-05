@@ -2028,6 +2028,8 @@ void Session::scheduleNextTTLs() {
 void Session::unregisterMessageTTL(
 		TimeId when,
 		not_null<HistoryItem*> item) {
+	return; // Make this toggle-able
+
 	Expects(when > 0);
 
 	const auto i = _ttlMessages.find(when);
@@ -2053,6 +2055,9 @@ void Session::checkTTLs() {
 void Session::processMessagesDeleted(
 		PeerId peerId,
 		const QVector<MTPint> &data) {
+
+	return; // Make this toggle-able
+
 	const auto list = messagesList(peerId);
 	const auto affected = historyLoaded(peerId);
 	if (!list && !affected) {
@@ -2078,6 +2083,8 @@ void Session::processMessagesDeleted(
 }
 
 void Session::processNonChannelMessagesDeleted(const QVector<MTPint> &data) {
+	return; // Make this toggle-able
+
 	auto historiesToCheck = base::flat_set<not_null<History*>>();
 	for (const auto &messageId : data) {
 		if (const auto item = nonChannelMessage(messageId.v)) {
@@ -2094,6 +2101,7 @@ void Session::processNonChannelMessagesDeleted(const QVector<MTPint> &data) {
 }
 
 void Session::removeDependencyMessage(not_null<HistoryItem*> item) {
+	return; // Make this toggle-able
 	const auto i = _dependentMessages.find(item);
 	if (i == end(_dependentMessages)) {
 		return;
@@ -2107,6 +2115,7 @@ void Session::removeDependencyMessage(not_null<HistoryItem*> item) {
 }
 
 void Session::unregisterMessage(not_null<HistoryItem*> item) {
+	return; // Make this toggle-able
 	const auto peerId = item->history()->peer->id;
 	const auto itemId = item->id;
 	_shownSpoilers.remove(item);

@@ -3187,6 +3187,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_other" = "Other";
 "lng_settings_hide_all_chats" = "Hide \"All chats\" folder";
 "lng_settings_replace_edit_button" = "Replace \"Edit\" button by Saved Messages";
+"lng_settings_enable_chat_actions" = "Enable chat actions like typing/stickers choosing etc, WARNING: BREAKS TG'S TOS WHEN DISABLED!!";
 "lng_settings_disable_link_warning" = "Disable open link warning";
 "lng_settings_hide_messages" = "Hide messages from blocked user";
 "lng_settings_restart_hint" = "WARNING: Changing options that are colored in red will take effect only after the app restarts.";

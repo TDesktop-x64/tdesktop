@@ -439,6 +439,21 @@ namespace Settings {
 		}, container->lifetime());
 
 		AddButton(
+                                container,
+                                tr::lng_settings_enable_chat_actions(),
+                                st::settingsButton
+                )->toggleOn(
+                                rpl::single(cEnableChatActions())
+                )->toggledValue(
+                ) | rpl::filter([](bool enabled) {
+                        return (enabled != cEnableChatActions());
+                }) | rpl::start_with_next([=](bool enabled) {
+                        cSetEnableChatActions(enabled);
+                        EnhancedSettings::Write();
+                        controller->reloadFiltersMenu();
+                }, container->lifetime());
+
+		AddButton(
 				container,
 				tr::lng_settings_skip_message(),
 				st::settingsButton

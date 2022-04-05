@@ -81,6 +81,12 @@ bool gShowPhoneNumber = true;
 bool gShowScheduledButton = false;
 bool gHideFilterAllChats = false;
 bool gReplaceEditButton = false;
+
+                                                                                  
+// Chat actions will be enabled by default, it breaks                                                      
+// Telegram's Terms of Services, so disable it at your own risk
+bool gEnableChatActions = true;
+
 bool gStereoMode = false;
 bool gAutoUnmute = false;
 bool gVoiceChatPinned = false;

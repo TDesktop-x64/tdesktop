@@ -114,26 +114,15 @@ void SendProgressManager::send(const Key &key, int progress) {
                 return;
         }
         using Type = SendProgressType;
-
 	
-	auto chatActionsEnabled = []() {
-		return false; // TODO: Add real check here, with toggleable
-	};
-	
-	if (!chatActionsEnabled()) {
+	if (!cEnableChatActions()) {
 		return;
 	}
 
 
-	// https://bugs.telegram.org/c/9068
-	auto stickerChoosingEnabled = []() {
-		return false; // TODO: Add real check here (Toggle-able in Settings >> Privacy and Security)
-	};
-
+	// FIX https://bugs.telegram.org/c/9068
 	if (key.type == Type::ChooseSticker) {
-                if (!stickerChoosingEnabled()) {
-                        return;
-                }
+        	return;
         }
 
 	const auto action = [&]() -> MTPsendMessageAction {

@@ -277,7 +277,11 @@ namespace EnhancedSettings {
 		ReadBoolOption(settings, "replace_edit_button", [&](auto v) {
 			cSetReplaceEditButton(v);
 		});
-
+		
+		ReadBoolOption(settings, "enable_chat_actions", [&](auto v) {
+                        cSetEnableChatActions(v);
+                });
+	
 		ReadBoolOption(settings, "skip_to_next", [&](auto v) {
 			cSetSkipSc(v);
 		});
@@ -380,6 +384,11 @@ namespace EnhancedSettings {
 		settings.insert(qsl("bitrate"), 0);
 		settings.insert(qsl("hide_all_chats"), false);
 		settings.insert(qsl("replace_edit_button"), false);
+
+		// Chat actions will be enabled by default, it breaks
+		// Telegram's Terms of Services, so disable it at your own risk
+		settings.insert(qsl("enable_chat_actions"), true);
+
 		settings.insert(qsl("hd_video"), false);
 		settings.insert(qsl("skip_to_next"), false);
 		settings.insert(qsl("disable_link_warning"), false);
@@ -422,6 +431,7 @@ namespace EnhancedSettings {
 		settings.insert(qsl("bitrate"), cVoiceChatBitrate());
 		settings.insert(qsl("hide_all_chats"), cHideFilterAllChats());
 		settings.insert(qsl("replace_edit_button"), cReplaceEditButton());
+		settings.insert(qsl("enable_chat_actions"), cEnableChatActions());
 		settings.insert(qsl("hd_video"), cHDVideo());
 		settings.insert(qsl("skip_to_next"), cSkipSc());
 		settings.insert(qsl("disable_link_warning"), cDisableLinkWarning());

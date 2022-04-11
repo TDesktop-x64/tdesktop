@@ -110,8 +110,6 @@ QSize Icon::size() const {
 	return _icon->size();
 }
 
-	case Type::Enhanced:
-		return object_ptr<Enhanced>(parent, controller);
 void AddSkip(not_null<Ui::VerticalLayout*> container) {
 	AddSkip(container, st::settingsSectionSkip);
 }

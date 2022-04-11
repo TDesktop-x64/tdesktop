@@ -46,7 +46,6 @@ struct SectionMeta {
 		not_null<QWidget*> parent,
 		not_null<Window::SessionController*> controller) const = 0;
 	[[nodiscard]] virtual rpl::producer<QString> title() const = 0;
-	Enhanced,
 };
 
 template <typename SectionType>

@@ -330,7 +330,7 @@ void SetupSections(
 		{ &st::settingsIconCalls, kIconGreen });
 	addSection(
 		tr::lng_settings_enhanced(),
-		Type::Enhanced,
+		Advanced::Id(),
 		{ &st::settingsIconGeneral, kIconRed });
 
 	SetupLanguageButton(container);

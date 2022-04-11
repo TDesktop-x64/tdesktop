@@ -11,12 +11,18 @@ https://github.com/TDesktop-x64/tdesktop/blob/dev/LEGAL
 
 class BoxContent;
 
+namespace Window {
+class Controller;
+class SessionController;
+} // namespace Window
+
 namespace Settings {
-	class Enhanced : public Section {
+	class Enhanced : public Section<Enhanced> {
 	public:
 		Enhanced(
 				QWidget *parent,
 				not_null<Window::SessionController *> controller);
+		[[nodiscard]] static rpl::producer<QString> Title();
 
 	private:
 		void setupContent(not_null<Window::SessionController *> controller);

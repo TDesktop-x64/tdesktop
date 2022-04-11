@@ -42,9 +42,8 @@ public:
 		int outerWidth,
 		bool selected,
 		bool actionSelected) override;
-	// Source from kotatogram
-	int adminTitleWidth() const override;
-	void paintAdminTitle(
+	int nameIconWidth() const override;
+	void paintNameIcon(
 		Painter &p,
 		int x,
 		int y,

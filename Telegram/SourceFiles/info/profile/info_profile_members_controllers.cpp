@@ -72,23 +72,34 @@ QMargins MemberListRow::rightActionMargins() const {
 		: PeerListRowWithLink::rightActionMargins();
 }
 
-// Source from kotatogram
-int MemberListRow::adminTitleWidth() const {
-	return st::normalFont->width(_type.adminTitle);
+int MemberListRow::nameIconWidth() const {
+	return (_type.rights == Rights::Admin)
+		? st::infoMembersAdminIcon.width()
+		: (_type.rights == Rights::Creator)
+		? st::infoMembersCreatorIcon.width()
+		: 0;
 }
 
 not_null<UserData*> MemberListRow::user() const {
 	return peer()->asUser();
 }
 
-// Source from kotatogram
-void MemberListRow::paintAdminTitle(
+void MemberListRow::paintNameIcon(
 		Painter &p,
 		int x,
 		int y,
 		int outerWidth,
 		bool selected) {
-	p.drawTextLeft(x, y, outerWidth, _type.adminTitle, adminTitleWidth());
+	const auto icon = [&] {
+		return (_type.rights == Rights::Admin)
+			? (selected
+				? &st::infoMembersAdminIconOver
+				: &st::infoMembersAdminIcon)
+			: (selected
+				? &st::infoMembersCreatorIconOver
+				: &st::infoMembersCreatorIcon);
+	}();
+	icon->paint(p, x, y, outerWidth);
 }
 
 void MemberListRow::refreshStatus() {

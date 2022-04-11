@@ -265,7 +265,7 @@ namespace Settings {
 					}
 					blockList = QList<int64>();
 					reqBlocked(0);
-				}, lifetime());
+				}, container->lifetime());
 			}
 		}, container->lifetime());
 
@@ -455,6 +455,10 @@ namespace Settings {
 		AddDividerText(container, tr::lng_settings_skip_message_desc());
 
 		AddSkip(container);
+	}
+
+	rpl::producer<QString> Enhanced::Title() {
+		return tr::lng_settings_enhanced();
 	}
 
 	Enhanced::Enhanced(

@@ -653,6 +653,21 @@ void PeerListRow::invalidatePixmapsCache() {
 	}
 }
 
+int PeerListRow::nameIconWidth() const {
+	return (special() || !_peer->isVerified())
+		? 0
+		: st::dialogsVerifiedIcon.width();
+}
+
+void PeerListRow::paintNameIcon(
+		Painter &p,
+		int x,
+		int y,
+		int outerWidth,
+		bool selected) {
+	st::dialogsVerifiedIcon.paint(p, x, y, outerWidth);
+}
+
 void PeerListRow::paintStatusText(
 		Painter &p,
 		const style::PeerListItem &st,
@@ -678,19 +693,6 @@ void PeerListRow::addRipple(const style::PeerListItem &st, MaskGenerator &&maskG
 		_ripple = std::make_unique<Ui::RippleAnimation>(st.button.ripple, std::move(mask), std::forward<UpdateCallback>(updateCallback));
 	}
 	_ripple->add(point);
-}
-
-// Source from kotatogram
-int PeerListRow::adminTitleWidth() const {
-	return 0;
-}
-
-void PeerListRow::paintAdminTitle(
-		Painter &p,
-		int x,
-		int y,
-		int outerWidth,
-		bool selected) {
 }
 
 void PeerListRow::stopLastRipple() {
@@ -1554,18 +1556,11 @@ crl::time PeerListContent::paintRow(
 			- skipRight;
 	}
 	auto statusw = namew;
-	if (auto adminTitleWidth = row->adminTitleWidth()) {
-		namew -= adminTitleWidth;
-		auto rankx = width() - adminTitleWidth - skipRight;
-		if (!rightActionSize.isEmpty() && selected) {
-			namew -= skipRight;
-			rankx -= skipRight;
-		}
-		p.setFont(st::normalFont);
-		p.setPen(selected ? _st.item.statusFgOver : _st.item.statusFg);
-		row->paintAdminTitle(
+	if (auto iconWidth = row->nameIconWidth()) {
+		namew -= iconWidth;
+		row->paintNameIcon(
 			p,
-			rankx,
+			namex + qMin(name.maxWidth(), namew),
 			_st.item.namePosition.y(),
 			width(),
 			selected);

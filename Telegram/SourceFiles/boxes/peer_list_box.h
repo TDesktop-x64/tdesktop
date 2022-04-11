@@ -94,9 +94,8 @@ public:
 	void clearCustomStatus();
 
 	// Box interface.
-	// Source from kotatogram
-	virtual int adminTitleWidth() const;
-	virtual void paintAdminTitle(
+	virtual int nameIconWidth() const;
+	virtual void paintNameIcon(
 		Painter &p,
 		int x,
 		int y,

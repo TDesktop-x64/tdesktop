@@ -325,15 +325,13 @@ base::unique_qptr<Ui::SideBarButton> FiltersMenu::prepareButton(
 			_popupMenu = base::make_unique_q<Ui::PopupMenu>(
 				raw,
 				st::popupMenuWithIcons);;
-			const auto addAction = [&](
-				const QString& text,
-				Fn<void()> callback,
-				const style::icon* icon) {
-					return _popupMenu->addAction(
-						text,
-						crl::guard(raw, std::move(callback)),
-						icon);
-			};
+			const auto addAction = Window::PeerMenuCallback([&](
+					Window::PeerMenuCallback::Args args) {
+				return _popupMenu->addAction(
+					args.text,
+					crl::guard(&_outer, std::move(args.handler)),
+					args.icon);
+			});
 			Window::MenuAddMarkAsReadAllChatsAction(
 					_session,
 					addAction);

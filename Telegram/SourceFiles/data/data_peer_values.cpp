@@ -182,8 +182,7 @@ rpl::producer<bool> CanWriteValue(ChatData *chat) {
 		| ChatDataFlag::Deactivated
 		| ChatDataFlag::Forbidden
 		| ChatDataFlag::Left
-		| ChatDataFlag::Creator
-		| ChatDataFlag::Kicked;
+		| ChatDataFlag::Creator;
 	return rpl::combine(
 		PeerFlagsValue(chat, mask),
 		AdminRightsValue(chat),
@@ -197,8 +196,7 @@ rpl::producer<bool> CanWriteValue(ChatData *chat) {
 			const auto amOutFlags = 0
 				| ChatDataFlag::Deactivated
 				| ChatDataFlag::Forbidden
-				| ChatDataFlag::Left
-				| ChatDataFlag::Kicked;
+				| ChatDataFlag::Left;
 			return !(flags & amOutFlags)
 				&& ((flags & ChatDataFlag::Creator)
 					|| (adminRights.value != ChatAdminRights(0))
@@ -265,8 +263,7 @@ rpl::producer<bool> CanPinMessagesValue(not_null<PeerData*> peer) {
 			| ChatDataFlag::Deactivated
 			| ChatDataFlag::Forbidden
 			| ChatDataFlag::Left
-			| ChatDataFlag::Creator
-			| ChatDataFlag::Kicked;
+			| ChatDataFlag::Creator;
 		return rpl::combine(
 			PeerFlagsValue(chat, mask),
 			AdminRightValue(chat, ChatAdminRight::PinMessages),
@@ -278,8 +275,7 @@ rpl::producer<bool> CanPinMessagesValue(not_null<PeerData*> peer) {
 			const auto amOutFlags = 0
 				| ChatDataFlag::Deactivated
 				| ChatDataFlag::Forbidden
-				| ChatDataFlag::Left
-				| ChatDataFlag::Kicked;
+				| ChatDataFlag::Left;
 			return !(flags & amOutFlags)
 				&& ((flags & ChatDataFlag::Creator)
 					|| adminRightAllows

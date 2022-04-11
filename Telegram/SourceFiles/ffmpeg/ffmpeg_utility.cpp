@@ -112,33 +112,61 @@ void PremultiplyLine(uchar *dst, const uchar *src, int intsCount) {
 [[nodiscard]] enum AVPixelFormat GetHwFormat(
 		AVCodecContext *context,
 		const enum AVPixelFormat *formats) {
-	const enum AVPixelFormat *p = nullptr;
-	for (p = formats; *p != AV_PIX_FMT_NONE; p++) {
+	const auto has = [&](enum AVPixelFormat format) {
+		const enum AVPixelFormat *p = nullptr;
+		for (p = formats; *p != AV_PIX_FMT_NONE; p++) {
+			if (*p == format) {
+				return true;
+			}
+		}
+		return false;
+	};
+	const auto list = std::array{
+#ifdef Q_OS_WIN
+		AV_PIX_FMT_D3D11,
+		AV_PIX_FMT_DXVA2_VLD,
+		AV_PIX_FMT_CUDA,
+#elif defined Q_OS_MAC // Q_OS_WIN
+		AV_PIX_FMT_VIDEOTOOLBOX,
+#else // Q_OS_WIN || Q_OS_MAC
+		AV_PIX_FMT_VAAPI,
+		AV_PIX_FMT_VDPAU,
+		AV_PIX_FMT_CUDA,
+#endif // Q_OS_WIN || Q_OS_MAC
+	};
+	for (const auto format : list) {
+		if (!has(format)) {
+			continue;
+		}
 		const auto type = [&] {
-			switch (*p) {
+			switch (format) {
 #ifdef Q_OS_WIN
 			case AV_PIX_FMT_D3D11: return AV_HWDEVICE_TYPE_D3D11VA;
 			case AV_PIX_FMT_DXVA2_VLD: return AV_HWDEVICE_TYPE_DXVA2;
-			case AV_PIX_FMT_D3D11VA_VLD: return AV_HWDEVICE_TYPE_D3D11VA;
+			case AV_PIX_FMT_CUDA: return AV_HWDEVICE_TYPE_CUDA;
 #elif defined Q_OS_MAC // Q_OS_WIN
 			case AV_PIX_FMT_VIDEOTOOLBOX:
 				return AV_HWDEVICE_TYPE_VIDEOTOOLBOX;
 #else // Q_OS_WIN || Q_OS_MAC
 			case AV_PIX_FMT_VAAPI: return AV_HWDEVICE_TYPE_VAAPI;
 			case AV_PIX_FMT_VDPAU: return AV_HWDEVICE_TYPE_VDPAU;
-#endif // Q_OS_WIN || Q_OS_MAC
 			case AV_PIX_FMT_CUDA: return AV_HWDEVICE_TYPE_CUDA;
+#endif // Q_OS_WIN || Q_OS_MAC
 			}
 			return AV_HWDEVICE_TYPE_NONE;
 		}();
-		if (type != AV_HWDEVICE_TYPE_NONE && !InitHw(context, type)) {
-			continue;
-		} else if (type == AV_HWDEVICE_TYPE_NONE && context->hw_device_ctx) {
+		if (type == AV_HWDEVICE_TYPE_NONE && context->hw_device_ctx) {
 			av_buffer_unref(&context->hw_device_ctx);
+		} else if (type != AV_HWDEVICE_TYPE_NONE && !InitHw(context, type)) {
+			continue;
 		}
-		return *p;
+		return format;
 	}
-	return AV_PIX_FMT_NONE;
+	enum AVPixelFormat result = AV_PIX_FMT_NONE;
+	for (const enum AVPixelFormat *p = formats; *p != AV_PIX_FMT_NONE; p++) {
+		result = *p;
+	}
+	return result;
 }
 
 template <AVPixelFormat Required>
@@ -152,56 +180,6 @@ enum AVPixelFormat GetFormatImplementation(
 		}
 	}
 	return AV_PIX_FMT_NONE;
-}
-
-template <AVPixelFormat Format>
-[[nodiscard]] HwAccelDescriptor HwAccelByFormat() {
-	return {
-		.getFormat = GetFormatImplementation<Format>,
-		.format = Format,
-	};
-}
-
-[[nodiscard]] HwAccelDescriptor ResolveHwAccel(
-		not_null<const AVCodec*> decoder,
-		AVHWDeviceType type) {
-	Expects(type != AV_HWDEVICE_TYPE_NONE);
-
-	const auto format = [&] {
-		for (auto i = 0;; i++) {
-			const auto config = avcodec_get_hw_config(decoder, i);
-			if (!config) {
-				break;
-			} else if (config->device_type == type
-				&& (config->methods
-					& AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX)) {
-				return config->pix_fmt;
-			}
-		}
-		return AV_PIX_FMT_NONE;
-	}();
-
-	switch (format) {
-#ifdef Q_OS_WIN
-	case AV_PIX_FMT_D3D11:
-		return HwAccelByFormat<AV_PIX_FMT_D3D11>();
-	case AV_PIX_FMT_DXVA2_VLD:
-		return HwAccelByFormat<AV_PIX_FMT_DXVA2_VLD>();
-	case AV_PIX_FMT_D3D11VA_VLD:
-		return HwAccelByFormat<AV_PIX_FMT_D3D11VA_VLD>();
-#elif defined Q_OS_MAC // Q_OS_WIN
-	case AV_PIX_FMT_VIDEOTOOLBOX:
-		return HwAccelByFormat<AV_PIX_FMT_VIDEOTOOLBOX>();
-#else // Q_OS_WIN || Q_OS_MAC
-	case AV_PIX_FMT_VAAPI:
-		return HwAccelByFormat<AV_PIX_FMT_VAAPI>();
-	case AV_PIX_FMT_VDPAU:
-		return HwAccelByFormat<AV_PIX_FMT_VDPAU>();
-#endif // Q_OS_WIN || Q_OS_MAC
-	case AV_PIX_FMT_CUDA:
-		return HwAccelByFormat<AV_PIX_FMT_CUDA>();
-	}
-	return {};
 }
 
 } // namespace

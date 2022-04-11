@@ -38,6 +38,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_settings.h"
 #include "styles/style_menu_icons.h"
 
+#include <QAction>
+
 namespace Settings {
 namespace {
 
@@ -108,37 +110,8 @@ QSize Icon::size() const {
 	return _icon->size();
 }
 
-object_ptr<Section> CreateSection(
-		Type type,
-		not_null<QWidget*> parent,
-		not_null<Window::SessionController*> controller) {
-	switch (type) {
-	case Type::Main:
-		return object_ptr<Main>(parent, controller);
-	case Type::Information:
-		return object_ptr<Information>(parent, controller);
-	case Type::Notifications:
-		return object_ptr<Notifications>(parent, controller);
-	case Type::PrivacySecurity:
-		return object_ptr<PrivacySecurity>(parent, controller);
-	case Type::Sessions:
-		return object_ptr<Sessions>(parent, controller);
-	case Type::Advanced:
-		return object_ptr<Advanced>(parent, controller);
-	case Type::Folders:
-		return object_ptr<Folders>(parent, controller);
-	case Type::Chat:
-		return object_ptr<Chat>(parent, controller);
-	case Type::Calls:
-		return object_ptr<Calls>(parent, controller);
 	case Type::Enhanced:
 		return object_ptr<Enhanced>(parent, controller);
-	case Type::Experimental:
-		return object_ptr<Experimental>(parent, controller);
-	}
-	Unexpected("Settings section type in Widget::createInnerWidget.");
-}
-
 void AddSkip(not_null<Ui::VerticalLayout*> container) {
 	AddSkip(container, st::settingsSectionSkip);
 }
@@ -280,9 +253,9 @@ void FillMenu(
 		not_null<Window::SessionController*> controller,
 		Type type,
 		Fn<void(Type)> showOther,
-		MenuCallback addAction) {
+		Menu::MenuCallback addAction) {
 	const auto window = &controller->window();
-	if (type == Type::Chat) {
+	if (type == Chat::Id()) {
 		addAction(
 			tr::lng_settings_bg_theme_create(tr::now),
 			[=] { window->show(Box(Window::Theme::CreateBox, window)); },
@@ -297,13 +270,15 @@ void FillMenu(
 		if (!controller->session().supportMode()) {
 			addAction(
 				tr::lng_settings_information(tr::now),
-				[=] { showOther(Type::Information); },
+				[=] { showOther(Information::Id()); },
 				&st::menuIconInfo);
 		}
-		addAction(
-			tr::lng_settings_logout(tr::now),
-			[=] { window->showLogoutConfirmation(); },
-			&st::menuIconLeave);
+		addAction({
+			.text = tr::lng_settings_logout(tr::now),
+			.handler = [=] { window->showLogoutConfirmation(); },
+			.icon = &st::menuIconLeaveAttention,
+			.isAttention = true,
+		});
 	}
 }
 

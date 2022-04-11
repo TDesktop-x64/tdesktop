@@ -14,10 +14,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/info_controller.h"
 #include "info/info_memento.h"
 #include "info/info_top_bar.h"
+#include "settings/settings_chat.h"
+#include "settings/settings_main.h"
 #include "ui/widgets/discrete_sliders.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/shadow.h"
-#include "ui/widgets/dropdown_menu.h"
+#include "ui/widgets/popup_menu.h"
 #include "ui/wrap/fade_wrap.h"
 #include "ui/search_field_controller.h"
 #include "core/application.h"
@@ -29,6 +31,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/peer_list_box.h"
 #include "ui/boxes/confirm_box.h"
 #include "main/main_session.h"
+#include "menu/add_action_callback_factory.h"
 #include "mtproto/mtproto_config.h"
 #include "data/data_download_manager.h"
 #include "data/data_session.h"
@@ -36,6 +39,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_user.h"
 #include "mainwidget.h"
 #include "lang/lang_keys.h"
+#include "styles/style_chat.h" // popupMenuExpandedSeparator
 #include "styles/style_info.h"
 #include "styles/style_profile.h"
 #include "styles/style_menu_icons.h"
@@ -351,10 +355,6 @@ void WrapWidget::createTopBar() {
 		_content->selectionAction(action);
 	}, _topBar->lifetime());
 
-	_topBar->setTitle(TitleValue(
-		_controller->section(),
-		_controller->key(),
-		!hasStackHistory()));
 	if (wrapValue == Wrap::Narrow || hasStackHistory()) {
 		_topBar->enableBackButton();
 		_topBar->backRequest(
@@ -395,8 +395,8 @@ void WrapWidget::createTopBar() {
 		addTopBarMenuButton();
 		addProfileCallsButton();
 	} else if (section.type() == Section::Type::Settings
-		&& (section.settingsType() == Section::SettingsType::Main
-			|| section.settingsType() == Section::SettingsType::Chat)) {
+		&& (section.settingsType() == ::Settings::Main::Id()
+			|| section.settingsType() == ::Settings::Chat::Id())) {
 		addTopBarMenuButton();
 	} else if (section.type() == Section::Type::Downloads) {
 		auto &manager = Core::App().downloadManager();
@@ -487,38 +487,22 @@ void WrapWidget::addProfileCallsButton() {
 
 void WrapWidget::showTopBarMenu() {
 	if (_topBarMenu) {
-		_topBarMenu->hideAnimated(
-			Ui::InnerDropdown::HideOption::IgnoreShow);
+		_topBarMenu->hideMenu(true);
 		return;
 	}
-	_topBarMenu = base::make_unique_q<Ui::DropdownMenu>(
+	_topBarMenu = base::make_unique_q<Ui::PopupMenu>(
 		this,
-		st::dropdownMenuWithIcons);
+		st::popupMenuExpandedSeparator);
 
-	_topBarMenu->setHiddenCallback([this] {
+	_topBarMenu->setDestroyedCallback([this] {
 		InvokeQueued(this, [this] { _topBarMenu = nullptr; });
 		if (auto toggle = _topBarMenuToggle.get()) {
 			toggle->setForceRippled(false);
 		}
 	});
-	_topBarMenu->setShowStartCallback([this] {
-		if (auto toggle = _topBarMenuToggle.get()) {
-			toggle->setForceRippled(true);
-		}
-	});
-	_topBarMenu->setHideStartCallback([this] {
-		if (auto toggle = _topBarMenuToggle.get()) {
-			toggle->setForceRippled(false);
-		}
-	});
-	_topBarMenuToggle->installEventFilter(_topBarMenu.get());
+	_topBarMenuToggle->setForceRippled(true);
 
-	const auto addAction = [=](
-			const QString &text,
-			Fn<void()> callback,
-			const style::icon *icon) {
-		return _topBarMenu->addAction(text, std::move(callback), icon);
-	};
+	const auto addAction = Menu::CreateAddActionCallback(_topBarMenu);
 	if (key().isDownloads()) {
 		addAction(
 			tr::lng_context_delete_all_files(tr::now),
@@ -547,11 +531,9 @@ void WrapWidget::showTopBarMenu() {
 		_topBarMenu = nullptr;
 		return;
 	}
-	auto position = (wrap() == Wrap::Layer)
-		? st::infoLayerTopBarMenuPosition
-		: st::infoTopBarMenuPosition;
-	_topBarMenu->moveToRight(position.x(), position.y());
-	_topBarMenu->showAnimated(Ui::PanelAnimation::Origin::TopRight);
+	_topBarMenu->setForcedOrigin(Ui::PanelAnimation::Origin::TopRight);
+	_topBarMenu->popup(_topBarMenuToggle->mapToGlobal(
+		st::infoLayerTopBarMenuPosition));
 }
 
 void WrapWidget::deleteAllDownloads() {
@@ -630,8 +612,9 @@ void WrapWidget::showContent(object_ptr<ContentWidget> content) {
 }
 
 void WrapWidget::finishShowContent() {
-	_content->setIsStackBottom(!hasStackHistory());
 	updateContentGeometry();
+	_content->setIsStackBottom(!hasStackHistory());
+	_topBar->setTitle(_content->title());
 	_desiredHeights.fire(desiredHeightForContent());
 	_desiredShadowVisibilities.fire(_content->desiredShadowVisibility());
 	_selectedLists.fire(_content->selectedListValue());

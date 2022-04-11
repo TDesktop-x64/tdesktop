@@ -102,8 +102,14 @@ PRIVATE
     media/player/media_player_dropdown.cpp
     media/player/media_player_dropdown.h
 
+    menu/add_action_callback.cpp
+    menu/add_action_callback.h
+    menu/add_action_callback_factory.cpp
+    menu/add_action_callback_factory.h
     menu/menu_check_item.cpp
     menu/menu_check_item.h
+    menu/menu_ttl.cpp
+    menu/menu_ttl.h
 
     passport/ui/passport_details_row.cpp
     passport/ui/passport_details_row.h
@@ -133,6 +139,8 @@ PRIVATE
     ui/boxes/calendar_box.h
     ui/boxes/choose_date_time.cpp
     ui/boxes/choose_date_time.h
+    ui/boxes/choose_time.cpp
+    ui/boxes/choose_time.h
     ui/boxes/confirm_box.cpp
     ui/boxes/confirm_box.h
     ui/boxes/confirm_phone_box.cpp
@@ -147,6 +155,8 @@ PRIVATE
     ui/boxes/report_box.h
     ui/boxes/single_choice_box.cpp
     ui/boxes/single_choice_box.h
+    ui/boxes/time_picker_box.cpp
+    ui/boxes/time_picker_box.h
 
     ui/chat/attach/attach_abstract_single_file_preview.cpp
     ui/chat/attach/attach_abstract_single_file_preview.h
@@ -157,6 +167,8 @@ PRIVATE
     ui/chat/attach/attach_album_preview.h
     ui/chat/attach/attach_album_thumbnail.cpp
     ui/chat/attach/attach_album_thumbnail.h
+    ui/chat/attach/attach_bot_webview.cpp
+    ui/chat/attach/attach_bot_webview.h
     ui/chat/attach/attach_controls.cpp
     ui/chat/attach/attach_controls.h
     ui/chat/attach/attach_extensions.cpp
@@ -230,13 +242,17 @@ PRIVATE
     ui/widgets/sent_code_field.h
     ui/widgets/separate_panel.cpp
     ui/widgets/separate_panel.h
+    ui/widgets/vertical_drum_picker.cpp
+    ui/widgets/vertical_drum_picker.h
 
     ui/cached_round_corners.cpp
     ui/cached_round_corners.h
     ui/grouped_layout.cpp
     ui/grouped_layout.h
-    ui/special_fields.cpp
-    ui/special_fields.h
+    ui/widgets/fields/special_fields.cpp
+    ui/widgets/fields/special_fields.h
+    ui/widgets/fields/time_part_input_with_placeholder.cpp
+    ui/widgets/fields/time_part_input_with_placeholder.h
 
     ui/ui_pch.h
 )

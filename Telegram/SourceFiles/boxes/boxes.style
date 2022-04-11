@@ -576,17 +576,13 @@ colorValueInput: InputField(defaultInputField) {
 colorResultInput: InputField(colorValueInput) {
 }
 
-changePhoneIcon: icon {
-	{ "phone_simcard_from", changePhoneSimcardFrom },
-	{ "phone_simcard_migrate", changePhoneSimcardTo, point(30px, 11px) },
-	{ "phone_simcard_to", changePhoneSimcardTo, point(78px, 0px) }
-};
 changePhoneDescription: FlatLabel(boxLabel) {
 	minWidth: 332px;
 	align: align(top);
 }
-changePhoneIconTop: 20px;
-changePhoneDescriptionTop: 96px;
+changePhoneIconTop: 16px;
+changePhoneIconSize: 96px;
+changePhoneDescriptionTop: 128px;
 changePhoneLabel: FlatLabel(defaultFlatLabel) {
 	minWidth: 275px;
 	textFg: windowSubTextFg;
@@ -993,6 +989,16 @@ scheduleTimeSeparator: FlatLabel(defaultFlatLabel) {
 }
 scheduleTimeSeparatorPadding: margins(2px, 0px, 2px, 0px);
 
+muteBoxTimeField: InputField(scheduleDateField) {
+	textMargins: margins(0px, 0px, 0px, 0px);
+	placeholderMargins: margins(0px, 0px, 0px, 0px);
+	placeholderScale: 0.;
+	heightMin: 30px;
+	textAlign: align(left);
+	font: font(14px);
+}
+muteBoxTimeFieldPadding: margins(5px, 0px, 5px, 0px);
+
 boxAttentionDividerLabel: FlatLabel(boxDividerLabel) {
 	textFg: boxTextFgError;
 }
@@ -1049,3 +1055,11 @@ requestsRejectButton: RoundButton(defaultLightButton) {
 }
 requestAcceptPosition: point(71px, 58px);
 requestButtonsSkip: 9px;
+
+ringtonesBoxButton: SettingsButton(defaultSettingsButton) {
+	textFg: lightButtonFg;
+	textFgOver: lightButtonFgOver;
+	padding: margins(56px, 10px, 22px, 8px);
+	iconLeft: 25px;
+}
+ringtonesBoxSkip: 7px;

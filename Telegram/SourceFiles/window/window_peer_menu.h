@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_common.h"
 #include "menu/menu_send.h"
 #include "data/data_poll.h"
+#include "menu/add_action_callback.h"
 
 class History;
 
@@ -38,10 +39,7 @@ class SessionNavigation;
 
 extern const char kOptionViewProfileInChatsListContextMenu[];
 
-using PeerMenuCallback = Fn<QAction*(
-	const QString &text,
-	Fn<void()> handler,
-	const style::icon *icon)>;
+using PeerMenuCallback = Menu::MenuCallback;
 
 void FillDialogsEntryMenu(
 	not_null<SessionController*> controller,

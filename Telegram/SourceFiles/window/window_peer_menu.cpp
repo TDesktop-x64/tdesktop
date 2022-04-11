@@ -13,16 +13,20 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "ui/boxes/confirm_box.h"
 #include "base/options.h"
+#include "base/unixtime.h"
 #include "boxes/delete_messages_box.h"
 #include "boxes/max_invite_box.h"
 #include "boxes/mute_settings_box.h"
 #include "boxes/add_contact_box.h"
+#include "boxes/choose_filter_box.h"
 #include "boxes/create_poll_box.h"
 #include "boxes/pin_messages_box.h"
+#include "boxes/peers/add_bot_to_chat_box.h"
 #include "boxes/peers/add_participants_box.h"
 #include "boxes/peers/edit_contact_box.h"
 #include "boxes/share_box.h"
 #include "ui/toast/toast.h"
+#include "ui/text/format_values.h"
 #include "ui/text/text_utilities.h"
 #include "ui/widgets/labels.h"
 #include "ui/widgets/checkbox.h"
@@ -32,6 +36,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
 #include "main/session/send_as_peers.h"
+#include "menu/menu_mute.h"
+#include "menu/menu_ttl_validator.h"
 #include "apiwrap.h"
 #include "mainwidget.h"
 #include "mainwindow.h"
@@ -53,6 +59,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/info_memento.h"
 #include "info/info_controller.h"
 #include "info/profile/info_profile_values.h"
+#include "data/notify/data_notify_settings.h"
 #include "data/data_changes.h"
 #include "data/data_session.h"
 #include "data/data_file_origin.h"
@@ -133,6 +140,35 @@ void MarkAsReadChatList(not_null<Dialogs::MainList*> list) {
 	ranges::for_each(mark, MarkAsReadHistory);
 }
 
+void PeerMenuAddMuteSubmenuAction(
+		not_null<Window::SessionController*> controller,
+		not_null<PeerData*> peer,
+		const PeerMenuCallback &addAction) {
+	peer->owner().notifySettings().request(peer);
+	const auto isMuted = peer->owner().notifySettings().isMuted(peer);
+	if (isMuted) {
+		const auto text = tr::lng_context_unmute(tr::now)
+			+ '\t'
+			+ Ui::FormatMuteForTiny(peer->notifyMuteUntil().value_or(0)
+				- base::unixtime::now());
+		addAction(text, [=] {
+			peer->owner().notifySettings().update(peer, 0);
+		}, &st::menuIconUnmute);
+	} else {
+		const auto show = std::make_shared<Window::Show>(controller);
+		addAction(PeerMenuCallback::Args{
+			.text = tr::lng_context_mute(tr::now),
+			.handler = nullptr,
+			.icon = peer->owner().notifySettings().sound(peer).none
+				? &st::menuIconSilent
+				: &st::menuIconMute,
+			.fillSubmenu = [=](not_null<Ui::PopupMenu*> menu) {
+				MuteMenu::FillMuteMenu(menu, { peer, show });
+			},
+		});
+	}
+}
+
 class Filler {
 public:
 	Filler(
@@ -153,10 +189,10 @@ private:
 
 	void addHidePromotion();
 	void addTogglePin();
-	void addToggleMute();
+	void addToggleMuteSubmenu(bool addSeparator);
 	void addSupportInfo();
 	void addInfo();
-	//void addToFolder();
+	void addToggleFolder();
 	void addToggleUnreadMark();
 	void addToggleArchive();
 	void addClearHistory();
@@ -175,6 +211,7 @@ private:
 	void addBotToGroup();
 	void addNewMembers();
 	void addDeleteContact();
+	void addTTLSubmenu(bool addSeparator);
 	void addPinnedMessages();
 	void addFirstMessage();
 	void addViewChannel();
@@ -351,11 +388,14 @@ void Filler::addTogglePin() {
 	SetActionText(pinAction, std::move(actionText));
 }
 
-void Filler::addToggleMute() {
+void Filler::addToggleMuteSubmenu(bool addSeparator) {
 	if (_peer->isSelf()) {
 		return;
 	}
-	PeerMenuAddMuteAction(_controller, _peer, _addAction);
+	PeerMenuAddMuteSubmenuAction(_controller, _peer, _addAction);
+	if (addSeparator) {
+		_addAction(PeerMenuCallback::Args{ .isSeparator = true });
+	}
 }
 
 void Filler::addSupportInfo() {
@@ -393,8 +433,20 @@ void Filler::addInfo() {
 	}, peer->isUser() ? &st::menuIconProfile : &st::menuIconInfo);
 }
 
-//void Filler::addToFolder() {
-//}
+void Filler::addToggleFolder() {
+	const auto history = _request.key.history();
+	if (!history || history->owner().chatsFilters().list().empty()) {
+		return;
+	}
+	_addAction(PeerMenuCallback::Args{
+		.text = tr::lng_filters_menu_add(tr::now),
+		.handler = nullptr,
+		.icon = &st::menuIconAddToFolder,
+		.fillSubmenu = [=](not_null<Ui::PopupMenu*> menu) {
+			FillChooseFilterMenu(menu, history);
+		},
+	});
+}
 
 void Filler::addToggleUnreadMark() {
 	const auto peer = _peer;
@@ -478,12 +530,14 @@ void Filler::addDeleteChat() {
 	if (_peer->isChannel()) {
 		return;
 	}
-	_addAction(
-		(_peer->isUser()
+	_addAction({
+		.text = (_peer->isUser()
 			? tr::lng_profile_delete_conversation(tr::now)
 			: tr::lng_profile_clear_and_exit(tr::now)),
-		DeleteAndLeaveHandler(_controller, _peer),
-		&st::menuIconDelete);
+		.handler = DeleteAndLeaveHandler(_controller, _peer),
+		.icon = &st::menuIconDeleteAttention,
+		.isAttention = true,
+	});
 }
 
 void Filler::addLeaveChat() {
@@ -491,12 +545,14 @@ void Filler::addLeaveChat() {
 	if (!channel || !channel->amIn()) {
 		return;
 	}
-	_addAction(
-		(_peer->isMegagroup()
+	_addAction({
+		.text = (_peer->isMegagroup()
 			? tr::lng_profile_leave_group(tr::now)
 			: tr::lng_profile_leave_channel(tr::now)),
-		DeleteAndLeaveHandler(_controller, _peer),
-		&st::menuIconLeave);
+		.handler = DeleteAndLeaveHandler(_controller, _peer),
+		.icon = &st::menuIconLeaveAttention,
+		.isAttention = true,
+	});
 }
 
 void Filler::addBlockUser() {
@@ -632,17 +688,19 @@ void Filler::addEditContact() {
 
 void Filler::addBotToGroup() {
 	const auto user = _peer->asUser();
-	if (!user
-		|| !user->isBot()
-		|| user->isRepliesChat()
-		|| user->botInfo->cantJoinGroups) {
+	if (!user) {
 		return;
 	}
-	using AddBotToGroup = AddBotToGroupBoxController;
-	_addAction(
-		tr::lng_profile_invite_to_group(tr::now),
-		[=] { AddBotToGroup::Start(user); },
-		&st::menuIconInvite);
+	[[maybe_unused]] const auto lifetime = Info::Profile::InviteToChatButton(
+		user
+	) | rpl::take(1) | rpl::start_with_next([=](QString label) {
+		if (!label.isEmpty()) {
+			_addAction(
+				label,
+				[=] { AddBotToGroupBoxController::Start(user); },
+				&st::menuIconInvite);
+		}
+	});
 }
 
 void Filler::addNewMembers() {
@@ -670,10 +728,12 @@ void Filler::addDeleteContact() {
 		return;
 	}
 	const auto controller = _controller;
-	_addAction(
-		tr::lng_info_delete_contact(tr::now),
-		[=] { PeerMenuDeleteContact(controller, user); },
-		&st::menuIconDelete);
+	_addAction({
+		.text = tr::lng_info_delete_contact(tr::now),
+		.handler = [=] { PeerMenuDeleteContact(controller, user); },
+		.icon = &st::menuIconDeleteAttention,
+		.isAttention = true,
+	});
 }
 
 void Filler::addManageChat() {
@@ -734,6 +794,23 @@ void Filler::addThemeEdit() {
 		tr::lng_chat_theme_change(tr::now),
 		[=] { controller->toggleChooseChatTheme(user); },
 		&st::menuIconChangeColors);
+}
+
+void Filler::addTTLSubmenu(bool addSeparator) {
+	const auto validator = TTLMenu::TTLValidator(
+		std::make_shared<Window::Show>(_controller),
+		_peer);
+	if (!validator.can()) {
+		return;
+	}
+	const auto text = tr::lng_manage_messages_ttl_menu(tr::now)
+		+ (_peer->messagesTTL()
+			? ('\t' + Ui::FormatTTLTiny(_peer->messagesTTL()))
+			: QString());
+	_addAction(text, [=] { validator.showBox(); }, validator.icon());
+	if (addSeparator) {
+		_addAction(PeerMenuCallback::Args{ .isSeparator = true });
+	}
 }
 
 void Filler::addPinnedMessages() {
@@ -811,9 +888,9 @@ void Filler::fillChatsListActions() {
 	if (ViewProfileInChatsListContextMenu.value()) {
 		addInfo();
 	}
-	addToggleMute();
+	addToggleMuteSubmenu(false);
 	addToggleUnreadMark();
-	// addToFolder();
+	addToggleFolder();
 	if (const auto user = _peer->asUser()) {
 		if (!user->isContact()) {
 			addBlockUser();
@@ -825,8 +902,8 @@ void Filler::fillChatsListActions() {
 }
 
 void Filler::fillHistoryActions() {
+	addToggleMuteSubmenu(true);
 	addInfo();
-	addToggleMute();
 	addSupportInfo();
 	addManageChat();
 	addViewChannel();
@@ -843,6 +920,7 @@ void Filler::fillHistoryActions() {
 }
 
 void Filler::fillProfileActions() {
+	addTTLSubmenu(true);
 	addSupportInfo();
 	addNewContact();
 	addShareContact();
@@ -1677,21 +1755,21 @@ void PeerMenuAddMuteAction(
 		not_null<PeerData*> peer,
 		const PeerMenuCallback &addAction) {
 	// There is no async to make weak from controller.
-	peer->owner().requestNotifySettings(peer);
+	peer->owner().notifySettings().request(peer);
 	const auto muteText = [](bool isUnmuted) {
 		return isUnmuted
 			? tr::lng_context_mute(tr::now)
 			: tr::lng_context_unmute(tr::now);
 	};
 	const auto muteAction = addAction(QString("-"), [=] {
-		if (!peer->owner().notifyIsMuted(peer)) {
+		if (!peer->owner().notifySettings().isMuted(peer)) {
 			controller->show(
 				Box<MuteSettingsBox>(peer),
 				Ui::LayerOption::CloseOther);
 		} else {
-			peer->owner().updateNotifySettings(peer, 0);
+			peer->owner().notifySettings().update(peer, 0);
 		}
-	}, (peer->owner().notifyIsMuted(peer)
+	}, (peer->owner().notifySettings().isMuted(peer)
 		? &st::menuIconUnmute
 		: &st::menuIconMute));
 

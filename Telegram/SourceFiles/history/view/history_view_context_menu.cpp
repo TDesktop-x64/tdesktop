@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_attached_stickers.h"
 #include "api/api_editing.h"
 #include "api/api_polls.h"
+#include "api/api_ringtones.h"
 #include "api/api_who_reacted.h"
 #include "api/api_toggling_media.h" // Api::ToggleFavedSticker
 #include "base/unixtime.h"
@@ -293,6 +294,10 @@ void AddDocumentActions(
 			tr::lng_context_attached_stickers(tr::now),
 			std::move(callback),
 			&st::menuIconStickers);
+	}
+	if (item && !list->hasCopyRestriction(item)) {
+		const auto controller = list->controller();
+		AddSaveSoundForNotifications(menu, item, document, controller);
 	}
 	AddSaveDocumentAction(menu, item, document, list);
 }
@@ -1114,6 +1119,43 @@ void AddPollActions(
 			StopPoll(&poll->session(), itemId);
 		}, &st::menuIconStopPoll);
 	}
+}
+
+void AddSaveSoundForNotifications(
+		not_null<Ui::PopupMenu*> menu,
+		not_null<HistoryItem*> item,
+		not_null<DocumentData*> document,
+		not_null<Window::SessionController*> controller) {
+	const auto &ringtones = document->session().api().ringtones();
+	if (document->size > ringtones.maxSize()) {
+		return;
+	} else if (ranges::contains(ringtones.list(), document->id)) {
+		return;
+	} else if (int(ringtones.list().size()) >= ringtones.maxSavedCount()) {
+		return;
+	} else if (const auto song = document->song()) {
+		if (song->duration > ringtones.maxDuration()) {
+			return;
+		}
+	} else if (const auto voice = document->voice()) {
+		if (voice->duration > ringtones.maxDuration()) {
+			return;
+		}
+	} else {
+		return;
+	}
+	const auto toastParent = Window::Show(controller).toastParent();
+	menu->addAction(tr::lng_context_save_custom_sound(tr::now), [=] {
+		Api::ToggleSavedRingtone(
+			document,
+			item->fullId(),
+			[=] {
+				Ui::Toast::Show(
+					toastParent,
+					tr::lng_ringtones_toast_added(tr::now));
+			},
+			true);
+	}, &st::menuIconSoundAdd);
 }
 
 void AddWhoReactedAction(

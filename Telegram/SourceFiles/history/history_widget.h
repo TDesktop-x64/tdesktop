@@ -51,6 +51,7 @@ class ItemBase;
 class Widget;
 } // namespace Layout
 struct ResultSelected;
+class AttachBotsList;
 } // namespace InlineBots
 
 namespace Support {
@@ -430,7 +431,7 @@ private:
 
 	void animationCallback();
 	void updateOverStates(QPoint pos);
-	void chooseAttach();
+	void chooseAttach(std::optional<bool> overrideSendImagesAsPhotos = {});
 	void cornerButtonsAnimationFinish();
 	void sendButtonClicked();
 	void newItemAdded(not_null<HistoryItem*> item);
@@ -746,6 +747,8 @@ private:
 	object_ptr<Ui::FlatButton> _muteUnmute;
 	object_ptr<Ui::FlatButton> _discuss;
 	object_ptr<Ui::FlatButton> _reportMessages;
+	object_ptr<Ui::RoundButton> _botMenuButton = { nullptr };
+	QString _botMenuButtonText;
 	object_ptr<Ui::IconButton> _attachToggle;
 	object_ptr<Ui::SendAsButton> _sendAs = { nullptr };
 	object_ptr<Ui::EmojiButton> _tabbedSelectorToggle;
@@ -774,6 +777,7 @@ private:
 
 	object_ptr<InlineBots::Layout::Widget> _inlineResults = { nullptr };
 	std::unique_ptr<TabbedPanel> _tabbedPanel;
+	std::unique_ptr<Ui::DropdownMenu> _attachBotsMenu;
 
 	DragArea::Areas _attachDragAreas;
 

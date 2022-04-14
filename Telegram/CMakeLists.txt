@@ -258,6 +258,8 @@ PRIVATE
     boxes/phone_banned_box.h
     boxes/pin_messages_box.cpp
     boxes/pin_messages_box.h
+    boxes/reactions_settings_box.cpp
+    boxes/reactions_settings_box.h
     boxes/ringtones_box.cpp
     boxes/ringtones_box.h
     boxes/self_destruction_box.cpp
@@ -662,6 +664,8 @@ PRIVATE
     history/view/history_view_pinned_section.h
     history/view/history_view_pinned_tracker.cpp
     history/view/history_view_pinned_tracker.h
+    history/view/history_view_quick_action.cpp
+    history/view/history_view_quick_action.h
     history/view/history_view_react_animation.cpp
     history/view/history_view_react_animation.h
     history/view/history_view_react_button.cpp

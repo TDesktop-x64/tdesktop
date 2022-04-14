@@ -457,7 +457,7 @@ namespace Settings {
 		AddSkip(container);
 	}
 
-	rpl::producer<QString> Enhanced::Title() {
+	rpl::producer<QString> Enhanced::title() {
 		return tr::lng_settings_enhanced();
 	}
 

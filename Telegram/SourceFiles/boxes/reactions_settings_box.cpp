@@ -43,6 +43,7 @@ constexpr auto kVisibleButtonsCount = 7;
 
 PeerId GenerateUser(not_null<History*> history, const QString &name) {
 	Expects(history->peer->isUser());
+
 	const auto peerId = Data::FakePeerIdForJustName(name);
 	history->owner().processUser(MTP_user(
 		MTP_flags(MTPDuser::Flag::f_first_name | MTPDuser::Flag::f_min),
@@ -125,6 +126,7 @@ void AddMessage(
 		controller,
 		crl::guard(widget, [=] { widget->update(); }));
 	state->style = std::make_unique<Ui::ChatStyle>();
+	state->style->apply(controller->defaultChatTheme().get());
 	state->icons.lifetimes = std::vector<rpl::lifetime>(2);
 
 	const auto history = controller->session().data().history(
@@ -215,7 +217,7 @@ void AddMessage(
 		iconSize = st::settingsReactionMessageSize
 	](const QString &emoji) {
 		const auto &reactions = controller->session().data().reactions();
-		for (const auto &r : reactions.list(Data::Reactions::Type::All)) {
+		for (const auto &r : reactions.list(Data::Reactions::Type::Active)) {
 			if (emoji != r.emoji) {
 				continue;
 			}
@@ -430,7 +432,7 @@ void ReactionsSettingsBox(
 	};
 
 	auto firstCheckedButton = (Ui::RpWidget*)(nullptr);
-	for (const auto &r : reactions.list(Data::Reactions::Type::All)) {
+	for (const auto &r : reactions.list(Data::Reactions::Type::Active)) {
 		const auto button = Settings::AddButton(
 			buttonsContainer,
 			rpl::single<QString>(base::duplicate(r.title)),

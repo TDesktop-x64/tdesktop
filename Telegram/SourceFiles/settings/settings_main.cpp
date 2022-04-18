@@ -16,6 +16,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/settings_advanced.h"
 #include "settings/settings_folders.h"
 #include "settings/settings_calls.h"
+#include "settings/settings_enhanced.h"
 #include "boxes/language_box.h"
 #include "boxes/username_box.h"
 #include "ui/boxes/confirm_box.h"
@@ -330,7 +331,7 @@ void SetupSections(
 		{ &st::settingsIconCalls, kIconGreen });
 	addSection(
 		tr::lng_settings_enhanced(),
-		Advanced::Id(),
+		Enhanced::Id(),
 		{ &st::settingsIconGeneral, kIconRed });
 
 	SetupLanguageButton(container);

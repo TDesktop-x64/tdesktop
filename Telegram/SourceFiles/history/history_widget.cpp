@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_editing.h"
 #include "api/api_bot.h"
 #include "api/api_chat_participants.h"
+#include "api/api_report.h"
 #include "api/api_sending.h"
 #include "api/api_text_entities.h"
 #include "api/api_send_progress.h"
@@ -4033,19 +4034,18 @@ void HistoryWidget::reportSelectedMessages() {
 	const auto ids = _list->getSelectedItems();
 	const auto peer = _peer;
 	const auto reason = _chooseForReport->reason;
-	const auto box = std::make_shared<QPointer<Ui::GenericBox>>();
 	const auto weak = Ui::MakeWeak(_list.data());
-	const auto send = [=](const QString &text) {
-		if (weak) {
-			clearSelected();
-			controller()->clearChooseReportMessages();
-		}
-		HistoryView::SendReport(peer, reason, text, ids);
-		if (*box) {
-			(*box)->closeBox();
-		}
-	};
-	*box = controller()->window().show(Box(Ui::ReportDetailsBox, send));
+	controller()->window().show(Box([=](not_null<Ui::GenericBox*> box) {
+		Ui::ReportDetailsBox(box, [=](const QString &text) {
+			if (weak) {
+				clearSelected();
+				controller()->clearChooseReportMessages();
+			}
+			const auto toastParent = Window::Show(controller()).toastParent();
+			Api::SendReport(toastParent, peer, reason, text, ids);
+			box->closeBox();
+		});
+	}));
 }
 
 History *HistoryWidget::history() const {

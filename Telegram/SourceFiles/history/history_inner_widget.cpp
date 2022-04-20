@@ -50,6 +50,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/notifications_manager.h"
 #include "boxes/about_sponsored_box.h"
 #include "boxes/delete_messages_box.h"
+#include "boxes/report_messages_box.h"
 #include "boxes/sticker_set_box.h"
 #include "chat_helpers/message_field.h"
 #include "chat_helpers/emoji_interactions.h"
@@ -2391,7 +2392,8 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 							_menu,
 							poll,
 							item,
-							HistoryView::Context::History);
+							HistoryView::Context::History,
+							_controller);
 					} else if (const auto contact = media->sharedContact()) {
 						const auto phone = contact->phoneNumber;
 						_menu->addAction(tr::lng_profile_copy_phone(tr::now), [=] {
@@ -4125,17 +4127,17 @@ void HistoryInner::deleteAsGroup(FullMsgId itemId) {
 }
 
 void HistoryInner::reportItem(FullMsgId itemId) {
-	HistoryView::ShowReportItemsBox(_peer, { 1, itemId });
+	_controller->show(ReportItemsBox(_peer, { 1, itemId }));
 }
 
 void HistoryInner::reportAsGroup(FullMsgId itemId) {
 	if (const auto item = session().data().message(itemId)) {
 		const auto group = session().data().groups().find(item);
-		HistoryView::ShowReportItemsBox(
+		_controller->show(ReportItemsBox(
 			_peer,
 			(group
 				? session().data().itemsToIds(group->items)
-				: MessageIdsList{ 1, itemId }));
+				: MessageIdsList{ 1, itemId })));
 	}
 }
 

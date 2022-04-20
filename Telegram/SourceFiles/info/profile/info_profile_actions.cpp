@@ -33,6 +33,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/add_contact_box.h"
 #include "boxes/peers/add_bot_to_chat_box.h"
 #include "boxes/peers/edit_contact_box.h"
+#include "boxes/report_messages_box.h"
 #include "lang/lang_keys.h"
 #include "menu/menu_mute.h"
 #include "info/info_controller.h"
@@ -629,7 +630,7 @@ void ActionsFiller::addReportAction() {
 	const auto peer = _peer;
 	const auto controller = _controller->parentController();
 	const auto report = [=] {
-		HistoryView::ShowReportPeerBox(controller, peer);
+		ShowReportPeerBox(controller, peer);
 	};
 	AddActionButton(
 		_wrap,

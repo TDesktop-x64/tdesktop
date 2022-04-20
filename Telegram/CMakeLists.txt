@@ -137,6 +137,8 @@ PRIVATE
     api/api_peer_photo.h
     api/api_polls.cpp
     api/api_polls.h
+    api/api_report.cpp
+    api/api_report.h
     api/api_ringtones.cpp
     api/api_ringtones.h
     api/api_self_destruct.cpp
@@ -260,6 +262,8 @@ PRIVATE
     boxes/pin_messages_box.h
     boxes/reactions_settings_box.cpp
     boxes/reactions_settings_box.h
+    boxes/report_messages_box.cpp
+    boxes/report_messages_box.h
     boxes/ringtones_box.cpp
     boxes/ringtones_box.h
     boxes/self_destruction_box.cpp

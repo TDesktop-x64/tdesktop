@@ -10,12 +10,19 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/event_filter.h"
 #include "lang/lang_keys.h"
 #include "ui/layers/generic_box.h"
+#include "ui/effects/animation_value.h"
 #include "ui/ui_utility.h"
 #include "ui/widgets/vertical_drum_picker.h"
 #include "styles/style_chat.h"
 #include "styles/style_layers.h"
 
 namespace Ui {
+
+namespace {
+
+constexpr auto kMinYScale = 0.2;
+
+} // namespace
 
 Fn<TimeId()> TimePickerBox(
 		not_null<GenericBox*> box,
@@ -24,9 +31,17 @@ Fn<TimeId()> TimePickerBox(
 		TimeId startValue) {
 	Expects(phrases.size() == values.size());
 
-	const auto startIndex = [&] {
-		const auto it = ranges::find(values, startValue);
-		return (it == end(values)) ? 0 : std::distance(begin(values), it);
+	const auto startIndex = [&, &v = startValue] {
+		const auto it = ranges::lower_bound(values, v);
+		if (it == begin(values)) {
+			return 0;
+		}
+		const auto left = *(it - 1);
+		const auto right = *it;
+		const auto shift = (std::abs(v - left) < std::abs(v - right))
+			? -1
+			: 0;
+		return int(std::distance(begin(values), it - shift));
 	}();
 
 	const auto content = box->addRow(object_ptr<Ui::FixedHeightWidget>(
@@ -35,11 +50,14 @@ Fn<TimeId()> TimePickerBox(
 
 	const auto font = st::boxTextFont;
 	const auto maxPhraseWidth = [&] {
+		// We have to use QFontMetricsF instead of
+		// FontData::width for more precise calculation.
+		const auto mf = QFontMetricsF(font->f);
 		const auto maxPhrase = ranges::max_element(
 			phrases,
 			std::less<>(),
-			[&](const QString &s) { return font->width(s); });
-		return font->width(*maxPhrase) + font->spacew * 2;
+			[&](const QString &s) { return mf.horizontalAdvance(s); });
+		return std::ceil(mf.horizontalAdvance(*maxPhrase));
 	}();
 	const auto itemHeight = st::historyMessagesTTLPickerItemHeight;
 	auto paintCallback = [=](
@@ -50,10 +68,18 @@ Fn<TimeId()> TimePickerBox(
 			int outerWidth) {
 		const auto r = QRectF(0, y, outerWidth, itemHeight);
 		const auto progress = std::abs(distanceFromCenter);
-		p.setOpacity(1. - progress);
+		const auto revProgress = 1. - progress;
+		p.save();
+		p.translate(r.center());
+		const auto yScale = kMinYScale
+			+ (1. - kMinYScale) * anim::easeOutCubic(1., revProgress);
+		p.scale(1., yScale);
+		p.translate(-r.center());
+		p.setOpacity(revProgress);
 		p.setFont(font);
 		p.setPen(st::defaultFlatLabel.textFg);
 		p.drawText(r, phrases[index], style::al_center);
+		p.restore();
 	};
 
 	const auto picker = Ui::CreateChild<Ui::VerticalDrumPicker>(

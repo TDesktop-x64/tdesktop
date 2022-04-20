@@ -128,6 +128,9 @@ void MuteItem::paintEvent(QPaintEvent *e) {
 		st::settingsIconBg2,
 		progress);
 	p.setPen(color);
+
+	Action::paintBackground(p, Action::isSelected());
+	RippleButton::paintRipple(p, 0, 0);
 	Action::paintText(p);
 
 	const auto &icon = _isMuted ? st::menuIconUnmute : st::menuIconMute;
@@ -182,9 +185,9 @@ void PickMuteBox(not_null<Ui::GenericBox*> box, not_null<PeerData*> peer) {
 		(84600 * 3),
 		(84600 * 7 * 1),
 		(84600 * 7 * 2),
-		(84600 * 30 * 1),
-		(84600 * 30 * 2),
-		(84600 * 30 * 3),
+		(84600 * 31 * 1),
+		(84600 * 31 * 2),
+		(84600 * 31 * 3),
 	};
 	const auto phrases = ranges::views::all(
 		seconds
@@ -279,9 +282,13 @@ void FillMuteMenu(
 		menu->addAction(std::move(item));
 	}
 
+	const auto callback = [=, show = args.show] {
+		DEBUG_LOG(("Mute Info: PickMuteBox called."));
+		show->showBox(Box(PickMuteBox, peer));
+	};
 	menu->addAction(
 		tr::lng_mute_menu_duration(tr::now),
-		[=, show = args.show] { show->showBox(Box(PickMuteBox, peer)); },
+		callback,
 		&st::menuIconMuteFor);
 
 	menu->addAction(

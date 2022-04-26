@@ -723,12 +723,12 @@ topBarInfo: IconButton(topBarSearch) {
 	iconOver: icon {{ "top_bar_profile", menuIconFgOver }};
 }
 topBarRecentActions: IconButton(topBarSearch) {
-	icon: icon {{ "info/edit/group_manage_actions", menuIconFg }};
-	iconOver: icon {{ "info/edit/group_manage_actions", menuIconFgOver }};
+	icon: icon {{ "info/edit/group_manage_actions_topbar", menuIconFg }};
+	iconOver: icon {{ "info/edit/group_manage_actions_topbar", menuIconFgOver }};
 }
 topBarAdmins: IconButton(topBarSearch) {
-	icon: icon {{ "info/edit/group_manage_admins", menuIconFg }};
-	iconOver: icon {{ "info/edit/group_manage_admins", menuIconFgOver }};
+	icon: icon {{ "info/edit/group_manage_admins_topbar", menuIconFg }};
+	iconOver: icon {{ "info/edit/group_manage_admins_topbar", menuIconFgOver }};
 }
 topBarInfoActive: icon {{ "top_bar_profile", windowActiveTextFg }};
 topBarActionSkip: 10px;

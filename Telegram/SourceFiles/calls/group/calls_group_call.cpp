@@ -1067,6 +1067,7 @@ void GroupCall::start(TimeId scheduleDate, bool rtmp) {
 		MTPstring(), // title
 		MTP_int(scheduleDate)
 	)).done([=](const MTPUpdates &result) {
+		_reloadedStaleCall = true;
 		_acceptFields = true;
 		_peer->session().api().applyUpdates(result);
 		_acceptFields = false;
@@ -1395,6 +1396,13 @@ void GroupCall::rejoin(not_null<PeerData*> as) {
 					sendSelfUpdate(SendUpdateType::CameraPaused);
 				}
 				sendPendingSelfUpdates();
+				if (!_reloadedStaleCall
+					&& _state.current() != State::Joining) {
+					if (const auto real = lookupReal()) {
+						_reloadedStaleCall = true;
+						real->reloadIfStale();
+					}
+				}
 			}).fail([=](const MTP::Error &error) {
 				_joinState.finish();
 

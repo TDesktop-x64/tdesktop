@@ -57,7 +57,7 @@ std::map<int, const char*> BetaLogs() {
 		"- Fix media viewer\n"
 	},
 	{
-		3007004,
+		1000035,
 		"- More icons for chat folders.\n"
 
 		"- Improve some more sections design.\n"

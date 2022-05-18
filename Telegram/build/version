@@ -1,7 +1,7 @@
-﻿AppVersion         1000034
+﻿AppVersion         1000035
 AppVersionStrMajor 1.0
-AppVersionStrSmall 1.0.34
-AppVersionStr      1.0.34
-BetaChannel        0
+AppVersionStrSmall 1.0.35
+AppVersionStr      1.0.35
+BetaChannel        1
 AlphaVersion       0
-AppVersionOriginal 1.0.34
+AppVersionOriginal 1.0.35.beta

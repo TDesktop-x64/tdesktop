@@ -964,26 +964,29 @@ depends:yasm/yasm
 
 stage('openal-soft', """
 version: 2
+win:
     git clone -b wasapi_exact_device_time https://github.com/telegramdesktop/openal-soft.git
     cd openal-soft
-    cd build
-win:
-    cmake .. ^
+    cmake -B build . ^
         -A %WIN32X64% ^
         -D LIBTYPE:STRING=STATIC ^
         -D FORCE_STATIC_VCRT=ON
-    msbuild OpenAL.vcxproj /property:Configuration=Debug /property:Platform="%WIN32X64%"
+    cmake --build build --config Debug --parallel
 release:
-    msbuild OpenAL.vcxproj /property:Configuration=RelWithDebInfo /property:Platform="%WIN32X64%"
+    cmake --build build --config RelWithDebInfo --parallel
 mac:
-    CFLAGS=$UNGUARDED CPPFLAGS=$UNGUARDED cmake .. \\
+    git clone https://github.com/kcat/openal-soft.git
+    cd openal-soft
+    git checkout af8e756d
+    CFLAGS=$UNGUARDED CPPFLAGS=$UNGUARDED cmake -B build . \\
         -D CMAKE_INSTALL_PREFIX:PATH=$USED_PREFIX \\
         -D ALSOFT_EXAMPLES=OFF \\
+        -D ALSOFT_UTILS=OFF \\
         -D LIBTYPE:STRING=STATIC \\
         -D CMAKE_OSX_DEPLOYMENT_TARGET:STRING=$MACOSX_DEPLOYMENT_TARGET \\
         -D CMAKE_OSX_ARCHITECTURES="x86_64;arm64"
-    make $MAKE_THREADS_CNT
-    make install
+    cmake --build build $MAKE_THREADS_CNT
+    cmake --install build
 """)
 
 if 'build-stackwalk' in options:
@@ -1246,9 +1249,9 @@ mac:
 stage('tg_owt', """
     git clone https://github.com/desktop-app/tg_owt.git
     cd tg_owt
-    git checkout 1fe5e68d99
+    git checkout bab760d7bd
     git submodule init
-    git submodule update src/third_party/libyuv
+    git submodule update src/third_party/libyuv src/third_party/crc32c/src
 win:
     SET MOZJPEG_PATH=$LIBS_DIR/mozjpeg
     SET OPUS_PATH=$USED_PREFIX/include/opus

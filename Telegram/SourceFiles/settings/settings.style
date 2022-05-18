@@ -18,6 +18,8 @@ settingsButton: SettingsButton(infoProfileButton) {
 settingsButtonNoIcon: SettingsButton(settingsButton) {
 	padding: margins(22px, 10px, 22px, 8px);
 }
+settingsButtonActive: SettingsButton(infoMainButton, settingsButton) {
+}
 settingsAttentionButton: SettingsButton(settingsButtonNoIcon) {
 	textFg: attentionButtonFg;
 	textFgOver: attentionButtonFgOver;
@@ -91,6 +93,9 @@ settingsIconPin: icon {{ "settings/pin", settingsIconFg }};
 settingsIconDownload: icon {{ "settings/download", settingsIconFg }};
 settingsIconMention: icon {{ "settings/mention", settingsIconFg }};
 
+settingsIconAdd: icon {{ "settings/add", windowFgActive }};
+settingsIconRemove: icon {{ "settings/remove", windowFgActive }};
+
 settingsCheckbox: Checkbox(defaultBoxCheckbox) {
 	textPosition: point(15px, 1px);
 }
@@ -136,6 +141,21 @@ settingsCloudPasswordLabel: FlatLabel(defaultFlatLabel) {
 	maxHeight: 20px;
 }
 settingsCloudPasswordLabelPadding: margins(22px, 8px, 10px, 8px);
+settingsCloudPasswordIconSize: 100px;
+
+settingLocalPasscodeInputField: InputField(defaultInputField) {
+	width: 256px;
+}
+settingLocalPasscodeDescription: FlatLabel(changePhoneDescription) {
+	minWidth: 256px;
+}
+settingLocalPasscodeDescriptionHeight: 52px;
+settingLocalPasscodeError: FlatLabel(changePhoneError) {
+	minWidth: 256px;
+}
+settingLocalPasscodeDescriptionBottomSkip: 15px;
+settingLocalPasscodeIconPadding: margins(0px, 19px, 0px, 5px);
+settingLocalPasscodeButtonPadding: margins(0px, 19px, 0px, 35px);
 
 settingsInfoPhotoHeight: 161px;
 settingsInfoPhotoSize: 100px;
@@ -247,8 +267,14 @@ settingsAccentColorSize: 24px;
 settingsAccentColorSkip: 4px;
 settingsAccentColorLine: 3px;
 
-settingsFilterIconSkip: 68px;
-settingsFilterIconLeft: 17px;
+settingsFilterDividerLabel: FlatLabel(boxDividerLabel) {
+	minWidth: 258px;
+	maxHeight: 0px;
+	align: align(top);
+}
+settingsFilterDividerLabelPadding: margins(0px, 16px, 0px, 22px);
+settingsFilterIconSize: 74px;
+settingsFilterIconPadding: margins(0px, 17px, 0px, 5px);
 
 settingsDeviceName: InputField(defaultInputField) {
 	textBg: transparent;

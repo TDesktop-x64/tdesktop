@@ -13,6 +13,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/object_ptr.h"
 #include "settings/settings_type.h"
 
+namespace anim {
+enum class repeat : uchar;
+} // namespace anim
+
 namespace Main {
 class Session;
 } // namespace Main
@@ -74,11 +78,30 @@ public:
 	[[nodiscard]] virtual rpl::producer<Type> sectionShowOther() {
 		return nullptr;
 	}
+	[[nodiscard]] virtual rpl::producer<> sectionShowBack() {
+		return nullptr;
+	}
+	[[nodiscard]] virtual rpl::producer<std::vector<Type>> removeFromStack() {
+		return nullptr;
+	}
 	[[nodiscard]] virtual rpl::producer<QString> title() = 0;
 	virtual void sectionSaveChanges(FnMut<void()> done) {
 		done();
 	}
 	virtual void showFinished() {
+	}
+	virtual void setInnerFocus() {
+		setFocus();
+	}
+	[[nodiscard]] virtual QPointer<Ui::RpWidget> createPinnedToTop(
+			not_null<QWidget*> parent) {
+		return nullptr;
+	}
+	[[nodiscard]] virtual QPointer<Ui::RpWidget> createPinnedToBottom(
+			not_null<Ui::RpWidget*> parent) {
+		return nullptr;
+	}
+	virtual void setStepDataReference(std::any &data) {
 	}
 };
 
@@ -176,7 +199,7 @@ not_null<Ui::FlatLabel*> AddSubsectionTitle(
 
 struct LottieIcon {
 	object_ptr<Ui::RpWidget> widget;
-	Fn<void()> animate;
+	Fn<void(anim::repeat repeat)> animate;
 };
 [[nodiscard]] LottieIcon CreateLottieIcon(
 	not_null<QWidget*> parent,

@@ -47,6 +47,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_instance.h"
 #include "inline_bots/bot_attach_web_view.h"
 #include "mainwidget.h"
+#include "tray.h"
 #include "core/file_utilities.h"
 #include "core/click_handler_types.h" // ClickHandlerContext.
 #include "core/crash_reports.h"
@@ -150,6 +151,7 @@ Application::Application(not_null<Launcher*> launcher)
 , _langpack(std::make_unique<Lang::Instance>())
 , _langCloudManager(std::make_unique<Lang::CloudManager>(langpack()))
 , _emojiKeywords(std::make_unique<ChatHelpers::EmojiKeywords>())
+, _tray(std::make_unique<Tray>())
 , _autoLockTimer([=] { checkAutoLock(); }) {
 	Ui::Integration::Set(&_private->uiIntegration);
 
@@ -303,6 +305,8 @@ void Application::run() {
 	startShortcuts();
 	startDomain();
 
+	startTray();
+
 	_primaryWindow->widget()->show();
 
 	const auto currentGeometry = _primaryWindow->widget()->geometry();
@@ -412,6 +416,38 @@ void Application::startSystemDarkModeViewer() {
 	}, _lifetime);
 }
 
+void Application::startTray() {
+	using WindowRaw = not_null<Window::Controller*>;
+	const auto enumerate = [=](Fn<void(WindowRaw)> c) {
+		if (_primaryWindow) {
+			c(_primaryWindow.get());
+		}
+		for (const auto &window : ranges::views::values(_secondaryWindows)) {
+			c(window.get());
+		}
+	};
+	_tray->create();
+	_tray->aboutToShowRequests(
+	) | rpl::start_with_next([=] {
+		enumerate([&](WindowRaw w) { w->updateIsActive(); });
+		_tray->updateMenuText();
+	}, _primaryWindow->widget()->lifetime());
+
+	_tray->showFromTrayRequests(
+	) | rpl::start_with_next([=] {
+		const auto last = _lastActiveWindow;
+		enumerate([&](WindowRaw w) { w->widget()->showFromTray(); });
+		if (last) {
+			last->widget()->showFromTray();
+		}
+	}, _primaryWindow->widget()->lifetime());
+
+	_tray->hideToTrayRequests(
+	) | rpl::start_with_next([=] {
+		enumerate([&](WindowRaw w) { w->widget()->minimizeToTray(); });
+	}, _primaryWindow->widget()->lifetime());
+}
+
 auto Application::prepareEmojiSourceImages()
 -> std::shared_ptr<Ui::Emoji::UniversalImages> {
 	const auto &images = Ui::Emoji::SourceImages();
@@ -427,6 +463,16 @@ void Application::clearEmojiSourceImages() {
 		crl::on_main([images = loader.releaseImages()]{
 			Ui::Emoji::ClearSourceImages(images);
 		});
+	});
+}
+
+bool Application::isActiveForTrayMenu() const {
+	if (_primaryWindow && _primaryWindow->widget()->isActiveForTrayMenu()) {
+		return true;
+	}
+	return ranges::any_of(ranges::views::values(_secondaryWindows), [=](
+			const std::unique_ptr<Window::Controller> &controller) {
+		return controller->widget()->isActiveForTrayMenu();
 	});
 }
 

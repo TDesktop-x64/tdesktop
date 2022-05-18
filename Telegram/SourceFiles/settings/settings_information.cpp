@@ -37,6 +37,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_account.h"
 #include "main/main_session.h"
 #include "main/main_domain.h"
+#include "menu/add_action_callback_factory.h"
 #include "mtproto/mtproto_dc_options.h"
 #include "window/window_session_controller.h"
 #include "window/window_controller.h"
@@ -222,7 +223,7 @@ void ShowMenu(
 		QWidget *parent,
 		const QString &copyButton,
 		const QString &text) {
-	const auto menu = new Ui::PopupMenu(parent);
+	const auto menu = Ui::CreateChild<Ui::PopupMenu>(parent);
 
 	menu->addAction(copyButton, [=] {
 		QGuiApplication::clipboard()->setText(text);
@@ -516,7 +517,7 @@ void SetupAccountsWrap(
 	raw->heightValue(
 	) | rpl::start_with_next([=](int height) {
 		const auto left = st::mainMenuAddAccountButton.iconLeft
-			+ (st::mainMenuAddAccount.width() - userpicSize) / 2;
+			+ (st::settingsIconAdd.width() - userpicSize) / 2;
 		const auto top = (height - userpicSize) / 2;
 		state->userpic.setGeometry(left, top, userpicSize, userpicSize);
 	}, state->userpic.lifetime());
@@ -551,13 +552,7 @@ void SetupAccountsWrap(
 		} else if (which != Qt::RightButton) {
 			return;
 		}
-		const auto addAction = Window::PeerMenuCallback([&](
-				Window::PeerMenuCallback::Args args) {
-			return state->menu->addAction(
-				args.text,
-				crl::guard(raw, std::move(args.handler)),
-				args.icon);
-		});
+		const auto addAction = Menu::CreateAddActionCallback(state->menu);
 		if (!state->menu && IsAltShift(raw->clickModifiers())) {
 			state->menu = base::make_unique_q<Ui::PopupMenu>(
 				raw,
@@ -573,6 +568,12 @@ void SetupAccountsWrap(
 		state->menu = base::make_unique_q<Ui::PopupMenu>(
 			raw,
 			st::popupMenuWithIcons);
+		addAction(tr::lng_profile_copy_phone(tr::now), [=] {
+			const auto phone = rpl::variable<TextWithEntities>(
+				Info::Profile::PhoneValue(session->user()));
+			QGuiApplication::clipboard()->setText(phone.current().text);
+		}, &st::menuIconCopy);
+
 		addAction(tr::lng_menu_activate(tr::now), [=] {
 			Core::App().domain().activate(&session->account());
 		}, &st::menuIconProfile);
@@ -683,7 +684,7 @@ not_null<Ui::SlideWrap<Ui::SettingsButton>*> AccountsList::setupAdd() {
 				tr::lng_menu_add_account(),
 				st::mainMenuAddAccountButton,
 				{
-					&st::mainMenuAddAccount,
+					&st::settingsIconAdd,
 					0,
 					IconType::Round,
 					&st::windowBgActive

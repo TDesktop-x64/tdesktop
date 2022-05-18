@@ -55,6 +55,14 @@ std::map<int, const char*> BetaLogs() {
 	{
 		1000028,
 		"- Fix media viewer\n"
+	},
+	{
+		3007004,
+		"- More icons for chat folders.\n"
+
+		"- Improve some more sections design.\n"
+		
+		"- Update the OpenAL library to 1.22.0.\n"
 	}
 	};
 };

@@ -7,6 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "settings/settings_common.h"
 
+#include "apiwrap.h"
+#include "api/api_cloud_password.h"
+#include "settings/cloud_password/settings_cloud_password_email_confirm.h"
 #include "settings/settings_chat.h"
 #include "settings/settings_advanced.h"
 #include "settings/settings_information.h"
@@ -18,6 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/settings_enhanced.h"
 #include "settings/settings_experimental.h"
 #include "core/application.h"
+#include "core/core_cloud_password.h"
 #include "ui/wrap/padding_wrap.h"
 #include "ui/wrap/vertical_layout.h"
 #include "ui/widgets/labels.h"
@@ -264,17 +268,22 @@ LottieIcon CreateLottieIcon(
 	const auto icon = owned.get();
 
 	raw->lifetime().add([kept = std::move(owned)]{});
+	const auto looped = raw->lifetime().make_state<bool>(true);
 
-	const auto animate = [=] {
-		icon->animate([=] { raw->update(); }, 0, icon->framesCount());
+	const auto start = [=] {
+		icon->animate([=] { raw->update(); }, 0, icon->framesCount() - 1);
+	};
+	const auto animate = [=](anim::repeat repeat) {
+		*looped = (repeat == anim::repeat::loop);
+		start();
 	};
 	raw->paintRequest(
 	) | rpl::start_with_next([=] {
 		auto p = QPainter(raw);
 		const auto left = (raw->width() - width) / 2;
 		icon->paint(p, left, padding.top());
-		if (!icon->animating() && icon->frameIndex() > 0) {
-			animate();
+		if (!icon->animating() && icon->frameIndex() > 0 && *looped) {
+			start();
 		}
 
 	}, raw->lifetime());
@@ -293,6 +302,17 @@ void FillMenu(
 			tr::lng_settings_bg_theme_create(tr::now),
 			[=] { window->show(Box(Window::Theme::CreateBox, window)); },
 			&st::menuIconChangeColors);
+	} else if (type == CloudPasswordEmailConfirmId()) {
+		const auto api = &controller->session().api();
+		if (const auto state = api->cloudPassword().stateCurrent()) {
+			if (state->unconfirmedPattern.isEmpty()) {
+				return;
+			}
+		}
+		addAction(
+			tr::lng_settings_password_abort(tr::now),
+			[=] { api->cloudPassword().clearUnconfirmedPassword(); },
+			&st::menuIconCancel);
 	} else {
 		const auto &list = Core::App().domain().accounts();
 		if (list.size() < ::Main::Domain::kMaxAccounts) {

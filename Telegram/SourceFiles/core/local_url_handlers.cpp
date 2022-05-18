@@ -25,6 +25,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/sticker_set_box.h"
 #include "boxes/sessions_box.h"
 #include "boxes/language_box.h"
+#include "boxes/change_phone_box.h"
 #include "passport/passport_form_controller.h"
 #include "window/window_session_controller.h"
 #include "ui/toast/toast.h"
@@ -40,6 +41,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/settings_common.h"
 #include "settings/settings_folders.h"
 #include "settings/settings_main.h"
+#include "settings/settings_privacy_security.h"
+#include "settings/settings_chat.h"
 #include "mainwidget.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
@@ -444,22 +447,30 @@ bool ResolveSettings(
 	}
 	controller->window().activate();
 	const auto section = match->captured(1).mid(1).toLower();
-	if (section.isEmpty()) {
-		controller->window().showSettings();
-		return true;
-	} else if (section == qstr("language")) {
-		ShowLanguagesBox();
-		return true;
-	} else if (section == qstr("devices")) {
-		controller->session().api().authorizations().reload();
+	
+	const auto type = [&]() -> std::optional<::Settings::Type> {
+		if (section == qstr("language")) {
+			ShowLanguagesBox();
+			return {};
+		} else if (section == qstr("devices")) {
+			controller->session().api().authorizations().reload();
+			return ::Settings::Sessions::Id();
+		} else if (section == qstr("folders")) {
+			return ::Settings::Folders::Id();
+		} else if (section == qstr("privacy")) {
+			return ::Settings::PrivacySecurity::Id();
+		} else if (section == qstr("themes")) {
+			return ::Settings::Chat::Id();
+		} else if (section == qstr("change_number")) {
+			return ::Settings::ChangePhone::Id();
+		}
+		return ::Settings::Main::Id();
+	}();
+	
+	if (type.has_value()) {
+		controller->showSettings(*type);
+		controller->window().activate();
 	}
-	const auto type = (section == qstr("folders"))
-		? ::Settings::Folders::Id()
-		: (section == qstr("devices"))
-		? ::Settings::Sessions::Id()
-		: ::Settings::Main::Id();
-	controller->showSettings(type);
-	controller->window().activate();
 	return true;
 }
 
@@ -812,7 +823,7 @@ const std::vector<LocalUrlHandler> &LocalUrlHandlers() {
 			ResolvePrivatePost
 		},
 		{
-			qsl("^settings(/folders|/devices|/language)?$"),
+			qsl("^settings(/language|/devices|/folders|/privacy|/themes|/change_number)?$"),
 			ResolveSettings
 		},
 		{

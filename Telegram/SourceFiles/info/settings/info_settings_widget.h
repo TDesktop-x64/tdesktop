@@ -66,6 +66,7 @@ public:
 	void saveChanges(FnMut<void()> done) override;
 
 	void showFinished() override;
+	void setInnerFocus() override;
 
 	rpl::producer<bool> desiredShadowVisibility() const override;
 
@@ -81,6 +82,10 @@ private:
 	Type _type = Type();
 
 	not_null<::Settings::AbstractSection*> _inner;
+	QPointer<Ui::RpWidget> _pinnedToTop;
+	QPointer<Ui::RpWidget> _pinnedToBottom;
+
+	rpl::event_stream<std::vector<Type>> _removesFromStack;
 
 };
 

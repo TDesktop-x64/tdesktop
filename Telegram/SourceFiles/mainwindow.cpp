@@ -123,55 +123,6 @@ void MainWindow::initHook() {
 	}
 }
 
-void MainWindow::createTrayIconMenu() {
-#ifdef Q_OS_WIN
-	trayIconMenu = new Ui::PopupMenu(nullptr);
-	trayIconMenu->deleteOnHide(false);
-#else // Q_OS_WIN
-	trayIconMenu = new QMenu(this);
-
-	connect(trayIconMenu, &QMenu::aboutToShow, [=] {
-		updateIsActive();
-		updateTrayMenu();
-	});
-#endif // else for Q_OS_WIN
-
-	const auto minimizeAction = trayIconMenu->addAction(QString(), [=] {
-		if (_activeForTrayIconAction) {
-			minimizeToTray();
-		} else {
-			showFromTrayMenu();
-		}
-	});
-	const auto notificationAction = trayIconMenu->addAction(QString(), [=] {
-		toggleDisplayNotifyFromTray();
-	});
-	trayIconMenu->addAction(tr::lng_quit_from_tray(tr::now), [=] {
-		quitFromTray();
-	});
-
-	_updateTrayMenuTextActions.events(
-	) | rpl::start_with_next([=] {
-		if (!trayIconMenu) {
-			return;
-		}
-
-		_activeForTrayIconAction = isActiveForTrayMenu();
-		minimizeAction->setText(_activeForTrayIconAction
-			? tr::lng_minimize_to_tray(tr::now)
-			: tr::lng_open_from_tray(tr::now));
-
-		auto notificationActionText = Core::App().settings().desktopNotify()
-			? tr::lng_disable_notifications_from_tray(tr::now)
-			: tr::lng_enable_notifications_from_tray(tr::now);
-		notificationAction->setText(notificationActionText);
-	}, lifetime());
-
-	_updateTrayMenuTextActions.fire({});
-
-	initTrayMenuHook();
-}
-
 void MainWindow::applyInitialWorkMode() {
 	const auto workMode = Core::App().settings().workMode();
 	workmodeUpdated(workMode);
@@ -196,7 +147,6 @@ void MainWindow::applyInitialWorkMode() {
 }
 
 void MainWindow::finishFirstShow() {
-	createTrayIconMenu();
 	applyInitialWorkMode();
 	createGlobalMenu();
 
@@ -680,15 +630,6 @@ bool MainWindow::eventFilter(QObject *object, QEvent *e) {
 	return Platform::MainWindow::eventFilter(object, e);
 }
 
-void MainWindow::updateTrayMenu() {
-	if (!trayIconMenu) {
-		return;
-	}
-	_updateTrayMenuTextActions.fire({});
-
-	psTrayMenuUpdated();
-}
-
 bool MainWindow::takeThirdSectionFromLayer() {
 	return _layer ? _layer->takeToThirdSection() : false;
 }
@@ -698,91 +639,6 @@ void MainWindow::fixOrder() {
 	if (_layer) _layer->raise();
 	if (_mediaPreview) _mediaPreview->raise();
 	if (_testingThemeWarning) _testingThemeWarning->raise();
-}
-
-void MainWindow::handleTrayIconActication(
-		QSystemTrayIcon::ActivationReason reason) {
-	updateIsActive();
-	if (Platform::IsMac() && isActive()) {
-		if (trayIcon && !trayIcon->contextMenu()) {
-			showFromTray();
-		}
-		return;
-	}
-	if (reason == QSystemTrayIcon::Context) {
-		updateTrayMenu();
-		InvokeQueued(this, [=] {
-			psShowTrayMenu();
-		});
-	} else if (!skipTrayClick()) {
-		if (isActiveForTrayMenu()) {
-			minimizeToTray();
-		} else {
-			showFromTray();
-		}
-		_lastTrayClickTime = crl::now();
-	}
-}
-
-bool MainWindow::skipTrayClick() const {
-	return (_lastTrayClickTime > 0)
-		&& (crl::now() - _lastTrayClickTime
-			< QApplication::doubleClickInterval());
-}
-
-void MainWindow::toggleDisplayNotifyFromTray() {
-	if (controller().locked()) {
-		if (!isActive()) showFromTray();
-		Ui::show(Ui::MakeInformBox(tr::lng_passcode_need_unblock()));
-		return;
-	}
-	if (!sessionController()) {
-		return;
-	}
-
-	auto soundNotifyChanged = false;
-	auto flashBounceNotifyChanged = false;
-	auto &settings = Core::App().settings();
-	settings.setDesktopNotify(!settings.desktopNotify());
-	if (settings.desktopNotify()) {
-		if (settings.rememberedSoundNotifyFromTray()
-			&& !settings.soundNotify()) {
-			settings.setSoundNotify(true);
-			settings.setRememberedSoundNotifyFromTray(false);
-			soundNotifyChanged = true;
-		}
-		if (settings.rememberedFlashBounceNotifyFromTray()
-			&& !settings.flashBounceNotify()) {
-			settings.setFlashBounceNotify(true);
-			settings.setRememberedFlashBounceNotifyFromTray(false);
-			flashBounceNotifyChanged = true;
-		}
-	} else {
-		if (settings.soundNotify()) {
-			settings.setSoundNotify(false);
-			settings.setRememberedSoundNotifyFromTray(true);
-			soundNotifyChanged = true;
-		} else {
-			settings.setRememberedSoundNotifyFromTray(false);
-		}
-		if (settings.flashBounceNotify()) {
-			settings.setFlashBounceNotify(false);
-			settings.setRememberedFlashBounceNotifyFromTray(true);
-			flashBounceNotifyChanged = true;
-		} else {
-			settings.setRememberedFlashBounceNotifyFromTray(false);
-		}
-	}
-	Core::App().saveSettingsDelayed();
-	using Change = Window::Notifications::ChangeType;
-	auto &notifications = Core::App().notifications();
-	notifications.notifySettingsChanged(Change::DesktopEnabled);
-	if (soundNotifyChanged) {
-		notifications.notifySettingsChanged(Change::SoundEnabled);
-	}
-	if (flashBounceNotifyChanged) {
-		notifications.notifySettingsChanged(Change::FlashBounceEnabled);
-	}
 }
 
 void MainWindow::closeEvent(QCloseEvent *e) {
@@ -853,10 +709,7 @@ void MainWindow::activeChangedHook() {
 	}
 }
 
-MainWindow::~MainWindow() {
-	delete trayIcon;
-	delete trayIconMenu;
-}
+MainWindow::~MainWindow() = default;
 
 namespace App {
 

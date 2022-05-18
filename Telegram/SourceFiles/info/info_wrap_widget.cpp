@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/info_controller.h"
 #include "info/info_memento.h"
 #include "info/info_top_bar.h"
+#include "settings/cloud_password/settings_cloud_password_email_confirm.h"
 #include "settings/settings_chat.h"
 #include "settings/settings_main.h"
 #include "ui/widgets/discrete_sliders.h"
@@ -395,7 +396,9 @@ void WrapWidget::createTopBar() {
 		addTopBarMenuButton();
 		addProfileCallsButton();
 	} else if (section.type() == Section::Type::Settings
-		&& (section.settingsType() == ::Settings::Main::Id()
+		&& (section.settingsType()
+				== ::Settings::CloudPasswordEmailConfirmId()
+			|| section.settingsType() == ::Settings::Main::Id()
 			|| section.settingsType() == ::Settings::Chat::Id())) {
 		addTopBarMenuButton();
 	} else if (section.type() == Section::Type::Downloads) {
@@ -594,6 +597,26 @@ bool WrapWidget::showBackFromStackInternal(
 		return true;
 	}
 	return (wrap() == Wrap::Layer);
+}
+
+void WrapWidget::removeFromStack(const std::vector<Section> &sections) {
+	for (const auto &section : sections) {
+		const auto it = ranges::find_if(_historyStack, [&](
+				const StackItem &item) {
+			const auto &s = item.section->section();
+			if (s.type() != section.type()) {
+				return false;
+			} else if (s.type() == Section::Type::Media) {
+				return (s.mediaType() == section.mediaType());
+			} else if (s.type() == Section::Type::Settings) {
+				return (s.settingsType() == section.settingsType());
+			}
+			return false;
+		});
+		if (it != end(_historyStack)) {
+			_historyStack.erase(it);
+		}
+	}
 }
 
 not_null<Ui::RpWidget*> WrapWidget::topWidget() const {
@@ -900,6 +923,9 @@ void WrapWidget::showNewContent(
 	auto newController = createController(
 		_controller->parentController(),
 		memento);
+	if (_controller && newController) {
+		newController->takeStepData(_controller.get());
+	}
 	auto newContent = object_ptr<ContentWidget>(nullptr);
 	if (needAnimation) {
 		newContent = createContent(memento, newController.get());

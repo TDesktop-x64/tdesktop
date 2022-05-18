@@ -33,6 +33,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #endif // !DESKTOP_APP_DISABLE_X11_INTEGRATION
 
 #include <QtWidgets/QApplication>
+#include <QtWidgets/QSystemTrayIcon>
 #include <QtCore/QStandardPaths>
 #include <QtCore/QProcess>
 #include <QtGui/QWindow>
@@ -64,7 +65,6 @@ constexpr auto kDesktopFile = ":/misc/telegramdesktop.desktop"_cs;
 constexpr auto kIconName = "telegram"_cs;
 
 constexpr auto kIBusPortalService = "org.freedesktop.portal.IBus"_cs;
-constexpr auto kWebviewService = "org.telegram.desktop.GtkIntegration.WebviewHelper-%1-%2"_cs;
 
 #ifndef DESKTOP_APP_DISABLE_DBUS_INTEGRATION
 void PortalAutostart(bool start, bool silent) {

@@ -545,38 +545,36 @@ object_ptr<Ui::RpWidget> Controller::createStickersEdit() {
 	Expects(_wrap != nullptr);
 
 	const auto channel = _peer->asChannel();
+	const auto bottomSkip = st::editPeerTopButtonsLayoutSkipCustomBottom;
 
 	auto result = object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
 		_wrap,
-		object_ptr<Ui::VerticalLayout>(_wrap),
-		st::editPeerInvitesMargins);
+		object_ptr<Ui::VerticalLayout>(_wrap));
 	const auto container = result->entity();
 
-	container->add(object_ptr<Ui::FlatLabel>(
+	Settings::AddSubsectionTitle(
 		container,
 		tr::lng_group_stickers(),
-		st::editPeerSectionLabel));
-	container->add(object_ptr<Ui::FixedHeightWidget>(
-		container,
-		st::editPeerInviteLinkSkip));
+		{ 0, st::settingsSubsectionTitlePadding.top() - bottomSkip, 0, 0 });
 
-	container->add(object_ptr<Ui::FlatLabel>(
+	AddButtonWithCount(
 		container,
-		tr::lng_group_stickers_description(),
-		st::editPeerPrivacyLabel));
-	container->add(object_ptr<Ui::FixedHeightWidget>(
-		container,
-		st::editPeerInviteLinkSkip));
+		tr::lng_group_stickers_add(),
+		rpl::single(QString()), //Empty count.
+		[=, controller = _navigation->parentController()] {
+			controller->show(
+				Box<StickersBox>(controller, channel),
+				Ui::LayerOption::KeepOther);
+		},
+		{ &st::settingsIconStickers, Settings::kIconLightOrange });
 
-	container->add(object_ptr<Ui::LinkButton>(
-		_wrap,
-		tr::lng_group_stickers_add(tr::now),
-		st::editPeerInviteLinkButton)
-	)->addClickHandler([=] {
-		_navigation->parentController()->show(
-			Box<StickersBox>(_navigation->parentController(), channel),
-			Ui::LayerOption::KeepOther);
-	});
+	Settings::AddSkip(container, bottomSkip);
+
+	Settings::AddDividerText(
+		container,
+		tr::lng_group_stickers_description());
+
+	Settings::AddSkip(container, bottomSkip);
 
 	return result;
 }
@@ -708,6 +706,9 @@ void Controller::fillPrivacyTypeButton() {
 	_noForwardsSavedValue = !_peer->allowsForwarding();
 
 	const auto isGroup = (_peer->isChat() || _peer->isMegagroup());
+	const auto icon = isGroup
+		? &st::settingsIconGroup
+		: &st::settingsIconChannel;
 	AddButtonWithText(
 		_controls.buttonsLayout,
 		(hasLocation
@@ -730,7 +731,7 @@ void Controller::fillPrivacyTypeButton() {
 					: tr::lng_manage_private_peer_title)();
 		}) | rpl::flatten_latest(),
 		[=] { showEditPeerTypeBox(); },
-		{ &st::infoIconGroupType, Settings::kIconLightBlue });
+		{ icon, Settings::kIconLightBlue });
 
 	_privacyTypeUpdates.fire_copy(*_privacySavedValue);
 }
@@ -804,7 +805,7 @@ void Controller::fillSignaturesButton() {
 		tr::lng_edit_sign_messages(),
 		rpl::single(QString()),
 		[] {},
-		{ &st::infoIconSignature, Settings::kIconLightBlue }
+		{ &st::infoRoundedIconSignature, Settings::kIconLightBlue }
 	)->toggleOn(rpl::single(channel->addsSignature())
 	)->toggledValue(
 	) | rpl::start_with_next([=](bool toggled) {
@@ -1012,7 +1013,7 @@ void Controller::fillManageSection() {
 					*Data::PeerAllowedReactions(_peer),
 					done));
 			},
-			{ &st::infoIconReactions, Settings::kIconRed });
+			{ &st::infoRoundedIconReactions, Settings::kIconRed });
 	}
 	if (canEditPermissions) {
 		AddButtonWithCount(
@@ -1061,7 +1062,7 @@ void Controller::fillManageSection() {
 						0),
 					Ui::LayerOption::KeepOther);
 			},
-			{ &st::infoIconInviteLinks, Settings::kIconLightOrange });
+			{ &st::infoRoundedIconInviteLinks, Settings::kIconLightOrange });
 
 		if (_privacySavedValue) {
 			_privacyTypeUpdates.events_starting_with_copy(
@@ -1089,7 +1090,7 @@ void Controller::fillManageSection() {
 					_peer,
 					ParticipantsBoxController::Role::Admins);
 			},
-			{ &st::infoIconAdministrators, Settings::kIconLightBlue });
+			{ &st::infoRoundedIconAdministrators, Settings::kIconLightBlue });
 	}
 	if (canViewMembers) {
 		AddButtonWithCount(
@@ -1138,7 +1139,7 @@ void Controller::fillManageSection() {
 			tr::lng_manage_peer_recent_actions(),
 			rpl::single(QString()), //Empty count.
 			std::move(callback),
-			{ &st::infoIconRecentActions, Settings::kIconPurple });
+			{ &st::infoRoundedIconRecentActions, Settings::kIconPurple });
 	}
 
 	if (canEditStickers || canDeleteChannel) {
@@ -1188,7 +1189,7 @@ void Controller::fillPendingRequestsButton() {
 			: tr::lng_manage_peer_requests_channel()),
 		rpl::duplicate(pendingRequestsCount) | ToPositiveNumberString(),
 		[=] { RequestsBoxController::Start(_navigation, _peer); },
-		{ &st::infoIconRequests, Settings::kIconRed });
+		{ &st::infoRoundedIconRequests, Settings::kIconRed });
 	std::move(
 		pendingRequestsCount
 	) | rpl::start_with_next([=](int count) {

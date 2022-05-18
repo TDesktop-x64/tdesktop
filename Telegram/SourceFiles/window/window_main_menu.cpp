@@ -66,6 +66,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QScreen>
 #include <core/enhanced_settings.h>
 
+#include <QtGui/QGuiApplication>
+#include <QtGui/QClipboard>
+
 namespace Window {
 namespace {
 
@@ -569,7 +572,20 @@ void MainMenu::setupAccounts() {
 
 void MainMenu::setupAccountsToggle() {
 	_toggleAccounts->show();
-	_toggleAccounts->setClickedCallback([=] { toggleAccounts(); });
+	_toggleAccounts->setAcceptBoth();
+	_toggleAccounts->addClickHandler([=](Qt::MouseButton button) {
+		if (button == Qt::LeftButton) {
+			toggleAccounts();
+		} else if (button == Qt::RightButton) {
+			const auto menu = Ui::CreateChild<Ui::PopupMenu>(
+				_toggleAccounts.data());
+
+			menu->addAction(tr::lng_profile_copy_phone(tr::now), [=] {
+				QGuiApplication::clipboard()->setText(_phoneText);
+			});
+			menu->popup(QCursor::pos());
+		}
+	});
 }
 
 void MainMenu::parentResized() {

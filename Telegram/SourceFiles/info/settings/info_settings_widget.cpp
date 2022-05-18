@@ -8,7 +8,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/settings/info_settings_widget.h"
 
 #include "info/info_memento.h"
-#include "info/info_controller.h"
 #include "settings/settings_common.h"
 #include "settings/settings_main.h"
 #include "settings/settings_information.h"
@@ -47,11 +46,63 @@ Widget::Widget(
 , _type(controller->section().settingsType())
 , _inner(
 	setInnerWidget(
-		_type()->create(this, controller->parentController()))) {
+		_type()->create(this, controller->parentController())))
+, _pinnedToTop(_inner->createPinnedToTop(this))
+, _pinnedToBottom(_inner->createPinnedToBottom(this)) {
 	_inner->sectionShowOther(
 	) | rpl::start_with_next([=](Type type) {
 		controller->showSettings(type);
 	}, _inner->lifetime());
+
+	_inner->sectionShowBack(
+	) | rpl::start_with_next([=] {
+		controller->showBackFromStack();
+	}, _inner->lifetime());
+
+	_inner->setStepDataReference(controller->stepDataReference());
+
+	_removesFromStack.events(
+	) | rpl::start_with_next([=](const std::vector<Type> &types) {
+		const auto sections = ranges::views::all(
+			types
+		) | ranges::views::transform([](Type type) {
+			return Section(type);
+		}) | ranges::to_vector;
+		controller->removeFromStack(sections);
+	}, _inner->lifetime());
+
+	if (_pinnedToTop) {
+		_inner->widthValue(
+		) | rpl::start_with_next([=](int w) {
+			_pinnedToTop->resizeToWidth(w);
+			setScrollTopSkip(_pinnedToTop->height());
+		}, _pinnedToTop->lifetime());
+
+		_pinnedToTop->heightValue(
+		) | rpl::start_with_next([=](int h) {
+			setScrollTopSkip(h);
+		}, _pinnedToTop->lifetime());
+	}
+
+	if (_pinnedToBottom) {
+		const auto processHeight = [=](int bottomHeight, int height) {
+			setScrollBottomSkip(bottomHeight);
+			_pinnedToBottom->moveToLeft(
+				_pinnedToBottom->x(),
+				height - bottomHeight);
+		};
+
+		_inner->sizeValue(
+		) | rpl::start_with_next([=](const QSize &s) {
+			_pinnedToBottom->resizeToWidth(s.width());
+			processHeight(_pinnedToBottom->height(), height());
+		}, _pinnedToBottom->lifetime());
+
+		rpl::combine(
+			_pinnedToBottom->heightValue(),
+			heightValue()
+		) | rpl::start_with_next(processHeight, _pinnedToBottom->lifetime());
+	}
 }
 
 Widget::~Widget() = default;
@@ -85,6 +136,13 @@ void Widget::saveChanges(FnMut<void()> done) {
 
 void Widget::showFinished() {
 	_inner->showFinished();
+
+	_inner->removeFromStack(
+	) | rpl::start_to_stream(_removesFromStack, lifetime());
+}
+
+void Widget::setInnerFocus() {
+	_inner->setInnerFocus();
 }
 
 rpl::producer<bool> Widget::desiredShadowVisibility() const {

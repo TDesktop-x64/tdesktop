@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/media/history_view_sticker.h"
 #include "history/view/history_view_context_menu.h"
 #include "history/view/history_view_element.h"
+#include "history/view/history_view_emoji_interactions.h"
 #include "history/view/history_view_message.h"
 #include "history/view/history_view_service_message.h"
 #include "history/view/history_view_cursor_state.h"
@@ -29,6 +30,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "apiwrap.h"
 #include "api/api_who_reacted.h"
 #include "layout/layout_selection.h"
+#include "window/section_widget.h"
 #include "window/window_adaptive.h"
 #include "window/window_session_controller.h"
 #include "window/window_peer_menu.h"
@@ -264,6 +266,9 @@ ListWidget::ListWidget(
 : RpWidget(parent)
 , _delegate(delegate)
 , _controller(controller)
+, _emojiInteractions(std::make_unique<EmojiInteractions>(
+	&controller->session(),
+	[=](not_null<const Element*> view) { return itemTop(view); }))
 , _context(_delegate->listContext())
 , _itemAverageHeight(itemMinimalHeight())
 , _pathGradient(
@@ -279,7 +284,10 @@ ListWidget::ListWidget(
 , _scrollDateCheck([this] { scrollDateCheck(); })
 , _applyUpdatedScrollState([this] { applyUpdatedScrollState(); })
 , _selectEnabled(_delegate->listAllowsMultiSelect())
-, _highlightTimer([this] { updateHighlightedMessage(); }) {
+, _highlighter(
+	&session().data(),
+	[=](const HistoryItem *item) { return viewForItem(item); },
+	[=](const Element *view) { repaintItem(view); }) {
 	setMouseTracking(true);
 	_scrollDateHideTimer.setCallback([this] { scrollDateHideByTimer(); });
 	session().data().viewRepaintRequest(
@@ -350,7 +358,11 @@ ListWidget::ListWidget(
 	_reactionsManager->chosen(
 	) | rpl::start_with_next([=](ChosenReaction reaction) {
 		const auto item = session().data().message(reaction.context);
-		if (!item) {
+		if (!item
+			|| Window::ShowReactPremiumError(
+				_controller,
+				item,
+				reaction.emoji)) {
 			return;
 		}
 		item->toggleReaction(reaction.emoji);
@@ -375,6 +387,11 @@ ListWidget::ListWidget(
 	controller->adaptive().chatWideValue(
 	) | rpl::start_with_next([=](bool wide) {
 		_isChatWide = wide;
+	}, lifetime());
+
+	_emojiInteractions->updateRequests(
+	) | rpl::start_with_next([=](QRect rect) {
+		update(rect);
 	}, lifetime());
 
 	_selectScroll.scrolls(
@@ -565,15 +582,7 @@ bool ListWidget::isBelowPosition(Data::MessagePosition position) const {
 }
 
 void ListWidget::highlightMessage(FullMsgId itemId) {
-	if (const auto item = session().data().message(itemId)) {
-		if (const auto view = viewForItem(item)) {
-			_highlightStart = crl::now();
-			_highlightedMessageId = itemId;
-			_highlightTimer.callEach(AnimationTimerDelta);
-
-			repaintHighlightedItem(view);
-		}
-	}
+	_highlighter.highlight(itemId);
 }
 
 void ListWidget::showAroundPosition(
@@ -583,39 +592,6 @@ void ListWidget::showAroundPosition(
 	_aroundIndex = -1;
 	_overrideInitialScroll = std::move(overrideInitialScroll);
 	refreshViewer();
-}
-
-void ListWidget::repaintHighlightedItem(not_null<const Element*> view) {
-	if (view->isHiddenByGroup()) {
-		if (const auto group = session().data().groups().find(view->data())) {
-			if (const auto leader = viewForItem(group->items.front())) {
-				if (!leader->isHiddenByGroup()) {
-					repaintItem(leader);
-					return;
-				}
-			}
-		}
-	}
-	repaintItem(view);
-}
-
-void ListWidget::updateHighlightedMessage() {
-	if (const auto item = session().data().message(_highlightedMessageId)) {
-		if (const auto view = viewForItem(item)) {
-			repaintHighlightedItem(view);
-			auto duration = st::activeFadeInDuration + st::activeFadeOutDuration;
-			if (crl::now() - _highlightStart <= duration) {
-				return;
-			}
-		}
-	}
-	_highlightTimer.cancel();
-	_highlightedMessageId = FullMsgId();
-}
-
-void ListWidget::clearHighlightedMessage() {
-	_highlightedMessageId = FullMsgId();
-	updateHighlightedMessage();
 }
 
 void ListWidget::checkUnreadBarCreation() {
@@ -800,6 +776,8 @@ void ListWidget::visibleTopBottomUpdated(
 	_controller->floatPlayerAreaUpdated();
 	session().data().itemVisibilitiesUpdated();
 	_applyUpdatedScrollState.call();
+
+	_emojiInteractions->visibleAreaUpdated(_visibleTop, _visibleBottom);
 }
 
 void ListWidget::applyUpdatedScrollState() {
@@ -1420,14 +1398,9 @@ bool ListWidget::elementUnderCursor(
 	return (_overElement == view);
 }
 
-crl::time ListWidget::elementHighlightTime(
-		not_null<const HistoryItem*> item) {
-	if (item->fullId() == _highlightedMessageId) {
-		if (_highlightTimer.isActive()) {
-			return crl::now() - _highlightStart;
-		}
-	}
-	return crl::time(0);
+float64 ListWidget::elementHighlightOpacity(
+		not_null<const HistoryItem*> item) const {
+	return _highlighter.progress(item);
 }
 
 bool ListWidget::elementInSelectionMode() {
@@ -1513,6 +1486,16 @@ void ListWidget::elementReplyTo(const FullMsgId &to) {
 }
 
 void ListWidget::elementStartInteraction(not_null<const Element*> view) {
+}
+
+void ListWidget::elementStartPremium(
+		not_null<const Element*> view,
+		Element *replacing) {
+	_emojiInteractions->playPremiumEffect(view, replacing);
+}
+
+void ListWidget::elementCancelPremium(not_null<const Element*> view) {
+	_emojiInteractions->cancelPremiumEffect(view);
 }
 
 void ListWidget::elementShowSpoilerAnimation() {
@@ -1905,6 +1888,7 @@ void ListWidget::paintEvent(QPaintEvent *e) {
 		});
 
 		_reactionsManager->paint(p, context);
+		_emojiInteractions->paint(p);
 	}
 }
 
@@ -2120,7 +2104,9 @@ void ListWidget::toggleFavoriteReaction(not_null<Element*> view) const {
 		return;
 	}
 	const auto item = view->data();
-	if (item->chosenReaction() != favorite) {
+	if (Window::ShowReactPremiumError(_controller, item, favorite)) {
+		return;
+	} else if (item->chosenReaction() != favorite) {
 		if (const auto top = itemTop(view); top >= 0) {
 			view->animateReaction({ .emoji = favorite });
 		}
@@ -3231,11 +3217,14 @@ void ListWidget::replyNextMessage(FullMsgId fullId, bool next) {
 	const auto reply = [&](Element *view) {
 		if (view) {
 			const auto newFullId = view->data()->fullId();
+			if (!view->data()->isRegular()) {
+				return replyNextMessage(newFullId, next);
+			}
 			replyToMessageRequestNotify(newFullId);
 			_requestedToShowMessage.fire_copy(newFullId);
 		} else {
 			replyToMessageRequestNotify(FullMsgId());
-			clearHighlightedMessage();
+			_highlighter.clear();
 		}
 	};
 	const auto replyFirst = [&] {

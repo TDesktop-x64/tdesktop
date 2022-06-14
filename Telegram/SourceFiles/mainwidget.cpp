@@ -311,7 +311,7 @@ MainWidget::MainWidget(
 			} else {
 				Ui::showPeerHistory(history, ShowAtUnreadMsgId);
 			}
-			Ui::hideLayer();
+			_controller->hideLayer();
 		}
 	}, lifetime());
 
@@ -522,24 +522,24 @@ bool MainWidget::setForwardDraft(PeerId peerId, Data::ForwardDraft &&draft) {
 bool MainWidget::shareUrl(
 		PeerId peerId,
 		const QString &url,
-		const QString &text) {
+		const QString &text) const {
 	Expects(peerId != 0);
 
 	const auto peer = session().data().peer(peerId);
 	if (!peer->canWrite()) {
-		Ui::show(Ui::MakeInformBox(tr::lng_share_cant()));
+		_controller->show(Ui::MakeInformBox(tr::lng_share_cant()));
 		return false;
 	}
-	TextWithTags textWithTags = {
+	const auto textWithTags = TextWithTags{
 		url + '\n' + text,
 		TextWithTags::Tags()
 	};
-	MessageCursor cursor = {
+	const auto cursor = MessageCursor{
 		int(url.size()) + 1,
 		int(url.size()) + 1 + int(text.size()),
 		QFIXED_MAX
 	};
-	auto history = peer->owner().history(peer);
+	const auto history = peer->owner().history(peer);
 	history->setLocalDraft(std::make_unique<Data::Draft>(
 		textWithTags,
 		0,
@@ -552,7 +552,9 @@ bool MainWidget::shareUrl(
 	return true;
 }
 
-bool MainWidget::inlineSwitchChosen(PeerId peerId, const QString &botAndQuery) {
+bool MainWidget::inlineSwitchChosen(
+		PeerId peerId,
+		const QString &botAndQuery) const {
 	Expects(peerId != 0);
 
 	const auto peer = session().data().peer(peerId);
@@ -561,8 +563,15 @@ bool MainWidget::inlineSwitchChosen(PeerId peerId, const QString &botAndQuery) {
 		return false;
 	}
 	const auto h = peer->owner().history(peer);
-	TextWithTags textWithTags = { botAndQuery, TextWithTags::Tags() };
-	MessageCursor cursor = { int(botAndQuery.size()), int(botAndQuery.size()), QFIXED_MAX };
+	const auto textWithTags = TextWithTags{
+		botAndQuery,
+		TextWithTags::Tags(),
+	};
+	const auto cursor = MessageCursor{
+		int(botAndQuery.size()),
+		int(botAndQuery.size()),
+		QFIXED_MAX
+	};
 	h->setLocalDraft(std::make_unique<Data::Draft>(
 		textWithTags,
 		0,
@@ -953,11 +962,12 @@ void MainWidget::setCurrentGroupCall(Calls::GroupCall *call) {
 void MainWidget::createCallTopBar() {
 	Expects(_currentCall != nullptr || _currentGroupCall != nullptr);
 
+	const auto show = std::make_shared<Window::Show>(controller());
 	_callTopBar.create(
 		this,
 		(_currentCall
-			? object_ptr<Calls::TopBar>(this, _currentCall)
-			: object_ptr<Calls::TopBar>(this, _currentGroupCall)));
+			? object_ptr<Calls::TopBar>(this, _currentCall, show)
+			: object_ptr<Calls::TopBar>(this, _currentGroupCall, show)));
 	_callTopBar->entity()->initBlobsUnder(this, _callTopBar->geometryValue());
 	_callTopBar->heightValue(
 	) | rpl::start_with_next([this](int value) {
@@ -1307,7 +1317,7 @@ void MainWidget::ui_showPeerHistory(
 			return;
 		}
 	}
-	if (IsServerMsgId(showAtMsgId)
+	if ((IsServerMsgId(showAtMsgId) || Data::IsScheduledMsgId(showAtMsgId))
 		&& _mainSection
 		&& _mainSection->showMessage(peerId, params, showAtMsgId)) {
 		session().data().hideShownSpoilers();
@@ -1476,8 +1486,12 @@ void MainWidget::ui_showPeerHistory(
 	floatPlayerCheckVisibility();
 }
 
-PeerData *MainWidget::peer() {
+PeerData *MainWidget::peer() const {
 	return _history->peer();
+}
+
+Ui::ChatTheme *MainWidget::customChatTheme() const {
+	return _history->customChatTheme();
 }
 
 void MainWidget::saveSectionInStack() {
@@ -1640,7 +1654,7 @@ void MainWidget::showNewSection(
 		saveInStack = false;
 	} else if (auto layer = memento->createLayer(_controller, layerRect)) {
 		if (params.activation != anim::activation::background) {
-			Ui::hideLayer(anim::type::instant);
+			_controller->hideLayer(anim::type::instant);
 		}
 		_controller->showSpecialLayer(std::move(layer));
 		return;
@@ -1908,7 +1922,7 @@ QPixmap MainWidget::grabForShowAnimation(const Window::SectionSlideParams &param
 		result = Ui::GrabWidget(this, QRect(
 			0,
 			sectionTop,
-			_dialogsWidth,
+			width(),
 			height() - sectionTop));
 	} else {
 		if (_sideShadow) {
@@ -2159,7 +2173,7 @@ void MainWidget::updateControlsGeometry() {
 	auto dialogsWidth = _dialogs
 		? qRound(_a_dialogsWidth.value(_dialogsWidth))
 		: isOneColumn()
-		? _dialogsWidth
+		? width()
 		: 0;
 	if (isOneColumn()) {
 		if (_callTopBar) {
@@ -2272,7 +2286,7 @@ void MainWidget::updateControlsGeometry() {
 }
 
 void MainWidget::refreshResizeAreas() {
-	if (!isOneColumn()) {
+	if (!isOneColumn() && _dialogs) {
 		ensureFirstColumnResizeAreaCreated();
 		_firstColumnResizeArea->setGeometryToLeft(
 			_history->x(),
@@ -2310,6 +2324,8 @@ void MainWidget::createResizeArea(
 }
 
 void MainWidget::ensureFirstColumnResizeAreaCreated() {
+	Expects(_dialogs != nullptr);
+
 	if (_firstColumnResizeArea) {
 		return;
 	}

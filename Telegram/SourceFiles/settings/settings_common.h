@@ -7,7 +7,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "menu/add_action_callback.h"
 #include "ui/rp_widget.h"
 #include "ui/round_rect.h"
 #include "base/object_ptr.h"
@@ -27,6 +26,10 @@ class FlatLabel;
 class SettingsButton;
 class AbstractButton;
 } // namespace Ui
+
+namespace Ui::Menu {
+struct MenuCallback;
+} // namespace Ui::Menu
 
 namespace Window {
 class SessionController;
@@ -93,6 +96,9 @@ public:
 	virtual void setInnerFocus() {
 		setFocus();
 	}
+	[[nodiscard]] virtual const Ui::RoundRect *bottomSkipRounding() const {
+		return nullptr;
+	}
 	[[nodiscard]] virtual QPointer<Ui::RpWidget> createPinnedToTop(
 			not_null<QWidget*> parent) {
 		return nullptr;
@@ -100,6 +106,9 @@ public:
 	[[nodiscard]] virtual QPointer<Ui::RpWidget> createPinnedToBottom(
 			not_null<Ui::RpWidget*> parent) {
 		return nullptr;
+	}
+	[[nodiscard]] virtual bool hasFlexibleTopBar() const {
+		return false;
 	}
 	virtual void setStepDataReference(std::any &data) {
 	}
@@ -137,6 +146,7 @@ struct IconDescriptor {
 	int color = 0; // settingsIconBg{color}, 9 for settingsIconBgArchive.
 	IconType type = IconType::Rounded;
 	const style::color *background = nullptr;
+	std::optional<QBrush> backgroundBrush; // Can be useful for gragdients.
 
 	explicit operator bool() const {
 		return (icon != nullptr);
@@ -157,6 +167,7 @@ public:
 private:
 	not_null<const style::icon*> _icon;
 	std::optional<Ui::RoundRect> _background;
+	std::optional<std::pair<int, QBrush>> _backgroundBrush;
 
 };
 
@@ -210,6 +221,6 @@ void FillMenu(
 	not_null<Window::SessionController*> controller,
 	Type type,
 	Fn<void(Type)> showOther,
-	Menu::MenuCallback addAction);
+	Ui::Menu::MenuCallback addAction);
 
 } // namespace Settings

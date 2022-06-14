@@ -53,7 +53,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_session_controller.h"
 #include "info/profile/info_profile_icon.h"
 #include "api/api_invite_links.h"
-#include "facades.h" // Ui::showChatsList
 #include "styles/style_layers.h"
 #include "styles/style_boxes.h"
 #include "styles/style_info.h"
@@ -269,6 +268,8 @@ private:
 		std::optional<bool> hiddenPreHistory;
 		std::optional<bool> signatures;
 		std::optional<bool> noForwards;
+		std::optional<bool> joinToWrite;
+		std::optional<bool> requestToJoin;
 		std::optional<ChannelData*> linkedChat;
 	};
 
@@ -307,6 +308,8 @@ private:
 	[[nodiscard]] bool validateHistoryVisibility(Saving &to) const;
 	[[nodiscard]] bool validateSignatures(Saving &to) const;
 	[[nodiscard]] bool validateForwards(Saving &to) const;
+	[[nodiscard]] bool validateJoinToWrite(Saving &to) const;
+	[[nodiscard]] bool validateRequestToJoin(Saving &to) const;
 
 	void save();
 	void saveUsername();
@@ -316,6 +319,8 @@ private:
 	void saveHistoryVisibility();
 	void saveSignatures();
 	void saveForwards();
+	void saveJoinToWrite();
+	void saveRequestToJoin();
 	void savePhoto();
 	void pushSaveStage(FnMut<void()> &&lambda);
 	void continueSave();
@@ -330,14 +335,12 @@ private:
 	void subscribeToMigration();
 	void migrate(not_null<ChannelData*> channel);
 
-	std::optional<Privacy> _privacySavedValue;
 	std::optional<ChannelData*> _linkedChatSavedValue;
 	ChannelData *_linkedChatOriginalValue = nullptr;
 	bool _channelHasLocationOriginalValue = false;
 	std::optional<HistoryVisibility> _historyVisibilitySavedValue;
-	std::optional<QString> _usernameSavedValue;
+	std::optional<EditPeerTypeData> _typeDataSavedValue;
 	std::optional<bool> _signaturesSavedValue;
-	std::optional<bool> _noForwardsSavedValue;
 
 	const not_null<Window::SessionNavigation*> _navigation;
 	const not_null<Ui::BoxContent*> _box;
@@ -603,8 +606,10 @@ void Controller::refreshHistoryVisibility() {
 	if (!_controls.historyVisibilityWrap) {
 		return;
 	}
+	const auto withUsername = _typeDataSavedValue
+		&& (_typeDataSavedValue->privacy == Privacy::HasUsername);
 	_controls.historyVisibilityWrap->toggle(
-		(_privacySavedValue != Privacy::HasUsername
+		(withUsername
 			&& !_channelHasLocationOriginalValue
 			&& (!_linkedChatSavedValue || !*_linkedChatSavedValue)),
 		anim::type::instant);
@@ -612,22 +617,20 @@ void Controller::refreshHistoryVisibility() {
 
 void Controller::showEditPeerTypeBox(
 		std::optional<rpl::producer<QString>> error) {
-	const auto boxCallback = crl::guard(this, [=](
-			Privacy checked, QString publicLink, bool noForwards) {
-		_privacyTypeUpdates.fire(std::move(checked));
-		_privacySavedValue = checked;
-		_usernameSavedValue = publicLink;
-		_noForwardsSavedValue = noForwards;
+	const auto boxCallback = crl::guard(this, [=](EditPeerTypeData data) {
+		_privacyTypeUpdates.fire_copy(data.privacy);
+		_typeDataSavedValue = data;
 		refreshHistoryVisibility();
 	});
+	_typeDataSavedValue->hasLinkedChat
+		= (_linkedChatSavedValue.value_or(nullptr) != nullptr);
 	_navigation->parentController()->show(
 		Box<EditPeerTypeBox>(
+			_navigation,
 			_peer,
 			_channelHasLocationOriginalValue,
 			boxCallback,
-			_privacySavedValue,
-			_usernameSavedValue,
-			_noForwardsSavedValue,
+			_typeDataSavedValue,
 			error),
 		Ui::LayerOption::KeepOther);
 }
@@ -699,12 +702,20 @@ void Controller::fillPrivacyTypeButton() {
 	// Create Privacy Button.
 	const auto hasLocation = _peer->isChannel()
 		&& _peer->asChannel()->hasLocation();
-	_privacySavedValue = (_peer->isChannel()
-		&& _peer->asChannel()->hasUsername())
-		? Privacy::HasUsername
-		: Privacy::NoUsername;
-	_noForwardsSavedValue = !_peer->allowsForwarding();
-
+	_typeDataSavedValue = EditPeerTypeData{
+		.privacy = ((_peer->isChannel()
+			&& _peer->asChannel()->hasUsername())
+			? Privacy::HasUsername
+			: Privacy::NoUsername),
+		.username = (_peer->isChannel()
+			? _peer->asChannel()->username
+			: QString()),
+		.noForwards = !_peer->allowsForwarding(),
+		.joinToWrite = (_peer->isMegagroup()
+			&& _peer->asChannel()->joinToWrite()),
+		.requestToJoin = (_peer->isMegagroup()
+			&& _peer->asChannel()->requestToJoin()),
+	};
 	const auto isGroup = (_peer->isChat() || _peer->isMegagroup());
 	const auto icon = isGroup
 		? &st::settingsIconGroup
@@ -733,7 +744,7 @@ void Controller::fillPrivacyTypeButton() {
 		[=] { showEditPeerTypeBox(); },
 		{ icon, Settings::kIconLightBlue });
 
-	_privacyTypeUpdates.fire_copy(*_privacySavedValue);
+	_privacyTypeUpdates.fire_copy(_typeDataSavedValue->privacy);
 }
 
 void Controller::fillLinkedChatButton() {
@@ -1064,9 +1075,9 @@ void Controller::fillManageSection() {
 			},
 			{ &st::infoRoundedIconInviteLinks, Settings::kIconLightOrange });
 
-		if (_privacySavedValue) {
+		if (_typeDataSavedValue) {
 			_privacyTypeUpdates.events_starting_with_copy(
-				*_privacySavedValue
+				_typeDataSavedValue->privacy
 			) | rpl::start_with_next([=](Privacy flag) {
 				wrap->toggle(
 					flag != Privacy::HasUsername,
@@ -1229,24 +1240,22 @@ std::optional<Controller::Saving> Controller::validate() const {
 		&& validateDescription(result)
 		&& validateHistoryVisibility(result)
 		&& validateSignatures(result)
-		&& validateForwards(result)) {
+		&& validateForwards(result)
+		&& validateJoinToWrite(result)
+		&& validateRequestToJoin(result)) {
 		return result;
 	}
 	return {};
 }
 
 bool Controller::validateUsername(Saving &to) const {
-	if (!_privacySavedValue) {
+	if (!_typeDataSavedValue) {
 		return true;
-	} else if (_privacySavedValue != Privacy::HasUsername) {
+	} else if (_typeDataSavedValue->privacy != Privacy::HasUsername) {
 		to.username = QString();
 		return true;
 	}
-	const auto username = _usernameSavedValue.value_or(
-		_peer->isChannel()
-			? _peer->asChannel()->username
-			: QString()
-	);
+	const auto username = _typeDataSavedValue->username;
 	if (username.isEmpty()) {
 		return false;
 	}
@@ -1288,7 +1297,8 @@ bool Controller::validateHistoryVisibility(Saving &to) const {
 	if (!_controls.historyVisibilityWrap
 		|| !_controls.historyVisibilityWrap->toggled()
 		|| _channelHasLocationOriginalValue
-		|| (_privacySavedValue == Privacy::HasUsername)) {
+		|| (_typeDataSavedValue
+			&& _typeDataSavedValue->privacy == Privacy::HasUsername)) {
 		return true;
 	}
 	to.hiddenPreHistory
@@ -1305,10 +1315,26 @@ bool Controller::validateSignatures(Saving &to) const {
 }
 
 bool Controller::validateForwards(Saving &to) const {
-	if (!_noForwardsSavedValue.has_value()) {
+	if (!_typeDataSavedValue) {
 		return true;
 	}
-	to.noForwards = _noForwardsSavedValue;
+	to.noForwards = _typeDataSavedValue->noForwards;
+	return true;
+}
+
+bool Controller::validateJoinToWrite(Saving &to) const {
+	if (!_typeDataSavedValue) {
+		return true;
+	}
+	to.joinToWrite = _typeDataSavedValue->joinToWrite;
+	return true;
+}
+
+bool Controller::validateRequestToJoin(Saving &to) const {
+	if (!_typeDataSavedValue) {
+		return true;
+	}
+	to.requestToJoin = _typeDataSavedValue->requestToJoin;
 	return true;
 }
 
@@ -1327,6 +1353,8 @@ void Controller::save() {
 		pushSaveStage([=] { saveHistoryVisibility(); });
 		pushSaveStage([=] { saveSignatures(); });
 		pushSaveStage([=] { saveForwards(); });
+		pushSaveStage([=] { saveJoinToWrite(); });
+		pushSaveStage([=] { saveRequestToJoin(); });
 		pushSaveStage([=] { savePhoto(); });
 		continueSave();
 	}
@@ -1603,6 +1631,50 @@ void Controller::saveForwards() {
 	}).send();
 }
 
+void Controller::saveJoinToWrite() {
+	const auto joinToWrite = _peer->isMegagroup()
+		&& _peer->asChannel()->joinToWrite();
+	if (!_savingData.joinToWrite
+		|| *_savingData.joinToWrite == joinToWrite) {
+		return continueSave();
+	}
+	_api.request(MTPchannels_ToggleJoinToSend(
+		_peer->asChannel()->inputChannel,
+		MTP_bool(*_savingData.joinToWrite)
+	)).done([=](const MTPUpdates &result) {
+		_peer->session().api().applyUpdates(result);
+		continueSave();
+	}).fail([=](const MTP::Error &error) {
+		if (error.type() == qstr("CHAT_NOT_MODIFIED")) {
+			continueSave();
+		} else {
+			cancelSave();
+		}
+	}).send();
+}
+
+void Controller::saveRequestToJoin() {
+	const auto requestToJoin = _peer->isMegagroup()
+		&& _peer->asChannel()->requestToJoin();
+	if (!_savingData.requestToJoin
+		|| *_savingData.requestToJoin == requestToJoin) {
+		return continueSave();
+	}
+	_api.request(MTPchannels_ToggleJoinRequest(
+		_peer->asChannel()->inputChannel,
+		MTP_bool(*_savingData.requestToJoin)
+	)).done([=](const MTPUpdates &result) {
+		_peer->session().api().applyUpdates(result);
+		continueSave();
+	}).fail([=](const MTP::Error &error) {
+		if (error.type() == qstr("CHAT_NOT_MODIFIED")) {
+			continueSave();
+		} else {
+			cancelSave();
+		}
+	}).send();
+}
+
 void Controller::savePhoto() {
 	auto image = _controls.photo
 		? _controls.photo->takeResultImage()
@@ -1641,8 +1713,8 @@ void Controller::deleteChannel() {
 
 	const auto session = &_peer->session();
 
-	Ui::hideLayer();
-	Ui::showChatsList(session);
+	_navigation->parentController()->hideLayer();
+	Core::App().closeChatFromWindows(_peer);
 	if (chat) {
 		session->api().deleteConversation(chat, false);
 	}

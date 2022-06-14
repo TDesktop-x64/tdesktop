@@ -95,7 +95,7 @@ PRIVATE
     desktop-app::external_xxhash
 )
 
-target_precompile_headers(Telegram PRIVATE ${src_loc}/stdafx.h)
+target_precompile_headers(Telegram PRIVATE $<$<COMPILE_LANGUAGE:CXX,OBJCXX>:${src_loc}/stdafx.h>)
 nice_target_sources(Telegram ${src_loc}
 PRIVATE
     ${style_files}
@@ -137,6 +137,8 @@ PRIVATE
     api/api_peer_photo.h
     api/api_polls.cpp
     api/api_polls.h
+    api/api_premium.cpp
+    api/api_premium.h
     api/api_report.cpp
     api/api_report.h
     api/api_ringtones.cpp
@@ -155,6 +157,8 @@ PRIVATE
     api/api_text_entities.h
     api/api_toggling_media.cpp
     api/api_toggling_media.h
+    api/api_transcribes.cpp
+    api/api_transcribes.h
     api/api_unread_things.cpp
     api/api_unread_things.h
     api/api_updates.cpp
@@ -258,6 +262,10 @@ PRIVATE
     boxes/phone_banned_box.h
     boxes/pin_messages_box.cpp
     boxes/pin_messages_box.h
+    boxes/premium_limits_box.cpp
+    boxes/premium_limits_box.h
+    boxes/premium_preview_box.cpp
+    boxes/premium_preview_box.h
     boxes/reactions_settings_box.cpp
     boxes/reactions_settings_box.h
     boxes/report_messages_box.cpp
@@ -473,13 +481,17 @@ PRIVATE
     data/data_media_rotation.h
     data/data_media_types.cpp
     data/data_media_types.h
-    data/data_messages.cpp
-    data/data_messages.h
+    # data/data_messages.cpp
+    # data/data_messages.h
     data/data_message_reactions.cpp
     data/data_message_reactions.h
     data/data_msg_id.h
     data/data_peer.cpp
     data/data_peer.h
+    data/data_peer_bot_command.cpp
+    data/data_peer_bot_command.h
+    data/data_peer_bot_commands.cpp
+    data/data_peer_bot_commands.h
     data/data_peer_id.cpp
     data/data_peer_id.h
     data/data_peer_values.cpp
@@ -546,6 +558,8 @@ PRIVATE
     dialogs/ui/dialogs_layout.h
     dialogs/ui/dialogs_message_view.cpp
     dialogs/ui/dialogs_message_view.h
+    dialogs/ui/dialogs_video_userpic.cpp
+    dialogs/ui/dialogs_video_userpic.h
     editor/color_picker.cpp
     editor/color_picker.h
     editor/controllers/controllers.h
@@ -688,6 +702,10 @@ PRIVATE
     history/view/history_view_service_message.h
     history/view/history_view_spoiler_click_handler.cpp
     history/view/history_view_spoiler_click_handler.h
+    history/view/history_view_sticker_toast.cpp
+    history/view/history_view_sticker_toast.h
+    history/view/history_view_transcribe_button.cpp
+    history/view/history_view_transcribe_button.h
     history/view/history_view_top_bar_widget.cpp
     history/view/history_view_top_bar_widget.h
     history/view/history_view_view_button.cpp
@@ -718,6 +736,8 @@ PRIVATE
     history/history_service.h
     history/history_unread_things.cpp
     history/history_unread_things.h
+    history/history_view_highlight_manager.cpp
+    history/history_view_highlight_manager.h
     history/history_widget.cpp
     history/history_widget.h
     info/info_content_widget.cpp
@@ -977,8 +997,6 @@ PRIVATE
     platform/linux/linux_wayland_integration_dummy.cpp
     platform/linux/linux_wayland_integration.cpp
     platform/linux/linux_wayland_integration.h
-    platform/linux/linux_xdp_file_dialog.cpp
-    platform/linux/linux_xdp_file_dialog.h
     platform/linux/linux_xdp_open_with_dialog.cpp
     platform/linux/linux_xdp_open_with_dialog.h
     platform/linux/file_utilities_linux.cpp
@@ -1118,6 +1136,8 @@ PRIVATE
     settings/settings_main.h
     settings/settings_notifications.cpp
     settings/settings_notifications.h
+    settings/settings_premium.cpp
+    settings/settings_premium.h
     settings/settings_privacy_controllers.cpp
     settings/settings_privacy_controllers.h
     settings/settings_privacy_security.cpp
@@ -1185,13 +1205,9 @@ PRIVATE
     ui/chat/choose_send_as.h
     ui/chat/choose_theme_controller.cpp
     ui/chat/choose_theme_controller.h
-    ui/effects/fireworks_animation.cpp
-    ui/effects/fireworks_animation.h
     ui/effects/message_sending_animation_common.h
     ui/effects/message_sending_animation_controller.cpp
     ui/effects/message_sending_animation_controller.h
-    ui/effects/round_checkbox.cpp
-    ui/effects/round_checkbox.h
     ui/effects/send_action_animations.cpp
     ui/effects/send_action_animations.h
     ui/image/image.cpp
@@ -1302,8 +1318,6 @@ endif()
 
 if (DESKTOP_APP_DISABLE_DBUS_INTEGRATION)
     remove_target_sources(Telegram ${src_loc}
-        platform/linux/linux_xdp_file_dialog.cpp
-        platform/linux/linux_xdp_file_dialog.h
         platform/linux/linux_xdp_open_with_dialog.cpp
         platform/linux/linux_xdp_open_with_dialog.h
         platform/linux/notifications_manager_linux.cpp
@@ -1433,10 +1447,19 @@ else()
     endif()
 
     if (NOT DESKTOP_APP_DISABLE_WAYLAND_INTEGRATION)
+        if (DESKTOP_APP_QT6)
+            qt6_generate_wayland_protocol_client_sources(Telegram
+            FILES
+                ${third_party_loc}/plasma-wayland-protocols/src/protocols/plasma-shell.xml
+            )
+        else()
+            message(FATAL_ERROR "This piece of cmake code is not ported to Qt 5")
+        endif()
+
         target_link_libraries(Telegram
         PRIVATE
             desktop-app::lib_waylandshells
-            desktop-app::external_kwayland
+            desktop-app::external_wayland_client
         )
     endif()
 endif()

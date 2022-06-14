@@ -8,11 +8,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/settings_folders.h"
 
 #include "apiwrap.h"
+#include "boxes/premium_limits_box.h"
 #include "boxes/filters/edit_filter_box.h"
 #include "core/application.h"
 #include "data/data_chat_filters.h"
 #include "data/data_folder.h"
 #include "data/data_peer.h"
+#include "data/data_peer_values.h" // Data::AmPremiumValue.
 #include "data/data_session.h"
 #include "history/history.h"
 #include "lang/lang_keys.h"
@@ -38,8 +40,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace Settings {
 namespace {
-
-constexpr auto kFiltersLimit = 10;
 
 using Flag = Data::ChatFilter::Flag;
 using Flags = Data::ChatFilter::Flags;
@@ -133,7 +133,7 @@ struct FilterRow {
 	const auto &list = session->data().chatsFilters().list();
 	const auto id = filter.id();
 	const auto i = ranges::find(list, id, &Data::ChatFilter::id);
-	if (i != end(list)
+	if ((id && i != end(list))
 		&& (!check
 			|| (i->flags() == filter.flags()
 				&& i->always() == filter.always()
@@ -301,6 +301,7 @@ void FilterRowButton::paintEvent(QPaintEvent *e) {
 		const auto icon = Ui::LookupFilterIcon(_icon).normal;
 
 		// For now.
+		auto hq = PainterHighQualityEnabler(p);
 		const auto iconWidth = icon->width() - style::ConvertScale(9);
 		const auto scale = st::settingsIconAdd.width() / float64(iconWidth);
 		p.translate(
@@ -326,6 +327,9 @@ void FilterRowButton::paintEvent(QPaintEvent *e) {
 	auto &lifetime = container->lifetime();
 
 	const auto session = &controller->session();
+	const auto limit = [=] {
+		return CurrentPremiumFiltersLimit(session);
+	};
 	AddSkip(container, st::settingsSectionSkip);
 	AddSubsectionTitle(container, tr::lng_filters_subtitle());
 
@@ -338,10 +342,10 @@ void FilterRowButton::paintEvent(QPaintEvent *e) {
 	};
 	const auto showLimitReached = [=] {
 		const auto removed = ranges::count_if(*rows, &FilterRow::removed);
-		if (rows->size() < kFiltersLimit + removed) {
+		if (rows->size() < limit() + removed) {
 			return false;
 		}
-		controller->window().showToast(tr::lng_filters_limit(tr::now));
+		controller->show(Box(FiltersLimitBox, session));
 		return true;
 	};
 	const auto wrap = container->add(object_ptr<Ui::VerticalLayout>(
@@ -416,7 +420,9 @@ void FilterRowButton::paintEvent(QPaintEvent *e) {
 	};
 	const auto &list = session->data().chatsFilters().list();
 	for (const auto &filter : list) {
-		addFilter(filter);
+		if (filter.id()) {
+			addFilter(filter);
+		}
 	}
 
 	AddButton(
@@ -485,8 +491,11 @@ void FilterRowButton::paintEvent(QPaintEvent *e) {
 
 	auto showSuggestions = rpl::combine(
 		suggested->value(),
-		rowsCount->value()
-	) | rpl::map(rpl::mappers::_1 > 0 && rpl::mappers::_2 < kFiltersLimit);
+		rowsCount->value(),
+		Data::AmPremiumValue(session)
+	) | rpl::map([limit](int suggested, int count, bool) {
+		return suggested > 0 && count < limit();
+	});
 	nonEmptyAbout->toggleOn(std::move(showSuggestions));
 
 	const auto prepareGoodIdsForNewFilters = [=] {
@@ -505,7 +514,8 @@ void FilterRowButton::paintEvent(QPaintEvent *e) {
 			const auto id = row.filter.id();
 			if (row.removed) {
 				continue;
-			} else if (!ranges::contains(list, id, &Data::ChatFilter::id)) {
+			} else if (!id
+				|| !ranges::contains(list, id, &Data::ChatFilter::id)) {
 				result.emplace(row.button, chooseNextId());
 			}
 		}
@@ -553,6 +563,19 @@ void FilterRowButton::paintEvent(QPaintEvent *e) {
 					: MTPDupdateDialogFilter::Flag::f_filter),
 				MTP_int(newId),
 				tl));
+		}
+		if (!ranges::contains(order, FilterId(0))) {
+			auto position = 0;
+			for (const auto &filter : list) {
+				const auto id = filter.id();
+				if (!id) {
+					break;
+				} else if (const auto i = ranges::find(order, id)
+					; i != order.end()) {
+					position = int(i - order.begin()) + 1;
+				}
+			}
+			order.insert(order.begin() + position, FilterId(0));
 		}
 		auto previousId = mtpRequestId(0);
 		auto &&requests = ranges::views::concat(removeRequests, addRequests);

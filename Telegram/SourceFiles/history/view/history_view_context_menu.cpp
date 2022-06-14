@@ -130,9 +130,10 @@ void ShowStickerPackInfo(
 }
 
 void ToggleFavedSticker(
+		not_null<Window::SessionController*> controller,
 		not_null<DocumentData*> document,
 		FullMsgId contextId) {
-	Api::ToggleFavedSticker(document, contextId);
+	Api::ToggleFavedSticker(controller, document, contextId);
 }
 
 void AddPhotoActions(
@@ -175,7 +176,11 @@ void SaveGif(
 	if (const auto item = controller->session().data().message(itemId)) {
 		if (const auto media = item->media()) {
 			if (const auto document = media->document()) {
-				Api::ToggleSavedGif(document, item->fullId(), true);
+				Api::ToggleSavedGif(
+					controller,
+					document,
+					item->fullId(),
+					true);
 			}
 		}
 	}
@@ -244,6 +249,7 @@ void AddDocumentActions(
 		}, &st::menuIconCancel);
 		return;
 	}
+	const auto controller = list->controller();
 	const auto contextId = item ? item->fullId() : FullMsgId();
 	const auto session = &document->session();
 	if (item && document->isGifv()) {
@@ -274,7 +280,7 @@ void AddDocumentActions(
 			(isFaved
 				? tr::lng_faved_stickers_remove(tr::now)
 				: tr::lng_faved_stickers_add(tr::now)),
-			[=] { ToggleFavedSticker(document, contextId); },
+			[=] { ToggleFavedSticker(controller, document, contextId); },
 			isFaved ? &st::menuIconUnfave : &st::menuIconFave);
 	}
 	if (!document->filepath(true).isEmpty()) {
@@ -320,11 +326,12 @@ void AddPostLinkAction(
 	const auto context = request.view
 		? request.view->context()
 		: Context::History;
+	const auto controller = request.navigation->parentController();
 	menu->addAction(
 		(item->history()->peer->isMegagroup()
 			? tr::lng_context_copy_message_link
 			: tr::lng_context_copy_post_link)(tr::now),
-		[=] { CopyPostLink(session, itemId, context); },
+		[=] { CopyPostLink(controller, itemId, context); },
 		&st::menuIconLink);
 }
 
@@ -1047,10 +1054,10 @@ base::unique_qptr<Ui::PopupMenu> FillContextMenu(
 }
 
 void CopyPostLink(
-		not_null<Main::Session*> session,
+		not_null<Window::SessionController*> controller,
 		FullMsgId itemId,
 		Context context) {
-	const auto item = session->data().message(itemId);
+	const auto item = controller->session().data().message(itemId);
 	if (!item || !item->hasDirectLink()) {
 		return;
 	}
@@ -1077,9 +1084,11 @@ void CopyPostLink(
 		return channel->hasUsername();
 	}();
 
-	Ui::Toast::Show(isPublicLink
-		? tr::lng_channel_public_link_copied(tr::now)
-		: tr::lng_context_about_private_link(tr::now));
+	Ui::Toast::Show(
+		Window::Show(controller).toastParent(),
+		isPublicLink
+			? tr::lng_channel_public_link_copied(tr::now)
+			: tr::lng_context_about_private_link(tr::now));
 }
 
 void AddPollActions(

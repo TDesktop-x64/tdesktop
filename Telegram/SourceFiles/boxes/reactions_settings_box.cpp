@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/reactions_settings_box.h"
 
 #include "base/unixtime.h"
+#include "data/data_user.h"
 #include "data/data_document.h"
 #include "data/data_document_media.h"
 #include "data/data_message_reactions.h"
@@ -19,12 +20,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_react_button.h" // DefaultIconFactory
 #include "lang/lang_keys.h"
 #include "lottie/lottie_icon.h"
+#include "boxes/premium_preview_box.h"
 #include "main/main_session.h"
 #include "settings/settings_common.h"
+#include "settings/settings_premium.h"
 #include "ui/chat/chat_style.h"
 #include "ui/chat/chat_theme.h"
 #include "ui/effects/scroll_content_shadow.h"
 #include "ui/layers/generic_box.h"
+#include "ui/toasts/common_toasts.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/labels.h"
 #include "ui/widgets/scroll_area.h"
@@ -418,11 +422,17 @@ void ReactionsSettingsBox(
 	};
 
 	auto firstCheckedButton = (Ui::RpWidget*)(nullptr);
+	const auto premiumPossible = controller->session().premiumPossible();
 	for (const auto &r : reactions.list(Data::Reactions::Type::Active)) {
 		const auto button = Settings::AddButton(
 			container,
 			rpl::single<QString>(base::duplicate(r.title)),
 			st::settingsButton);
+
+		const auto premium = r.premium;
+		if (premium && !premiumPossible) {
+			continue;
+		}
 
 		const auto iconSize = st::settingsReactionSize;
 		AddReactionLottieIcon(
@@ -443,6 +453,12 @@ void ReactionsSettingsBox(
 			&button->lifetime());
 
 		button->setClickedCallback([=, emoji = r.emoji] {
+			if (premium && !controller->session().premium()) {
+				ShowPremiumPreviewBox(
+					controller,
+					PremiumPreview::Reactions);
+				return;
+			}
 			checkButton(button);
 			state->selectedEmoji = emoji;
 		});

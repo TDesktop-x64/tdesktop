@@ -16,6 +16,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/options.h"
 #include "core/application.h"
 #include "chat_helpers/tabbed_panel.h"
+#include "dialogs/dialogs_inner_widget.h"
+#include "history/history_widget.h"
 #include "lang/lang_keys.h"
 #include "media/player/media_player_instance.h"
 #include "webview/webview_embed.h"
@@ -133,10 +135,12 @@ void SetupExperimental(
 
 	addToggle(ChatHelpers::kOptionTabbedPanelShowOnClick);
 	addToggle(Window::kOptionViewProfileInChatsListContextMenu);
+	addToggle(Dialogs::kOptionCtrlClickChatNewWindow);
 	addToggle(Ui::GL::kOptionAllowLinuxNvidiaOpenGL);
 	addToggle(Media::Player::kOptionDisableAutoplayNext);
 	addToggle(Settings::kOptionMonoSettingsIcons);
 	addToggle(Webview::kOptionWebviewDebugEnabled);
+	addToggle(kOptionAutoScrollInactiveChat);
 }
 
 } // namespace

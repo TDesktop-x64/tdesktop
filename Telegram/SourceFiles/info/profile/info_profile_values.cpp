@@ -26,6 +26,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_user.h"
 #include "data/data_session.h"
 #include "boxes/peers/edit_peer_permissions_box.h"
+#include "boxes/premium_limits_box.h"
 #include "base/unixtime.h"
 
 namespace Info {
@@ -129,6 +130,7 @@ TextWithEntities AboutWithEntities(
 	auto flags = TextParseLinks | TextParseMentions;
 	const auto user = peer->asUser();
 	const auto isBot = user && user->isBot();
+	const auto isPremium = user && user->isPremium();
 	if (!user) {
 		flags |= TextParseHashtags;
 	} else if (isBot) {
@@ -136,7 +138,14 @@ TextWithEntities AboutWithEntities(
 	}
 	const auto stripExternal = peer->isChat()
 		|| peer->isMegagroup()
-		|| (user && !isBot);
+		|| (user && !isBot && !isPremium);
+	const auto limit = AppConfigLimit(
+		&peer->session(),
+		"about_length_limit_default",
+		70);
+	const auto used = (!user || isPremium || value.size() <= limit)
+		? value
+		: value.mid(0, limit) + "...";
 	auto result = TextWithEntities{ value };
 	TextUtilities::ParseEntities(result, flags);
 //	if (stripExternal) {
@@ -470,12 +479,16 @@ rpl::producer<int> AllowedReactionsCountValue(not_null<PeerData*> peer) {
 
 template <typename Flag, typename Peer>
 rpl::producer<Badge> BadgeValueFromFlags(Peer peer) {
-	return Data::PeerFlagsValue(
-		peer,
-		Flag::Verified | Flag::Scam | Flag::Fake
-	) | rpl::map([=](base::flags<Flag> value) {
+	return rpl::combine(
+		Data::PeerFlagsValue(
+			peer,
+			Flag::Verified | Flag::Scam | Flag::Fake),
+		Data::PeerPremiumValue(peer)
+	) | rpl::map([=](base::flags<Flag> value, bool premium) {
 		return (value & Flag::Verified)
 			? Badge::Verified
+			: premium
+			? Badge::Premium
 			: (value & Flag::Scam)
 			? Badge::Scam
 			: (value & Flag::Fake)

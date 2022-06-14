@@ -1661,6 +1661,7 @@ ClickHandlerPtr Message::createGoToCommentsLink() const {
 			if (const auto channel = history->peer->asChannel()) {
 				if (channel->invitePeekExpires()) {
 					Ui::Toast::Show(
+						Window::Show(controller).toastParent(),
 						tr::lng_channel_invite_private(tr::now));
 					return;
 				}
@@ -3086,10 +3087,6 @@ void Message::refreshInfoSkipBlock() {
 		item->_textWidth = -1;
 		item->_textHeight = 0;
 	}
-}
-
-bool Message::displayEditedBadge() const {
-	return (displayedEditDate() != TimeId(0));
 }
 
 TimeId Message::displayedEditDate() const {

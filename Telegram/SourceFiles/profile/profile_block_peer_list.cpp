@@ -110,8 +110,7 @@ void PeerListWidget::paintItem(Painter &p, int x, int y, Item *item, bool select
 		p.setPen(st::windowActiveTextFg);
 		p.drawTextLeft(nameLeft + nameWidth - _removeWidth, nameTop, width(), _removeText, _removeWidth);
 		nameWidth -= _removeWidth + skip;
-	}
-	if (item->adminState != Item::AdminState::None) {
+	} else if (item->rank) {
 		p.setFont(st::normalFont);
 		p.setPen(selected ? _st.statusFgOver : _st.statusFg);
 		p.drawTextLeft(nameLeft + nameWidth - item->adminTitleWidth, nameTop, width(), item->adminTitle, item->adminTitleWidth);

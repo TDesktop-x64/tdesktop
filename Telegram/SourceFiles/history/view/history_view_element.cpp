@@ -124,9 +124,9 @@ bool SimpleElementDelegate::elementUnderCursor(
 	return false;
 }
 
-crl::time SimpleElementDelegate::elementHighlightTime(
-		not_null<const HistoryItem*> item) {
-	return crl::time(0);
+float64 SimpleElementDelegate::elementHighlightOpacity(
+		not_null<const HistoryItem*> item) const {
+	return 0.;
 }
 
 bool SimpleElementDelegate::elementInSelectionMode() {
@@ -202,6 +202,15 @@ void SimpleElementDelegate::elementReplyTo(const FullMsgId &to) {
 }
 
 void SimpleElementDelegate::elementStartInteraction(
+	not_null<const Element*> view) {
+}
+
+void SimpleElementDelegate::elementStartPremium(
+	not_null<const Element*> view,
+	Element *replacing) {
+}
+
+void SimpleElementDelegate::elementCancelPremium(
 	not_null<const Element*> view) {
 }
 
@@ -406,6 +415,19 @@ void Element::setY(int y) {
 void Element::refreshDataIdHook() {
 }
 
+//void Element::externalLottieProgressing(bool external) const {
+//	if (const auto media = _media.get()) {
+//		media->externalLottieProgressing(external);
+//	}
+//}
+//
+//bool Element::externalLottieTill(ExternalLottieInfo info) const {
+//	if (const auto media = _media.get()) {
+//		return media->externalLottieTill(info);
+//	}
+//	return true;
+//}
+
 void Element::repaint() const {
 	history()->owner().requestViewRepaint(this);
 }
@@ -423,26 +445,13 @@ void Element::paintHighlight(
 	paintCustomHighlight(p, context, skiptop, fillheight, data());
 }
 
-float64 Element::highlightOpacity(not_null<const HistoryItem*> item) const {
-	const auto animms = delegate()->elementHighlightTime(item);
-	if (!animms
-		|| animms >= st::activeFadeInDuration + st::activeFadeOutDuration) {
-		return 0.;
-	}
-
-	return (animms > st::activeFadeInDuration)
-		? (1. - (animms - st::activeFadeInDuration)
-			/ float64(st::activeFadeOutDuration))
-		: (animms / float64(st::activeFadeInDuration));
-}
-
 void Element::paintCustomHighlight(
 		Painter &p,
 		const PaintContext &context,
 		int y,
 		int height,
 		not_null<const HistoryItem*> item) const {
-	const auto opacity = highlightOpacity(item);
+	const auto opacity = delegate()->elementHighlightOpacity(item);
 	if (opacity == 0.) {
 		return;
 	}
@@ -546,12 +555,14 @@ void Element::refreshMedia(Element *replacing) {
 		&& Core::App().settings().largeEmoji()) {
 		const auto emoji = _data->isolatedEmoji();
 		const auto emojiStickers = &session->emojiStickersPack();
+		const auto skipPremiumEffect = false;
 		if (const auto sticker = emojiStickers->stickerForEmoji(emoji)) {
 			_media = std::make_unique<UnwrappedMedia>(
 				this,
 				std::make_unique<Sticker>(
 					this,
 					sticker.document,
+					skipPremiumEffect,
 					replacing,
 					sticker.replacements));
 		} else {
@@ -674,10 +685,7 @@ ClickHandlerPtr Element::fromLink() const {
 			return imported;
 		}
 	}
-	static const auto hidden = std::make_shared<LambdaClickHandler>([] {
-		Ui::Toast::Show(tr::lng_forwarded_hidden(tr::now));
-	});
-	_fromLink = hidden;
+	_fromLink = HiddenSenderInfo::ForwardClickHandler();
 	return _fromLink;
 }
 
@@ -859,10 +867,6 @@ void Element::drawRightAction(
 
 ClickHandlerPtr Element::rightActionLink() const {
 	return ClickHandlerPtr();
-}
-
-bool Element::displayEditedBadge() const {
-	return false;
 }
 
 TimeId Element::displayedEditDate() const {

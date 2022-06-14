@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_sending.h"
 #include "data/data_document.h"
 #include "data/data_session.h"
+#include "data/data_user.h"
 #include "core/file_utilities.h"
 #include "core/mime_type.h"
 #include "base/unixtime.h"
@@ -91,8 +92,8 @@ struct PreparedFileThumbnail {
 
 [[nodiscard]] bool FileThumbnailUploadRequired(
 		const QString &filemime,
-		int32 filesize) {
-	constexpr auto kThumbnailUploadBySize = 5 * 1024 * 1024;
+		int64 filesize) {
+	constexpr auto kThumbnailUploadBySize = 5 * int64(1024 * 1024);
 	const auto kThumbnailKnownMimes = {
 		"image/jpeg",
 		"image/gif",
@@ -108,7 +109,7 @@ struct PreparedFileThumbnail {
 [[nodiscard]] PreparedFileThumbnail FinalizeFileThumbnail(
 		PreparedFileThumbnail &&prepared,
 		const QString &filemime,
-		int32 filesize,
+		int64 filesize,
 		bool isSticker) {
 	prepared.name = isSticker ? qsl("thumb.webp") : qsl("thumb.jpg");
 	if (FileThumbnailUploadRequired(filemime, filesize)) {
@@ -249,7 +250,7 @@ SendMediaReady::SendMediaReady(
 	SendMediaType type,
 	const QString &file,
 	const QString &filename,
-	int32 filesize,
+	int64 filesize,
 	const QByteArray &data,
 	const uint64 &id,
 	const uint64 &thumbId,
@@ -842,9 +843,9 @@ void FileLoadTask::process(Args &&args) {
 			fullimagebytes = fullimageformat = QByteArray();
 		}
 	}
-	_result->filesize = (int32)qMin(filesize, qint64(INT_MAX));
+	_result->filesize = qMin(filesize, qint64(UINT_MAX));
 
-	if (!filesize || filesize > kFileSizeLimit) {
+	if (!filesize || filesize > kFileSizePremiumLimit) {
 		return;
 	}
 
@@ -987,7 +988,7 @@ void FileLoadTask::process(Args &&args) {
 			MTP_bytes(),
 			MTP_int(base::unixtime::now()),
 			MTP_string(filemime),
-			MTP_int(filesize),
+			MTP_long(filesize),
 			MTP_vector<MTPPhotoSize>(1, thumbnail.mtpSize),
 			MTPVector<MTPVideoSize>(),
 			MTP_int(_dcId),
@@ -1000,7 +1001,7 @@ void FileLoadTask::process(Args &&args) {
 			MTP_bytes(),
 			MTP_int(base::unixtime::now()),
 			MTP_string(filemime),
-			MTP_int(filesize),
+			MTP_long(filesize),
 			MTP_vector<MTPPhotoSize>(1, thumbnail.mtpSize),
 			MTPVector<MTPVideoSize>(),
 			MTP_int(_dcId),
@@ -1042,19 +1043,30 @@ void FileLoadTask::process(Args &&args) {
 }
 
 void FileLoadTask::finish() {
+	const auto session = _session.get();
+	if (!session) {
+		return;
+	}
+	const auto premium = session->user()->isPremium();
 	if (!_result || !_result->filesize || _result->filesize < 0) {
 		Ui::show(
 			Ui::MakeInformBox(
 				tr::lng_send_image_empty(tr::now, lt_name, _filepath)),
 			Ui::LayerOption::KeepOther);
 		removeFromAlbum();
-	} else if (_result->filesize > kFileSizeLimit) {
+	} else if (_result->filesize > kFileSizePremiumLimit) {
 		Ui::show(
 			Ui::MakeInformBox(
 				tr::lng_send_image_too_large(tr::now, lt_name, _filepath)),
 			Ui::LayerOption::KeepOther);
 		removeFromAlbum();
-	} else if (const auto session = _session.get()) {
+	} else if (_result->filesize > kFileSizeLimit && !premium) {
+		Ui::show(
+			Ui::MakeInformBox(
+				tr::lng_send_image_too_large(tr::now, lt_name, _filepath)),
+			Ui::LayerOption::KeepOther);
+		removeFromAlbum();
+	} else {
 		Api::SendConfirmedFile(session, _result);
 	}
 }

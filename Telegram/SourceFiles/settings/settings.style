@@ -93,6 +93,15 @@ settingsIconPin: icon {{ "settings/pin", settingsIconFg }};
 settingsIconDownload: icon {{ "settings/download", settingsIconFg }};
 settingsIconMention: icon {{ "settings/mention", settingsIconFg }};
 
+settingsPremiumIconChannelsOff: icon {{ "settings/premium/channels_off", settingsIconFg }};
+settingsPremiumIconDouble: icon {{ "settings/premium/double", settingsIconFg }};
+settingsPremiumIconLike: icon {{ "settings/premium/like", settingsIconFg }};
+settingsPremiumIconPlay: icon {{ "settings/premium/play", settingsIconFg }};
+settingsPremiumIconSpeed: icon {{ "settings/premium/speed", settingsIconFg }};
+settingsPremiumIconStar: icon {{ "settings/premium/star", settingsIconFg }};
+settingsPremiumIconVoice: icon {{ "settings/premium/voice", settingsIconFg }};
+settingsPremiumIconFiles: icon {{ "settings/premium/files", settingsIconFg }};
+
 settingsIconAdd: icon {{ "settings/add", windowFgActive }};
 settingsIconRemove: icon {{ "settings/remove", windowFgActive }};
 
@@ -411,3 +420,52 @@ notifyPreviewTitlePosition: point(64px, 9px);
 notifyPreviewTextPosition: point(64px, 30px);
 notifyPreviewChecksSkip: 12px;
 notifyPreviewBottomSkip: 9px;
+
+settingsPremiumButtonPadding: margins(11px, 11px, 11px, 3px);
+settingsPremiumTopBarBackIcon: icon {{ "info/info_back", premiumButtonFg }};
+settingsPremiumTopBarBackIconOver: icon {{ "info/info_back", premiumButtonFg }};
+settingsPremiumStarSize: size(77px, 73px);
+settingsPremiumStarTopSkip: 42px;
+settingsPremiumTopBarBack: IconButton(infoTopBarBack) {
+	icon: settingsPremiumTopBarBackIcon;
+	iconOver: settingsPremiumTopBarBackIconOver;
+	ripple: RippleAnimation(defaultRippleAnimation) {
+		color: shadowFg;
+	}
+}
+settingsPremiumLayerTopBarBack: IconButton(infoLayerTopBarBack) {
+	icon: settingsPremiumTopBarBackIcon;
+	iconOver: settingsPremiumTopBarBackIcon;
+	ripple: RippleAnimation(defaultRippleAnimation) {
+		color: shadowFg;
+	}
+}
+settingsPremiumTopBarClose: IconButton(infoTopBarClose) {
+	icon: icon {{ "info/info_close", premiumButtonFg }};
+	iconOver: icon {{ "info/info_close", premiumButtonFg }};
+	ripple: RippleAnimation(defaultRippleAnimation) {
+		color: shadowFg;
+	}
+}
+settingsPremiumRowTitlePadding: margins(60px, 5px, 46px, 3px);
+settingsPremiumRowAboutPadding: margins(60px, 0px, 46px, 6px);
+settingsPremiumPreviewTitlePadding: margins(24px, 13px, 24px, 3px);
+settingsPremiumPreviewAboutPadding: margins(24px, 0px, 24px, 11px);
+settingsPremiumPreviewLinePadding: margins(18px, 0px, 18px, 8px);
+
+settingsPremiumTitlePadding: margins(0px, 20px, 0px, 16px);
+settingsPremiumAbout: FlatLabel(defaultFlatLabel) {
+	style: TextStyle(defaultTextStyle) {
+		font: font(12px);
+		linkFont: font(12px underline);
+		linkFontOver: font(12px underline);
+		lineHeight: 18px;
+	}
+	palette: TextPalette(defaultTextPalette) {
+		linkFg: premiumButtonFg;
+	}
+	align: align(top);
+	textFg: premiumButtonFg;
+	minWidth: 190px;
+}
+settingsPremiumStatusPadding: margins(22px, 8px, 22px, 2px);

@@ -301,20 +301,32 @@ infoProfileNameLabel: FlatLabel(infoProfileStatusLabel) {
 }
 infoVerifiedCheckPosition: point(10px, 2px);
 infoVerifiedCheck: icon {
-	{ "profile_verified_star", profileVerifiedCheckBg, point(0px, 0px) },
-	{ "profile_verified_check", profileVerifiedCheckFg, point(4px, 4px) }
+	{ "profile_verified_star", profileVerifiedCheckBg },
+	{ "profile_verified_check", profileVerifiedCheckFg }
 };
+infoPremiumStar: icon {{ "profile_premium", profileVerifiedCheckBg }};
+
+infoIconFg: windowBoldFg;
 
 infoProfileSkip: 7px;
 
 infoProfileLabeledPadding: margins(79px, 9px, 30px, 7px);
+infoProfileLabeledUsernamePadding: margins(79px, 9px, 20px, 7px);
 infoProfileSeparatorPadding: margins(
 	77px,
 	infoProfileSkip,
 	0px,
 	infoProfileSkip);
+infoProfileLabeledButtonCopy: IconButton(defaultIconButton) {
+	width: 34px;
+	height: 34px;
+	icon: icon {{ "menu/copy", infoIconFg }};
+	iconOver: icon {{ "menu/copy", infoIconFg }};
+	rippleAreaPosition: point(0px, 0px);
+	rippleAreaSize: 34px;
+	ripple: defaultRippleAnimation;
+}
 
-infoIconFg: windowBoldFg;
 infoIconInformation: icon {{ "info/info_information", infoIconFg }};
 infoIconAddMember: icon {{ "info/info_add_member", infoIconFg }};
 infoIconNotifications: icon {{ "info/info_notifications", infoIconFg }};
@@ -470,37 +482,6 @@ infoChannelsAddChannel: IconButton(infoMembersButton) {
 	icon: icon {{ "settings/settings_edit_name", menuIconFg, point(9px, 9px) }};
 	iconOver: icon {{ "settings/settings_edit_name", menuIconFgOver, point(9px, 9px) }};
 }
-
-infoMembersCreatorIcon: icon {{
-	"profile_admin_star",
-	profileAdminStartFg,
-	point(4px, 3px)
-}};
-infoMembersCreatorIconOver: icon {{
-	"profile_admin_star",
-	profileAdminStarFgOver,
-	point(4px, 3px)
-}};
-infoMembersAdminIcon: icon {{
-	"profile_admin_star",
-	profileOtherAdminStarFg,
-	point(4px, 3px)
-}};
-infoMembersAdminIconOver: icon {{
-	"profile_admin_star",
-	profileOtherAdminStarFgOver,
-	point(4px, 3px)
-}};
-infoMembersRemoveIcon: icon {{
-	"simple_close",
-	menuIconFg
-}};
-infoMembersRemoveIconOver: icon {{
-	"simple_close",
-	menuIconFgOver
-}};
-infoMembersAdminIconMarigns: margins(10px, 18px, 10px, 10px);
-infoMembersRemoveIconMargins: margins(10px, 12px, 12px, 10px);
 
 infoMediaHeaderStyle: TextStyle(semiboldTextStyle) {
 }

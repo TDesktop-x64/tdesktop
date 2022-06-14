@@ -399,7 +399,7 @@ if customRunCommand:
 stage('patches', """
     git clone https://github.com/desktop-app/patches.git
     cd patches
-    git checkout 22629a5df5
+    git checkout 4a5c759f8f
 """)
 
 stage('depot_tools', """
@@ -739,9 +739,11 @@ depends:yasm/yasm
     --enable-decoder=aac_fixed \
     --enable-decoder=aac_latm \
     --enable-decoder=aasc \
+    --enable-decoder=ac3 \
     --enable-decoder=alac \
     --enable-decoder=alac_at \
     --enable-decoder=av1 \
+    --enable-decoder=eac3 \
     --enable-decoder=flac \
     --enable-decoder=gif \
     --enable-decoder=h264 \
@@ -1130,30 +1132,30 @@ release:
 """)
 
 if buildQt5:
-    stage('qt_5_15_3', """
-    git clone https://code.qt.io/qt/qt5.git qt_5_15_3
-    cd qt_5_15_3
+    stage('qt_5_15_4', """
+    git clone https://code.qt.io/qt/qt5.git qt_5_15_4
+    cd qt_5_15_4
     perl init-repository --module-subset=qtbase,qtimageformats,qtsvg
-    git checkout v5.15.3-lts-lgpl
+    git checkout v5.15.4-lts-lgpl
     git submodule update qtbase qtimageformats qtsvg
-depends:patches/qtbase_5_15_3/*.patch
+depends:patches/qtbase_5_15_4/*.patch
     cd qtbase
 win:
-    for /r %%i in (..\\..\\patches\\qtbase_5_15_3\\*) do git apply %%i
+    for /r %%i in (..\\..\\patches\\qtbase_5_15_4\\*) do git apply %%i
     cd ..
 
     SET CONFIGURATIONS=-debug
 release:
     SET CONFIGURATIONS=-debug-and-release
 win:
-    """ + removeDir("\"%LIBS_DIR%\\Qt-5.15.3\"") + """
+    """ + removeDir("\"%LIBS_DIR%\\Qt-5.15.4\"") + """
     SET ANGLE_DIR=%LIBS_DIR%\\tg_angle
     SET ANGLE_LIBS_DIR=%ANGLE_DIR%\\out
     SET MOZJPEG_DIR=%LIBS_DIR%\\mozjpeg
     SET OPENSSL_DIR=%LIBS_DIR%\\openssl
     SET OPENSSL_LIBS_DIR=%OPENSSL_DIR%\\out
     SET ZLIB_LIBS_DIR=%LIBS_DIR%\\zlib\\contrib\\vstudio\\vc14\\%X8664%
-    configure -prefix "%LIBS_DIR%\\Qt-5.15.3" ^
+    configure -prefix "%LIBS_DIR%\\Qt-5.15.4" ^
         %CONFIGURATIONS% ^
         -force-debug-info ^
         -opensource ^
@@ -1184,14 +1186,14 @@ win:
     jom -j16
     jom -j16 install
 mac:
-    find ../../patches/qtbase_5_15_3 -type f -print0 | sort -z | xargs -0 git apply
+    find ../../patches/qtbase_5_15_4 -type f -print0 | sort -z | xargs -0 git apply
     cd ..
 
     CONFIGURATIONS=-debug
 release:
     CONFIGURATIONS=-debug-and-release
 mac:
-    ./configure -prefix "$USED_PREFIX/Qt-5.15.3" \
+    ./configure -prefix "$USED_PREFIX/Qt-5.15.4" \
         $CONFIGURATIONS \
         -force-debug-info \
         -opensource \

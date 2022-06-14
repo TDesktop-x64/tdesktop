@@ -75,6 +75,9 @@ public:
 	void activate();
 
 	[[nodiscard]] QRect desktopRect() const;
+	[[nodiscard]] Core::WindowPosition withScreenInPosition(
+		Core::WindowPosition position) const;
+	[[nodiscard]] static Core::WindowPosition SecondaryInitPosition();
 
 	void init();
 
@@ -144,9 +147,6 @@ protected:
 	void handleVisibleChanged(bool visible);
 
 	virtual void initHook() {
-	}
-
-	virtual void activeChangedHook() {
 	}
 
 	virtual void handleVisibleChangedHook(bool visible) {

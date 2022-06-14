@@ -7,15 +7,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "core/core_settings.h"
 #include "mtproto/mtproto_auth_key.h"
 #include "mtproto/mtproto_proxy_data.h"
 #include "base/timer.h"
 
-class MainWindow;
-class MainWidget;
-class FileUploader;
-class Translator;
+class History;
 
 namespace Platform {
 class Integration;
@@ -69,6 +65,7 @@ class Instance;
 } // namespace Audio
 namespace View {
 class OverlayWidget;
+struct OpenRequest;
 } // namespace View
 namespace Player {
 class FloatController;
@@ -103,6 +100,7 @@ namespace Core {
 
 class Launcher;
 struct LocalUrlHandler;
+class Settings;
 class Tray;
 
 enum class LaunchState {
@@ -162,15 +160,17 @@ public:
 	Window::Controller *ensureSeparateWindowForPeer(
 		not_null<PeerData*> peer,
 		MsgId showAtMsgId);
+	void closeWindow(not_null<Window::Controller*> window);
+	void windowActivated(not_null<Window::Controller*> window);
 	bool closeActiveWindow();
 	bool minimizeActiveWindow();
 	[[nodiscard]] QWidget *getFileDialogParent();
 	void notifyFileDialogShown(bool shown);
 	void checkSystemDarkMode();
 	[[nodiscard]] bool isActiveForTrayMenu() const;
+	void closeChatFromWindows(not_null<PeerData*> peer);
 
 	// Media view interface.
-	void checkMediaViewActivation();
 	bool hideMediaView();
 
 	[[nodiscard]] QPoint getPointForCallPanelCenter() const;
@@ -207,7 +207,7 @@ public:
 	[[nodiscard]] bool exportPreventsQuit();
 
 	// Main::Session component.
-	Main::Session *maybeActiveSession() const;
+	Main::Session *maybePrimarySession() const;
 	[[nodiscard]] int unreadBadge() const;
 	[[nodiscard]] bool unreadBadgeMuted() const;
 	[[nodiscard]] rpl::producer<> unreadBadgeChanges() const;
@@ -323,6 +323,10 @@ private:
 	void startSystemDarkModeViewer();
 	void startTray();
 
+	void enumerateWindows(
+		Fn<void(not_null<Window::Controller*>)> callback) const;
+	void processSecondaryWindow(not_null<Window::Controller*> window);
+
 	friend void QuitAttempt();
 	void quitDelayed();
 	[[nodiscard]] bool readyToQuit();
@@ -401,6 +405,8 @@ private:
 		QPointer<QObject> filter;
 	};
 	base::flat_map<not_null<QWidget*>, LeaveFilter> _leaveFilters;
+
+	rpl::event_stream<Media::View::OpenRequest> _openInMediaViewRequests;
 
 	rpl::lifetime _lifetime;
 

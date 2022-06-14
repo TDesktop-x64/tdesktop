@@ -37,6 +37,8 @@ public:
 		Ui::Text::String name;
 		QString statusText;
 		bool statusHasOnlineColor = false;
+		std::optional<QString> rank;
+		int rankWidth = 0;
 		enum class AdminState {
 			None,
 			Admin,

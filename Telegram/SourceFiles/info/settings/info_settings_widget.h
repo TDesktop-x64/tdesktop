@@ -21,6 +21,11 @@ using Type = Section::SettingsType;
 
 struct Tag;
 
+struct SectionCustomTopBarData {
+	rpl::producer<> backButtonEnables;
+	rpl::producer<Info::Wrap> wrapValue;
+};
+
 class Memento final : public ContentMemento {
 public:
 	Memento(not_null<UserData*> self, Type type);
@@ -67,10 +72,13 @@ public:
 
 	void showFinished() override;
 	void setInnerFocus() override;
+	const Ui::RoundRect *bottomSkipRounding() const override;
 
 	rpl::producer<bool> desiredShadowVisibility() const override;
 
 	rpl::producer<QString> title() override;
+
+	void enableBackButton() override;
 
 private:
 	void saveState(not_null<Memento*> memento);
@@ -81,6 +89,11 @@ private:
 	not_null<UserData*> _self;
 	Type _type = Type();
 
+	struct {
+		rpl::event_stream<int> contentHeightValue;
+		rpl::event_stream<int> fillerWidthValue;
+		rpl::event_stream<> backButtonEnables;
+	} _flexibleScroll;
 	not_null<::Settings::AbstractSection*> _inner;
 	QPointer<Ui::RpWidget> _pinnedToTop;
 	QPointer<Ui::RpWidget> _pinnedToBottom;

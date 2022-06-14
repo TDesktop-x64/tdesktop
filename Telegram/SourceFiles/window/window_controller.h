@@ -83,6 +83,7 @@ public:
 
 	void showRightColumn(object_ptr<TWidget> widget);
 
+	void hideLayer(anim::type animated = anim::type::normal);
 	void hideSettingsAndLayer(anim::type animated = anim::type::normal);
 
 	void activate();
@@ -97,6 +98,7 @@ public:
 
 	void invokeForSessionController(
 		not_null<Main::Account*> account,
+		PeerData *singlePeer,
 		Fn<void(not_null<SessionController*>)> &&callback);
 
 	void openInMediaView(Media::View::OpenRequest &&request);

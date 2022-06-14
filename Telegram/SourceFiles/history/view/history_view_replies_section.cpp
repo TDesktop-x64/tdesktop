@@ -42,6 +42,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/delete_messages_box.h"
 #include "boxes/edit_caption_box.h"
 #include "boxes/send_files_box.h"
+#include "boxes/premium_limits_box.h"
 #include "window/window_adaptive.h"
 #include "window/window_session_controller.h"
 #include "window/window_peer_menu.h"
@@ -243,7 +244,9 @@ RepliesWidget::RepliesWidget(
 	}, lifetime());
 
 	_inner->editMessageRequested(
-	) | rpl::start_with_next([=](auto fullId) {
+	) | rpl::filter([=] {
+		return !_joinGroup;
+	}) | rpl::start_with_next([=](auto fullId) {
 		if (const auto item = session().data().message(fullId)) {
 			const auto media = item->media();
 			if (media && !media->webpage()) {
@@ -257,7 +260,9 @@ RepliesWidget::RepliesWidget(
 	}, _inner->lifetime());
 
 	_inner->replyToMessageRequested(
-	) | rpl::start_with_next([=](auto fullId) {
+	) | rpl::filter([=] {
+		return !_joinGroup;
+	}) | rpl::start_with_next([=](auto fullId) {
 		replyToMessage(fullId);
 	}, _inner->lifetime());
 
@@ -489,13 +494,20 @@ void RepliesWidget::setupComposeControls() {
 			std::move(hasSendingMessage),
 			_1 && _2);
 
-	auto writeRestriction = session().changes().peerFlagsValue(
-		_history->peer,
-		Data::PeerUpdate::Flag::Rights
+	auto writeRestriction = rpl::combine(
+		session().changes().peerFlagsValue(
+			_history->peer,
+			Data::PeerUpdate::Flag::Rights),
+		Data::CanWriteValue(_history->peer)
 	) | rpl::map([=] {
-		return Data::RestrictionError(
+		const auto restriction = Data::RestrictionError(
 			_history->peer,
 			ChatRestriction::SendMessages);
+		return restriction
+			? restriction
+			: _history->peer->canWrite()
+			? std::optional<QString>()
+			: tr::lng_group_not_accessible(tr::now);
 	});
 
 	_composeControls->setHistory({
@@ -507,7 +519,9 @@ void RepliesWidget::setupComposeControls() {
 	});
 
 	_composeControls->height(
-	) | rpl::start_with_next([=] {
+	) | rpl::filter([=] {
+		return !_joinGroup;
+	}) | rpl::start_with_next([=] {
 		const auto wasMax = (_scroll->scrollTopMax() == _scroll->scrollTop());
 		updateControlsGeometry();
 		if (wasMax) {
@@ -629,6 +643,20 @@ void RepliesWidget::setupComposeControls() {
 	}, lifetime());
 
 	_composeControls->finishAnimating();
+
+	if (const auto channel = _history->peer->asChannel()) {
+		channel->updateFull();
+		if (!channel->isBroadcast()) {
+			rpl::combine(
+				Data::CanWriteValue(channel),
+				channel->flagsValue()
+			) | rpl::start_with_next([=] {
+				refreshJoinGroupButton();
+			}, lifetime());
+		} else {
+			refreshJoinGroupButton();
+		}
+	}
 }
 
 void RepliesWidget::chooseAttach() {
@@ -662,9 +690,11 @@ void RepliesWidget::chooseAttach() {
 				uploadFile(result.remoteContent, SendMediaType::File);
 			}
 		} else {
+			const auto premium = controller()->session().user()->isPremium();
 			auto list = Storage::PrepareMediaList(
 				result.paths,
-				st::sendMediaPreviewSize);
+				st::sendMediaPreviewSize,
+				premium);
 			confirmSendingFiles(std::move(list));
 		}
 	}), nullptr);
@@ -675,11 +705,13 @@ bool RepliesWidget::confirmSendingFiles(
 		std::optional<bool> overrideSendImagesAsPhotos,
 		const QString &insertTextOnCancel) {
 	const auto hasImage = data->hasImage();
+	const auto premium = controller()->session().user()->isPremium();
 
 	if (const auto urls = data->urls(); !urls.empty()) {
 		auto list = Storage::PrepareMediaList(
 			urls,
-			st::sendMediaPreviewSize);
+			st::sendMediaPreviewSize,
+			premium);
 		if (list.error != Ui::PreparedList::Error::NonLocalUrl) {
 			if (list.error == Ui::PreparedList::Error::None
 				|| !hasImage) {
@@ -921,11 +953,16 @@ bool RepliesWidget::showSendingFilesError(
 			tr::now,
 			lt_name,
 			list.errorData);
+		case Error::PremiumRequired: return u"(premium)"_q;
 		}
 		return tr::lng_forward_send_files_cant(tr::now);
 	}();
 	if (text.isEmpty()) {
 		return false;
+	} else if (text == u"(premium)"_q) {
+		const auto fileSize = list.files.back().size;
+		controller()->show(Box(FileSizeLimitBox, &session(), fileSize));
+		return true;
 	}
 
 	Ui::ShowMultilineToast({
@@ -1078,6 +1115,47 @@ void RepliesWidget::edit(
 	doSetInnerFocus();
 }
 
+void RepliesWidget::refreshJoinGroupButton() {
+	const auto set = [&](std::unique_ptr<Ui::FlatButton> button) {
+		if (!button && !_joinGroup) {
+			return;
+		}
+		const auto atMax = (_scroll->scrollTopMax() == _scroll->scrollTop());
+		_joinGroup = std::move(button);
+		if (!animatingShow()) {
+			if (button) {
+				button->show();
+				_composeControls->hide();
+			} else {
+				_composeControls->show();
+			}
+		}
+		updateControlsGeometry();
+		if (atMax) {
+			listScrollTo(_scroll->scrollTopMax());
+		}
+	};
+	const auto channel = _history->peer->asChannel();
+	if (channel->amIn() || !channel->joinToWrite() || channel->amCreator()) {
+		set(nullptr);
+	} else {
+		if (!_joinGroup) {
+			set(std::make_unique<Ui::FlatButton>(
+				this,
+				QString(),
+				st::historyComposeButton));
+			_joinGroup->setClickedCallback([=] {
+				session().api().joinChannel(channel);
+			});
+		}
+		_joinGroup->setText((channel->isBroadcast()
+			? tr::lng_profile_join_channel(tr::now)
+			: (channel->requestToJoin() && !channel->amCreator())
+			? tr::lng_profile_apply_to_join_group(tr::now)
+			: tr::lng_profile_join_group(tr::now)).toUpper());
+	}
+}
+
 void RepliesWidget::sendExistingDocument(
 		not_null<DocumentData*> document) {
 	sendExistingDocument(document, {}, std::nullopt);
@@ -1102,7 +1180,8 @@ bool RepliesWidget::sendExistingDocument(
 			Ui::MakeInformBox(*error),
 			Ui::LayerOption::KeepOther);
 		return false;
-	} else if (showSlowmodeError()) {
+	} else if (showSlowmodeError()
+		|| ShowSendPremiumError(controller(), document)) {
 		return false;
 	}
 
@@ -1441,7 +1520,11 @@ bool RepliesWidget::preventsClose(Fn<void()> &&continueCallback) const {
 QPixmap RepliesWidget::grabForShowAnimation(const Window::SectionSlideParams &params) {
 	_topBar->updateControlsVisibility();
 	if (params.withTopBarShadow) _topBarShadow->hide();
-	_composeControls->showForGrab();
+	if (_joinGroup) {
+		_composeControls->hide();
+	} else {
+		_composeControls->showForGrab();
+	}
 	auto result = Ui::GrabWidget(this);
 	if (params.withTopBarShadow) _topBarShadow->show();
 	_rootView->hide();
@@ -1519,9 +1602,7 @@ bool RepliesWidget::showMessage(
 		}
 		return nullptr;
 	}();
-	showAtPosition(
-		Data::MessagePosition{ .fullId = id, .date = message->date() },
-		originItem);
+	showAtPosition(message->position(), originItem);
 	return true;
 }
 
@@ -1616,7 +1697,9 @@ void RepliesWidget::updateControlsGeometry() {
 	_rootView->resizeToWidth(contentWidth);
 
 	const auto bottom = height();
-	const auto controlsHeight = _composeControls->heightCurrent();
+	const auto controlsHeight = _joinGroup
+		? _joinGroup->height()
+		: _composeControls->heightCurrent();
 	const auto scrollY = _topBar->height() + _rootViewHeight;
 	const auto scrollHeight = bottom - scrollY - controlsHeight;
 	const auto scrollSize = QSize(contentWidth, scrollHeight);
@@ -1632,6 +1715,13 @@ void RepliesWidget::updateControlsGeometry() {
 			_scroll->scrollToY(*newScrollTop);
 		}
 		updateInnerVisibleArea();
+	}
+	if (_joinGroup) {
+		_joinGroup->setGeometry(
+			0,
+			bottom - _joinGroup->height(),
+			contentWidth,
+			_joinGroup->height());
 	}
 	_composeControls->move(0, bottom - controlsHeight);
 	_composeControls->setAutocompleteBoundingRect(_scroll->geometry());
@@ -1726,7 +1816,11 @@ void RepliesWidget::showAnimatedHook(
 
 void RepliesWidget::showFinishedHook() {
 	_topBar->setAnimatingMode(false);
-	_composeControls->showFinished();
+	if (_joinGroup) {
+		_composeControls->hide();
+	} else {
+		_composeControls->showFinished();
+	}
 	_rootView->show();
 
 	// We should setup the drag area only after

@@ -52,8 +52,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
 #include "core/application.h"
+#include "core/click_handler_types.h" // ClickHandlerContext
 #include "lang/lang_keys.h"
 #include "storage/file_upload.h"
+#include "window/window_session_controller.h" // Window::Show
 #include "styles/style_chat.h"
 #include "styles/style_dialogs.h"
 
@@ -635,10 +637,12 @@ std::unique_ptr<HistoryView::Media> MediaPhoto::createView(
 
 MediaFile::MediaFile(
 	not_null<HistoryItem*> parent,
-	not_null<DocumentData*> document)
+	not_null<DocumentData*> document,
+	bool skipPremiumEffect)
 : Media(parent)
 , _document(document)
-, _emoji(document->sticker() ? document->sticker()->alt : QString()) {
+, _emoji(document->sticker() ? document->sticker()->alt : QString())
+, _skipPremiumEffect(skipPremiumEffect) {
 	parent->history()->owner().registerDocumentItem(_document, parent);
 
 	if (!_emoji.isEmpty()) {
@@ -658,7 +662,10 @@ MediaFile::~MediaFile() {
 }
 
 std::unique_ptr<Media> MediaFile::clone(not_null<HistoryItem*> parent) {
-	return std::make_unique<MediaFile>(parent, _document);
+	return std::make_unique<MediaFile>(
+		parent,
+		_document,
+		!_document->session().premium());
 }
 
 DocumentData *MediaFile::document() const {
@@ -953,6 +960,7 @@ std::unique_ptr<HistoryView::Media> MediaFile::createView(
 			std::make_unique<HistoryView::Sticker>(
 				message,
 				_document,
+				_skipPremiumEffect,
 				replacing));
 	} else if (_document->isAnimation()
 		|| _document->isVideoFile()
@@ -1640,6 +1648,7 @@ ClickHandlerPtr MediaDice::makeHandler() const {
 ClickHandlerPtr MediaDice::MakeHandler(
 		not_null<History*> history,
 		const QString &emoji) {
+	// TODO support multi-windows.
 	static auto ShownToast = base::weak_ptr<Ui::Toast::Instance>();
 	static const auto HideExisting = [] {
 		if (const auto toast = ShownToast.get()) {
@@ -1647,7 +1656,7 @@ ClickHandlerPtr MediaDice::MakeHandler(
 			ShownToast = nullptr;
 		}
 	};
-	return std::make_shared<LambdaClickHandler>([=] {
+	return std::make_shared<LambdaClickHandler>([=](ClickContext context) {
 		auto config = Ui::Toast::Config{
 			.text = { tr::lng_about_random(tr::now, lt_emoji, emoji) },
 			.st = &st::historyDiceToast,
@@ -1677,7 +1686,15 @@ ClickHandlerPtr MediaDice::MakeHandler(
 		}
 
 		HideExisting();
-		ShownToast = Ui::Toast::Show(config);
+		const auto my = context.other.value<ClickHandlerContext>();
+		const auto weak = my.sessionWindow;
+		if (const auto strong = weak.get()) {
+			ShownToast = Ui::Toast::Show(
+				Window::Show(strong).toastParent(),
+				config);
+		} else {
+			ShownToast = Ui::Toast::Show(config);
+		}
 	});
 }
 

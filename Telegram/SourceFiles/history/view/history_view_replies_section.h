@@ -263,6 +263,7 @@ private:
 		Api::SendOptions options,
 		std::optional<MsgId> localMessageId);
 
+	void refreshJoinGroupButton();
 	[[nodiscard]] bool showSlowmodeError();
 	[[nodiscard]] std::optional<QString> writeRestriction() const;
 
@@ -277,6 +278,7 @@ private:
 	object_ptr<TopBarWidget> _topBar;
 	object_ptr<Ui::PlainShadow> _topBarShadow;
 	std::unique_ptr<ComposeControls> _composeControls;
+	std::unique_ptr<Ui::FlatButton> _joinGroup;
 	bool _skipScrollEvent = false;
 
 	std::unique_ptr<Ui::PinnedBar> _rootView;

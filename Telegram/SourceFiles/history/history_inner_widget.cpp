@@ -89,6 +89,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_changes.h"
 #include "data/stickers/data_stickers.h"
 #include "data/data_sponsored_messages.h"
+#include "dialogs/ui/dialogs_video_userpic.h"
+#include "settings/settings_premium.h"
 #include "facades.h"
 #include "styles/style_chat.h"
 #include "styles/style_window.h" // st::windowMinWidth
@@ -163,9 +165,9 @@ public:
 			not_null<const Element*> view) override {
 		return (Element::Moused() == view);
 	}
-	crl::time elementHighlightTime(
-			not_null<const HistoryItem*> item) override {
-		return _widget ? _widget->elementHighlightTime(item) : 0;
+	[[nodiscard]] float64 elementHighlightOpacity(
+			not_null<const HistoryItem*> item) const override {
+		return _widget ? _widget->elementHighlightOpacity(item) : 0.;
 	}
 	bool elementInSelectionMode() override {
 		return _widget ? _widget->inSelectionMode() : false;
@@ -260,6 +262,20 @@ public:
 			_widget->elementStartInteraction(view);
 		}
 	}
+	void elementStartPremium(
+			not_null<const Element*> view,
+			Element *replacing) override {
+		if (_widget) {
+			_widget->elementStartPremium(view, replacing);
+		}
+	}
+
+	void elementCancelPremium(not_null<const Element*> view) override {
+		if (_widget) {
+			_widget->elementCancelPremium(view);
+		}
+	}
+
 	void elementShowSpoilerAnimation() override {
 		if (_widget) {
 			_widget->elementShowSpoilerAnimation();
@@ -322,7 +338,8 @@ HistoryInner::HistoryInner(
 , _history(history)
 , _elementDelegate(_history->delegateMixin()->delegate())
 , _emojiInteractions(std::make_unique<HistoryView::EmojiInteractions>(
-	&controller->session()))
+	&controller->session(),
+	[=](not_null<const Element*> view) { return itemTop(view); }))
 , _migrated(history->migrateFrom())
 , _pathGradient(
 	HistoryView::MakePathShiftGradient(
@@ -358,8 +375,7 @@ HistoryInner::HistoryInner(
 	setMouseTracking(true);
 	_controller->gifPauseLevelChanged(
 	) | rpl::start_with_next([=] {
-		if (!_controller->isGifPausedAtLeastFor(
-				Window::GifPauseReason::Any)) {
+		if (!elementIsGifPaused()) {
 			update();
 		}
 	}, lifetime());
@@ -376,7 +392,7 @@ HistoryInner::HistoryInner(
 	}, lifetime());
 	_emojiInteractions->updateRequests(
 	) | rpl::start_with_next([=](QRect rect) {
-		update(rect.translated(0, _historyPaddingTop));
+		update(rect);
 	}, lifetime());
 	_emojiInteractions->playStarted(
 	) | rpl::start_with_next([=](QString &&emoji) {
@@ -387,7 +403,11 @@ HistoryInner::HistoryInner(
 	_reactionsManager->chosen(
 	) | rpl::start_with_next([=](ChosenReaction reaction) {
 		const auto item = session().data().message(reaction.context);
-		if (!item) {
+		if (!item
+			|| Window::ShowReactPremiumError(
+				_controller,
+				item,
+				reaction.emoji)) {
 			return;
 		}
 		item->toggleReaction(reaction.emoji);
@@ -1068,6 +1088,7 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 		p.translate(0, -top);
 	}
 
+	const auto paused = elementIsGifPaused();
 	enumerateUserpics([&](not_null<Element*> view, int userpicTop) {
 		// stop the enumeration if the userpic is below the painted rect
 		if (userpicTop >= clip.top() + clip.height()) {
@@ -1077,13 +1098,16 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 		// paint the userpic if it intersects the painted rect
 		if (userpicTop + st::msgPhotoSize > clip.top()) {
 			if (const auto from = view->data()->displayFrom()) {
-				from->paintUserpicLeft(
+				Dialogs::Ui::PaintUserpic(
 					p,
+					from,
+					validateVideoUserpic(from),
 					_userpics[from],
 					st::historyPhotoLeft,
 					userpicTop,
 					width(),
-					st::msgPhotoSize);
+					st::msgPhotoSize,
+					paused);
 			} else if (const auto info = view->data()->hiddenSenderInfo()) {
 				if (info->customUserpic.empty()) {
 					info->emptyUserpic.paint(
@@ -1172,8 +1196,6 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 	p.setOpacity(1.);
 
 	_reactionsManager->paint(p, context);
-
-	p.translate(0, _historyPaddingTop);
 	_emojiInteractions->paint(p);
 }
 
@@ -1189,6 +1211,46 @@ bool HistoryInner::eventHook(QEvent *e) {
 		}
 	}
 	return RpWidget::eventHook(e);
+}
+
+HistoryInner::VideoUserpic *HistoryInner::validateVideoUserpic(
+		not_null<PeerData*> peer) {
+	if (!peer->isPremium()
+		|| peer->userpicPhotoUnknown()
+		|| !peer->userpicHasVideo()) {
+		_videoUserpics.remove(peer);
+		return nullptr;
+	}
+	const auto i = _videoUserpics.find(peer);
+	if (i != end(_videoUserpics)) {
+		return i->second.get();
+	}
+	const auto repaint = [=] {
+		enumerateUserpics([&](not_null<Element*> view, int userpicTop) {
+			// stop the enumeration if the userpic is below the painted rect
+			if (userpicTop >= _visibleAreaBottom) {
+				return false;
+			}
+
+			// repaint the userpic if it intersects the painted rect
+			if (userpicTop + st::msgPhotoSize > _visibleAreaTop) {
+				if (const auto from = view->data()->displayFrom()) {
+					if (from == peer) {
+						rtlupdate(
+							st::historyPhotoLeft,
+							userpicTop,
+							st::msgPhotoSize,
+							st::msgPhotoSize);
+					}
+				}
+			}
+			return true;
+		});
+	};
+	return _videoUserpics.emplace(peer, std::make_unique<VideoUserpic>(
+		peer,
+		repaint
+	)).first->second.get();
 }
 
 void HistoryInner::onTouchScrollTimer() {
@@ -1884,7 +1946,9 @@ void HistoryInner::toggleFavoriteReaction(not_null<Element*> view) const {
 		return;
 	}
 	const auto item = view->data();
-	if (item->chosenReaction() != favorite) {
+	if (Window::ShowReactPremiumError(_controller, item, favorite)) {
+		return;
+	} else if (item->chosenReaction() != favorite) {
 		if (const auto top = itemTop(view); top >= 0) {
 			view->animateReaction({ .emoji = favorite });
 		}
@@ -2184,7 +2248,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 		}
 		if (item && item->hasDirectLink() && isUponSelected != 2 && isUponSelected != -2) {
 			_menu->addAction(item->history()->peer->isMegagroup() ? tr::lng_context_copy_message_link(tr::now) : tr::lng_context_copy_post_link(tr::now), [=] {
-				HistoryView::CopyPostLink(session, itemId, HistoryView::Context::History);
+				HistoryView::CopyPostLink(controller, itemId, HistoryView::Context::History);
 			}, &st::menuIconLink);
 		}
 		if (isUponSelected > 1) {
@@ -2376,7 +2440,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 							}, &st::menuIconStickers);
 							const auto isFaved = session->data().stickers().isFaved(document);
 							_menu->addAction(isFaved ? tr::lng_faved_stickers_remove(tr::now) : tr::lng_faved_stickers_add(tr::now), [=] {
-								Api::ToggleFavedSticker(document, itemId);
+								Api::ToggleFavedSticker(controller, document, itemId);
 							}, isFaved ? &st::menuIconUnfave : &st::menuIconFave);
 						}
 						if (!hasCopyRestriction(item)) {
@@ -2405,6 +2469,10 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					_menu->addAction(tr::lng_sponsored_title({}), [=] {
 						_controller->show(Box(Ui::AboutSponsoredBox));
 					}, &st::menuIconInfo);
+					_menu->addSeparator();
+					_menu->addAction(tr::lng_sponsored_hide_ads({}), [=] {
+						Settings::ShowPremium(_controller, "no_ads");
+					}, &st::menuIconBlock);
 				}
 				if (!item->isService()
 					&& view
@@ -2430,7 +2498,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				&st::menuIconCopy);
 		} else if (item && item->hasDirectLink() && isUponSelected != 2 && isUponSelected != -2) {
 			_menu->addAction(item->history()->peer->isMegagroup() ? tr::lng_context_copy_message_link(tr::now) : tr::lng_context_copy_post_link(tr::now), [=] {
-				HistoryView::CopyPostLink(session, itemId, HistoryView::Context::History);
+				HistoryView::CopyPostLink(controller, itemId, HistoryView::Context::History);
 			}, &st::menuIconLink);
 		}
 		if (isUponSelected > 1) {
@@ -2710,7 +2778,11 @@ void HistoryInner::saveContextGif(FullMsgId itemId) {
 		if (!hasCopyRestriction(item)) {
 			if (const auto media = item->media()) {
 				if (const auto document = media->document()) {
-					Api::ToggleSavedGif(document, item->fullId(), true);
+					Api::ToggleSavedGif(
+						_controller,
+						document,
+						item->fullId(),
+						true);
 				}
 			}
 		}
@@ -3057,8 +3129,8 @@ void HistoryInner::visibleAreaUpdated(int top, int bottom) {
 	checkHistoryActivation();
 
 	_emojiInteractions->visibleAreaUpdated(
-		_visibleAreaTop - _historyPaddingTop,
-		_visibleAreaBottom - _historyPaddingTop);
+		_visibleAreaTop,
+		_visibleAreaBottom);
 }
 
 bool HistoryInner::displayScrollDate() const {
@@ -3158,9 +3230,6 @@ void HistoryInner::updateSize() {
 
 	if (_historyPaddingTop != newHistoryPaddingTop) {
 		_historyPaddingTop = newHistoryPaddingTop;
-		_emojiInteractions->visibleAreaUpdated(
-			_visibleAreaTop - _historyPaddingTop,
-			_visibleAreaBottom - _historyPaddingTop);
 	}
 
 	int newHeight = _historyPaddingTop + itemsHeight + st::historyPaddingBottom;
@@ -3329,16 +3398,9 @@ void HistoryInner::elementStartStickerLoop(
 	_animatedStickersPlayed.emplace(view->data());
 }
 
-crl::time HistoryInner::elementHighlightTime(
-		not_null<const HistoryItem*> item) {
-	const auto fullAnimMs = _widget->highlightStartTime(item);
-	if (fullAnimMs > 0) {
-		const auto now = crl::now();
-		if (fullAnimMs < now) {
-			return now - fullAnimMs;
-		}
-	}
-	return 0;
+float64 HistoryInner::elementHighlightOpacity(
+		not_null<const HistoryItem*> item) const {
+	return _widget->highlightOpacity(item);
 }
 
 void HistoryInner::elementShowPollResults(
@@ -3400,6 +3462,22 @@ void HistoryInner::elementReplyTo(const FullMsgId &to) {
 
 void HistoryInner::elementStartInteraction(not_null<const Element*> view) {
 	_controller->emojiInteractions().startOutgoing(view);
+}
+
+void HistoryInner::elementStartPremium(
+		not_null<const Element*> view,
+		Element *replacing) {
+	const auto already = !_emojiInteractions->playPremiumEffect(
+		view,
+		replacing);
+	_animatedStickersPlayed.emplace(view->data());
+	if (already) {
+		_widget->showPremiumStickerTooltip(view);
+	}
+}
+
+void HistoryInner::elementCancelPremium(not_null<const Element*> view) {
+	_emojiInteractions->cancelPremiumEffect(view);
 }
 
 void HistoryInner::elementShowSpoilerAnimation() {

@@ -1391,7 +1391,7 @@ void Gif::validateGroupedCache(
 		{ .options = options, .outer = { width, height } });
 }
 
-void Gif::setStatusSize(int newSize) const {
+void Gif::setStatusSize(int64 newSize) const {
 	if (newSize < 0) {
 		_statusSize = newSize;
 		_statusText = Ui::FormatDurationText(-newSize - 1);
@@ -1409,7 +1409,7 @@ void Gif::setStatusSize(int newSize) const {
 
 void Gif::updateStatusText() const {
 	ensureDataMediaCreated();
-	auto statusSize = 0;
+	auto statusSize = int64();
 	if (_data->status == FileDownloadFailed || _data->status == FileUploadFailed) {
 		statusSize = Ui::FileStatusSizeFailed;
 	} else if (_data->uploading()) {

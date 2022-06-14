@@ -38,14 +38,17 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_session_controller.h"
 #include "window/window_controller.h"
 #include "window/themes/window_theme_editor_box.h" // GenerateSlug.
+#include "payments/payments_checkout_process.h"
 #include "settings/settings_common.h"
 #include "settings/settings_folders.h"
 #include "settings/settings_main.h"
 #include "settings/settings_privacy_security.h"
 #include "settings/settings_chat.h"
+#include "settings/settings_premium.h"
 #include "mainwidget.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
+#include "inline_bots/bot_attach_web_view.h"
 #include "history/history.h"
 #include "base/qt/qt_common_adapters.h"
 #include "apiwrap.h"
@@ -363,7 +366,7 @@ bool ResolveUsernameOrPhone(
 		startToken = gameParam;
 		resolveType = ResolveType::ShareGame;
 	}
-	const auto fromMessageId = context.value<ClickHandlerContext>().itemId;
+	const auto myContext = context.value<ClickHandlerContext>();
 	using Navigation = Window::SessionNavigation;
 	controller->showPeerByLink(Navigation::PeerByLinkInfo{
 		.usernameOrId = domain,
@@ -381,10 +384,13 @@ bool ResolveUsernameOrPhone(
 		.resolveType = resolveType,
 		.startToken = startToken,
 		.startAdminRights = adminRights,
+		.startAutoSubmit = myContext.botStartAutoSubmit,
 		.attachBotUsername = params.value(u"attach"_q),
 		.attachBotToggleCommand = (params.contains(u"startattach"_q)
 			? params.value(u"startattach"_q)
 			: std::optional<QString>()),
+		.attachBotChooseTypes = InlineBots::ParseChooseTypes(
+			params.value(u"choose"_q)),
 		.voicechatHash = (params.contains(u"livestream"_q)
 			? std::make_optional(params.value(u"livestream"_q))
 			: params.contains(u"videochat"_q)
@@ -392,7 +398,7 @@ bool ResolveUsernameOrPhone(
 			: params.contains(u"voicechat"_q)
 			? std::make_optional(params.value(u"voicechat"_q))
 			: std::nullopt),
-		.clickFromMessageId = fromMessageId,
+		.clickFromMessageId = myContext.itemId,
 	});
 	controller->window().activate();
 	return true;
@@ -447,7 +453,7 @@ bool ResolveSettings(
 	}
 	controller->window().activate();
 	const auto section = match->captured(1).mid(1).toLower();
-	
+
 	const auto type = [&]() -> std::optional<::Settings::Type> {
 		if (section == qstr("language")) {
 			ShowLanguagesBox();
@@ -466,7 +472,7 @@ bool ResolveSettings(
 		}
 		return ::Settings::Main::Id();
 	}();
-	
+
 	if (type.has_value()) {
 		controller->showSettings(*type);
 		controller->window().activate();
@@ -611,7 +617,9 @@ bool ShowInviteLink(
 		return false;
 	}
 	QGuiApplication::clipboard()->setText(link);
-	Ui::Toast::Show(tr::lng_group_invite_copied(tr::now));
+	Ui::Toast::Show(
+		Window::Show(controller).toastParent(),
+		tr::lng_group_invite_copied(tr::now));
 	return true;
 }
 
@@ -625,13 +633,15 @@ bool OpenExternalLink(
 }
 
 void ExportTestChatTheme(
-		not_null<Main::Session*> session,
+		not_null<Window::SessionController*> controller,
 		not_null<const Data::CloudTheme*> theme) {
+	const auto session = &controller->session();
+	const auto show = std::make_shared<Window::Show>(controller);
 	const auto inputSettings = [&](Data::CloudThemeType type)
 	-> std::optional<MTPInputThemeSettings> {
 		const auto i = theme->settings.find(type);
 		if (i == end(theme->settings)) {
-			Ui::Toast::Show("Something went wrong :(");
+			Ui::Toast::Show(show->toastParent(), "Something went wrong :(");
 			return std::nullopt;
 		}
 		const auto &fields = i->second;
@@ -639,7 +649,7 @@ void ExportTestChatTheme(
 			|| !fields.paper->isPattern()
 			|| fields.paper->backgroundColors().empty()
 			|| !fields.paper->hasShareUrl()) {
-			Ui::Toast::Show("Something went wrong :(");
+			Ui::Toast::Show(show->toastParent(), "Something went wrong :(");
 			return std::nullopt;
 		}
 		const auto &bg = fields.paper->backgroundColors();
@@ -647,7 +657,9 @@ void ExportTestChatTheme(
 		const auto from = url.indexOf("bg/");
 		const auto till = url.indexOf("?");
 		if (from < 0 || till <= from) {
-			Ui::Toast::Show("Bad WallPaper link: " + url);
+			Ui::Toast::Show(
+				show->toastParent(),
+				"Bad WallPaper link: " + url);
 			return std::nullopt;
 		}
 
@@ -729,9 +741,15 @@ void ExportTestChatTheme(
 		const auto slug = Data::CloudTheme::Parse(session, result, true).slug;
 		QGuiApplication::clipboard()->setText(
 			session->createInternalLinkFull("addtheme/" + slug));
-		Ui::Toast::Show(tr::lng_background_link_copied(tr::now));
+		if (show->valid()) {
+			Ui::Toast::Show(
+				show->toastParent(),
+				tr::lng_background_link_copied(tr::now));
+		}
 	}).fail([=](const MTP::Error &error) {
-		Ui::Toast::Show("Error: " + error.type());
+		if (show->valid()) {
+			Ui::Toast::Show(show->toastParent(), "Error: " + error.type());
+		}
 	}).send();
 }
 
@@ -752,7 +770,7 @@ bool ResolveTestChatTheme(
 			params);
 		if (theme) {
 			if (!params["export"].isEmpty()) {
-				ExportTestChatTheme(&controller->session(), &*theme);
+				ExportTestChatTheme(controller, &*theme);
 			}
 			const auto recache = [&](Data::CloudThemeType type) {
 				[[maybe_unused]] auto value = theme->settings.contains(type)
@@ -763,6 +781,46 @@ bool ResolveTestChatTheme(
 			recache(Data::CloudThemeType::Light);
 		}
 	}
+	return true;
+}
+
+bool ResolveInvoice(
+		Window::SessionController *controller,
+		const Match &match,
+		const QVariant &context) {
+	if (!controller) {
+		return false;
+	}
+	const auto params = url_parse_params(
+		match->captured(1),
+		qthelp::UrlParamNameTransform::ToLower);
+	const auto slug = params.value(qsl("slug"));
+	if (slug.isEmpty()) {
+		return false;
+	}
+	const auto window = &controller->window();
+	Payments::CheckoutProcess::Start(
+		&controller->session(),
+		slug,
+		crl::guard(window, [=](auto) { window->activate(); }));
+	return true;
+}
+
+bool ResolvePremiumOffer(
+		Window::SessionController *controller,
+		const Match &match,
+		const QVariant &context) {
+	if (!controller) {
+		return false;
+	}
+	const auto params = url_parse_params(
+		match->captured(1).mid(1),
+		qthelp::UrlParamNameTransform::ToLower);
+	const auto refAddition = params.value(qsl("ref"));
+	const auto ref = "deeplink"
+		+ (refAddition.isEmpty() ? QString() : '_' + refAddition);
+	::Settings::ShowPremium(controller, ref);
+	controller->window().activate();
 	return true;
 }
 
@@ -839,6 +897,14 @@ const std::vector<LocalUrlHandler> &LocalUrlHandlers() {
 			HandleUser
 		},
 		{
+			qsl("invoice/?\\?(.+)(#|$)"),
+			ResolveInvoice,
+		},
+		{
+			qsl("premium_offer/?(\\?.+)?(#|$)"),
+			ResolvePremiumOffer,
+		},
+		{
 			qsl("^([^\\?]+)(\\?|#|$)"),
 			HandleUnknown
 		},
@@ -904,6 +970,8 @@ QString TryConvertUrlToLocal(QString url) {
 			return qsl("tg://socks?") + socksMatch->captured(1);
 		} else if (auto proxyMatch = regex_match(qsl("^proxy/?\\?(.+)(#|$)"), query, matchOptions)) {
 			return qsl("tg://proxy?") + proxyMatch->captured(1);
+		} else if (auto invoiceMatch = regex_match(qsl("^(invoice/|\\$)([a-zA-Z0-9_\\-]+)(\\?|#|$)"), query, matchOptions)) {
+			return qsl("tg://invoice?slug=") + invoiceMatch->captured(2);
 		} else if (auto bgMatch = regex_match(qsl("^bg/([a-zA-Z0-9\\.\\_\\-\\~]+)(\\?(.+)?)?$"), query, matchOptions)) {
 			const auto params = bgMatch->captured(3);
 			const auto bg = bgMatch->captured(1);

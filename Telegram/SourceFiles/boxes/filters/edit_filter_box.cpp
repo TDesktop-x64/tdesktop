@@ -18,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/filter_icon_panel.h"
 #include "data/data_chat_filters.h"
 #include "data/data_peer.h"
+#include "data/data_peer_values.h" // Data::AmPremiumValue.
 #include "data/data_session.h"
 #include "core/application.h"
 #include "core/core_settings.h"
@@ -504,6 +505,12 @@ void EditFilterBox(
 	box->setTitle(creating ? tr::lng_filters_new() : tr::lng_filters_edit());
 	box->setCloseByOutsideClick(false);
 
+	Data::AmPremiumValue(
+		&window->session()
+	) | rpl::start_with_next([=] {
+		box->closeBox();
+	}, box->lifetime());
+
 	using State = rpl::variable<Data::ChatFilter>;
 	const auto data = box->lifetime().make_state<State>(filter);
 
@@ -668,6 +675,8 @@ void EditFilterBox(
 void EditExistingFilter(
 		not_null<Window::SessionController*> window,
 		FilterId id) {
+	Expects(id != 0);
+
 	const auto session = &window->session();
 	const auto &list = session->data().chatsFilters().list();
 	const auto i = ranges::find(list, id, &Data::ChatFilter::id);

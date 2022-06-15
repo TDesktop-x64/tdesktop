@@ -212,6 +212,7 @@ void FiltersMenu::refresh() {
 	auto now = base::flat_map<int, base::unique_qptr<Ui::SideBarButton>>();
 	const auto &currentFilter = _session->activeChatsFilterCurrent();
 	for (const auto &filter : filters->list()) {
+		if (filter.id() == 0) continue;
 		const auto nextIsLocked = (now.size() >= premiumFrom);
 		if (nextIsLocked && (currentFilter == filter.id())) {
 			_session->setActiveChatsFilter(FilterId(0));

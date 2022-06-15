@@ -244,7 +244,8 @@ QSize Document::countOptimalSize() {
 			voice->transcribe = nullptr;
 			voice->transcribeText = {};
 		} else {
-			if (!voice->transcribe) {
+			const auto creating = !voice->transcribe;
+			if (creating) {
 				voice->transcribe = std::make_unique<TranscribeButton>(
 					_realParent);
 			}
@@ -263,7 +264,9 @@ QSize Document::countOptimalSize() {
 				: TextWithEntities{
 					entry.result + (entry.pending ? " [...]" : ""),
 				};
-			voice->transcribe->setOpened(!text.empty(), update);
+			voice->transcribe->setOpened(
+				!text.empty(),
+				creating ? Fn<void()>() : update);
 			if (text.empty()) {
 				voice->transcribeText = {};
 			} else {

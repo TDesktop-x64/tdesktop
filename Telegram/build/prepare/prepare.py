@@ -399,12 +399,14 @@ if customRunCommand:
 stage('patches', """
     git clone https://github.com/desktop-app/patches.git
     cd patches
-    git checkout 4a5c759f8f
+    git checkout 8ce6ac9d6e
 """)
 
 stage('depot_tools', """
 mac:
     git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
+    cd depot_tools
+    ./update_depot_tools
 """, 'ThirdParty')
 
 if not mac or 'build-stackwalk' in options:
@@ -1214,22 +1216,22 @@ mac:
 """)
 
 if buildQt6:
-    stage('qt_6_3_0', """
+    stage('qt_6_3_1', """
 mac:
-    git clone -b v6.3.0 https://code.qt.io/qt/qt5.git qt_6_3_0
-    cd qt_6_3_0
+    git clone -b v6.3.1 https://code.qt.io/qt/qt5.git qt_6_3_1
+    cd qt_6_3_1
     perl init-repository --module-subset=qtbase,qtimageformats,qtsvg,qt5compat
-depends:patches/qtbase_6_3_0/*.patch
+depends:patches/qtbase_6_3_1/*.patch
     cd qtbase
 
-    find ../../patches/qtbase_6_3_0 -type f -print0 | sort -z | xargs -0 git apply
+    find ../../patches/qtbase_6_3_1 -type f -print0 | sort -z | xargs -0 git apply
     cd ..
 
     CONFIGURATIONS=-debug
 release:
     CONFIGURATIONS=-debug-and-release
 mac:
-    ./configure -prefix "$USED_PREFIX/Qt-6.3.0" \
+    ./configure -prefix "$USED_PREFIX/Qt-6.3.1" \
         $CONFIGURATIONS \
         -force-debug-info \
         -opensource \

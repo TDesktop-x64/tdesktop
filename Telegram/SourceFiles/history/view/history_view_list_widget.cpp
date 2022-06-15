@@ -1211,6 +1211,7 @@ bool ListWidget::showCopyRestriction(HistoryItem *item) {
 		return false;
 	}
 	Ui::ShowMultilineToast({
+		.parentOverride = Window::Show(_controller).toastParent(),
 		.text = { (type == CopyRestrictionType::Channel)
 			? tr::lng_error_nocopy_channel(tr::now)
 			: tr::lng_error_nocopy_group(tr::now) },

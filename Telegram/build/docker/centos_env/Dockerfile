@@ -580,7 +580,7 @@ RUN git clone -b ${QT_TAG} --depth=1 git://code.qt.io/qt/qt5.git qt_${QT} \
 	&& rm -rf qt_${QT}
 
 FROM patches AS breakpad
-RUN git clone https://chromium.googlesource.com/breakpad/breakpad.git \
+RUN git clone https://github.com/google/breakpad.git \
 	&& cd breakpad \
 	&& git checkout dfcb7b6799 \
 	&& git apply ../patches/breakpad.diff \

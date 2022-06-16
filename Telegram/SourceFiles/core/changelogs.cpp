@@ -65,7 +65,7 @@ std::map<int, const char*> BetaLogs() {
 		"- Update the OpenAL library to 1.22.0.\n"
 	},
 	{
-		3007006,
+		1000036,
 		"- Settings > Advanced > Experimental adds an option "
 		"to open chats in separate windows.\n"
 

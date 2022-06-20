@@ -611,7 +611,7 @@ void ActivateWindow(not_null<SessionController*> controller);
 class Show : public Ui::Show {
 public:
 	explicit Show(not_null<SessionNavigation*> navigation);
-	explicit Show(not_null<Controller*> window);
+	explicit Show(Controller *window);
 	~Show();
 	void showBox(
 		object_ptr<Ui::BoxContent> content,

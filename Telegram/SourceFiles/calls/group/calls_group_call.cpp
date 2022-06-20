@@ -3538,6 +3538,7 @@ void GroupCall::destroyController() {
 		DEBUG_LOG(("Call Info: Destroying call controller.."));
 		invalidate_weak_ptrs(&_instanceGuard);
 
+		_instance->stop();
 		crl::async([
 			instance = base::take(_instance),
 			done = _delegate->groupCallAddAsyncWaiter()
@@ -3553,6 +3554,8 @@ void GroupCall::destroyScreencast() {
 	if (_screenInstance) {
 		DEBUG_LOG(("Call Info: Destroying call screen controller.."));
 		invalidate_weak_ptrs(&_screenInstanceGuard);
+
+		_screenInstance->stop();
 		crl::async([
 			instance = base::take(_screenInstance),
 			done = _delegate->groupCallAddAsyncWaiter()

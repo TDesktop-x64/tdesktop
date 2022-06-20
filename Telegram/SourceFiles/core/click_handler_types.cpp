@@ -24,6 +24,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item.h"
 #include "data/data_user.h"
 #include "data/data_session.h"
+#include "window/window_controller.h"
 #include "window/window_session_controller.h"
 
 namespace {
@@ -118,16 +119,21 @@ void HiddenUrlClickHandler::Open(QString url, QVariant context) {
 				? QString::fromUtf8(parsedUrl.toEncoded())
 				: ShowEncoded(displayed);
 			const auto my = context.value<ClickHandlerContext>();
-			if (const auto controller = my.sessionWindow.get()) {
-				controller->show(
-					Ui::MakeConfirmBox({
-						.text = (tr::lng_open_this_link(tr::now)
-							+ qsl("\n\n")
-							+ displayUrl),
-						.confirmed = [=](Fn<void()> hide) { hide(); open(); },
-						.confirmText = tr::lng_open_link(),
-					}),
-					Ui::LayerOption::KeepOther);
+			const auto controller = my.sessionWindow.get();
+			const auto use = controller
+				? &controller->window()
+				: Core::App().activeWindow();
+			auto box = Ui::MakeConfirmBox({
+				.text = (tr::lng_open_this_link(tr::now)
+					+ qsl("\n\n")
+					+ displayUrl),
+				.confirmed = [=](Fn<void()> hide) { hide(); open(); },
+				.confirmText = tr::lng_open_link(),
+			});
+			if (my.show) {
+				my.show->showBox(std::move(box));
+			} else if (use) {
+				use->show(std::move(box), Ui::LayerOption::KeepOther);
 			}
 		} else {
 			open();

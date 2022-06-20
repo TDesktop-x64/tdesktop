@@ -772,7 +772,7 @@ void MainMenu::updatePhone() {
 	if (cShowPhoneNumber()) {
 		_phoneText = Ui::FormatPhone(_controller->session().user()->phone());
 	} else {
-		_phoneText = "";
+		_phoneText = tr::lng_info_mobile_hidden(tr::now);
 	}
 	update();
 }

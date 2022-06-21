@@ -307,7 +307,7 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 			UsernameValue(user),
 			tr::lng_context_copy_mention(tr::now),
 			st::infoProfileLabeledUsernamePadding);
-		if (user->isBot()) {
+		if (!user->username.isEmpty()) {
 			const auto copyUsername = Ui::CreateChild<Ui::IconButton>(
 				usernameLabel->parentWidget(),
 				st::infoProfileLabeledButtonCopy);

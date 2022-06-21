@@ -1123,6 +1123,25 @@ void Message::paintFromName(
 	availableLeft += skipWidth;
 	availableWidth -= skipWidth;
 
+	const auto premiumIcon = [&]() -> const style::icon * {
+		if (!item->isPost()) {
+			const auto from = item->displayFrom();
+			if (const auto user = from->asUser()) {
+				if (user->isPremium()) {
+					return &st::dialogsPremiumIcon;
+				}
+			}
+		}
+		return nullptr;
+	}();
+
+	if (premiumIcon) {
+		premiumIcon->paint(p, QPoint(availableLeft, trect.top()-2), availableWidth);
+		auto skipWidth = premiumIcon->width() + st::msgServiceFont->spacew;
+		availableLeft += skipWidth;
+		availableWidth -= skipWidth;
+	}
+
 	auto via = item->Get<HistoryMessageVia>();
 	if (via && !displayForwardedFrom() && availableWidth > 0) {
 		p.setPen(stm->msgServiceFg);

@@ -120,23 +120,23 @@ void SetupUpdate(
 		tr::lng_settings_install_beta(),
 		st::settingsButtonNoIcon).get();
 
-	if (showOther) {
-		const auto experimental = inner->add(
-			object_ptr<Ui::SlideWrap<Button>>(
-				inner,
-				CreateButton(
-					inner,
-					tr::lng_settings_experimental(),
-					st::settingsButtonNoIcon)));
-		if (!install) {
-			experimental->toggle(true, anim::type::instant);
-		} else {
-			experimental->toggleOn(install->toggledValue());
-		}
-		experimental->entity()->setClickedCallback([=] {
-			showOther(Experimental::Id());
-		});
-	}
+	//if (showOther) {
+	//	const auto experimental = inner->add(
+	//		object_ptr<Ui::SlideWrap<Button>>(
+	//			inner,
+	//			CreateButton(
+	//				inner,
+	//				tr::lng_settings_experimental(),
+	//				st::settingsButtonNoIcon)));
+	//	if (!install) {
+	//		experimental->toggle(true, anim::type::instant);
+	//	} else {
+	//		experimental->toggleOn(install->toggledValue());
+	//	}
+	//	experimental->entity()->setClickedCallback([=] {
+	//		showOther(Experimental::Id());
+	//	});
+	//}
 
 	const auto check = AddButton(
 		inner,
@@ -804,6 +804,24 @@ void Advanced::setupContent(not_null<Window::SessionController*> controller) {
 	AddSkip(content);
 	AddDivider(content);
 	AddSkip(content);
+
+	// Move experimental setting to Export Data upside
+	const auto experimental = content->add(
+		object_ptr<Ui::SlideWrap<Button>>(
+			content,
+			CreateButton(
+				content,
+				tr::lng_settings_experimental(),
+				st::settingsButtonNoIcon)));
+	experimental->toggle(true, anim::type::instant);
+	experimental->entity()->setClickedCallback([=] {
+		controller->showSettings(Experimental::Id());
+	});
+
+	AddSkip(content);
+	AddDivider(content);
+	AddSkip(content);
+
 	SetupExport(controller, content);
 
 	Ui::ResizeFitChild(this, content);

@@ -1137,7 +1137,7 @@ void Message::paintFromName(
 	}();
 
 	if (premiumIcon) {
-		premiumIcon->paint(p, QPoint(availableLeft, trect.top()-2), availableWidth);
+		premiumIcon->paint(p, QPoint(availableLeft, trect.top()), availableWidth);
 		auto skipWidth = premiumIcon->width() + st::msgServiceFont->spacew;
 		availableLeft += skipWidth;
 		availableWidth -= skipWidth;

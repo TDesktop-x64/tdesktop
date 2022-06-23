@@ -56,7 +56,7 @@ namespace Settings {
 				container,
 				tr::lng_settings_net_speed_boost(),
 				rpl::single(NetBoostBox::BoostLabel(cNetSpeedBoost())),
-				st::settingsButton
+				st::settingsButtonNoIcon
 		);
 		boostBtn->setColorOverride(QColor(255, 0, 0));
 		boostBtn->addClickHandler([=] {
@@ -130,7 +130,7 @@ namespace Settings {
 		auto MsgIdBtn = AddButton(
 				inner,
 				tr::lng_settings_show_message_id(),
-				st::settingsButton
+				st::settingsButtonNoIcon
 		);
 		MsgIdBtn->setColorOverride(QColor(255, 0, 0));
 		MsgIdBtn->toggleOn(
@@ -147,7 +147,7 @@ namespace Settings {
 		AddButton(
 				inner,
 				tr::lng_settings_show_repeater_option(),
-				st::settingsButton
+				st::settingsButtonNoIcon
 		)->toggleOn(
 				rpl::single(cShowRepeaterOption())
 		)->toggledChanges(
@@ -162,7 +162,7 @@ namespace Settings {
 			AddButton(
 					inner,
 					tr::lng_settings_repeater_reply_to_orig_msg(),
-					st::settingsButton
+					st::settingsButtonNoIcon
 			)->toggleOn(
 					rpl::single(cRepeaterReplyToOrigMsg())
 			)->toggledChanges(
@@ -186,7 +186,7 @@ namespace Settings {
 				container,
 				tr::lng_settings_always_delete_for(),
 				std::move(value),
-				st::settingsButton
+				st::settingsButtonNoIcon
 		);
 		btn->events(
 		) | rpl::start_with_next([=]() {
@@ -199,7 +199,7 @@ namespace Settings {
 		AddButton(
 				inner,
 				tr::lng_settings_disable_cloud_draft_sync(),
-				st::settingsButton
+				st::settingsButtonNoIcon
 		)->toggleOn(
 				rpl::single(cDisableCloudDraftSync())
 		)->toggledChanges(
@@ -215,7 +215,7 @@ namespace Settings {
 		AddButton(
 				inner,
 				tr::lng_settings_hide_classic_forward(),
-				st::settingsButton
+				st::settingsButtonNoIcon
 		)->toggleOn(
 				rpl::single(cHideClassicFwd())
 		)->toggledChanges(
@@ -229,7 +229,7 @@ namespace Settings {
 		AddButton(
 				inner,
 				tr::lng_settings_disable_link_warning(),
-				st::settingsButton
+				st::settingsButtonNoIcon
 		)->toggleOn(
 				rpl::single(cDisableLinkWarning())
 		)->toggledChanges(
@@ -243,7 +243,7 @@ namespace Settings {
 		AddButton(
 				inner,
 				tr::lng_settings_disable_premium_animation(),
-				st::settingsButton
+				st::settingsButtonNoIcon
 		)->toggleOn(
 				rpl::single(GetEnhancedBool("disable_premium_animation"))
 		)->toggledChanges(
@@ -257,7 +257,7 @@ namespace Settings {
 		auto hideBtn = AddButton(
 			inner,
 			tr::lng_settings_hide_messages(),
-			st::settingsButton
+			st::settingsButtonNoIcon
 		);
 		hideBtn->setColorOverride(QColor(255, 0, 0));
 		hideBtn->toggleOn(
@@ -300,7 +300,7 @@ namespace Settings {
 		auto EmojiBtn = AddButton(
 				inner,
 				tr::lng_settings_show_emoji_button_as_text(),
-				st::settingsButton
+				st::settingsButtonNoIcon
 		);
 		EmojiBtn->setColorOverride(QColor(255, 0, 0));
 		EmojiBtn->toggleOn(
@@ -319,7 +319,7 @@ namespace Settings {
 		AddButton(
 				inner,
 				tr::lng_settings_show_scheduled_button(),
-				st::settingsButton
+				st::settingsButtonNoIcon
 		)->toggleOn(
 				rpl::single(cShowScheduledButton())
 		)->toggledChanges(
@@ -347,7 +347,7 @@ namespace Settings {
 		AddButton(
 				inner,
 				tr::lng_settings_radio_controller(),
-				st::settingsButton
+				st::settingsButtonNoIcon
 		)->addClickHandler([=] {
 			Ui::show(Box<RadioController>());
 		});
@@ -357,7 +357,7 @@ namespace Settings {
 		AddButton(
 				inner,
 				tr::lng_settings_auto_unmute(),
-				st::settingsButton
+				st::settingsButtonNoIcon
 		)->toggleOn(
 				rpl::single(cAutoUnmute())
 		)->toggledChanges(
@@ -382,7 +382,7 @@ namespace Settings {
 				container,
 				tr::lng_bitrate_controller(),
 				std::move(value),
-				st::settingsButton
+				st::settingsButtonNoIcon
 		);
 		btn->events(
 		) | rpl::start_with_next([=]() {
@@ -395,7 +395,7 @@ namespace Settings {
 		AddButton(
 				inner,
 				tr::lng_settings_enable_hd_video(),
-				st::settingsButton
+				st::settingsButtonNoIcon
 		)->toggleOn(
 				rpl::single(cHDVideo())
 		)->toggledChanges(
@@ -424,23 +424,24 @@ namespace Settings {
 		AddButton(
 				container,
 				tr::lng_settings_hide_all_chats(),
-				st::settingsButton
+				st::settingsOptionDisabled
 		)->toggleOn(
-				rpl::single(cHideFilterAllChats())
+				rpl::single(false)
 		)->toggledValue(
 		) | rpl::filter([](bool enabled) {
 			return (enabled != cHideFilterAllChats());
 		}) | rpl::start_with_next([=](bool enabled) {
-			cSetHideFilterAllChats(enabled);
-			EnhancedSettings::Write();
-			controller->reloadFiltersMenu();
-			App::wnd()->fixOrder();
+			Ui::Toast::Show(tr::lng_settings_experimental_irrelevant(tr::now));
+			//cSetHideFilterAllChats(enabled);
+			//EnhancedSettings::Write();
+			//controller->reloadFiltersMenu();
+			//App::wnd()->fixOrder();
 		}, container->lifetime());
 
 		AddButton(
 				container,
 				tr::lng_settings_replace_edit_button(),
-				st::settingsButton
+				st::settingsButtonNoIcon
 		)->toggleOn(
 				rpl::single(cReplaceEditButton())
 		)->toggledValue(
@@ -455,7 +456,7 @@ namespace Settings {
 		AddButton(
 				container,
 				tr::lng_settings_skip_message(),
-				st::settingsButton
+				st::settingsButtonNoIcon
 		)->toggleOn(
 				rpl::single(cSkipSc())
 		)->toggledValue(

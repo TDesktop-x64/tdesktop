@@ -1125,10 +1125,11 @@ void Message::paintFromName(
 
 	const auto premiumIcon = [&]() -> const style::icon * {
 		if (!item->isPost()) {
-			const auto from = item->displayFrom();
-			if (const auto user = from->asUser()) {
-				if (user->isPremium()) {
-					return &st::dialogsPremiumIcon;
+			if (const auto from = item->displayFrom()) {
+				if (const auto user = from->asUser()) {
+					if (user->isPremium()) {
+						return &st::dialogsPremiumIcon;
+					}
 				}
 			}
 		}

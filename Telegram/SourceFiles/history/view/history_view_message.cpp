@@ -1096,6 +1096,26 @@ void Message::paintFromName(
 	p.setFont(st::msgNameFont);
 	const auto stm = context.messageStyle();
 
+	const auto premiumIcon = [&]() -> const style::icon * {
+		if (!item->isPost()) {
+			if (const auto from = item->displayFrom()) {
+				if (const auto user = from->asUser()) {
+					if (user->isPremium()) {
+						return &st::dialogsPremiumIcon;
+					}
+				}
+			}
+		}
+		return nullptr;
+	}();
+
+	if (premiumIcon) {
+		premiumIcon->paint(p, QPoint(availableLeft-4, trect.top()), availableWidth);
+		auto skipWidth = premiumIcon->width();
+		availableLeft += skipWidth;
+		availableWidth -= skipWidth;
+	}
+
 	const auto nameText = [&]() -> const Ui::Text::String * {
 		const auto from = item->displayFrom();
 		const auto service = (context.outbg || item->isPost());
@@ -1122,26 +1142,6 @@ void Message::paintFromName(
 	const auto skipWidth = nameText->maxWidth() + st::msgServiceFont->spacew;
 	availableLeft += skipWidth;
 	availableWidth -= skipWidth;
-
-	const auto premiumIcon = [&]() -> const style::icon * {
-		if (!item->isPost()) {
-			if (const auto from = item->displayFrom()) {
-				if (const auto user = from->asUser()) {
-					if (user->isPremium()) {
-						return &st::dialogsPremiumIcon;
-					}
-				}
-			}
-		}
-		return nullptr;
-	}();
-
-	if (premiumIcon) {
-		premiumIcon->paint(p, QPoint(availableLeft, trect.top()), availableWidth);
-		auto skipWidth = premiumIcon->width() + st::msgServiceFont->spacew;
-		availableLeft += skipWidth;
-		availableWidth -= skipWidth;
-	}
 
 	auto via = item->Get<HistoryMessageVia>();
 	if (via && !displayForwardedFrom() && availableWidth > 0) {

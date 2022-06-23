@@ -406,7 +406,7 @@ void GroupMembersWidget::setItemFlags(
 	const auto rankIt = megagroup->mgInfo->admins.find(peerToUser(user->id));
 	const auto adminCanEdit = isAdmin && adminIt->second.canEdit;
 	const auto rank = (amCreator || isCreator)
-		? (megagroup->mgInfo->creatorRank.isEmpty()
+		? (!megagroup->mgInfo->creatorRank.isEmpty()
 			? megagroup->mgInfo->creatorRank
 			: tr::lng_owner_badge(tr::now))
 		: (amAdmin || isAdmin)

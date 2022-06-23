@@ -1286,7 +1286,9 @@ QPointer<Ui::BoxContent> ShowOldForwardMessagesBox(
 		navigation
 	](not_null<PeerData*> peer) mutable {
 		const auto content = navigation->parentController()->content();
-		if (peer->isSelf()) {
+		if (peer->isSelf()
+			&& !draft.ids.empty()
+			&& draft.ids.front().peer != peer->id) {
 			const auto history = peer->owner().history(peer);
 			auto resolved = history->resolveForwardDraft(draft);
 			if (!resolved.items.empty()) {

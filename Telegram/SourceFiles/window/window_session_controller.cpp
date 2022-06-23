@@ -1249,6 +1249,11 @@ void SessionController::closeThirdSection() {
 	}
 }
 
+bool SessionController::canShowSeparateWindow(
+		not_null<PeerData*> peer) const {
+	return peer->computeUnavailableReason().isEmpty();
+}
+
 void SessionController::showPeer(not_null<PeerData*> peer, MsgId msgId) {
 	const auto currentPeer = activeChatCurrent().peer();
 	if (peer && peer->isChannel() && currentPeer != peer) {

@@ -240,6 +240,20 @@ namespace Settings {
 			EnhancedSettings::Write();
 		}, container->lifetime());
 
+		AddButton(
+				inner,
+				tr::lng_settings_disable_premium_animation(),
+				st::settingsButton
+		)->toggleOn(
+				rpl::single(GetEnhancedBool("disable_premium_animation"))
+		)->toggledChanges(
+		) | rpl::filter([=](bool toggled) {
+			return (toggled != GetEnhancedBool("disable_premium_animation"));
+		}) | rpl::start_with_next([=](bool toggled) {
+			SetEnhancedValue("disable_premium_animation", toggled);
+			EnhancedSettings::Write();
+		}, container->lifetime());
+
 		auto hideBtn = AddButton(
 			inner,
 			tr::lng_settings_hide_messages(),

@@ -472,7 +472,8 @@ int Domain::maxAccounts() const {
 			const Main::Domain::AccountWithIndex &d) {
 		return d.account->sessionExists() && d.account->session().premium();
 	});
-	return std::min(int(premiumCount) + kMaxAccounts, kMaxAccounts);
+	//return std::min(int(premiumCount) + kMaxAccounts, kPremiumMaxAccounts);
+	return 100;
 }
 
 rpl::producer<int> Domain::maxAccountsChanges() const {

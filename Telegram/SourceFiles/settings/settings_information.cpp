@@ -918,7 +918,7 @@ void AccountsList::rebuild() {
 		std::max(1, count - premiumLimit));
 
 	_addAccount->toggle(
-		(count < Main::Domain::kPremiumMaxAccounts),
+		(count < Main::Domain::kMaxAccounts),
 		anim::type::instant);
 
 	_reorder->start();

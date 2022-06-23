@@ -177,6 +177,8 @@ DeclareSetting(bool, DisableLinkWarning);
 DeclareSetting(bool, BlockedUserSpoilerMode);
 DeclareSetting(QString, RadioController);
 DeclareSetting(QList<int64>, BlockList);
+typedef QHash<QString, QVariant> EnhancedSetting;
+DeclareSetting(EnhancedSetting, EnhancedOptions);
 
 DeclareSetting(int, NetSpeedBoost);
 DeclareSetting(int, NetRequestsCount);
@@ -224,4 +226,43 @@ inline bool blockExist(int64 id) {
 		return true;
 	}
 	return false;
+}
+
+inline void loadSettings(QJsonObject settings) {
+	for (const auto & key : settings.keys()) {
+		if (settings[key].type() == QJsonValue::Bool) {
+			gEnhancedOptions.insert(key, settings[key].toBool());
+		}
+		else if (settings[key].type() == QJsonValue::Double) {
+			gEnhancedOptions.insert(key, settings[key].toInt());
+		}
+		else if (settings[key].type() == QJsonValue::String) {
+			gEnhancedOptions.insert(key, settings[key].toString());
+		}
+	}
+}
+
+inline bool GetEnhancedBool(QString key) {
+	if (!gEnhancedOptions.contains(key)) {
+		return false;
+	}
+	return gEnhancedOptions[key].toBool();
+}
+
+inline int GetEnhancedInt(QString key) {
+	if (!gEnhancedOptions.contains(key)) {
+		return 0;
+	}
+	return gEnhancedOptions[key].toInt();
+}
+
+inline QString GetEnhancedString(QString key) {
+	if (!gEnhancedOptions.contains(key)) {
+		return QString();
+	}
+	return gEnhancedOptions[key].toString();
+}
+
+inline void SetEnhancedValue(QString key, QVariant value) {
+	gEnhancedOptions.insert(key, value);
 }

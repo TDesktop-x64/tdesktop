@@ -90,6 +90,7 @@ bool gDisableLinkWarning = false;
 bool gBlockedUserSpoilerMode = false;
 QString gRadioController;
 QList<int64> gBlockList;
+EnhancedSetting gEnhancedOptions;
 int gVoiceChatBitrate = 0;
 
 int gNetSpeedBoost = 0;

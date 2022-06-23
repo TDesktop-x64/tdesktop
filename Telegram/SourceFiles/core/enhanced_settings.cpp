@@ -292,6 +292,10 @@ namespace EnhancedSettings {
 			}
 		});
 
+		
+		// Refactoring enhanced settings
+		loadSettings(settings);
+
 		return true;
 	}
 
@@ -385,6 +389,9 @@ namespace EnhancedSettings {
 		auto document = QJsonDocument();
 		document.setObject(settings);
 		file.write(document.toJson(QJsonDocument::Indented));
+
+		// Refactoring enhanced settings
+		loadSettings(settings);
 	}
 
 	void Manager::writeCurrentSettings() {

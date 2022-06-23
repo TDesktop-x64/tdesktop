@@ -305,7 +305,6 @@ void ChatFilters::received(const QVector<MTPDialogFilter> &list) {
 		_loaded = true;
 		_listChanged.fire({});
 	}
-	remove(0); // to avoid folder drag and drop crash
 }
 
 void ChatFilters::apply(const MTPUpdate &update) {

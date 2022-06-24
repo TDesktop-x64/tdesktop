@@ -88,7 +88,7 @@ def checkChangelog():
     print('Wrong changelog entries count found: ' + count)
     finish(1)
 
-checkChangelog()
+#checkChangelog()
 
 def replaceInFile(path, replacements):
   content = ''

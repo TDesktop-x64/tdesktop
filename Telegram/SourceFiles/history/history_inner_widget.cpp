@@ -2256,7 +2256,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 		}
 		if (isUponSelected > 1) {
 			if (selectedState.count > 0 && selectedState.canForwardCount == selectedState.count) {
-				if (!cHideClassicFwd()) {
+				if (!GetEnhancedBool("hide_classic_fwd")) {
 					_menu->addAction(tr::lng_context_forward_msg_old_selected(tr::now), [=] {
 						_widget->oldForwardSelected();
 					}, &st::menuIconForward);
@@ -2297,7 +2297,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					}, &st::menuIconForward);
 				}
 				if ((item->history()->peer->isMegagroup() || item->history()->peer->isChat() || item->history()->peer->isUser())) {
-					if (cShowRepeaterOption()) {
+					if (GetEnhancedBool("show_repeater_option")) {
 						if (item->allowsForward()) {
 							repeatSubmenu->addAction(tr::lng_context_repeat_msg(tr::now), [=] {
 								const auto api = &item->history()->peer->session().api();
@@ -2320,7 +2320,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 								const auto api = &item->history()->peer->session().api();
 								auto message = ApiWrap::MessageToSend(prepareSendAction(_history,Api::SendOptions{.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer)}));
 								message.textWithTags = {item->originalText().text,TextUtilities::ConvertEntitiesToTextTags(item->originalText().entities)};
-								if (cRepeaterReplyToOrigMsg()) {
+								if (GetEnhancedBool("repeater_reply_to_orig_msg")) {
 									message.action.replyTo = item->idOriginal();
 								}
 								api->sendMessage(std::move(message));
@@ -2334,7 +2334,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 									if (item->history()->peer->isUser()) {
 										action.options.sendAs = nullptr;
 									}
-									if (cRepeaterReplyToOrigMsg()) {
+									if (GetEnhancedBool("repeater_reply_to_orig_msg")) {
 										action.replyTo = item->idOriginal();
 									}
 
@@ -2378,7 +2378,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				if (!fwdSubmenu->empty()) {
 					_menu->addAction(tr::lng_context_forward(tr::now), std::move(fwdSubmenu), &st::menuIconForward);
 				}
-				if (cShowRepeaterOption() && !repeatSubmenu->empty()) {
+				if (GetEnhancedBool("show_repeater_option") && !repeatSubmenu->empty()) {
 					_menu->addAction(tr::lng_context_repeater(tr::now), std::move(repeatSubmenu), &st::menuIconDiscussion);
 				}
 				if (item->canDelete()) {
@@ -2506,7 +2506,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 		}
 		if (isUponSelected > 1) {
 			if (selectedState.count > 0 && selectedState.count == selectedState.canForwardCount) {
-				if (!cHideClassicFwd()) {
+				if (!GetEnhancedBool("hide_classic_fwd")) {
 					_menu->addAction(tr::lng_context_forward_msg_old_selected(tr::now), [=] {
 						_widget->oldForwardSelected();
 					}, &st::menuIconForward);
@@ -2545,7 +2545,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					}, &st::menuIconForward);
 				}
 				if ((item->history()->peer->isMegagroup() || item->history()->peer->isChat() || item->history()->peer->isUser())) {
-					if (cShowRepeaterOption()) {
+					if (GetEnhancedBool("show_repeater_option")) {
 						if (canForward) {
 							repeatSubmenu->addAction(tr::lng_context_repeat_msg(tr::now), [=] {
 								const auto api = &item->history()->peer->session().api();
@@ -2568,7 +2568,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 								const auto api = &item->history()->peer->session().api();
 								auto message = ApiWrap::MessageToSend(prepareSendAction(_history, Api::SendOptions{ .sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer) }));
 								message.textWithTags = { item->originalText().text, TextUtilities::ConvertEntitiesToTextTags(item->originalText().entities) };
-								if (cRepeaterReplyToOrigMsg()) {
+								if (GetEnhancedBool("repeater_reply_to_orig_msg")) {
 									message.action.replyTo = item->idOriginal();
 								}
 								api->sendMessage(std::move(message));
@@ -2623,7 +2623,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				if (!fwdSubmenu->empty()) {
 					_menu->addAction(tr::lng_context_forward(tr::now), std::move(fwdSubmenu), &st::menuIconForward);
 				}
-				if (cShowRepeaterOption() && !repeatSubmenu->empty()) {
+				if (GetEnhancedBool("show_repeater_option") && !repeatSubmenu->empty()) {
 					_menu->addAction(tr::lng_context_repeater(tr::now), std::move(repeatSubmenu), &st::menuIconDiscussion);
 				}
 				if (canDelete) {

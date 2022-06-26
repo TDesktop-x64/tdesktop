@@ -737,7 +737,7 @@ HistoryWidget::HistoryWidget(
 			updateBotKeyboard(update.history);
 		}
 		if (flags & HistoryUpdateFlag::CloudDraft) {
-			if (cDisableCloudDraftSync()) {
+			if (GetEnhancedBool("disable_cloud_draft_sync")) {
 				return;
 			}
 			applyCloudDraft(update.history);
@@ -2646,7 +2646,7 @@ void HistoryWidget::refreshScheduledToggle() {
 	auto has = _history
 		&& _peer->canWrite()
 		&& (session().data().scheduledMessages().count(_history) > 0);
-	if (cShowScheduledButton()) has = true;
+	if (GetEnhancedBool("show_scheduled_button")) has = true;
 	if (!_scheduled && has) {
 		_scheduled.create(this, st::historyScheduledToggle);
 		_scheduled->show();

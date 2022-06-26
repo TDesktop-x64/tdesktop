@@ -84,7 +84,7 @@ void ApplyPeerCloudDraft(
 			: Data::PreviewState::Allowed));
 	cloudDraft->date = date;
 
-	if (cDisableCloudDraftSync()) {
+	if (GetEnhancedBool("disable_cloud_draft_sync")) {
 		return;
 	}
 
@@ -101,7 +101,7 @@ void ClearPeerCloudDraft(
 		return;
 	}
 
-	if (cDisableCloudDraftSync()) {
+	if (GetEnhancedBool("disable_cloud_draft_sync")) {
 		return;
 	}
 

@@ -371,17 +371,17 @@ void SettingsBox(
 		tr::lng_settings_stereo_mode(),
 		st::groupCallSettingsButton
 	)->toggleOn(
-		rpl::single(cStereoMode())
+		rpl::single(GetEnhancedBool("show_scheduled_button"))
 	)->toggledChanges(
 	) | rpl::filter([=](bool toggled) {
-		return (toggled != cStereoMode());
+		return (toggled != GetEnhancedBool("show_scheduled_button"));
 	}) | rpl::start_with_next([=](bool toggled) {
 		call->setStereoMode(toggled);
 		if (call->muted() == MuteState::Active) {
 			call->setMuted(MuteState::Muted);
 			call->setMutedAndUpdate(MuteState::Active);
 		}
-		cSetStereoMode(toggled);
+		SetEnhancedValue("show_scheduled_button", toggled);
 		EnhancedSettings::Write();
 	}, layout->lifetime());
 		using GlobalShortcut = base::GlobalShortcut;

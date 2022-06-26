@@ -158,67 +158,52 @@ inline void ValidateScale() {
 }
 
 DeclareSetting(bool, EnhancedFirstRun);
-DeclareSetting(bool, ShowMessagesID);
-DeclareSetting(bool, ShowEmojiButtonAsText);
-DeclareSetting(bool, ShowRepeaterOption);
-DeclareSetting(bool, RepeaterReplyToOrigMsg);
-DeclareSetting(bool, DisableCloudDraftSync);
-DeclareSetting(bool, HideClassicFwd);
-DeclareSetting(bool, ShowPhoneNumber);
-DeclareSetting(bool, ShowScheduledButton);
-DeclareSetting(bool, HideFilterAllChats);
-DeclareSetting(bool, ReplaceEditButton);
-DeclareSetting(bool, StereoMode);
-DeclareSetting(bool, AutoUnmute);
 DeclareSetting(bool, VoiceChatPinned);
-DeclareSetting(bool, HDVideo);
-DeclareSetting(bool, SkipSc);
-DeclareSetting(bool, DisableLinkWarning);
-DeclareSetting(bool, BlockedUserSpoilerMode);
-DeclareSetting(QString, RadioController);
 DeclareSetting(QList<int64>, BlockList);
 typedef QHash<QString, QVariant> EnhancedSetting;
 DeclareSetting(EnhancedSetting, EnhancedOptions);
 
-DeclareSetting(int, NetSpeedBoost);
 DeclareSetting(int, NetRequestsCount);
 DeclareSetting(int, NetUploadSessionsCount);
 DeclareSetting(int, NetUploadRequestInterval);
-DeclareSetting(int, AlwaysDeleteFor);
-DeclareSetting(int, VoiceChatBitrate);
+
+inline bool GetEnhancedBool(const QString& key) {
+	if (!gEnhancedOptions.contains(key)) {
+		return false;
+	}
+	return gEnhancedOptions[key].toBool();
+}
+
+inline int GetEnhancedInt(const QString& key) {
+	if (!gEnhancedOptions.contains(key)) {
+		return 0;
+	}
+	return gEnhancedOptions[key].toInt();
+}
+
+inline QString GetEnhancedString(const QString& key) {
+	if (!gEnhancedOptions.contains(key)) {
+		return {};
+	}
+	return gEnhancedOptions[key].toString();
+}
+
+inline void SetEnhancedValue(const QString& key, const QVariant& value) {
+	gEnhancedOptions.insert(key, value);
+}
 
 inline void SetNetworkBoost(int boost) {
 	if (boost < 0) {
-		cSetNetSpeedBoost(0);
+		gEnhancedOptions.insert("net_speed_boost", 0);
 	} else if (boost > 3) {
-		cSetNetSpeedBoost(3);
+		gEnhancedOptions.insert("net_speed_boost", 3);
 	} else {
-		cSetNetSpeedBoost(boost);
+		gEnhancedOptions.insert("net_speed_boost", boost);
 	}
 
-	cSetNetRequestsCount(2 + (2 * cNetSpeedBoost()));
-	cSetNetUploadSessionsCount(2 + (2 * cNetSpeedBoost()));
-	cSetNetUploadRequestInterval(500 - (100 * cNetSpeedBoost()));
-}
-
-inline void SetAlwaysDelete(int option) {
- 	if (option < 0) {
- 	 	cSetAlwaysDeleteFor(0);
- 	} else if (option > 3) {
- 	 	cSetAlwaysDeleteFor(3);
- 	} else {
- 	 	cSetAlwaysDeleteFor(option);
- 	}
-}
-
-inline void SetBitrate(int option) {
-	if (option < 0) {
-		cSetVoiceChatBitrate(0);
-	} else if (option > 7) {
-		cSetVoiceChatBitrate(7);
-	} else {
-		cSetVoiceChatBitrate(option);
-	}
+	cSetNetRequestsCount(2 + (2 * GetEnhancedInt("net_speed_boost")));
+	cSetNetUploadSessionsCount(2 + (2 * GetEnhancedInt("net_speed_boost")));
+	cSetNetUploadRequestInterval(500 - (100 * GetEnhancedInt("net_speed_boost")));
 }
 
 inline bool blockExist(int64 id) {
@@ -240,29 +225,4 @@ inline void loadSettings(QJsonObject settings) {
 			gEnhancedOptions.insert(key, settings[key].toString());
 		}
 	}
-}
-
-inline bool GetEnhancedBool(QString key) {
-	if (!gEnhancedOptions.contains(key)) {
-		return false;
-	}
-	return gEnhancedOptions[key].toBool();
-}
-
-inline int GetEnhancedInt(QString key) {
-	if (!gEnhancedOptions.contains(key)) {
-		return 0;
-	}
-	return gEnhancedOptions[key].toInt();
-}
-
-inline QString GetEnhancedString(QString key) {
-	if (!gEnhancedOptions.contains(key)) {
-		return QString();
-	}
-	return gEnhancedOptions[key].toString();
-}
-
-inline void SetEnhancedValue(QString key, QVariant value) {
-	gEnhancedOptions.insert(key, value);
 }

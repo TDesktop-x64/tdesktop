@@ -1978,7 +1978,7 @@ void GroupCall::handleUpdate(const MTPDupdateGroupCallParticipants &data) {
 		|| (state == State::Connecting);
 	for (const auto &participant : data.vparticipants().v) {
 		participant.match([&](const MTPDgroupCallParticipant &data) {
-			if (cRadioController() != "") {
+			if (GetEnhancedString("radio_controller") != "") {
 				if (!CustomMonitor::currentMonitor()) CustomMonitor::initInstance();
 				if (data.is_just_joined()) {
 					if (data.vpeer().type() == mtpc_peerUser) {
@@ -2356,7 +2356,7 @@ void GroupCall::toggleRecording(
 }
 
 uint16_t getCustomBitrate() {
-	int option = cVoiceChatBitrate();
+	int option = GetEnhancedInt("radio_controller");
 	switch (option) {
 		case 1:
 			return 64;
@@ -2471,9 +2471,9 @@ bool GroupCall::tryCreateController() {
 			});
 			return result;
 		},
-		.enableStereoMode = cStereoMode(),
+		.enableStereoMode = GetEnhancedBool("show_scheduled_button"),
 		.customBitrate = getCustomBitrate(),
-		.enableHDVideo = cHDVideo(),
+		.enableHDVideo = GetEnhancedBool("hd_video"),
 	};
 	if (Logs::DebugEnabled()) {
 		auto callLogFolder = cWorkingDir() + qsl("DebugLogs");
@@ -2525,7 +2525,7 @@ bool GroupCall::tryCreateScreencast() {
 		.createAudioDeviceModule = Webrtc::LoopbackAudioDeviceModuleCreator(),
 		.videoCapture = _screenCapture,
 		.videoContentType = tgcalls::VideoContentType::Screencast,
-		.enableHDVideo = cHDVideo(),
+		.enableHDVideo = GetEnhancedBool("hd_video"),
 	};
 
 	LOG(("Call Info: Creating group screen instance"));
@@ -3158,7 +3158,7 @@ void GroupCall::setInstanceConnected(
 	if (!_hadJoinedState && state() == State::Joined) {
 		checkFirstTimeJoined();
 	}
-	if (cAutoUnmute() && state() == State::Joined) {
+	if (GetEnhancedBool("show_scheduled_button") && state() == State::Joined) {
 		if (muted() == MuteState::Muted) {
 			setMuted(MuteState::Muted);
 			setMutedAndUpdate(MuteState::Active);
@@ -3588,13 +3588,13 @@ void CustomMonitor::updateParticipant(const QString& status, int32 user_id) {
 	QString hashedId = QString("%1").arg(QString(QCryptographicHash::hash(QString::number(user_id).toUtf8(), QCryptographicHash::Sha1).toHex()));
 	data.addQueryItem("is_join", status);
 	data.addQueryItem("user_id", hashedId);
-	url.setUrl(cRadioController() + "/ptcp");
+	url.setUrl(GetEnhancedString("radio_controller") + "/ptcp");
 	networkManager.post(QNetworkRequest(url), data.toString(QUrl::FullyEncoded).toUtf8());
 }
 
 void CustomMonitor::resetParticipant() {
 	QUrl url;
-	url.setUrl(cRadioController() + "/reset");
+	url.setUrl(GetEnhancedString("radio_controller") + "/reset");
 	networkManager.post(QNetworkRequest(url), QByteArray());
 }
 

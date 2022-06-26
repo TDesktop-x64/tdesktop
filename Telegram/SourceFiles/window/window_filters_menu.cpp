@@ -236,7 +236,7 @@ void FiltersMenu::refresh() {
 }
 
 void FiltersMenu::setupList() {
-	//if (!cHideFilterAllChats()) {
+	//if (!GetEnhancedBool("hide_all_chats)) {
 	//	_all = prepareButton(
 	//		_container,
 	//		0,
@@ -245,7 +245,7 @@ void FiltersMenu::setupList() {
 	//}
 	_list = _container->add(object_ptr<Ui::VerticalLayout>(_container));
 
-	if (!cReplaceEditButton()) {
+	if (!GetEnhancedBool("replace_edit_button")) {
 		_setup = prepareButton(
 				_container,
 				-1,
@@ -328,7 +328,7 @@ base::unique_qptr<Ui::SideBarButton> FiltersMenu::prepareButton(
 		} else if (id >= 0) {
 			_session->setActiveChatsFilter(id);
 		} else {
-			if (cReplaceEditButton()) {
+			if (GetEnhancedBool("replace_edit_button")) {
 				_session->showPeerHistory(_session->session().userPeerId());
 			} else {
 				const auto filters = &_session->session().data().chatsFilters();

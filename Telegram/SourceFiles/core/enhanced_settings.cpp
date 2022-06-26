@@ -179,122 +179,45 @@ namespace EnhancedSettings {
 			return true;
 		}
 
+		loadSettings(settings);
 
 		ReadOption(settings, "net_speed_boost", [&](auto v) {
-			if (v.isString()) {
-
-				const auto option = v.toString();
-				if (option == "high") {
-					SetNetworkBoost(3);
-				} else if (option == "medium") {
-					SetNetworkBoost(2);
-				} else if (option == "low") {
-					SetNetworkBoost(1);
+			if (v.isDouble()) {
+				int value = v.toInt();
+				if (value < 0) {
+					gEnhancedOptions.insert("net_speed_boost", 0);
+				} else if (value > 3) {
+					gEnhancedOptions.insert("net_speed_boost", 3);
 				} else {
-					SetNetworkBoost(0);
+					gEnhancedOptions.insert("net_speed_boost", value);
 				}
-
-			} else if (v.isNull()) {
-				SetNetworkBoost(0);
-			} else if (v.isDouble()) {
-				SetNetworkBoost(v.toInt());
 			}
 		});
 
-		ReadBoolOption(settings, "show_messages_id", [&](auto v) {
-			cSetShowMessagesID(v);
-		});
-
-		ReadBoolOption(settings, "show_repeater_option", [&](auto v) {
-			cSetShowRepeaterOption(v);
-		});
-
-		ReadBoolOption(settings, "show_emoji_button_as_text", [&](auto v) {
-			cSetShowEmojiButtonAsText(v);
-		});
-
-		ReadOption(settings, "always_delete_for", [&](auto v) {
-			if (v.isNull()) {
-				SetAlwaysDelete(0);
-			} else if (v.isDouble()) {
-				SetAlwaysDelete(v.toInt());
+		ReadOption(settings, "bitrate", [&](auto v) {
+			if (v.isDouble()) {
+				int value = v.toInt();
+				if (value < 0) {
+					gEnhancedOptions.insert("bitrate", 0);
+				} else if (value > 7) {
+					gEnhancedOptions.insert("bitrate", 7);
+				} else {
+					gEnhancedOptions.insert("bitrate", value);
+				}
 			}
-		});
-
-		ReadBoolOption(settings, "show_phone_number", [&](auto v) {
-			cSetShowPhoneNumber(v);
-		});
-
-		ReadBoolOption(settings, "repeater_reply_to_orig_msg", [&](auto v) {
-			cSetRepeaterReplyToOrigMsg(v);
-		});
-
-		ReadBoolOption(settings, "disable_cloud_draft_sync", [&](auto v) {
-			cSetDisableCloudDraftSync(v);
-		});
-
-		ReadBoolOption(settings, "hide_classic_fwd", [&](auto v) {
-			cSetHideClassicFwd(v);
-		});
-
-		ReadBoolOption(settings, "show_scheduled_button", [&](auto v) {
-			cSetShowScheduledButton(v);
-		});
-
-		ReadBoolOption(settings, "stereo_mode", [&](auto v) {
-			cSetStereoMode(v);
 		});
 
 		ReadStringOption(settings, "radio_controller", [&](auto v) {
 			if (v.isEmpty()) {
-				cSetRadioController("http://localhost:2468");
-			} else {
-				cSetRadioController(v);
+				SetEnhancedValue("radio_controller", "http://localhost:2468");
 			}
-		});
-
-		ReadBoolOption(settings, "auto_unmute", [&](auto v) {
-			cSetAutoUnmute(v);
-		});
-
-		ReadOption(settings, "bitrate", [&](auto v) {
-			if (v.isNull()) {
-				SetBitrate(0);
-			} else if (v.isDouble()) {
-				SetBitrate(v.toInt());
-			}
-		});
-
-		ReadBoolOption(settings, "hd_video", [&](auto v) {
-			cSetHDVideo(v);
-		});
-
-		ReadBoolOption(settings, "hide_all_chats", [&](auto v) {
-			cSetHideFilterAllChats(v);
-		});
-
-		ReadBoolOption(settings, "replace_edit_button", [&](auto v) {
-			cSetReplaceEditButton(v);
-		});
-
-		ReadBoolOption(settings, "skip_to_next", [&](auto v) {
-			cSetSkipSc(v);
-		});
-
-		ReadBoolOption(settings, "disable_link_warning", [&](auto v) {
-			cSetDisableLinkWarning(v);
 		});
 
 		ReadBoolOption(settings, "blocked_user_spoiler_mode", [&](auto v) {
-			cSetBlockedUserSpoilerMode(v);
 			if (v) {
 				readBlocklist();
 			}
 		});
-
-		
-		// Refactoring enhanced settings
-		loadSettings(settings);
 
 		return true;
 	}
@@ -391,7 +314,6 @@ namespace EnhancedSettings {
 		document.setObject(settings);
 		file.write(document.toJson(QJsonDocument::Indented));
 
-		// Refactoring enhanced settings
 		loadSettings(settings);
 	}
 
@@ -411,26 +333,26 @@ namespace EnhancedSettings {
 		file.write(customHeader);
 
 		auto settings = QJsonObject();
-		settings.insert(qsl("net_speed_boost"), cNetSpeedBoost());
-		settings.insert(qsl("show_messages_id"), cShowMessagesID());
-		settings.insert(qsl("show_repeater_option"), cShowRepeaterOption());
-		settings.insert(qsl("show_emoji_button_as_text"), cShowEmojiButtonAsText());
-		settings.insert(qsl("always_delete_for"), cAlwaysDeleteFor());
-		settings.insert(qsl("show_phone_number"), cShowPhoneNumber());
-		settings.insert(qsl("repeater_reply_to_orig_msg"), cRepeaterReplyToOrigMsg());
-		settings.insert(qsl("disable_cloud_draft_sync"), cDisableCloudDraftSync());
-		settings.insert(qsl("hide_classic_fwd"), cHideClassicFwd());
-		settings.insert(qsl("show_scheduled_button"), cShowScheduledButton());
-		settings.insert(qsl("stereo_mode"), cStereoMode());
-		settings.insert(qsl("radio_controller"), cRadioController());
-		settings.insert(qsl("auto_unmute"), cAutoUnmute());
-		settings.insert(qsl("bitrate"), cVoiceChatBitrate());
-		settings.insert(qsl("hide_all_chats"), cHideFilterAllChats());
-		settings.insert(qsl("replace_edit_button"), cReplaceEditButton());
-		settings.insert(qsl("hd_video"), cHDVideo());
-		settings.insert(qsl("skip_to_next"), cSkipSc());
-		settings.insert(qsl("disable_link_warning"), cDisableLinkWarning());
-		settings.insert(qsl("blocked_user_spoiler_mode"), cBlockedUserSpoilerMode());
+		settings.insert(qsl("net_speed_boost"), GetEnhancedInt("net_speed_boost"));
+		settings.insert(qsl("show_messages_id"), GetEnhancedBool("show_messages_id"));
+		settings.insert(qsl("show_repeater_option"), GetEnhancedBool("show_repeater_option"));
+		settings.insert(qsl("show_emoji_button_as_text"), GetEnhancedBool("show_emoji_button_as_text"));
+		settings.insert(qsl("always_delete_for"), GetEnhancedInt("always_delete_for"));
+		settings.insert(qsl("show_phone_number"), GetEnhancedBool("show_phone_number"));
+		settings.insert(qsl("repeater_reply_to_orig_msg"), GetEnhancedBool("repeater_reply_to_orig_msg"));
+		settings.insert(qsl("disable_cloud_draft_sync"), GetEnhancedBool("disable_cloud_draft_sync"));
+		settings.insert(qsl("hide_classic_fwd"), GetEnhancedBool("hide_classic_fwd"));
+		settings.insert(qsl("show_scheduled_button"), GetEnhancedBool("show_scheduled_button"));
+		settings.insert(qsl("stereo_mode"), GetEnhancedBool("show_scheduled_button"));
+		settings.insert(qsl("radio_controller"), GetEnhancedString("radio_controller"));
+		settings.insert(qsl("auto_unmute"), GetEnhancedBool("show_scheduled_button"));
+		settings.insert(qsl("bitrate"), GetEnhancedInt("bitrate"));
+		settings.insert(qsl("hide_all_chats"), GetEnhancedBool("hide_all_chats"));
+		settings.insert(qsl("replace_edit_button"), GetEnhancedBool("replace_edit_button"));
+		settings.insert(qsl("hd_video"), GetEnhancedBool("hd_video"));
+		settings.insert(qsl("skip_to_next"), GetEnhancedBool("skip_to_next"));
+		settings.insert(qsl("disable_link_warning"), GetEnhancedBool("disable_link_warning"));
+		settings.insert(qsl("blocked_user_spoiler_mode"), GetEnhancedBool("blocked_user_spoiler_mode"));
 		settings.insert(qsl("disable_premium_animation"), GetEnhancedBool("disable_premium_animation"));
 
 		auto document = QJsonDocument();

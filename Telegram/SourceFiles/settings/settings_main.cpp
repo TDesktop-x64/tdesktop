@@ -180,7 +180,7 @@ void Cover::initViewers() {
 	Info::Profile::PhoneValue(
 		_user
 	) | rpl::start_with_next([=](const TextWithEntities &value) {
-		if (cShowPhoneNumber()) {
+		if (GetEnhancedBool("show_phone_number")) {
 			_phone->setText(value.text);
 		} else {
 			_phone->setText(tr::lng_info_mobile_hidden(tr::now));

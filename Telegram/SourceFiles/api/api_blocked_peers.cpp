@@ -86,7 +86,7 @@ void BlockedPeers::block(not_null<PeerData*> peer) {
 			_blockRequests.erase(peer);
 			peer->setIsBlocked(true);
 
-			if (cBlockedUserSpoilerMode()) {
+			if (GetEnhancedBool("blocked_user_spoiler_mode")) {
 				if (!blockExist(int64(peer->id.value))) {
 					EnhancedSettings::Manager().addIdToBlocklist(int64(peer->id.value));
 				}
@@ -124,7 +124,7 @@ void BlockedPeers::unblock(not_null<PeerData*> peer, Fn<void()> onDone) {
 		_blockRequests.erase(peer);
 		peer->setIsBlocked(false);
 
-		if (cBlockedUserSpoilerMode()) {
+		if (GetEnhancedBool("blocked_user_spoiler_mode")) {
 			if (blockExist(int64(peer->id.value))) {
 				EnhancedSettings::Manager().removeIdFromBlocklist(int64(peer->id.value));
 			}

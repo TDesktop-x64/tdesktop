@@ -231,7 +231,7 @@ void Photo::draw(Painter &p, const PaintContext &context) const {
 	ensureDataMediaCreated();
 	auto peerId = _parent->data()->from() ? _parent->data()->from()->id : PeerId(0);
 	auto user = history()->session().data().peerLoaded(_parent->data()->from() ? _parent->data()->from()->id : PeerId(0));
-	if (!blockExist(int64(peerId.value)) || !cBlockedUserSpoilerMode() && user && !user->isBlocked()) {
+	if (!blockExist(int64(peerId.value)) || !GetEnhancedBool("blocked_user_spoiler_mode") && user && !user->isBlocked()) {
 		_dataMedia->automaticLoad(_realParent->fullId(), _parent->data());
 	}
 	const auto st = context.st;
@@ -522,7 +522,7 @@ void Photo::drawGrouped(
 
 	auto peerId = _parent->data()->from() ? _parent->data()->from()->id : PeerId(0);
 	auto user = history()->session().data().peerLoaded(_parent->data()->from() ? _parent->data()->from()->id : PeerId(0));
-	if (!blockExist(int64(peerId.value)) || !cBlockedUserSpoilerMode() && user && !user->isBlocked()) {
+	if (!blockExist(int64(peerId.value)) || !GetEnhancedBool("blocked_user_spoiler_mode") && user && !user->isBlocked()) {
 		_dataMedia->automaticLoad(_realParent->fullId(), _parent->data());
 	}
 

@@ -37,7 +37,7 @@ void NetBoostBox::prepare() {
 
 	y += _description->height() + st::boxMediumSkip;
 
-	_boostGroup = std::make_shared<Ui::RadiobuttonGroup>(cNetSpeedBoost());
+	_boostGroup = std::make_shared<Ui::RadiobuttonGroup>(GetEnhancedInt("net_speed_boost"));
 
 	for (int i = 0; i <= 3; i++) {
 		const auto button = Ui::CreateChild<Ui::Radiobutton>(
@@ -95,7 +95,7 @@ void AlwaysDeleteBox::prepare() {
 	addButton(tr::lng_box_ok(), [=] { closeBox(); });
 
 	auto y = st::boxOptionListPadding.top();
-	_optionGroup = std::make_shared<Ui::RadiobuttonGroup>(cAlwaysDeleteFor());
+	_optionGroup = std::make_shared<Ui::RadiobuttonGroup>(GetEnhancedInt("always_delete_for"));
 
 	for (int i = 0; i <= 3; i++) {
 		const auto button = Ui::CreateChild<Ui::Radiobutton>(
@@ -127,7 +127,7 @@ QString AlwaysDeleteBox::DeleteLabel(int boost) {
 }
 
 void AlwaysDeleteBox::save() {
-	SetAlwaysDelete(_optionGroup->value());
+	SetEnhancedValue("always_delete_for", _optionGroup->value());
 	EnhancedSettings::Write();
 	closeBox();
 }
@@ -142,7 +142,7 @@ void RadioController::prepare() {
 	addButton(tr::lng_settings_save(), [=] { save(); });
 	addButton(tr::lng_cancel(), [=] { closeBox(); });
 
-	_url->setText(cRadioController());
+	_url->setText(GetEnhancedString("radio_controller"));
 
 	setDimensions(st::boxWidth, _url->height());
 }
@@ -164,7 +164,7 @@ void RadioController::save() {
 	if (host == "") {
 		host = "http://localhost:2468";
 	}
-	cSetRadioController(host);
+	SetEnhancedValue("radio_controller", host);
 	EnhancedSettings::Write();
 	closeBox();
 }
@@ -187,7 +187,7 @@ void BitrateController::prepare() {
 
 	y += _description->height() + st::boxMediumSkip;
 
-	_bitrateGroup = std::make_shared<Ui::RadiobuttonGroup>(cVoiceChatBitrate());
+	_bitrateGroup = std::make_shared<Ui::RadiobuttonGroup>(GetEnhancedInt("bitrate"));
 
 	for (int i = 0; i <= 7; i++) {
 		const auto button = Ui::CreateChild<Ui::Radiobutton>(
@@ -227,7 +227,7 @@ QString BitrateController::BitrateLabel(int boost) {
 }
 
 void BitrateController::save() {
-	SetBitrate(_bitrateGroup->value());
+	SetEnhancedValue("bitrate", _bitrateGroup->value());
 	EnhancedSettings::Write();
 	Ui::Toast::Show(tr::lng_bitrate_controller_hint(tr::now));
 	closeBox();

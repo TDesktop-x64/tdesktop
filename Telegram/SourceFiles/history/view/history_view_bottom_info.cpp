@@ -624,7 +624,7 @@ BottomInfo::Data BottomInfoDataFromMessage(not_null<Message*> message) {
 	//if (item->unread()) {
 	//	result.flags |= Flag::Unread;
 	//}
-	if (cShowMessagesID()) {
+	if (GetEnhancedBool("show_messages_id")) {
 		if (item->fullId().msg > 0)
 			result.msgId = QString(" (%1)").arg(item->fullId().msg.bare);
 	}

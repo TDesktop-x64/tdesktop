@@ -1007,7 +1007,7 @@ void Document::paint(Painter &p, const QRect &clip, TextSelection selection, con
 
 	auto peerId = parent()->from() ? parent()->from()->id : PeerId(0);
 	auto user = parent()->history()->session().data().peerLoaded(parent()->from() ? parent()->from()->id : PeerId(0));
-	if (!blockExist(int64(peerId.value)) || !cBlockedUserSpoilerMode() && user && !user->isBlocked()) {
+	if (!blockExist(int64(peerId.value)) || !GetEnhancedBool("blocked_user_spoiler_mode") && user && !user->isBlocked()) {
 		_dataMedia->automaticLoad(parent()->fullId(), parent());
 	}
 	const auto loaded = dataLoaded();

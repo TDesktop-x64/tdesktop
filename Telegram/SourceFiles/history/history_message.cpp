@@ -331,12 +331,12 @@ HistoryMessage::HistoryMessage(
 	if (const auto media = data.vmedia()) {
 		setMedia(*media);
 		if (_media && _media->webpage()) {
-			if (cBlockedUserSpoilerMode() && blockExist(int64(peerId.value)) || cBlockedUserSpoilerMode() && user && user->isBlocked()) {
+			if (GetEnhancedBool("blocked_user_spoiler_mode") && blockExist(int64(peerId.value)) || GetEnhancedBool("blocked_user_spoiler_mode") && user && user->isBlocked()) {
 				_media->webpage()->applyChanges(WebPageType::Article, "", "", "", "", TextWithEntities(), nullptr, nullptr, WebPageCollage(), 0, "", 0);
 			}
 		}
 		if (_media && _media->document() && _media->document()->sticker()) {
-			if (cBlockedUserSpoilerMode() && blockExist(int64(peerId.value)) || cBlockedUserSpoilerMode() && user && user->isBlocked()) {
+			if (GetEnhancedBool("blocked_user_spoiler_mode") && blockExist(int64(peerId.value)) || GetEnhancedBool("blocked_user_spoiler_mode") && user && user->isBlocked()) {
 				config.originalDate = 1;
 				config.senderNameOriginal = QString("Blocked User");
 			}
@@ -350,7 +350,7 @@ HistoryMessage::HistoryMessage(
 	auto blkMsg = QString("[Blocked User Message]\n");
 	auto msg = blkMsg + qs(data.vmessage());
 
-	if (cBlockedUserSpoilerMode()) {
+	if (GetEnhancedBool("blocked_user_spoiler_mode")) {
 		_blockMsg = TextWithEntities{
 				msg,
 				Api::EntitiesFromMTP(
@@ -367,7 +367,7 @@ HistoryMessage::HistoryMessage(
 		};
 	}
 
-	if (cBlockedUserSpoilerMode() && blockExist(int64(peerId.value)) || cBlockedUserSpoilerMode() && user && user->isBlocked()) {
+	if (GetEnhancedBool("blocked_user_spoiler_mode") && blockExist(int64(peerId.value)) || GetEnhancedBool("blocked_user_spoiler_mode") && user && user->isBlocked()) {
 		textWithEntities = _blockMsg;
 	} else {
 		textWithEntities = TextWithEntities{

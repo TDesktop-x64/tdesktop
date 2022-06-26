@@ -88,12 +88,12 @@ TopBarWidget::TopBarWidget(
 , _controller(controller)
 , _primaryWindow(controller->isPrimary())
 , _clear(this, tr::lng_selected_clear(), st::topBarClearButton)
-, _forward(this, cShowEmojiButtonAsText() ? tr::lng_selected_forward_text() : tr::lng_selected_forward_emoji(), st::defaultActiveButton)
+, _forward(this, GetEnhancedBool("show_emoji_button_as_text") ? tr::lng_selected_forward_text() : tr::lng_selected_forward_emoji(), st::defaultActiveButton)
 , _sendNow(this, tr::lng_selected_send_now(), st::defaultActiveButton)
-, _delete(this, cShowEmojiButtonAsText() ? tr::lng_selected_delete_text() : tr::lng_selected_delete_emoji(), st::defaultActiveButton)
-, _forwardNoQuote(this, cShowEmojiButtonAsText() ? tr::lng_selected_forward_no_quote_text() : tr::lng_selected_forward_no_quote_emoji(), st::defaultActiveButton)
-, _savedMessages(this, cShowEmojiButtonAsText() ? tr::lng_forward_to_saved_message_text() : tr::lng_forward_to_saved_message_emoji(), st::defaultActiveButton)
-, _oldForward(this, cShowEmojiButtonAsText() ? tr::lng_selected_forward_text_classic() : tr::lng_selected_forward_emoji_classic(), st::defaultActiveButton)
+, _delete(this, GetEnhancedBool("show_emoji_button_as_text") ? tr::lng_selected_delete_text() : tr::lng_selected_delete_emoji(), st::defaultActiveButton)
+, _forwardNoQuote(this, GetEnhancedBool("show_emoji_button_as_text") ? tr::lng_selected_forward_no_quote_text() : tr::lng_selected_forward_no_quote_emoji(), st::defaultActiveButton)
+, _savedMessages(this, GetEnhancedBool("show_emoji_button_as_text") ? tr::lng_forward_to_saved_message_text() : tr::lng_forward_to_saved_message_emoji(), st::defaultActiveButton)
+, _oldForward(this, GetEnhancedBool("show_emoji_button_as_text") ? tr::lng_selected_forward_text_classic() : tr::lng_selected_forward_emoji_classic(), st::defaultActiveButton)
 , _back(this, st::historyTopBarBack)
 , _cancelChoose(this, st::topBarCloseChoose)
 , _call(this, st::topBarCall)
@@ -840,7 +840,7 @@ void TopBarWidget::updateControlsGeometry() {
 
 	auto widthLeft = qMin(width() - buttonsWidth, -2 * st::defaultActiveButton.width);
 	auto buttonFullWidth = qMin(-(widthLeft / 2), 0);
-	if (!cHideClassicFwd()) {
+	if (!GetEnhancedBool("hide_classic_fwd")) {
 		_oldForward->show();
 		_oldForward->setFullWidth(buttonFullWidth);
 	} else {
@@ -854,7 +854,7 @@ void TopBarWidget::updateControlsGeometry() {
 
 	selectedButtonsTop += (height() - _forward->height()) / 2;
 
-	if (!cHideClassicFwd()) {
+	if (!GetEnhancedBool("hide_classic_fwd")) {
 		_oldForward->moveToLeft(buttonsLeft, selectedButtonsTop);
 		if (!_oldForward->isHidden()) {
 			buttonsLeft += _oldForward->width() + st::topBarActionSkip;
@@ -1108,7 +1108,7 @@ void TopBarWidget::showSelected(SelectedState state) {
 	_canSendNow = canSendNow;
 	const auto nowSelectedState = showSelectedState();
 	if (nowSelectedState) {
-		if (!cHideClassicFwd()) {
+		if (!GetEnhancedBool("hide_classic_fwd")) {
 			_oldForward->setNumbersText(_selectedCount);
 		}
 		_forward->setNumbersText(_selectedCount);
@@ -1117,7 +1117,7 @@ void TopBarWidget::showSelected(SelectedState state) {
 		_sendNow->setNumbersText(_selectedCount);
 		_delete->setNumbersText(_selectedCount);
 		if (!wasSelectedState) {
-			if (!cHideClassicFwd()) {
+			if (!GetEnhancedBool("hide_classic_fwd")) {
 				_oldForward->finishNumbersAnimation();
 			}
 			_forward->finishNumbersAnimation();

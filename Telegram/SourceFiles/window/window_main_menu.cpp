@@ -708,13 +708,13 @@ void MainMenu::setupMenu() {
 	_showPhoneToggle = addAction(
 		tr::lng_settings_show_phone_number(),
 		{ &st::settingsIconCalls, kIconDarkBlue }
-	)->toggleOn(rpl::single(cShowPhoneNumber()));
+	)->toggleOn(rpl::single(GetEnhancedBool("show_phone_number")));
 
 	_showPhoneToggle->toggledChanges(
 	) | rpl::filter([=](bool showPhone) {
-		return (showPhone != cShowPhoneNumber());
+		return (showPhone != GetEnhancedBool("show_phone_number"));
 	}) | rpl::start_with_next([=](bool showPhone) {
-		cSetShowPhoneNumber(!cShowPhoneNumber());
+		SetEnhancedValue("show_phone_number", !GetEnhancedBool("show_phone_number"));
 		EnhancedSettings::Write();
 		updatePhone();
 	}, _showPhoneToggle->lifetime());
@@ -769,7 +769,7 @@ void MainMenu::updateInnerControlsGeometry() {
 }
 
 void MainMenu::updatePhone() {
-	if (cShowPhoneNumber()) {
+	if (GetEnhancedBool("show_phone_number")) {
 		_phoneText = Ui::FormatPhone(_controller->session().user()->phone());
 	} else {
 		_phoneText = tr::lng_info_mobile_hidden(tr::now);

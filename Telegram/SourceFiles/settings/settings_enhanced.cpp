@@ -55,7 +55,7 @@ namespace Settings {
 		auto boostBtn = AddButtonWithLabel(
 				container,
 				tr::lng_settings_net_speed_boost(),
-				rpl::single(NetBoostBox::BoostLabel(cNetSpeedBoost())),
+				rpl::single(NetBoostBox::BoostLabel(GetEnhancedInt("net_speed_boost"))),
 				st::settingsButtonNoIcon
 		);
 		boostBtn->setColorOverride(QColor(255, 0, 0));
@@ -134,12 +134,12 @@ namespace Settings {
 		);
 		MsgIdBtn->setColorOverride(QColor(255, 0, 0));
 		MsgIdBtn->toggleOn(
-				rpl::single(cShowMessagesID())
+				rpl::single(GetEnhancedBool("show_messages_id"))
 		)->toggledChanges(
 		) | rpl::filter([=](bool toggled) {
-			return (toggled != cShowMessagesID());
+			return (toggled != GetEnhancedBool("show_messages_id"));
 		}) | rpl::start_with_next([=](bool toggled) {
-			cSetShowMessagesID(toggled);
+			SetEnhancedValue("show_messages_id", toggled);
 			EnhancedSettings::Write();
 			Core::Restart();
 		}, container->lifetime());
@@ -149,37 +149,37 @@ namespace Settings {
 				tr::lng_settings_show_repeater_option(),
 				st::settingsButtonNoIcon
 		)->toggleOn(
-				rpl::single(cShowRepeaterOption())
+				rpl::single(GetEnhancedBool("show_repeater_option"))
 		)->toggledChanges(
 		) | rpl::filter([=](bool toggled) {
-			return (toggled != cShowRepeaterOption());
+			return (toggled != GetEnhancedBool("show_repeater_option"));
 		}) | rpl::start_with_next([=](bool toggled) {
-			cSetShowRepeaterOption(toggled);
+			SetEnhancedValue("show_repeater_option", toggled);
 			EnhancedSettings::Write();
 		}, container->lifetime());
 
-		if (cShowRepeaterOption()) {
+		if (GetEnhancedBool("show_repeater_option")) {
 			AddButton(
 					inner,
 					tr::lng_settings_repeater_reply_to_orig_msg(),
 					st::settingsButtonNoIcon
 			)->toggleOn(
-					rpl::single(cRepeaterReplyToOrigMsg())
+					rpl::single(GetEnhancedBool("repeater_reply_to_orig_msg"))
 			)->toggledChanges(
 			) | rpl::filter([=](bool toggled) {
-				return (toggled != cRepeaterReplyToOrigMsg());
+				return (toggled != GetEnhancedBool("repeater_reply_to_orig_msg"));
 			}) | rpl::start_with_next([=](bool toggled) {
-				cSetRepeaterReplyToOrigMsg(toggled);
+				SetEnhancedValue("repeater_reply_to_orig_msg", toggled);
 				EnhancedSettings::Write();
 			}, container->lifetime());
 		}
 
 		auto value = rpl::single(
-				AlwaysDeleteBox::DeleteLabel(cAlwaysDeleteFor())
+				AlwaysDeleteBox::DeleteLabel(GetEnhancedInt("always_delete_for"))
 		) | rpl::then(
 				_AlwaysDeleteChanged.events()
 		) | rpl::map([] {
-			return AlwaysDeleteBox::DeleteLabel(cAlwaysDeleteFor());
+			return AlwaysDeleteBox::DeleteLabel(GetEnhancedInt("always_delete_for"));
 		});
 
 		auto btn = AddButtonWithLabel(
@@ -201,12 +201,12 @@ namespace Settings {
 				tr::lng_settings_disable_cloud_draft_sync(),
 				st::settingsButtonNoIcon
 		)->toggleOn(
-				rpl::single(cDisableCloudDraftSync())
+				rpl::single(GetEnhancedBool("disable_cloud_draft_sync"))
 		)->toggledChanges(
 		) | rpl::filter([=](bool toggled) {
-			return (toggled != cDisableCloudDraftSync());
+			return (toggled != GetEnhancedBool("disable_cloud_draft_sync"));
 		}) | rpl::start_with_next([=](bool toggled) {
-			cSetDisableCloudDraftSync(toggled);
+			SetEnhancedValue("disable_cloud_draft_sync", toggled);
 			EnhancedSettings::Write();
 		}, container->lifetime());
 
@@ -217,12 +217,12 @@ namespace Settings {
 				tr::lng_settings_hide_classic_forward(),
 				st::settingsButtonNoIcon
 		)->toggleOn(
-				rpl::single(cHideClassicFwd())
+				rpl::single(GetEnhancedBool("hide_classic_fwd"))
 		)->toggledChanges(
 		) | rpl::filter([=](bool toggled) {
-			return (toggled != cHideClassicFwd());
+			return (toggled != GetEnhancedBool("hide_classic_fwd"));
 		}) | rpl::start_with_next([=](bool toggled) {
-			cSetHideClassicFwd(toggled);
+			SetEnhancedValue("hide_classic_fwd", toggled);
 			EnhancedSettings::Write();
 		}, container->lifetime());
 
@@ -231,12 +231,12 @@ namespace Settings {
 				tr::lng_settings_disable_link_warning(),
 				st::settingsButtonNoIcon
 		)->toggleOn(
-				rpl::single(cDisableLinkWarning())
+				rpl::single(GetEnhancedBool("disable_link_warning"))
 		)->toggledChanges(
 		) | rpl::filter([=](bool toggled) {
-			return (toggled != cDisableLinkWarning());
+			return (toggled != GetEnhancedBool("disable_link_warning"));
 		}) | rpl::start_with_next([=](bool toggled) {
-			cSetDisableLinkWarning(toggled);
+			SetEnhancedValue("disable_link_warning", toggled);
 			EnhancedSettings::Write();
 		}, container->lifetime());
 
@@ -261,12 +261,12 @@ namespace Settings {
 		);
 		hideBtn->setColorOverride(QColor(255, 0, 0));
 		hideBtn->toggleOn(
-				rpl::single(cBlockedUserSpoilerMode())
+				rpl::single(GetEnhancedBool("blocked_user_spoiler_mode"))
 		)->toggledChanges(
 		) | rpl::filter([=](bool toggled) {
-			return (toggled != cBlockedUserSpoilerMode());
+			return (toggled != GetEnhancedBool("blocked_user_spoiler_mode"));
 		}) | rpl::start_with_next([=](bool toggled) {
-			cSetBlockedUserSpoilerMode(toggled);
+			SetEnhancedValue("blocked_user_spoiler_mode", toggled);
 			EnhancedSettings::Write();
 			if (toggled) {
 				Ui::Toast::Show("Please wait a moment, fetching blocklist...");
@@ -304,12 +304,12 @@ namespace Settings {
 		);
 		EmojiBtn->setColorOverride(QColor(255, 0, 0));
 		EmojiBtn->toggleOn(
-				rpl::single(cShowEmojiButtonAsText())
+				rpl::single(GetEnhancedBool("show_emoji_button_as_text"))
 		)->toggledChanges(
 		) | rpl::filter([=](bool toggled) {
-			return (toggled != cShowEmojiButtonAsText());
+			return (toggled != GetEnhancedBool("show_emoji_button_as_text"));
 		}) | rpl::start_with_next([=](bool toggled) {
-			cSetShowEmojiButtonAsText(toggled);
+			SetEnhancedValue("show_emoji_button_as_text", toggled);
 			EnhancedSettings::Write();
 			Core::Restart();
 		}, container->lifetime());
@@ -321,12 +321,12 @@ namespace Settings {
 				tr::lng_settings_show_scheduled_button(),
 				st::settingsButtonNoIcon
 		)->toggleOn(
-				rpl::single(cShowScheduledButton())
+				rpl::single(GetEnhancedBool("show_scheduled_button"))
 		)->toggledChanges(
 		) | rpl::filter([=](bool toggled) {
-			return (toggled != cShowScheduledButton());
+			return (toggled != GetEnhancedBool("show_scheduled_button"));
 		}) | rpl::start_with_next([=](bool toggled) {
-			cSetShowScheduledButton(toggled);
+			SetEnhancedValue("show_scheduled_button", toggled);
 			EnhancedSettings::Write();
 		}, container->lifetime());
 
@@ -359,23 +359,23 @@ namespace Settings {
 				tr::lng_settings_auto_unmute(),
 				st::settingsButtonNoIcon
 		)->toggleOn(
-				rpl::single(cAutoUnmute())
+				rpl::single(GetEnhancedBool("show_scheduled_button"))
 		)->toggledChanges(
 		) | rpl::filter([=](bool toggled) {
-			return (toggled != cAutoUnmute());
+			return (toggled != GetEnhancedBool("show_scheduled_button"));
 		}) | rpl::start_with_next([=](bool toggled) {
-			cSetAutoUnmute(toggled);
+			SetEnhancedValue("show_scheduled_button", toggled);
 			EnhancedSettings::Write();
 		}, container->lifetime());
 
 		AddDividerText(inner, tr::lng_auto_unmute_desc());
 
 		auto value = rpl::single(
-				BitrateController::BitrateLabel(cVoiceChatBitrate())
+				BitrateController::BitrateLabel(GetEnhancedInt("bitrate"))
 		) | rpl::then(
 				_BitrateChanged.events()
 		) | rpl::map([=] {
-			return BitrateController::BitrateLabel(cVoiceChatBitrate());
+			return BitrateController::BitrateLabel(GetEnhancedInt("bitrate"));
 		});
 
 		auto btn = AddButtonWithLabel(
@@ -397,12 +397,12 @@ namespace Settings {
 				tr::lng_settings_enable_hd_video(),
 				st::settingsButtonNoIcon
 		)->toggleOn(
-				rpl::single(cHDVideo())
+				rpl::single(GetEnhancedBool("hd_video"))
 		)->toggledChanges(
 		) | rpl::filter([=](bool toggled) {
-			return (toggled != cHDVideo());
+			return (toggled != GetEnhancedBool("hd_video"));
 		}) | rpl::start_with_next([=](bool toggled) {
-			cSetHDVideo(toggled);
+			SetEnhancedValue("hd_video", toggled);
 			Ui::Toast::Show(tr::lng_hd_video_hint(tr::now));
 			EnhancedSettings::Write();
 		}, container->lifetime());
@@ -429,10 +429,10 @@ namespace Settings {
 				rpl::single(false)
 		)->toggledValue(
 		) | rpl::filter([](bool enabled) {
-			return (enabled != cHideFilterAllChats());
+			return (enabled != GetEnhancedBool("hide_all_chats"));
 		}) | rpl::start_with_next([=](bool enabled) {
 			Ui::Toast::Show(tr::lng_settings_experimental_irrelevant(tr::now));
-			//cSetHideFilterAllChats(enabled);
+			//SetEnhancedValue("hide_all_chats", enabled);
 			//EnhancedSettings::Write();
 			//controller->reloadFiltersMenu();
 			//App::wnd()->fixOrder();
@@ -443,12 +443,12 @@ namespace Settings {
 				tr::lng_settings_replace_edit_button(),
 				st::settingsButtonNoIcon
 		)->toggleOn(
-				rpl::single(cReplaceEditButton())
+				rpl::single(GetEnhancedBool("replace_edit_button"))
 		)->toggledValue(
 		) | rpl::filter([](bool enabled) {
-			return (enabled != cReplaceEditButton());
+			return (enabled != GetEnhancedBool("replace_edit_button"));
 		}) | rpl::start_with_next([=](bool enabled) {
-			cSetReplaceEditButton(enabled);
+			SetEnhancedValue("replace_edit_button", enabled);
 			EnhancedSettings::Write();
 			controller->reloadFiltersMenu();
 		}, container->lifetime());
@@ -458,12 +458,12 @@ namespace Settings {
 				tr::lng_settings_skip_message(),
 				st::settingsButtonNoIcon
 		)->toggleOn(
-				rpl::single(cSkipSc())
+				rpl::single(GetEnhancedBool("skip_to_next"))
 		)->toggledValue(
 		) | rpl::filter([](bool enabled) {
-			return (enabled != cSkipSc());
+			return (enabled != GetEnhancedBool("skip_to_next"));
 		}) | rpl::start_with_next([=](bool enabled) {
-			cSetSkipSc(enabled);
+			SetEnhancedValue("skip_to_next", enabled);
 			EnhancedSettings::Write();
 		}, container->lifetime());
 

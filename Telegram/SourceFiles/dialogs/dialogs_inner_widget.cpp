@@ -3333,7 +3333,7 @@ RowDescriptor InnerWidget::computeJump(
 			|| (skip == JumpSkip::NextOrOriginal);
 		const auto needSkip = [&] {
 			return (result.key.folder() != nullptr)
-				|| (cSkipSc()
+				|| (GetEnhancedBool("skip_to_next")
 					&& !result.key.entry()->chatListUnreadCount()
 					&& !result.key.entry()->chatListUnreadMark())
 				|| (session().supportMode()

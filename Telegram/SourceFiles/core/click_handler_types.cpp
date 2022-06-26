@@ -108,7 +108,7 @@ void HiddenUrlClickHandler::Open(QString url, QVariant context) {
 		open();
 	} else {
 		const auto parsedUrl = QUrl::fromUserInput(url);
-		if (!cDisableLinkWarning() && UrlRequiresConfirmation(parsedUrl) && !base::IsCtrlPressed()) {
+		if (!GetEnhancedBool("disable_link_warning") && UrlRequiresConfirmation(parsedUrl) && !base::IsCtrlPressed()) {
 			Core::App().hideMediaView();
 			const auto displayed = parsedUrl.isValid()
 				? parsedUrl.toDisplayString()

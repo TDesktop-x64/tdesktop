@@ -121,7 +121,7 @@ void Sticker::initSize() {
 	
 	auto peerId = _parent->data()->from() ? _parent->data()->from()->id : PeerId(0);
 	auto user = _parent->history()->session().data().peerLoaded(_parent->data()->from() ? _parent->data()->from()->id : PeerId(0));
-	if (cBlockedUserSpoilerMode() && blockExist(int64(peerId.value)) || cBlockedUserSpoilerMode() && user && user->isBlocked()) {
+	if (GetEnhancedBool("blocked_user_spoiler_mode") && blockExist(int64(peerId.value)) || GetEnhancedBool("blocked_user_spoiler_mode") && user && user->isBlocked()) {
 		_size = DownscaledSize(_data->dimensions, {128,kMaxSizeFixed});
 	}
 }

@@ -379,6 +379,7 @@ QByteArray SerializeMessage(
 			push("width", image.width);
 			push("height", image.height);
 		}
+		push("media_group_id", message.media_group_id);
 	};
 
 	v::match(message.action.content, [&](const ActionChatCreate &data) {

@@ -599,6 +599,7 @@ struct Message {
 	PeerId replyToPeerId = 0;
 	std::vector<TextPart> text;
 	Media media;
+	int64 media_group_id;
 	ServiceAction action;
 	bool out = false;
 

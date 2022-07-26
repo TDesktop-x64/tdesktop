@@ -1262,6 +1262,7 @@ Message ParseMessage(
 				result.media.thumb().file = File();
 			}
 			context.botId = 0;
+			result.media_group_id = data.vgrouped_id().value_or_empty();
 		}
 		result.text = ParseText(
 			data.vmessage(),

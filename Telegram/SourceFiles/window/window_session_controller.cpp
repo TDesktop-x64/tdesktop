@@ -73,6 +73,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "apiwrap.h"
 #include "api/api_chat_invite.h"
 #include "api/api_global_privacy.h"
+#include "api/api_blocked_peers.h"
 #include "support/support_helper.h"
 #include "storage/file_upload.h"
 #include "facades.h"
@@ -186,7 +187,14 @@ void SessionNavigation::showPeerByLink(const PeerByLinkInfo &info) {
 		});
 	} else if (const auto name = std::get_if<QString>(&info.usernameOrId)) {
 		resolveUsername(*name, [=](not_null<PeerData*> peer) {
-			showPeerByLinkResolved(peer, info);
+			if (info.startAutoSubmit) {
+				peer->session().api().blockedPeers().unblock(
+					peer,
+					[=] { showPeerByLinkResolved(peer, info); },
+					true);
+			} else {
+				showPeerByLinkResolved(peer, info);
+			}
 		});
 	} else if (const auto id = std::get_if<ChannelId>(&info.usernameOrId)) {
 		resolveChannelById(*id, [=](not_null<ChannelData*> channel) {
@@ -612,12 +620,14 @@ SessionController::SessionController(
 , _tabbedSelector(
 	std::make_unique<ChatHelpers::TabbedSelector>(
 		_window->widget(),
-		this))
+		this,
+		GifPauseReason::TabbedPanel))
 , _invitePeekTimer([=] { checkInvitePeek(); })
 , _activeChatsFilter(session->data().chatsFilters().defaultId())
 , _defaultChatTheme(std::make_shared<Ui::ChatTheme>())
 , _chatStyle(std::make_unique<Ui::ChatStyle>())
-, _cachedReactionIconFactory(std::make_unique<ReactionIconFactory>()) {
+, _cachedReactionIconFactory(std::make_unique<ReactionIconFactory>())
+, _giftPremiumValidator(GiftPremiumValidator(this)) {
 	init();
 
 	_chatStyleTheme = _defaultChatTheme;
@@ -748,6 +758,14 @@ void SessionController::showEditPeerBox(PeerData *peer) {
 	session().api().requestFullPeer(peer);
 }
 
+void SessionController::showGiftPremiumBox(UserData *user) {
+	if (user) {
+		_giftPremiumValidator.showBox(user);
+	} else {
+		_giftPremiumValidator.cancel();
+	}
+}
+
 void SessionController::init() {
 	if (session().supportMode()) {
 		initSupportMode();
@@ -758,7 +776,9 @@ void SessionController::initSupportMode() {
 	session().supportHelper().registerWindow(this);
 
 	Shortcuts::Requests(
-	) | rpl::start_with_next([=](not_null<Shortcuts::Request*> request) {
+	) | rpl::filter([=] {
+		return (Core::App().activeWindow() == &window());
+	}) | rpl::start_with_next([=](not_null<Shortcuts::Request*> request) {
 		using C = Shortcuts::Command;
 
 		request->check(C::SupportHistoryBack) && request->handle([=] {
@@ -870,6 +890,7 @@ void SessionController::setupPremiumToast() {
 	}) | rpl::distinct_until_changed() | rpl::skip(
 		1
 	) | rpl::filter([=](bool premium) {
+		session().mtp().requestConfig();
 		return premium;
 	}) | rpl::start_with_next([=] {
 		Ui::Toast::Show(
@@ -1450,12 +1471,19 @@ void SessionController::showCalendar(Dialogs::Key chat, QDate requestedDate) {
 			button->setPointerCursor(false);
 		}
 	};
+	const auto weak = base::make_weak(this);
+	const auto jump = [=](const QDate &date) {
+		const auto open = [=](not_null<PeerData*> peer, MsgId id) {
+			if (const auto strong = weak.get()) {
+				strong->showPeerHistory(peer, SectionShow::Way::Forward, id);
+			}
+		};
+		session().api().resolveJumpToDate(chat, date, open);
+	};
 	show(Box<Ui::CalendarBox>(Ui::CalendarBoxArgs{
 		.month = highlighted,
 		.highlighted = highlighted,
-		.callback = [=](const QDate &date) {
-			session().api().jumpToDate(chat, date);
-		},
+		.callback = [=](const QDate &date) { jump(date); },
 		.minDate = minPeerDate,
 		.maxDate = maxPeerDate,
 		.allowsSelection = history->peer->isUser(),

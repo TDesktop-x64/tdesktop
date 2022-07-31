@@ -855,7 +855,6 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 			auto mediaPosition = QPoint(
 				inner.left(),
 				trect.y() + trect.height() - mediaHeight);
-
 			p.translate(mediaPosition);
 			media->draw(p, context.translated(
 				-mediaPosition
@@ -1271,7 +1270,16 @@ void Message::paintText(
 	const auto stm = context.messageStyle();
 	p.setPen(stm->historyTextFg);
 	p.setFont(st::msgFont);
-	item->_text.draw(p, trect.x(), trect.y(), trect.width(), style::al_left, 0, -1, context.selection);
+	prepareCustomEmojiPaint(p, item->_text);
+	item->_text.draw(
+		p,
+		trect.x(),
+		trect.y(),
+		trect.width(),
+		style::al_left,
+		0,
+		-1,
+		context.selection);
 }
 
 PointState Message::pointState(QPoint point) const {

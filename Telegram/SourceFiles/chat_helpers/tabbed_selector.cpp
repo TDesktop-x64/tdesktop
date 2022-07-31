@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/discrete_sliders.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/scroll_area.h"
+#include "ui/layers/box_content.h"
 #include "ui/image/image_prepare.h"
 #include "ui/cached_round_corners.h"
 #include "window/window_session_controller.h"
@@ -288,9 +289,11 @@ void TabbedSelector::Tab::saveScrollTop() {
 TabbedSelector::TabbedSelector(
 	QWidget *parent,
 	not_null<Window::SessionController*> controller,
+	Window::GifPauseReason level,
 	Mode mode)
 : RpWidget(parent)
 , _controller(controller)
+, _level(level)
 , _mode(mode)
 , _topShadow(full() ? object_ptr<Ui::PlainShadow>(this) : nullptr)
 , _bottomShadow(this)
@@ -396,10 +399,23 @@ TabbedSelector::TabbedSelector(
 
 		rpl::merge(
 			session().premiumPossibleValue() | rpl::to_empty,
-			session().data().stickers().updated()
+			session().data().stickers().updated(hasMasksTab()
+				? Data::StickersType::Masks
+				: Data::StickersType::Stickers)
 		) | rpl::start_with_next([=] {
 			refreshStickers();
 		}, lifetime());
+	}
+
+	if (hasEmojiTab()) {
+		session().data().stickers().emojiSetInstalled(
+		) | rpl::start_with_next([=](uint64 setId) {
+			_tabsSlider->setActiveSection(indexByType(SelectorTab::Emoji));
+			emoji()->showSet(setId);
+			_showRequests.fire({});
+		}, lifetime());
+
+		emoji()->refreshEmoji();
 	}
 	//setAttribute(Qt::WA_AcceptTouchEvents);
 	setAttribute(Qt::WA_OpaquePaintEvent, false);
@@ -413,17 +429,25 @@ Main::Session &TabbedSelector::session() const {
 	return _controller->session();
 }
 
+Window::GifPauseReason TabbedSelector::level() const {
+	return _level;
+}
+
 TabbedSelector::Tab TabbedSelector::createTab(SelectorTab type, int index) {
 	auto createWidget = [&]() -> object_ptr<Inner> {
 		switch (type) {
 		case SelectorTab::Emoji:
-			return object_ptr<EmojiListWidget>(this, _controller);
+			return object_ptr<EmojiListWidget>(this, _controller, _level);
 		case SelectorTab::Stickers:
-			return object_ptr<StickersListWidget>(this, _controller);
+			return object_ptr<StickersListWidget>(this, _controller, _level);
 		case SelectorTab::Gifs:
-			return object_ptr<GifsListWidget>(this, _controller);
+			return object_ptr<GifsListWidget>(this, _controller, _level);
 		case SelectorTab::Masks:
-			return object_ptr<StickersListWidget>(this, _controller, true);
+			return object_ptr<StickersListWidget>(
+				this,
+				_controller,
+				_level,
+				true);
 		}
 		Unexpected("Type in TabbedSelector::createTab.");
 	};
@@ -462,7 +486,11 @@ rpl::producer<EmojiPtr> TabbedSelector::emojiChosen() const {
 	return emoji()->chosen();
 }
 
-rpl::producer<TabbedSelector::FileChosen> TabbedSelector::fileChosen() const {
+auto TabbedSelector::customEmojiChosen() const -> rpl::producer<FileChosen> {
+	return emoji()->customChosen();
+}
+
+auto TabbedSelector::fileChosen() const -> rpl::producer<FileChosen> {
 	auto never = rpl::never<TabbedSelector::FileChosen>(
 	) | rpl::type_erased();
 	return rpl::merge(
@@ -496,7 +524,8 @@ rpl::producer<> TabbedSelector::checkForHide() const {
 	auto never = rpl::never<>();
 	return rpl::merge(
 		hasStickersTab() ? stickers()->checkForHide() : never,
-		hasMasksTab() ? masks()->checkForHide() : never);
+		hasMasksTab() ? masks()->checkForHide() : never,
+		hasEmojiTab() ? emoji()->checkForHide() : never);
 }
 
 rpl::producer<> TabbedSelector::slideFinished() const {
@@ -710,8 +739,9 @@ void TabbedSelector::refreshStickers() {
 }
 
 bool TabbedSelector::preventAutoHide() const {
-	return (hasStickersTab() ? stickers()->preventAutoHide() : false)
-		|| (hasMasksTab() ? masks()->preventAutoHide() : false)
+	return (hasStickersTab() && stickers()->preventAutoHide())
+		|| (hasMasksTab() && masks()->preventAutoHide())
+		|| (hasEmojiTab() && emoji()->preventAutoHide())
 		|| hasMenu();
 }
 
@@ -767,6 +797,12 @@ void TabbedSelector::showStarted() {
 	}
 	if (hasMasksTab()) {
 		session().api().updateMasks();
+	}
+	if (hasEmojiTab()) {
+		session().api().updateCustomEmoji();
+	}
+	if (hasGifsTab()) {
+		session().api().updateSavedGifs();
 	}
 	currentTab()->widget()->refreshRecent();
 	currentTab()->widget()->preloadImages();
@@ -1112,9 +1148,15 @@ not_null<const TabbedSelector::Tab*> TabbedSelector::currentTab() const {
 
 TabbedSelector::Inner::Inner(
 	QWidget *parent,
-	not_null<Window::SessionController*> controller)
+	not_null<Window::SessionController*> controller,
+	Window::GifPauseReason level)
 : RpWidget(parent)
-, _controller(controller) {
+, _controller(controller)
+, _level(level) {
+}
+
+Main::Session &TabbedSelector::Inner::session() const {
+	return controller()->session();
 }
 
 rpl::producer<int> TabbedSelector::Inner::scrollToRequests() const {
@@ -1131,6 +1173,17 @@ void TabbedSelector::Inner::scrollTo(int y) {
 
 void TabbedSelector::Inner::disableScroll(bool disabled) {
 	_disableScrollRequests.fire_copy(disabled);
+}
+
+void TabbedSelector::Inner::checkHideWithBox(QPointer<Ui::BoxContent> box) {
+	if (!box) {
+		return;
+	}
+	_preventHideWithBox = true;
+	connect(box, &QObject::destroyed, this, [=] {
+		_preventHideWithBox = false;
+		_checkForHide.fire({});
+	});
 }
 
 void TabbedSelector::Inner::visibleTopBottomUpdated(

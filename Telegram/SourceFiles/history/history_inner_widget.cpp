@@ -1801,23 +1801,10 @@ void HistoryInner::mouseActionFinish(
 			? pressedItemView->data()->fullId()
 			: FullMsgId();
 		const auto weak = base::make_weak(_controller.get());
-		ActivateClickHandler(window(), activated, {
-			button,
-			QVariant::fromValue(ClickHandlerContext{
-				.itemId = pressedItemId,
-				.elementDelegate = [=]() -> HistoryView::ElementDelegate* {
-					if (const auto strong = weak.get()) {
-						auto &data = strong->session().data();
-						if (const auto item = data.message(pressedItemId)) {
-							const auto history = item->history();
-							return history->delegateMixin()->delegate();
-						}
-					}
-					return nullptr;
-				},
-				.sessionWindow = weak,
-			})
-		});
+		ActivateClickHandler(
+			window(),
+			activated,
+			prepareClickContext(button, pressedItemId));
 		return;
 	}
 	if ((_mouseAction == MouseAction::PrepareSelect)
@@ -2042,7 +2029,9 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 	}
 	_menu = base::make_unique_q<Ui::PopupMenu>(
 		this,
-		hasWhoReactedItem ? st::whoReadMenu : st::popupMenuWithIcons);
+		(hasWhoReactedItem
+			? st::popupMenuExpandedSeparator
+			: st::popupMenuWithIcons));
 	const auto session = &this->session();
 	const auto controller = _controller;
 	const auto groupLeaderOrSelf = [](HistoryItem *item) -> HistoryItem* {
@@ -2419,6 +2408,9 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 		const auto canReport = item && item->suggestReport();
 		const auto canBlockSender = item && item->history()->peer->isRepliesChat();
 		const auto view = item ? item->mainView() : nullptr;
+		const auto actionText = link
+			? link->copyToClipboardContextItemText()
+			: QString();
 
 		if (isUponSelected > 0) {
 			if (!hasCopyRestrictionForSelected()) {
@@ -2479,7 +2471,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				}
 				if (!item->isService()
 					&& view
-					&& !link
+					&& actionText.isEmpty()
 					&& !hasCopyRestriction(item)
 					&& (view->hasVisibleText() || mediaHasTextForCopy)) {
 					_menu->addAction(tr::lng_context_copy_text(tr::now), [=] {
@@ -2488,10 +2480,6 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				}
 			}
 		}
-
-		const auto actionText = link
-			? link->copyToClipboardContextItemText()
-			: QString();
 		if (!actionText.isEmpty()) {
 			_menu->addAction(
 				actionText,
@@ -2657,6 +2645,16 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 		}
 	}
 
+	auto emojiPackIds = _dragStateItem
+		? HistoryView::CollectEmojiPacks(_dragStateItem)
+		: std::vector<StickerSetIdentifier>();
+	if (!emojiPackIds.empty()) {
+		HistoryView::AddEmojiPacksAction(
+			_menu,
+			this,
+			std::move(emojiPackIds),
+			_controller);
+	}
 	if (_menu->empty()) {
 		_menu = nullptr;
 	} else {
@@ -2827,26 +2825,30 @@ TextForMimeData HistoryInner::getSelectedText() const {
 		return TextForMimeData();
 	}
 
+	struct Part {
+		QString name;
+		QString time;
+		TextForMimeData unwrapped;
+	};
+
 	const auto timeFormat = QString(", [%1 %2]\n")
 		.arg(cDateFormat())
 		.arg(cTimeFormat());
 	auto groups = base::flat_set<not_null<const Data::Group*>>();
 	auto fullSize = 0;
-	auto texts = base::flat_map<Data::MessagePosition, TextForMimeData>();
+	auto texts = base::flat_map<Data::MessagePosition, Part>();
 
 	const auto wrapItem = [&](
 			not_null<HistoryItem*> item,
 			TextForMimeData &&unwrapped) {
-		auto time = ItemDateTime(item).toString(timeFormat);
-		auto part = TextForMimeData();
-		auto size = item->author()->name.size()
-			+ time.size()
-			+ unwrapped.expanded.size();
-		part.reserve(size);
-		part.append(item->author()->name).append(time);
-		part.append(std::move(unwrapped));
-		texts.emplace(item->position(), part);
-		fullSize += size;
+		const auto i = texts.emplace(item->position(), Part{
+			.name = item->author()->name,
+			.time = ItemDateTime(item).toString(timeFormat),
+			.unwrapped = std::move(unwrapped),
+		}).first;
+		fullSize += i->second.name.size()
+			+ i->second.time.size()
+			+ i->second.unwrapped.expanded.size();
 	};
 	const auto addItem = [&](not_null<HistoryItem*> item) {
 		wrapItem(item, HistoryItemText(item));
@@ -2872,12 +2874,15 @@ TextForMimeData HistoryInner::getSelectedText() const {
 			addItem(item);
 		}
 	}
-
+	if (texts.size() == 1) {
+		return texts.front().second.unwrapped;
+	}
 	auto result = TextForMimeData();
 	const auto sep = qstr("\n\n");
 	result.reserve(fullSize + (texts.size() - 1) * sep.size());
 	for (auto i = texts.begin(), e = texts.end(); i != e;) {
-		result.append(std::move(i->second));
+		result.append(i->second.name).append(i->second.time);
+		result.append(std::move(i->second.unwrapped));
 		if (++i != e) {
 			result.append(sep);
 		}
@@ -3449,7 +3454,7 @@ void HistoryInner::elementSendBotCommand(
 }
 
 void HistoryInner::elementHandleViaClick(not_null<UserData*> bot) {
-	App::insertBotCommand('@' + bot->username);
+	_widget->insertBotCommand('@' + bot->username);
 }
 
 bool HistoryInner::elementIsChatWide() {
@@ -4351,6 +4356,39 @@ void HistoryInner::onParentGeometryChanged() {
 	if (needToUpdate) {
 		mouseActionUpdate(mousePos);
 	}
+}
+
+Fn<HistoryView::ElementDelegate*()> HistoryInner::elementDelegateFactory(
+		FullMsgId itemId) const {
+	const auto weak = base::make_weak(_controller.get());
+	return [=]() -> HistoryView::ElementDelegate* {
+		if (const auto strong = weak.get()) {
+			auto &data = strong->session().data();
+			if (const auto item = data.message(itemId)) {
+				const auto history = item->history();
+				return history->delegateMixin()->delegate();
+			}
+		}
+		return nullptr;
+	};
+}
+
+ClickHandlerContext HistoryInner::prepareClickHandlerContext(
+		FullMsgId itemId) const {
+	return ClickHandlerContext{
+		.itemId = itemId,
+		.elementDelegate = elementDelegateFactory(itemId),
+		.sessionWindow = base::make_weak(_controller.get()),
+	};
+}
+
+ClickContext HistoryInner::prepareClickContext(
+		Qt::MouseButton button,
+		FullMsgId itemId) const {
+	return {
+		button,
+		QVariant::fromValue(prepareClickHandlerContext(itemId)),
+	};
 }
 
 auto HistoryInner::DelegateMixin()

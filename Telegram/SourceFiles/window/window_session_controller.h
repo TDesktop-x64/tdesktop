@@ -12,6 +12,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/observer.h"
 #include "base/weak_ptr.h"
 #include "base/timer.h"
+#include "boxes/gift_premium_box.h" // GiftPremiumValidator.
 #include "data/data_chat_participant_status.h"
 #include "dialogs/dialogs_key.h"
 #include "ui/layers/layer_widget.h"
@@ -83,7 +84,7 @@ class FiltersMenu;
 enum class GifPauseReason {
 	Any           = 0,
 	InlineResults = (1 << 0),
-	SavedGifs     = (1 << 1),
+	TabbedPanel   = (1 << 1),
 	Layer         = (1 << 2),
 	RoundPlaying  = (1 << 3),
 	MediaPreview  = (1 << 4),
@@ -354,6 +355,7 @@ public:
 		Dialogs::RowDescriptor from = {}) const;
 
 	void showEditPeerBox(PeerData *peer);
+	void showGiftPremiumBox(UserData *user);
 
 	void enableGifPauseReason(GifPauseReason reason);
 	void disableGifPauseReason(GifPauseReason reason);
@@ -600,6 +602,8 @@ private:
 
 	using ReactionIconFactory = HistoryView::Reactions::CachedIconFactory;
 	std::unique_ptr<ReactionIconFactory> _cachedReactionIconFactory;
+
+	GiftPremiumValidator _giftPremiumValidator;
 
 	QString _premiumRef;
 

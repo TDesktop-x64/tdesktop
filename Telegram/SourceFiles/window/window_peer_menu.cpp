@@ -214,6 +214,7 @@ private:
 	void addNewMembers();
 	void addDeleteContact();
 	void addTTLSubmenu(bool addSeparator);
+	void addGiftPremium();
 	void addPinnedMessages();
 	void addFirstMessage();
 	void addViewChannel();
@@ -821,6 +822,24 @@ void Filler::addTTLSubmenu(bool addSeparator) {
 	}
 }
 
+void Filler::addGiftPremium() {
+	const auto user = _peer->asUser();
+	if (!user
+		|| user->isInaccessible()
+		|| user->isSelf()
+		|| user->isBot()
+		|| user->isNotificationsUser()
+		|| !user->canReceiveGifts()
+		|| user->isRepliesChat()) {
+		return;
+	}
+
+	const auto navigation = _controller;
+	_addAction(tr::lng_profile_gift_premium(tr::now), [=] {
+		navigation->showGiftPremiumBox(user);
+	}, &st::menuIconGiftPremium);
+}
+
 void Filler::addPinnedMessages() {
 	const auto channel = _peer->asChannel();
 	if (!channel) {
@@ -933,6 +952,7 @@ void Filler::fillProfileActions() {
 	addNewContact();
 	addShareContact();
 	addEditContact();
+	addGiftPremium();
 	addBotToGroup();
 	addNewMembers();
 	addManageChat();

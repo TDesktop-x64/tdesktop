@@ -240,6 +240,8 @@ PRIVATE
     boxes/edit_color_box.h
     boxes/edit_privacy_box.cpp
     boxes/edit_privacy_box.h
+    boxes/gift_premium_box.cpp
+    boxes/gift_premium_box.h
     boxes/language_box.cpp
     boxes/language_box.h
     boxes/local_storage_box.cpp
@@ -368,8 +370,12 @@ PRIVATE
     chat_helpers/stickers_emoji_image_loader.h
     chat_helpers/stickers_emoji_pack.cpp
     chat_helpers/stickers_emoji_pack.h
+    chat_helpers/stickers_gift_box_pack.cpp
+    chat_helpers/stickers_gift_box_pack.h
     chat_helpers/stickers_dice_pack.cpp
     chat_helpers/stickers_dice_pack.h
+    chat_helpers/stickers_list_footer.cpp
+    chat_helpers/stickers_list_footer.h
     chat_helpers/stickers_list_widget.cpp
     chat_helpers/stickers_list_widget.h
     chat_helpers/stickers_lottie.cpp
@@ -423,6 +429,8 @@ PRIVATE
     data/notify/data_notify_settings.h
     data/notify/data_peer_notify_settings.cpp
     data/notify/data_peer_notify_settings.h
+    data/stickers/data_custom_emoji.cpp
+    data/stickers/data_custom_emoji.h
     data/stickers/data_stickers_set.cpp
     data/stickers/data_stickers_set.h
     data/stickers/data_stickers.cpp
@@ -642,6 +650,8 @@ PRIVATE
     history/view/media/history_view_photo.cpp
     history/view/media/history_view_poll.h
     history/view/media/history_view_poll.cpp
+    history/view/media/history_view_service_media_gift.h
+    history/view/media/history_view_service_media_gift.cpp
     history/view/media/history_view_slot_machine.h
     history/view/media/history_view_slot_machine.cpp
     history/view/media/history_view_sticker.h

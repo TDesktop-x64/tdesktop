@@ -25,6 +25,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_session.h"
 #include "data/data_user.h"
 #include "data/data_premium_limits.h"
+#include "data/stickers/data_custom_emoji.h"
 #include "editor/photo_editor_layer_widget.h"
 #include "history/history_drag_area.h"
 #include "history/history_item.h"
@@ -241,19 +242,18 @@ void EditCaptionBox::rebuildPreview() {
 }
 
 void EditCaptionBox::setupField() {
-	const auto show = std::make_shared<Window::Show>(_controller);
-	const auto session = &_controller->session();
+	InitMessageFieldHandlers(
+		_controller,
+		_field.get(),
+		Window::GifPauseReason::Layer);
+	Ui::Emoji::SuggestionsController::Init(
+		getDelegate()->outerContainer(),
+		_field,
+		&_controller->session());
+
 	_field->setSubmitSettings(
 		Core::App().settings().sendSubmitWay());
-	_field->setInstantReplaces(Ui::InstantReplaces::Default());
-	_field->setInstantReplacesEnabled(
-		Core::App().settings().replaceEmojiValue());
-	_field->setMarkdownReplacesEnabled(rpl::single(true));
-	_field->setEditLinkCallback(
-		DefaultEditLinkCallback(show, session, _field));
 	_field->setMaxHeight(st::confirmCaptionArea.heightMax);
-
-	InitSpellchecker(show, session, _field);
 
 	connect(_field, &Ui::InputField::submitted, [=] { save(); });
 	connect(_field, &Ui::InputField::cancelled, [=] { closeBox(); });
@@ -273,10 +273,6 @@ void EditCaptionBox::setupField() {
 		}
 		Unexpected("Action in MimeData hook.");
 	});
-	Ui::Emoji::SuggestionsController::Init(
-		getDelegate()->outerContainer(),
-		_field,
-		&_controller->session());
 
 	auto cursor = _field->textCursor();
 	cursor.movePosition(QTextCursor::End);
@@ -478,13 +474,15 @@ void EditCaptionBox::setupDragArea() {
 
 void EditCaptionBox::setupEmojiPanel() {
 	const auto container = getDelegate()->outerContainer();
+	using Selector = ChatHelpers::TabbedSelector;
 	_emojiPanel = base::make_unique_q<ChatHelpers::TabbedPanel>(
 		container,
 		_controller,
-		object_ptr<ChatHelpers::TabbedSelector>(
+		object_ptr<Selector>(
 			nullptr,
 			_controller,
-			ChatHelpers::TabbedSelector::Mode::EmojiOnly));
+			Window::GifPauseReason::Layer,
+			Selector::Mode::EmojiOnly));
 	_emojiPanel->setDesiredHeightValues(
 		1.,
 		st::emojiPanMinHeight / 2,
@@ -493,6 +491,10 @@ void EditCaptionBox::setupEmojiPanel() {
 	_emojiPanel->selector()->emojiChosen(
 	) | rpl::start_with_next([=](EmojiPtr emoji) {
 		Ui::InsertEmojiAtCursor(_field->textCursor(), emoji);
+	}, lifetime());
+	_emojiPanel->selector()->customEmojiChosen(
+	) | rpl::start_with_next([=](Selector::FileChosen data) {
+		Data::InsertCustomEmoji(_field.get(), data.document);
 	}, lifetime());
 
 	const auto filterCallback = [=](not_null<QEvent*> event) {

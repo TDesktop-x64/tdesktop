@@ -415,6 +415,32 @@ void Element::setY(int y) {
 void Element::refreshDataIdHook() {
 }
 
+void Element::customEmojiRepaint() {
+	if (!_customEmojiRepaintScheduled) {
+		_customEmojiRepaintScheduled = true;
+		history()->owner().requestViewRepaint(this);
+	}
+}
+
+void Element::clearCustomEmojiRepaint() const {
+	_customEmojiRepaintScheduled = false;
+	data()->_customEmojiRepaintScheduled = false;
+}
+
+void Element::prepareCustomEmojiPaint(
+		Painter &p,
+		const Ui::Text::String &text) const {
+	if (!text.hasCustomEmoji()) {
+		return;
+	}
+	clearCustomEmojiRepaint();
+	p.setInactive(delegate()->elementIsGifPaused());
+	if (!_heavyCustomEmoji) {
+		_heavyCustomEmoji = true;
+		history()->owner().registerHeavyViewPart(const_cast<Element*>(this));
+	}
+}
+
 //void Element::externalLottieProgressing(bool external) const {
 //	if (const auto media = _media.get()) {
 //		media->externalLottieProgressing(external);
@@ -900,7 +926,7 @@ auto Element::verticalRepaintRange() const -> VerticalRepaintRange {
 }
 
 bool Element::hasHeavyPart() const {
-	return false;
+	return _heavyCustomEmoji;
 }
 
 void Element::checkHeavyPart() {
@@ -920,6 +946,13 @@ void Element::unloadHeavyPart() {
 	history()->owner().unregisterHeavyViewPart(this);
 	if (_media) {
 		_media->unloadHeavyPart();
+	}
+	if (_heavyCustomEmoji) {
+		_heavyCustomEmoji = false;
+		data()->_text.unloadCustomEmoji();
+		if (const auto reply = data()->Get<HistoryMessageReply>()) {
+			reply->replyToText.unloadCustomEmoji();
+		}
 	}
 }
 
@@ -1094,6 +1127,11 @@ auto Element::takeReactionAnimations()
 Element::~Element() {
 	// Delete media while owner still exists.
 	base::take(_media);
+	if (_heavyCustomEmoji) {
+		_heavyCustomEmoji = false;
+		data()->_text.unloadCustomEmoji();
+		checkHeavyPart();
+	}
 	if (_data->mainView() == this) {
 		_data->clearMainView();
 	}

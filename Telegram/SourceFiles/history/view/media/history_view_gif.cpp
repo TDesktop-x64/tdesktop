@@ -675,6 +675,7 @@ void Gif::draw(Painter &p, const PaintContext &context) const {
 	}
 	if (!unwrapped && !_caption.isEmpty()) {
 		p.setPen(stm->historyTextFg);
+		_parent->prepareCustomEmojiPaint(p, _caption);
 		_caption.draw(p, st::msgPadding.left(), painty + painth + st::mediaCaptionSkip, captionw, style::al_left, 0, -1, context.selection);
 	} else if (!inWebPage && !skipDrawingSurrounding) {
 		auto fullRight = paintx + usex + usew;
@@ -1475,6 +1476,7 @@ void Gif::unloadHeavyPart() {
 	stopAnimation();
 	_dataMedia = nullptr;
 	_videoThumbnailFrame = nullptr;
+	_caption.unloadCustomEmoji();
 }
 
 void Gif::refreshParentId(not_null<HistoryItem*> realParent) {

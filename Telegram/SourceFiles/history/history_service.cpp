@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/history_service.h"
 
+#include "chat_helpers/stickers_gift_box_pack.h"
 #include "lang/lang_keys.h"
 #include "mainwidget.h"
 #include "main/main_session.h"
@@ -31,6 +32,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_group_call.h" // Data::GroupCall::id().
 #include "core/application.h"
 #include "core/click_handler_types.h"
+#include "core/ui_integration.h"
 #include "base/unixtime.h"
 #include "base/timer_rpl.h"
 #include "calls/calls_instance.h" // Core::App().calls().joinGroupCall.
@@ -621,6 +623,27 @@ void HistoryService::setMessageByAction(const MTPmessageAction &action) {
 		return result;
 	};
 
+	auto prepareGiftPremium = [&](
+			const MTPDmessageActionGiftPremium &action) {
+		auto result = PreparedText{};
+		const auto isSelf = (_from->id == _from->session().userPeerId());
+		const auto peer = isSelf ? history()->peer : _from;
+		history()->session().giftBoxStickersPacks().load();
+		const auto amount = action.vamount().v;
+		const auto currency = qs(action.vcurrency());
+		result.links.push_back(peer->createOpenLink());
+		result.text = (isSelf
+			? tr::lng_action_gift_received_me
+			: tr::lng_action_gift_received)(
+				tr::now,
+				lt_user,
+				Ui::Text::Link(peer->name, 1), // Link 1.
+				lt_cost,
+				{ Ui::FillAmountAndCurrency(amount, currency) },
+				Ui::Text::WithEntities);
+		return result;
+	};
+
 	const auto messageText = action.match([&](
 		const MTPDmessageActionChatAddUser &data) {
 		return prepareChatAddUserText(data);
@@ -688,6 +711,8 @@ void HistoryService::setMessageByAction(const MTPmessageAction &action) {
 		return prepareChatJoinedByRequest(data);
 	}, [&](const MTPDmessageActionWebViewDataSent &data) {
 		return prepareWebViewDataSent(data);
+	}, [&](const MTPDmessageActionGiftPremium &data) {
+		return prepareGiftPremium(data);
 	}, [&](const MTPDmessageActionWebViewDataSentMe &data) {
 		LOG(("API Error: messageActionWebViewDataSentMe received."));
 		return PreparedText{
@@ -746,6 +771,11 @@ void HistoryService::applyAction(const MTPMessageAction &action) {
 				channel->mgInfo->joinedMessageFound = true;
 			}
 		}
+	}, [&](const MTPDmessageActionGiftPremium &data) {
+		_media = std::make_unique<Data::MediaGiftBox>(
+			this,
+			_from,
+			data.vmonths().v);
 	}, [](const auto &) {
 	});
 }
@@ -927,7 +957,12 @@ HistoryService::PreparedText HistoryService::preparePinnedText() {
 			original = Ui::Text::Wrapped(
 				Ui::Text::Filtered(
 					std::move(original),
-					{ EntityType::Spoiler, EntityType::StrikeOut }),
+					{
+						EntityType::Spoiler,
+						EntityType::StrikeOut,
+						EntityType::Italic,
+						EntityType::CustomEmoji,
+					}),
 				EntityType::CustomUrl,
 				Ui::Text::Link({}, 2).entities.front().data());
 			result.text = tr::lng_action_pinned_message(
@@ -1255,10 +1290,15 @@ ClickHandlerPtr HistoryService::fromLink() const {
 void HistoryService::setServiceText(const PreparedText &prepared) {
 	PreparedText prepare = prepared;
 	prepare.text.text += GenerateServiceTime(date());
+	const auto context = Core::MarkedTextContext{
+		.session = &history()->session(),
+		.customEmojiRepaint = [=] { customEmojiRepaint(); },
+	};
 	_text.setMarkedText(
 		st::serviceTextStyle,
 		prepare.text,
-		Ui::ItemTextServiceOptions());
+		Ui::ItemTextServiceOptions(),
+		context);
 	HistoryView::FillTextWithAnimatedSpoilers(_text);
 	auto linkIndex = 0;
 	for (const auto &link : prepared.links) {

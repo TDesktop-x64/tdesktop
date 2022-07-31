@@ -47,19 +47,20 @@ enum class Notification;
 namespace ChatHelpers {
 
 struct StickerIcon;
+enum class ValidateIconAnimations;
+class StickersListFooter;
+class LocalStickersManager;
 
 class StickersListWidget final : public TabbedSelector::Inner {
 public:
 	StickersListWidget(
 		QWidget *parent,
 		not_null<Window::SessionController*> controller,
+		Window::GifPauseReason level,
 		bool masks = false);
-
-	Main::Session &session() const;
 
 	rpl::producer<TabbedSelector::FileChosen> chosen() const;
 	rpl::producer<> scrollUpdated() const;
-	rpl::producer<> checkForHide() const;
 	rpl::producer<TabbedSelector::Action> choosingUpdated() const;
 
 	void refreshRecent() override;
@@ -76,13 +77,8 @@ public:
 	void refreshStickers();
 
 	std::vector<StickerIcon> fillIcons();
-	bool preventAutoHide();
 
 	uint64 currentSet(int yOffset) const;
-
-	void installedLocally(uint64 setId);
-	void notInstalledLocally(uint64 setId);
-	void clearInstalledLocally();
 
 	void sendSearchRequest();
 	void searchForSets(const QString &query);
@@ -117,7 +113,6 @@ protected:
 	int countDesiredHeight(int newWidth) override;
 
 private:
-	class Footer;
 	struct Sticker;
 	struct Set;
 
@@ -205,13 +200,8 @@ private:
 
 	void setSection(Section section);
 	void displaySet(uint64 setId);
-	void checkHideWithBox(QPointer<Ui::BoxContent> box);
-	void installSet(uint64 setId);
 	void removeMegagroupSet(bool locally);
 	void removeSet(uint64 setId);
-	void sendInstallRequest(
-		uint64 setId,
-		const MTPInputStickerSet &input);
 	void refreshMySets();
 	void refreshFeaturedSets();
 	void refreshSearchSets();
@@ -235,13 +225,6 @@ private:
 	void setPressed(OverState newPressed);
 	std::unique_ptr<Ui::RippleAnimation> createButtonRipple(int section);
 	QPoint buttonRippleTopLeft(int section) const;
-
-	enum class ValidateIconAnimations {
-		Full,
-		Scroll,
-		None,
-	};
-	void validateSelectedIcon(ValidateIconAnimations animations);
 
 	std::vector<Set> &shownSets();
 	const std::vector<Set> &shownSets() const;
@@ -288,14 +271,16 @@ private:
 		const SectionInfo &info,
 		crl::time now);
 
-	int stickersRight() const;
-	bool featuredHasAddButton(int index) const;
-	QRect featuredAddRect(int index) const;
-	bool hasRemoveButton(int index) const;
-	QRect removeButtonRect(int index) const;
-	int megagroupSetInfoLeft() const;
+	[[nodiscard]] int stickersRight() const;
+	[[nodiscard]] bool featuredHasAddButton(int index) const;
+	[[nodiscard]] QRect featuredAddRect(int index) const;
+	[[nodiscard]] QRect featuredAddRect(const SectionInfo &info) const;
+	[[nodiscard]] bool hasRemoveButton(int index) const;
+	[[nodiscard]] QRect removeButtonRect(int index) const;
+	[[nodiscard]] QRect removeButtonRect(const SectionInfo &info) const;
+	[[nodiscard]] int megagroupSetInfoLeft() const;
 	void refreshMegagroupSetGeometry();
-	QRect megagroupSetButtonRectFinal() const;
+	[[nodiscard]] QRect megagroupSetButtonRectFinal() const;
 
 	[[nodiscard]] const Data::StickersSetsOrder &defaultSetsOrder() const;
 	[[nodiscard]] Data::StickersSetsOrder &defaultSetsOrderRef();
@@ -318,6 +303,7 @@ private:
 	void removeFavedSticker(int section, int index);
 	void setColumnCount(int count);
 	void refreshFooterIcons();
+	void refreshIcons(ValidateIconAnimations animations);
 
 	void showStickerSetBox(not_null<DocumentData*> document);
 
@@ -342,6 +328,7 @@ private:
 		not_null<DocumentData*> document);
 
 	MTP::Sender _api;
+	std::unique_ptr<LocalStickersManager> _localSetsManager;
 	ChannelData *_megagroupSet = nullptr;
 	uint64 _megagroupSetIdRequested = 0;
 	std::vector<Set> _mySets;
@@ -349,7 +336,6 @@ private:
 	std::vector<Set> _searchSets;
 	int _premiumsIndex = -1;
 	int _featuredSetsCount = 0;
-	base::flat_set<uint64> _installedLocallySets;
 	std::vector<bool> _custom;
 	base::flat_set<not_null<DocumentData*>> _favedStickersMap;
 	std::weak_ptr<Lottie::FrameRenderer> _lottieRenderer;
@@ -367,10 +353,7 @@ private:
 	base::Timer _updateSetsTimer;
 	base::flat_set<uint64> _repaintSetsIds;
 
-	bool _displayingSet = false;
-	uint64 _removingSetId = 0;
-
-	Footer *_footer = nullptr;
+	StickersListFooter *_footer = nullptr;
 	int _rowsLeft = 0;
 	int _columnCount = 1;
 	QSize _singleSize;
@@ -405,9 +388,12 @@ private:
 
 	rpl::event_stream<TabbedSelector::FileChosen> _chosen;
 	rpl::event_stream<> _scrollUpdated;
-	rpl::event_stream<> _checkForHide;
 	rpl::event_stream<TabbedSelector::Action> _choosingUpdated;
 
 };
+
+[[nodiscard]] object_ptr<Ui::BoxContent> MakeConfirmRemoveSetBox(
+	not_null<Main::Session*> session,
+	uint64 setId);
 
 } // namespace ChatHelpers

@@ -22,8 +22,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Core {
 namespace {
 
-constexpr auto kRecentEmojiLimit = 42;
-
 [[nodiscard]] WindowPosition Deserialize(const QByteArray &data) {
 	QDataStream stream(data);
 	stream.setVersion(QDataStream::Qt_5_1);
@@ -67,6 +65,24 @@ constexpr auto kRecentEmojiLimit = 42;
 	return result;
 }
 
+[[nodiscard]] QString Serialize(RecentEmojiDocument document) {
+	return u"%1-%2"_q.arg(document.id).arg(document.test ? 1 : 0);
+}
+
+[[nodiscard]] std::optional<RecentEmojiDocument> ParseRecentEmojiDocument(
+		const QString &serialized) {
+	const auto parts = QStringView(serialized).split('-');
+	if (parts.size() != 2 || parts[1].size() != 1) {
+		return {};
+	}
+	const auto id = parts[0].toULongLong();
+	const auto test = parts[1][0];
+	if (!id || (test != '0' && test != '1')) {
+		return {};
+	}
+	return RecentEmojiDocument{ id, (test == '1') };
+}
+
 } // namespace
 
 Settings::Settings()
@@ -81,11 +97,18 @@ QByteArray Settings::serialize() const {
 	const auto windowPosition = Serialize(_windowPosition);
 	const auto proxy = _proxy.serialize();
 
-	auto recentEmojiPreloadGenerated = std::vector<RecentEmojiId>();
+	auto recentEmojiPreloadGenerated = std::vector<RecentEmojiPreload>();
 	if (_recentEmojiPreload.empty()) {
 		recentEmojiPreloadGenerated.reserve(_recentEmoji.size());
-		for (const auto &[emoji, rating] : _recentEmoji) {
-			recentEmojiPreloadGenerated.push_back({ emoji->id(), rating });
+		for (const auto &[id, rating] : _recentEmoji) {
+			auto string = QString();
+			if (const auto document = std::get_if<RecentEmojiDocument>(
+					&id.data)) {
+				string = Serialize(*document);
+			} else if (const auto emoji = std::get_if<EmojiPtr>(&id.data)) {
+				string = (*emoji)->id();
+			}
+			recentEmojiPreloadGenerated.push_back({ string, rating });
 		}
 	}
 	const auto &recentEmojiPreloadData = _recentEmojiPreload.empty()
@@ -316,7 +339,7 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 	qint32 callAudioBackend = 0;
 	qint32 disableCallsLegacy = 0;
 	QByteArray windowPosition;
-	std::vector<RecentEmojiId> recentEmojiPreload;
+	std::vector<RecentEmojiPreload> recentEmojiPreload;
 	base::flat_map<QString, uint8> emojiVariants;
 	qint32 disableOpenGL = _disableOpenGL ? 1 : 0;
 	qint32 groupCallNoiseSuppression = _groupCallNoiseSuppression ? 1 : 0;
@@ -782,7 +805,7 @@ rpl::producer<int> Settings::thirdColumnWidthChanges() const {
 	return _thirdColumnWidth.changes();
 }
 
-const std::vector<Settings::RecentEmoji> &Settings::recentEmoji() const {
+const std::vector<RecentEmoji> &Settings::recentEmoji() const {
 	if (_recentEmoji.empty()) {
 		resolveRecentEmoji();
 	}
@@ -790,49 +813,52 @@ const std::vector<Settings::RecentEmoji> &Settings::recentEmoji() const {
 }
 
 void Settings::resolveRecentEmoji() const {
-	const auto haveAlready = [&](EmojiPtr emoji) {
+	const auto haveAlready = [&](RecentEmojiId id) {
 		return ranges::contains(
 			_recentEmoji,
-			emoji->id(),
-			[](const RecentEmoji &data) { return data.emoji->id(); });
+			id,
+			[](const RecentEmoji &data) { return data.id; });
 	};
+	auto testCount = 0;
+	auto nonTestCount = 0;
 	if (!_recentEmojiPreload.empty()) {
 		_recentEmoji.reserve(_recentEmojiPreload.size());
 		for (const auto &[id, rating] : base::take(_recentEmojiPreload)) {
-			if (const auto emoji = Ui::Emoji::Find(id)) {
-				if (!haveAlready(emoji)) {
-					_recentEmoji.push_back({ emoji, rating });
+			auto length = int();
+			const auto emoji = Ui::Emoji::Find(id, &length);
+			if (emoji && length == id.size()) {
+				if (!haveAlready({ emoji })) {
+					_recentEmoji.push_back({ { emoji }, rating });
+				}
+			} else if (const auto document = ParseRecentEmojiDocument(id)) {
+				if (!haveAlready({ *document })) {
+					_recentEmoji.push_back({ { *document }, rating });
+					if (document->test) {
+						++testCount;
+					} else {
+						++nonTestCount;
+					}
 				}
 			}
 		}
 		_recentEmojiPreload.clear();
 	}
+	const auto specialCount = std::max(testCount, nonTestCount);
 	for (const auto emoji : Ui::Emoji::GetDefaultRecent()) {
-		if (_recentEmoji.size() >= kRecentEmojiLimit) {
+		if (_recentEmoji.size() >= specialCount + kRecentEmojiLimit) {
 			break;
-		} else if (!haveAlready(emoji)) {
-			_recentEmoji.push_back({ emoji, 1 });
+		} else if (!haveAlready({ emoji })) {
+			_recentEmoji.push_back({ { emoji }, 1 });
 		}
 	}
 }
 
-EmojiPack Settings::recentEmojiSection() const {
-	const auto &recent = recentEmoji();
-
-	auto result = EmojiPack();
-	result.reserve(recent.size());
-	for (const auto &[emoji, rating] : recent) {
-		result.push_back(emoji);
-	}
-	return result;
-}
-
-void Settings::incrementRecentEmoji(EmojiPtr emoji) {
+void Settings::incrementRecentEmoji(RecentEmojiId id) {
 	resolveRecentEmoji();
 
 	auto i = _recentEmoji.begin(), e = _recentEmoji.end();
 	for (; i != e; ++i) {
-		if (i->emoji == emoji) {
+		if (i->id == id) {
 			++i->rating;
 			if (i->rating > 0x8000) {
 				for (auto j = _recentEmoji.begin(); j != e; ++j) {
@@ -853,15 +879,28 @@ void Settings::incrementRecentEmoji(EmojiPtr emoji) {
 		}
 	}
 	if (i == e) {
-		while (_recentEmoji.size() >= kRecentEmojiLimit) {
-			_recentEmoji.pop_back();
-		}
-		_recentEmoji.push_back({ emoji, 1 });
+		_recentEmoji.push_back({ id, 1 });
 		for (i = _recentEmoji.end() - 1; i != _recentEmoji.begin(); --i) {
 			if ((i - 1)->rating > i->rating) {
 				break;
 			}
 			std::swap(*i, *(i - 1));
+		}
+		auto testCount = 0;
+		auto nonTestCount = 0;
+		for (const auto &emoji : _recentEmoji) {
+			const auto id = &emoji.id.data;
+			if (const auto document = std::get_if<RecentEmojiDocument>(id)) {
+				if (document->test) {
+					++testCount;
+				} else {
+					++nonTestCount;
+				}
+			}
+		}
+		const auto specialCount = std::max(testCount, nonTestCount);
+		while (_recentEmoji.size() >= specialCount + kRecentEmojiLimit) {
+			_recentEmoji.pop_back();
 		}
 	}
 	_recentEmojiUpdated.fire({});
@@ -969,8 +1008,6 @@ void Settings::resetOnLastLogout() {
 	_recentEmojiPreload.clear();
 	_recentEmoji.clear();
 	_emojiVariants.clear();
-
-	_workMode = WorkMode::WindowAndTray;
 
 	_accountsOrder.clear();
 }

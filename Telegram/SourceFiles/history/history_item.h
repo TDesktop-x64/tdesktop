@@ -431,6 +431,7 @@ public:
 
 	void updateDate(TimeId newDate);
 	[[nodiscard]] bool canUpdateDate() const;
+	void customEmojiRepaint();
 
 	[[nodiscard]] TimeId ttlDestroyAt() const {
 		return _ttlDestroyAt;
@@ -481,6 +482,7 @@ protected:
 	Ui::Text::String _text = { st::msgMinWidth };
 	int _textWidth = -1;
 	int _textHeight = 0;
+	bool _customEmojiRepaintScheduled = false;
 
 	struct SavedMediaData {
 		TextWithEntities text;

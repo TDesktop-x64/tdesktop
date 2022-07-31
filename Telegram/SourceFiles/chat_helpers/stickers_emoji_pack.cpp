@@ -142,26 +142,33 @@ void EmojiPack::remove(not_null<const HistoryItem*> item) {
 	}
 }
 
-auto EmojiPack::stickerForEmoji(const IsolatedEmoji &emoji) -> Sticker {
-	Expects(!emoji.empty());
+auto EmojiPack::stickerForEmoji(EmojiPtr emoji) -> Sticker {
+	Expects(emoji != nullptr);
 
-	if (emoji.items[1] != nullptr) {
-		return Sticker();
-	}
-	const auto first = emoji.items[0];
-	const auto i = _map.find(first);
+	const auto i = _map.find(emoji);
 	if (i != end(_map)) {
 		return { i->second.get(), nullptr };
 	}
-	if (!first->colored()) {
-		return Sticker();
+	if (!emoji->colored()) {
+		return {};
 	}
-	const auto j = _map.find(first->original());
+	const auto j = _map.find(emoji->original());
 	if (j != end(_map)) {
-		const auto index = first->variantIndex(first);
+		const auto index = emoji->variantIndex(emoji);
 		return { j->second.get(), ColorReplacements(index) };
 	}
-	return Sticker();
+	return {};
+}
+
+auto EmojiPack::stickerForEmoji(const IsolatedEmoji &emoji) -> Sticker {
+	Expects(!emoji.empty());
+
+	if (!v::is_null(emoji.items[1])) {
+		return {};
+	} else if (const auto regular = std::get_if<EmojiPtr>(&emoji.items[0])) {
+		return stickerForEmoji(*regular);
+	}
+	return {};
 }
 
 std::shared_ptr<LargeEmojiImage> EmojiPack::image(EmojiPtr emoji) {

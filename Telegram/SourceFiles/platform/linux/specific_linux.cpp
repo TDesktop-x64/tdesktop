@@ -118,12 +118,10 @@ void PortalAutostart(bool start, bool silent) {
 				const Glib::ustring &object_path,
 				const Glib::ustring &interface_name,
 				const Glib::ustring &signal_name,
-				const Glib::VariantContainerBase &parameters) {
+				Glib::VariantContainerBase parameters) {
 				try {
-					auto parametersCopy = parameters;
-
 					const auto response = base::Platform::GlibVariantCast<
-						uint>(parametersCopy.get_child(0));
+						uint>(parameters.get_child(0));
 
 					if (response && !silent) {
 						LOG(("Portal Autostart Error: Request denied"));
@@ -640,6 +638,18 @@ void finish() {
 
 void psNewVersion() {
 	Platform::InstallLauncher();
+	if (Local::oldSettingsVersion() > 0
+		&& Local::oldSettingsVersion() <= 4000002
+		&& qEnvironmentVariableIsSet("WAYLAND_DISPLAY")
+		&& DesktopEnvironment::IsGnome()
+		&& !QFile::exists(cWorkingDir() + qsl("tdata/nowayland"))) {
+		QFile f(cWorkingDir() + qsl("tdata/nowayland"));
+		if (f.open(QIODevice::WriteOnly)) {
+			f.write("1");
+			f.close();
+			Core::Restart(); // restart with X backend
+		}
+	}
 }
 
 void psSendToMenu(bool send, bool silent) {

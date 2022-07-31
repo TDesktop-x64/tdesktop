@@ -29,6 +29,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_chat.h"
 #include "data/data_channel.h"
 #include "data/stickers/data_stickers.h"
+#include "data/stickers/data_custom_emoji.h"
 #include "data/data_web_page.h"
 #include "storage/storage_account.h"
 #include "apiwrap.h"
@@ -810,6 +811,7 @@ MessageToEdit FieldHeader::queryToEdit() {
 ComposeControls::ComposeControls(
 	not_null<Ui::RpWidget*> parent,
 	not_null<Window::SessionController*> window,
+	Fn<void(not_null<DocumentData*>)> unavailableEmojiPasted,
 	Mode mode,
 	SendMenu::Type sendMenuType)
 : _parent(parent)
@@ -846,6 +848,7 @@ ComposeControls::ComposeControls(
 		_send,
 		st::historySendSize.height()))
 , _sendMenuType(sendMenuType)
+, _unavailableEmojiPasted(unavailableEmojiPasted)
 , _saveDraftTimer([=] { saveDraft(); }) {
 	init();
 }
@@ -1419,14 +1422,13 @@ void ComposeControls::initField() {
 	Ui::Connect(_field, &Ui::InputField::resized, [=] { updateHeight(); });
 	//Ui::Connect(_field, &Ui::InputField::focused, [=] { fieldFocused(); });
 	Ui::Connect(_field, &Ui::InputField::changed, [=] { fieldChanged(); });
-	InitMessageField(_window, _field);
+	InitMessageField(_window, _field, _unavailableEmojiPasted);
 	initAutocomplete();
 	const auto suggestions = Ui::Emoji::SuggestionsController::Init(
 		_parent,
 		_field,
 		&_window->session());
 	_raiseEmojiSuggestions = [=] { suggestions->raise(); };
-	InitSpellchecker(_window, _field);
 
 	const auto rawTextEdit = _field->rawTextEdit().get();
 	rpl::merge(
@@ -1529,6 +1531,7 @@ void ComposeControls::initAutocomplete() {
 	}, _autocomplete->lifetime());
 
 	_window->session().data().stickers().updated(
+		Data::StickersType::Stickers
 	) | rpl::start_with_next([=] {
 		updateStickersByEmoji();
 	}, _autocomplete->lifetime());
@@ -1829,6 +1832,12 @@ void ComposeControls::initTabbedSelector() {
 		Ui::InsertEmojiAtCursor(_field->textCursor(), emoji);
 	}, wrap->lifetime());
 
+	using FileChosen = ChatHelpers::TabbedSelector::FileChosen;
+	selector->customEmojiChosen(
+	) | rpl::start_with_next([=](FileChosen data) {
+		Data::InsertCustomEmoji(_field, data.document);
+	}, wrap->lifetime());
+
 	selector->fileChosen(
 	) | rpl::start_to_stream(_fileChosen, wrap->lifetime());
 
@@ -1956,11 +1965,22 @@ void ComposeControls::initVoiceRecordBar() {
 	}, _wrap->lifetime());
 
 	_voiceRecordBar->setStartRecordingFilter([=] {
-		const auto error = _history
-			? Data::RestrictionError(
-				_history->peer,
-				ChatRestriction::SendMedia)
-			: std::nullopt;
+		const auto error = [&]() -> std::optional<QString> {
+			const auto peer = _history ? _history->peer.get() : nullptr;
+			if (!peer) {
+				if (const auto error = Data::RestrictionError(
+						peer,
+						ChatRestriction::SendMedia)) {
+					return error;
+				}
+				if (const auto error = Data::RestrictionError(
+						peer,
+						UserRestriction::SendVoiceMessages)) {
+					return error;
+				}
+			}
+			return std::nullopt;
+		}();
 		if (error) {
 			_window->show(Ui::MakeInformBox(*error));
 			return true;

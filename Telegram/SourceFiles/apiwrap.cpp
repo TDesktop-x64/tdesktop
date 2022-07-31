@@ -1419,12 +1419,16 @@ void ApiWrap::requestStickerSets() {
 void ApiWrap::saveStickerSets(
 		const Data::StickersSetsOrder &localOrder,
 		const Data::StickersSetsOrder &localRemoved,
-		bool setsMasks) {
-	auto &setDisenableRequests = setsMasks
+		Data::StickersType type) {
+	auto &setDisenableRequests = (type == Data::StickersType::Emoji)
+		? _customEmojiSetDisenableRequests
+		: (type == Data::StickersType::Masks)
 		? _maskSetDisenableRequests
 		: _stickerSetDisenableRequests;
 	const auto reorderRequestId = [=]() -> mtpRequestId & {
-		return setsMasks
+		return (type == Data::StickersType::Emoji)
+			? _customEmojiReorderRequestId
+			: (type == Data::StickersType::Masks)
 			? _masksReorderRequestId
 			: _stickersReorderRequestId;
 	};
@@ -1445,9 +1449,12 @@ void ApiWrap::saveStickerSets(
 			mtpOrder.push_back(MTP_long(setId));
 		}
 
-		const auto flags = setsMasks
-			? MTPmessages_ReorderStickerSets::Flag::f_masks
-			: MTPmessages_ReorderStickerSets::Flags(0);
+		using Flag = MTPmessages_ReorderStickerSets::Flag;
+		const auto flags = (type == Data::StickersType::Emoji)
+			? Flag::f_emojis
+			: (type == Data::StickersType::Masks)
+			? Flag::f_masks
+			: Flag(0);
 		reorderRequestId() = request(MTPmessages_ReorderStickerSets(
 			MTP_flags(flags),
 			MTP_vector<MTPlong>(mtpOrder)
@@ -1455,7 +1462,10 @@ void ApiWrap::saveStickerSets(
 			reorderRequestId() = 0;
 		}).fail([=] {
 			reorderRequestId() = 0;
-			if (setsMasks) {
+			if (type == Data::StickersType::Emoji) {
+				_session->data().stickers().setLastEmojiUpdate(0);
+				updateCustomEmoji();
+			} else if (type == Data::StickersType::Masks) {
 				_session->data().stickers().setLastMasksUpdate(0);
 				updateMasks();
 			} else {
@@ -1466,7 +1476,9 @@ void ApiWrap::saveStickerSets(
 	};
 
 	const auto stickerSetDisenabled = [=](mtpRequestId requestId) {
-		auto &setDisenableRequests = setsMasks
+		auto &setDisenableRequests = (type == Data::StickersType::Emoji)
+			? _customEmojiSetDisenableRequests
+			: (type == Data::StickersType::Masks)
 			? _maskSetDisenableRequests
 			: _stickerSetDisenableRequests;
 		setDisenableRequests.remove(requestId);
@@ -1484,10 +1496,14 @@ void ApiWrap::saveStickerSets(
 	auto &recent = _session->data().stickers().getRecentPack();
 	auto &sets = _session->data().stickers().setsRef();
 
-	auto &order = setsMasks
+	auto &order = (type == Data::StickersType::Emoji)
+		? _session->data().stickers().emojiSetsOrder()
+		: (type == Data::StickersType::Masks)
 		? _session->data().stickers().maskSetsOrder()
 		: _session->data().stickers().setsOrder();
-	auto &orderRef = setsMasks
+	auto &orderRef = (type == Data::StickersType::Emoji)
+		? _session->data().stickers().emojiSetsOrderRef()
+		: (type == Data::StickersType::Masks)
 		? _session->data().stickers().maskSetsOrderRef()
 		: _session->data().stickers().setsOrderRef();
 
@@ -1575,8 +1591,12 @@ void ApiWrap::saveStickerSets(
 	// Clear all installed flags, set only for sets from order.
 	for (auto &[id, set] : sets) {
 		const auto archived = !!(set->flags & Flag::Archived);
-		const auto masks = !!(set->flags & Flag::Masks);
-		if (!archived && (setsMasks == masks)) {
+		const auto thatType = !!(set->flags & Flag::Emoji)
+			? Data::StickersType::Emoji
+			: !!(set->flags & Flag::Masks)
+			? Data::StickersType::Masks
+			: Data::StickersType::Stickers;
+		if (!archived && (type == thatType)) {
 			set->flags &= ~Flag::Installed;
 		}
 	}
@@ -1630,17 +1650,21 @@ void ApiWrap::saveStickerSets(
 	}
 
 	auto &storage = local();
-	if (writeInstalled && !setsMasks) {
-		storage.writeInstalledStickers();
-	}
-	if (writeInstalled && setsMasks) {
-		storage.writeInstalledMasks();
+	if (writeInstalled) {
+		if (type == Data::StickersType::Emoji) {
+			storage.writeInstalledCustomEmoji();
+		} else if (type == Data::StickersType::Masks) {
+			storage.writeInstalledMasks();
+		} else {
+			storage.writeInstalledStickers();
+		}
 	}
 	if (writeRecent) {
 		session().saveSettings();
 	}
 	if (writeArchived) {
-		if (setsMasks) {
+		if (type == Data::StickersType::Emoji) {
+		} else if (type == Data::StickersType::Masks) {
 			storage.writeArchivedMasks();
 		} else {
 			storage.writeArchivedStickers();
@@ -1655,7 +1679,7 @@ void ApiWrap::saveStickerSets(
 	if (writeFaved) {
 		storage.writeFavedStickers();
 	}
-	_session->data().stickers().notifyUpdated();
+	_session->data().stickers().notifyUpdated(type);
 
 	if (setDisenableRequests.empty()) {
 		stickersSaveOrder();
@@ -2502,6 +2526,10 @@ void ApiWrap::updateStickers() {
 	requestRecentStickers(now);
 	requestFavedStickers(now);
 	requestFeaturedStickers(now);
+}
+
+void ApiWrap::updateSavedGifs() {
+	const auto now = crl::now();
 	requestSavedGifs(now);
 }
 
@@ -2509,6 +2537,12 @@ void ApiWrap::updateMasks() {
 	const auto now = crl::now();
 	requestMasks(now);
 	requestRecentStickers(now, true);
+}
+
+void ApiWrap::updateCustomEmoji() {
+	const auto now = crl::now();
+	requestCustomEmoji(now);
+	requestFeaturedEmoji(now);
 }
 
 void ApiWrap::requestRecentStickersForce(bool attached) {
@@ -2525,7 +2559,7 @@ void ApiWrap::setGroupStickerSet(
 		megagroup->inputChannel,
 		Data::InputStickerSet(set)
 	)).send();
-	_session->data().stickers().notifyUpdated();
+	_session->data().stickers().notifyUpdated(Data::StickersType::Stickers);
 }
 
 std::vector<not_null<DocumentData*>> *ApiWrap::stickersByEmoji(
@@ -2565,7 +2599,8 @@ std::vector<not_null<DocumentData*>> *ApiWrap::stickersByEmoji(
 			}
 			entry.hash = data.vhash().v;
 			entry.received = crl::now();
-			_session->data().stickers().notifyUpdated();
+			_session->data().stickers().notifyUpdated(
+				Data::StickersType::Stickers);
 		}).send();
 	}
 	if (it == _stickersByEmoji.end()) {
@@ -2620,6 +2655,30 @@ void ApiWrap::requestMasks(TimeId now) {
 		MTP_long(Api::CountMasksHash(_session, true))
 	)).done(done).fail([=] {
 		LOG(("App Fail: Failed to get masks!"));
+		done(MTP_messages_allStickersNotModified());
+	}).send();
+}
+
+void ApiWrap::requestCustomEmoji(TimeId now) {
+	if (!_session->data().stickers().emojiUpdateNeeded(now)
+		|| _customEmojiUpdateRequest) {
+		return;
+	}
+	const auto done = [=](const MTPmessages_AllStickers &result) {
+		_session->data().stickers().setLastEmojiUpdate(crl::now());
+		_customEmojiUpdateRequest = 0;
+
+		result.match([&](const MTPDmessages_allStickersNotModified&) {
+		}, [&](const MTPDmessages_allStickers &data) {
+			_session->data().stickers().emojiReceived(
+				data.vsets().v,
+				data.vhash().v);
+		});
+	};
+	_customEmojiUpdateRequest = request(MTPmessages_GetEmojiStickers(
+		MTP_long(Api::CountCustomEmojiHash(_session, true))
+	)).done(done).fail([=] {
+		LOG(("App Fail: Failed to get custom emoji!"));
 		done(MTP_messages_allStickersNotModified());
 	}).send();
 }
@@ -2725,25 +2784,30 @@ void ApiWrap::requestFeaturedStickers(TimeId now) {
 	_featuredStickersUpdateRequest = request(MTPmessages_GetFeaturedStickers(
 		MTP_long(Api::CountFeaturedStickersHash(_session))
 	)).done([=](const MTPmessages_FeaturedStickers &result) {
-		_session->data().stickers().setLastFeaturedUpdate(crl::now());
 		_featuredStickersUpdateRequest = 0;
-
-		switch (result.type()) {
-		case mtpc_messages_featuredStickersNotModified: return;
-		case mtpc_messages_featuredStickers: {
-			auto &d = result.c_messages_featuredStickers();
-			_session->data().stickers().featuredSetsReceived(
-				d.vsets().v,
-				d.vunread().v,
-				d.vhash().v);
-		} return;
-		default: Unexpected("Type in ApiWrap::featuredStickersDone()");
-		}
+		_session->data().stickers().featuredSetsReceived(result);
 	}).fail([=] {
-		_session->data().stickers().setLastFeaturedUpdate(crl::now());
 		_featuredStickersUpdateRequest = 0;
-
+		_session->data().stickers().setLastFeaturedUpdate(crl::now());
 		LOG(("App Fail: Failed to get featured stickers!"));
+	}).send();
+}
+
+void ApiWrap::requestFeaturedEmoji(TimeId now) {
+	if (!_session->data().stickers().featuredEmojiUpdateNeeded(now)
+		|| _featuredEmojiUpdateRequest) {
+		return;
+	}
+	_featuredEmojiUpdateRequest = request(
+		MTPmessages_GetFeaturedEmojiStickers(
+			MTP_long(Api::CountFeaturedStickersHash(_session)))
+	).done([=](const MTPmessages_FeaturedStickers &result) {
+		_featuredEmojiUpdateRequest = 0;
+		_session->data().stickers().featuredEmojiSetsReceived(result);
+	}).fail([=] {
+		_featuredEmojiUpdateRequest = 0;
+		_session->data().stickers().setLastFeaturedEmojiUpdate(crl::now());
+		LOG(("App Fail: Failed to get featured emoji!"));
 	}).send();
 }
 
@@ -2805,16 +2869,20 @@ void ApiWrap::readFeaturedSets() {
 			MTP_vector<MTPlong>(wrappedIds));
 		request(std::move(requestData)).done([=] {
 			local().writeFeaturedStickers();
-			_session->data().stickers().notifyUpdated();
+			_session->data().stickers().notifyUpdated(
+				Data::StickersType::Stickers);
 		}).send();
 
 		_session->data().stickers().setFeaturedSetsUnreadCount(count);
 	}
 }
 
-void ApiWrap::jumpToDate(Dialogs::Key chat, const QDate &date) {
+void ApiWrap::resolveJumpToDate(
+		Dialogs::Key chat,
+		const QDate &date,
+		Fn<void(not_null<PeerData*>, MsgId)> callback) {
 	if (const auto peer = chat.peer()) {
-		jumpToHistoryDate(peer, date);
+		resolveJumpToHistoryDate(peer, date, std::move(callback));
 	}
 }
 
@@ -2886,20 +2954,22 @@ void ApiWrap::requestMessageAfterDate(
 	}).send();
 }
 
-void ApiWrap::jumpToHistoryDate(not_null<PeerData*> peer, const QDate &date) {
+void ApiWrap::resolveJumpToHistoryDate(
+		not_null<PeerData*> peer,
+		const QDate &date,
+		Fn<void(not_null<PeerData*>, MsgId)> callback) {
 	if (const auto channel = peer->migrateTo()) {
-		jumpToHistoryDate(channel, date);
-		return;
+		return resolveJumpToHistoryDate(channel, date, std::move(callback));
 	}
 	const auto jumpToDateInPeer = [=] {
 		requestMessageAfterDate(peer, date, [=](MsgId resultId) {
-			Ui::showPeerHistory(peer, resultId);
+			callback(peer, resultId);
 		});
 	};
 	if (const auto chat = peer->migrateFrom()) {
 		requestMessageAfterDate(chat, date, [=](MsgId resultId) {
 			if (resultId) {
-				Ui::showPeerHistory(chat, resultId);
+				callback(chat, resultId);
 			} else {
 				jumpToDateInPeer();
 			}

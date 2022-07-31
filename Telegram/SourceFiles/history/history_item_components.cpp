@@ -21,6 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_service_message.h"
 #include "history/view/media/history_view_document.h"
 #include "core/click_handler_types.h"
+#include "core/ui_integration.h"
 #include "layout/layout_position.h"
 #include "mainwindow.h"
 #include "media/audio/media_audio.h"
@@ -34,7 +35,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_file_click_handler.h"
 #include "main/main_session.h"
 #include "window/window_session_controller.h"
-#include "facades.h"
+#include "api/api_bot.h"
 #include "styles/style_widgets.h"
 #include "styles/style_chat.h"
 
@@ -53,26 +54,25 @@ void HistoryMessageVia::create(
 	maxWidth = st::msgServiceNameFont->width(
 		tr::lng_inline_bot_via(tr::now, lt_inline_bot, '@' + bot->username));
 	link = std::make_shared<LambdaClickHandler>([bot = this->bot](
-			ClickContext context) {
-		if (const auto window = App::wnd()) {
-			if (const auto controller = window->sessionController()) {
-				if (base::IsCtrlPressed()) {
-					controller->showPeerInfo(bot);
-					return;
-				} else if (!bot->isBot()
-					|| bot->botInfo->inlinePlaceholder.isEmpty()) {
-					controller->showPeerHistory(
-						bot->id,
-						Window::SectionShow::Way::Forward);
-					return;
-				}
+		ClickContext context) {
+		const auto my = context.other.value<ClickHandlerContext>();
+		if (const auto controller = my.sessionWindow.get()) {
+			if (base::IsCtrlPressed()) {
+				controller->showPeerInfo(bot);
+				return;
+			} else if (!bot->isBot()
+				|| bot->botInfo->inlinePlaceholder.isEmpty()) {
+				controller->showPeerHistory(
+					bot->id,
+					Window::SectionShow::Way::Forward);
+				return;
 			}
 		}
-		const auto my = context.other.value<ClickHandlerContext>();
-		if (const auto delegate = my.elementDelegate ? my.elementDelegate() : nullptr) {
+		const auto delegate = my.elementDelegate
+			? my.elementDelegate()
+			: nullptr;
+		if (delegate) {
 			delegate->elementHandleViaClick(bot);
-		} else {
-			App::insertBotCommand('@' + bot->username);
 		}
 	});
 }
@@ -256,10 +256,15 @@ bool HistoryMessageReply::updateData(
 	}
 
 	if (replyToMsg) {
+		const auto context = Core::MarkedTextContext{
+			.session = &holder->history()->session(),
+			.customEmojiRepaint = [=] { holder->customEmojiRepaint(); },
+		};
 		replyToText.setMarkedText(
 			st::messageTextStyle,
 			replyToMsg->inReplyText(),
-			Ui::DialogTextOptions());
+			Ui::DialogTextOptions(),
+			context);
 
 		updateName(holder);
 
@@ -447,6 +452,7 @@ void HistoryMessageReply::paint(
 				p.setTextPalette(inBubble
 					? stm->replyTextPalette
 					: st->imgReplyTextPalette());
+				holder->prepareCustomEmojiPaint(p, replyToText);
 				replyToText.drawLeftElided(p, x + st::msgReplyBarSkip + previewSkip, y + st::msgReplyPadding.top() + st::msgServiceNameFont->height, w - st::msgReplyBarSkip - previewSkip, w + 2 * x);
 				p.setTextPalette(stm->textPalette);
 			}
@@ -524,10 +530,9 @@ void ReplyMarkupClickHandler::onClick(ClickContext context) const {
 	if (context.button != Qt::LeftButton) {
 		return;
 	}
-	if (const auto item = _owner->message(_itemId)) {
-		const auto my = context.other.value<ClickHandlerContext>();
-		App::activateBotCommand(my.sessionWindow.get(), item, _row, _column);
-	}
+	auto my = context.other.value<ClickHandlerContext>();
+	my.itemId = _itemId;
+	Api::ActivateBotCommand(my, _row, _column);
 }
 
 // Returns the full text of the corresponding button.

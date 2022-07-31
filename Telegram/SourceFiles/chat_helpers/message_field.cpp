@@ -22,6 +22,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/ui_utility.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
+#include "data/data_document.h"
+#include "data/stickers/data_custom_emoji.h"
 #include "chat_helpers/emoji_suggestions_widget.h"
 #include "window/window_session_controller.h"
 #include "lang/lang_keys.h"
@@ -48,35 +50,63 @@ using EditLinkSelection = Ui::InputField::EditLinkSelection;
 
 constexpr auto kParseLinksTimeout = crl::time(1000);
 
-// For mention tags save and validate userId, ignore tags for different userId.
-class FieldTagMimeProcessor : public Ui::InputField::TagMimeProcessor {
+// For mention / custom emoji tags save and validate selfId,
+// ignore tags for different users.
+class FieldTagMimeProcessor final {
 public:
-	explicit FieldTagMimeProcessor(
-		not_null<Window::SessionController*> controller);
+	FieldTagMimeProcessor(
+		not_null<Main::Session*> _session,
+		Fn<void(not_null<DocumentData*>)> unavailableEmojiPasted);
 
-	QString tagFromMimeTag(const QString &mimeTag) override;
+	QString operator()(QStringView mimeTag);
 
 private:
-	const not_null<Window::SessionController*> _controller;
+	const not_null<Main::Session*> _session;
+	const Fn<void(not_null<DocumentData*>)> _unavailableEmojiPasted;
 
 };
 
 FieldTagMimeProcessor::FieldTagMimeProcessor(
-	not_null<Window::SessionController*> controller)
-: _controller(controller) {
+	not_null<Main::Session*> session,
+	Fn<void(not_null<DocumentData*>)> unavailableEmojiPasted)
+: _session(session)
+, _unavailableEmojiPasted(unavailableEmojiPasted) {
 }
 
-QString FieldTagMimeProcessor::tagFromMimeTag(const QString &mimeTag) {
-	if (TextUtilities::IsMentionLink(mimeTag)) {
-		const auto userId = _controller->session().userId();
-		auto match = QRegularExpression(":(\\d+)$").match(mimeTag);
-		if (!match.hasMatch()
-			|| match.capturedView(1).toULongLong() != userId.bare) {
-			return QString();
+QString FieldTagMimeProcessor::operator()(QStringView mimeTag) {
+	const auto id = _session->userId().bare;
+	auto all = TextUtilities::SplitTags(mimeTag);
+	auto premiumSkipped = (DocumentData*)nullptr;
+	for (auto i = all.begin(); i != all.end();) {
+		const auto tag = *i;
+		if (TextUtilities::IsMentionLink(tag)
+			&& TextUtilities::MentionNameDataToFields(tag).selfId != id) {
+			i = all.erase(i);
+			continue;
+		} else if (Ui::InputField::IsCustomEmojiLink(tag)) {
+			const auto data = Ui::InputField::CustomEmojiEntityData(tag);
+			const auto emoji = Data::ParseCustomEmojiData(data);
+			if (emoji.selfId != id) {
+				i = all.erase(i);
+				continue;
+			}
+			if (!_session->premium()) {
+				const auto document = _session->data().document(emoji.id);
+				if (document->isPremiumEmoji()) {
+					premiumSkipped = document;
+					i = all.erase(i);
+					continue;
+				}
+			}
 		}
-		return mimeTag.mid(0, mimeTag.size() - match.capturedLength());
+		++i;
 	}
-	return mimeTag;
+	if (premiumSkipped
+		&& _session->premiumPossible()
+		&& _unavailableEmojiPasted) {
+		_unavailableEmojiPasted(premiumSkipped);
+	}
+	return TextUtilities::JoinTag(all);
 }
 
 //bool ValidateUrl(const QString &value) {
@@ -251,7 +281,9 @@ QString PrepareMentionTag(not_null<UserData*> user) {
 	return TextUtilities::kMentionTagStart
 		+ QString::number(user->id.value)
 		+ '.'
-		+ QString::number(user->accessHash());
+		+ QString::number(user->accessHash())
+		+ ':'
+		+ QString::number(user->session().userId().bare);
 }
 
 TextWithTags PrepareEditText(not_null<HistoryItem*> item) {
@@ -302,28 +334,64 @@ Fn<bool(
 	};
 }
 
-void InitMessageField(
-		not_null<Window::SessionController*> controller,
-		not_null<Ui::InputField*> field) {
-	field->setMinHeight(st::historySendSize.height() - 2 * st::historySendPadding);
-	field->setMaxHeight(st::historyComposeFieldMaxHeight);
-
+void InitMessageFieldHandlers(
+		not_null<Main::Session*> session,
+		std::shared_ptr<Ui::Show> show,
+		not_null<Ui::InputField*> field,
+		Fn<bool()> customEmojiPaused,
+		Fn<void(not_null<DocumentData*>)> unavailableEmojiPasted,
+		const style::InputField *fieldStyle) {
 	field->setTagMimeProcessor(
-		std::make_unique<FieldTagMimeProcessor>(controller));
-
-	field->document()->setDocumentMargin(4.);
-	field->setAdditionalMargin(style::ConvertScale(4) - 4);
-
-	field->customTab(true);
+		FieldTagMimeProcessor(session, unavailableEmojiPasted));
+	field->setCustomEmojiFactory([=](QStringView data, Fn<void()> update) {
+		return session->data().customEmojiManager().create(
+			data,
+			std::move(update));
+	}, std::move(customEmojiPaused));
 	field->setInstantReplaces(Ui::InstantReplaces::Default());
 	field->setInstantReplacesEnabled(
 		Core::App().settings().replaceEmojiValue());
 	field->setMarkdownReplacesEnabled(rpl::single(true));
-	field->setEditLinkCallback(
-		DefaultEditLinkCallback(
-			std::make_shared<Window::Show>(controller),
-			&controller->session(),
-			field));
+	if (show) {
+		field->setEditLinkCallback(
+			DefaultEditLinkCallback(show, session, field, fieldStyle));
+		InitSpellchecker(show, session, field, fieldStyle != nullptr);
+	}
+}
+
+void InitMessageFieldHandlers(
+		not_null<Window::SessionController*> controller,
+		not_null<Ui::InputField*> field,
+		Window::GifPauseReason pauseReasonLevel,
+		Fn<void(not_null<DocumentData*>)> unavailableEmojiPasted) {
+	InitMessageFieldHandlers(
+		&controller->session(),
+		std::make_shared<Window::Show>(controller),
+		field,
+		[=] { return controller->isGifPausedAtLeastFor(pauseReasonLevel); },
+		unavailableEmojiPasted);
+}
+
+void InitMessageFieldGeometry(not_null<Ui::InputField*> field) {
+	field->setMinHeight(
+		st::historySendSize.height() - 2 * st::historySendPadding);
+	field->setMaxHeight(st::historyComposeFieldMaxHeight);
+
+	field->document()->setDocumentMargin(4.);
+	field->setAdditionalMargin(style::ConvertScale(4) - 4);
+}
+
+void InitMessageField(
+		not_null<Window::SessionController*> controller,
+		not_null<Ui::InputField*> field,
+		Fn<void(not_null<DocumentData*>)> unavailableEmojiPasted) {
+	InitMessageFieldHandlers(
+		controller,
+		field,
+		Window::GifPauseReason::Any,
+		unavailableEmojiPasted);
+	InitMessageFieldGeometry(field);
+	field->customTab(true);
 }
 
 void InitSpellchecker(
@@ -345,15 +413,6 @@ void InitSpellchecker(
 		menuItem);
 	field->setExtendedContextMenu(s->contextMenuCreated());
 #endif // TDESKTOP_DISABLE_SPELLCHECK
-}
-
-void InitSpellchecker(
-		not_null<Window::SessionController*> controller,
-		not_null<Ui::InputField*> field) {
-	InitSpellchecker(
-		std::make_shared<Window::Show>(controller),
-		&controller->session(),
-		field);
 }
 
 bool HasSendText(not_null<const Ui::InputField*> field) {
@@ -585,7 +644,8 @@ void MessageLinksParser::parse() {
 		Expects(tag != tagsEnd);
 
 		if (Ui::InputField::IsValidMarkdownLink(tag->id)
-			&& !TextUtilities::IsMentionLink(tag->id)) {
+			&& !TextUtilities::IsMentionLink(tag->id)
+			&& !Ui::InputField::IsCustomEmojiLink(tag->id)) {
 			ranges.push_back({ tag->offset, tag->length, tag->id });
 		}
 		++tag;

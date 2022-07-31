@@ -51,6 +51,8 @@ enum class UserDataFlag {
 	DiscardMinPhoto = (1 << 12),
 	Self = (1 << 13),
 	Premium = (1 << 14),
+	CanReceiveGifts = (1 << 15),
+	CanReceiveVoices = (1 << 16),
 };
 inline constexpr bool is_flag_type(UserDataFlag) { return true; };
 using UserDataFlags = base::flags<UserDataFlag>;
@@ -105,6 +107,9 @@ public:
 
 	[[nodiscard]] bool canShareThisContact() const;
 	[[nodiscard]] bool canAddContact() const;
+
+	[[nodiscard]] bool canReceiveGifts() const;
+	[[nodiscard]] bool canReceiveVoices() const;
 
 	// In Data::Session::processUsers() we check only that.
 	// When actually trying to share contact we perform

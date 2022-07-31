@@ -375,6 +375,13 @@ void HistoryItem::invalidateChatListEntry() {
 	history()->lastItemDialogsView.itemInvalidated(this);
 }
 
+void HistoryItem::customEmojiRepaint() {
+	if (!_customEmojiRepaintScheduled) {
+		_customEmojiRepaintScheduled = true;
+		history()->owner().requestItemRepaint(this);
+	}
+}
+
 void HistoryItem::finishEditionToEmpty() {
 	finishEdition(-1);
 	_history->itemVanished(this);
@@ -1301,7 +1308,7 @@ TextWithEntities HistoryItem::inReplyText() const {
 }
 
 Ui::Text::IsolatedEmoji HistoryItem::isolatedEmoji() const {
-	return Ui::Text::IsolatedEmoji();
+	return {};
 }
 
 HistoryItem::~HistoryItem() {

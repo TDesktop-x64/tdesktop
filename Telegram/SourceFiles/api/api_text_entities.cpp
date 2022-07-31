@@ -132,12 +132,12 @@ EntitiesInText EntitiesFromMTP(
 				if (length > 0) {
 					break;
 				}
-				auto& d = entity.c_messageEntitySpoiler(); 
+				auto& d = entity.c_messageEntitySpoiler();
+				result.push_back({ EntityType::Spoiler, d.voffset().v + length, d.vlength().v }); 
+			}break;
 			case mtpc_messageEntityCustomEmoji: if (session) {
 				const auto &d = entity.c_messageEntityCustomEmoji();
 				result.push_back({ EntityType::CustomEmoji, d.voffset().v, d.vlength().v, CustomEmojiEntityData(session, d) });
-			} break;
-				result.push_back({ EntityType::Spoiler, d.voffset().v + length, d.vlength().v }); 
 			}break;
 			}
 		}

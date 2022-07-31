@@ -56,6 +56,8 @@ namespace {
 
 } // namespace
 
+namespace App {
+
 void searchByHashtag(const QString &tag, PeerData *inPeer, PeerData *from) {
 	const auto m = inPeer
 		? CheckMainWidget(&inPeer->session())
@@ -83,6 +85,8 @@ void searchByHashtag(const QString &tag, PeerData *inPeer, PeerData *from) {
 		}
 	}
 }
+
+} // namespace App
 
 namespace Ui {
 

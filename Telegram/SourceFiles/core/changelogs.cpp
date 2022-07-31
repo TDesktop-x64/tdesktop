@@ -74,7 +74,7 @@ std::map<int, const char*> BetaLogs() {
 		"- Fix possible crash after account switch.\n"
 	},
 	{
-		4000003,
+		1000040,
 		"- Animated emoji for messages.\n"
 
 		"- Premium: Privacy settings for voice messages.\n"

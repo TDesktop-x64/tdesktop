@@ -23,14 +23,14 @@ namespace {
 std::map<int, const char*> BetaLogs() {
 	return {
 	{
-		4000003,
+		1000040,
 		"- Animated emoji for messages.\n"
 		"- Premium: Privacy settings for voice messages.\n"
 		"- Premium: Gifting Telegram Premium "
 		"to any user from their profile page.\n"
 	},
 	{
-		4000004,
+		1000041,
 		"- Allow sending animated emoji to Saved Messages "
 		"even without Telegram Premium.\n"
 

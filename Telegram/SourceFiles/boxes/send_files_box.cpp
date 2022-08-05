@@ -250,15 +250,16 @@ SendFilesBox::SendFilesBox(
 	not_null<Window::SessionController*> controller,
 	Ui::PreparedList &&list,
 	const TextWithTags &caption,
-	SendLimit limit,
+	not_null<PeerData*> peer,
 	Api::SendType sendType,
 	SendMenu::Type sendMenuType)
 : _controller(controller)
 , _sendType(sendType)
 , _titleHeight(st::boxTitleHeight)
 , _list(std::move(list))
-, _sendLimit(limit)
+, _sendLimit(peer->slowmodeApplied() ? SendLimit::One : SendLimit::Many)
 , _sendMenuType(sendMenuType)
+, _allowEmojiWithoutPremium(Data::AllowEmojiWithoutPremium(peer))
 , _caption(
 	this,
 	st::confirmCaptionArea,
@@ -673,14 +674,19 @@ void SendFilesBox::updateSendWayControlsVisibility() {
 }
 
 void SendFilesBox::setupCaption() {
+	const auto allow = [=](const auto&) {
+		return _allowEmojiWithoutPremium;
+	};
 	InitMessageFieldHandlers(
 		_controller,
 		_caption.data(),
-		Window::GifPauseReason::Layer);
+		Window::GifPauseReason::Layer,
+		allow);
 	Ui::Emoji::SuggestionsController::Init(
 		getDelegate()->outerContainer(),
 		_caption,
-		&_controller->session());
+		&_controller->session(),
+		{ .suggestCustomEmoji = true, .allowCustomWithoutPremium = allow });
 
 	_caption->setSubmitSettings(
 		Core::App().settings().sendSubmitWay());
@@ -730,6 +736,8 @@ void SendFilesBox::setupEmojiPanel() {
 		st::emojiPanMinHeight / 2,
 		st::emojiPanMinHeight);
 	_emojiPanel->hide();
+	_emojiPanel->selector()->setAllowEmojiWithoutPremium(
+		_allowEmojiWithoutPremium);
 	_emojiPanel->selector()->emojiChosen(
 	) | rpl::start_with_next([=](EmojiPtr emoji) {
 		Ui::InsertEmojiAtCursor(_caption->textCursor(), emoji);
@@ -738,6 +746,7 @@ void SendFilesBox::setupEmojiPanel() {
 	) | rpl::start_with_next([=](Selector::FileChosen data) {
 		Data::InsertCustomEmoji(_caption.data(), data.document);
 	}, lifetime());
+	_emojiPanel->selector()->showPromoForPremiumEmoji();
 
 	const auto filterCallback = [=](not_null<QEvent*> event) {
 		emojiFilterForGeometry(event);

@@ -13,6 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_document.h"
 #include "data/data_document_media.h"
 #include "data/data_file_origin.h"
+#include "data/data_peer.h"
 #include "lottie/lottie_common.h"
 #include "lottie/lottie_emoji.h"
 #include "ffmpeg/ffmpeg_emoji.h"
@@ -34,11 +35,12 @@ constexpr auto kMaxPerRequest = 100;
 using SizeTag = CustomEmojiManager::SizeTag;
 
 [[nodiscard]] ChatHelpers::StickerLottieSize LottieSizeFromTag(SizeTag tag) {
+	// NB! onlyCustomEmoji dimensions caching uses last ::EmojiInteraction-s.
 	using LottieSize = ChatHelpers::StickerLottieSize;
 	switch (tag) {
-	case SizeTag::Normal: return LottieSize::MessageHistory;
-	case SizeTag::Large: return LottieSize::StickersPanel;
-	case SizeTag::Isolated: return LottieSize::EmojiInteraction;
+	case SizeTag::Normal: return LottieSize::EmojiInteraction;
+	case SizeTag::Large: return LottieSize::EmojiInteractionReserved1;
+	case SizeTag::Isolated: return LottieSize::EmojiInteractionReserved2;
 	}
 	Unexpected("SizeTag value in CustomEmojiManager-LottieSizeFromTag.");
 }
@@ -52,12 +54,6 @@ using SizeTag = CustomEmojiManager::SizeTag;
 			* style::DevicePixelRatio();
 	}
 	Unexpected("SizeTag value in CustomEmojiManager-SizeFromTag.");
-}
-
-[[nodiscard]] int SizeFromTag(SizeTag tag) {
-	const auto emoji = EmojiSizeFromTag(tag);
-	const auto factor = style::DevicePixelRatio();
-	return Ui::Text::AdjustCustomEmojiSize(emoji / factor) * factor;
 }
 
 } // namespace
@@ -232,7 +228,7 @@ void CustomEmojiLoader::startCacheLookup(
 	lookup->process = std::make_unique<Process>(Process{
 		.loaded = std::move(loaded),
 	});
-	const auto size = SizeFromTag(_tag);
+	const auto size = FrameSizeFromTag(_tag);
 	const auto weak = base::make_weak(&lookup->process->guard);
 	document->owner().cacheBigFile().get(key, [=](QByteArray value) {
 		auto cache = Ui::CustomEmoji::Cache::FromSerialized(value, size);
@@ -285,7 +281,7 @@ void CustomEmojiLoader::check() {
 	load->process->lifetime.destroy();
 
 	const auto tag = _tag;
-	const auto size = SizeFromTag(_tag);
+	const auto size = FrameSizeFromTag(_tag);
 	auto bytes = Lottie::ReadContent(data, filepath);
 	auto loader = [=] {
 		return std::make_unique<CustomEmojiLoader>(document, tag);
@@ -347,7 +343,7 @@ Ui::CustomEmoji::Preview CustomEmojiLoader::preview() {
 			|| !dimensions.width()) {
 			return {};
 		}
-		const auto scale = (SizeFromTag(_tag) * 1.)
+		const auto scale = (FrameSizeFromTag(_tag) * 1.)
 			/ (style::DevicePixelRatio() * dimensions.width());
 		return { document->createMediaView()->thumbnailPath(), scale };
 	};
@@ -410,7 +406,7 @@ Ui::CustomEmoji::Preview CustomEmojiManager::prepareNonExactPreview(
 		if (j == end(other)) {
 			continue;
 		} else if (const auto nonExact = j->second->imagePreview()) {
-			const auto size = SizeFromTag(tag);
+			const auto size = FrameSizeFromTag(tag);
 			return {
 				nonExact.image().scaled(
 					size,
@@ -448,6 +444,39 @@ std::unique_ptr<Ui::Text::CustomEmoji> CustomEmojiManager::create(
 	return create(document->id, std::move(update), tag, [&] {
 		return createLoader(document, tag);
 	});
+}
+
+void CustomEmojiManager::resolve(
+		QStringView data,
+		not_null<Listener*> listener) {
+	resolve(ParseCustomEmojiData(data).id, listener);
+}
+
+void CustomEmojiManager::resolve(
+		DocumentId documentId,
+		not_null<Listener*> listener) {
+	if (_owner->document(documentId)->sticker()) {
+		return;
+	}
+	_resolvers[documentId].emplace(listener);
+	_listeners[listener].emplace(documentId);
+	_pendingForRequest.emplace(documentId);
+	if (!_requestId && _pendingForRequest.size() == 1) {
+		crl::on_main(this, [=] { request(); });
+	}
+}
+
+void CustomEmojiManager::unregisterListener(not_null<Listener*> listener) {
+	if (const auto list = _listeners.take(listener)) {
+		for (const auto id : *list) {
+			const auto i = _resolvers.find(id);
+			if (i != end(_resolvers)
+				&& i->second.remove(listener)
+				&& i->second.empty()) {
+				_resolvers.erase(i);
+			}
+		}
+	}
 }
 
 std::unique_ptr<Ui::CustomEmoji::Loader> CustomEmojiManager::createLoader(
@@ -506,6 +535,17 @@ void CustomEmojiManager::request() {
 						if (const auto strong = weak.get()) {
 							strong->resolved(document);
 						}
+					}
+				}
+			}
+			if (const auto listeners = _resolvers.take(id)) {
+				for (const auto &listener : *listeners) {
+					const auto i = _listeners.find(listener);
+					if (i != end(_listeners) && i->second.remove(id)) {
+						if (i->second.empty()) {
+							_listeners.erase(i);
+						}
+						listener->customEmojiResolveDone(document);
 					}
 				}
 			}
@@ -622,6 +662,12 @@ Session &CustomEmojiManager::owner() const {
 	return *_owner;
 }
 
+int FrameSizeFromTag(SizeTag tag) {
+	const auto emoji = EmojiSizeFromTag(tag);
+	const auto factor = style::DevicePixelRatio();
+	return Ui::Text::AdjustCustomEmojiSize(emoji / factor) * factor;
+}
+
 QString SerializeCustomEmojiId(const CustomEmojiId &id) {
 	return QString::number(id.id)
 		+ ':'
@@ -644,6 +690,10 @@ CustomEmojiId ParseCustomEmojiData(QStringView data) {
 		.selfId = components[1].toULongLong(),
 		.id = components[0].toULongLong(),
 	};
+}
+
+bool AllowEmojiWithoutPremium(not_null<PeerData*> peer) {
+	return peer->isSelf();
 }
 
 void InsertCustomEmoji(

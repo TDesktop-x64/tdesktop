@@ -56,7 +56,7 @@ LargeEmoji::LargeEmoji(
 	const Ui::Text::IsolatedEmoji &emoji)
 : _parent(parent)
 , _images(ResolveImages(
-	&parent->data()->history()->session(),
+	&parent->history()->session(),
 	[=] { parent->customEmojiRepaint(); },
 	emoji)) {
 }
@@ -68,7 +68,7 @@ LargeEmoji::~LargeEmoji() {
 	}
 }
 
-QSize LargeEmoji::size() {
+QSize LargeEmoji::countOptimalSize() {
 	using namespace rpl::mappers;
 
 	const auto count = _images.size()

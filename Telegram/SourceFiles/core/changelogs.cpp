@@ -23,64 +23,31 @@ namespace {
 std::map<int, const char*> BetaLogs() {
 	return {
 	{
-		1000021,
-		"- Fix remove from group box can't dismiss after remove\n"
-		"- Show viewers count in RTMP streams.\n"
-		"- Send GIFs search results without \"via @bot\".\n"
-		"- Display the file thumbnail in downloads bar.\n"
-		"- Always try to save original photo bytes to disk.\n"
-		"- Fix crash when deleting a user from your contacts list.\n"
-	},
-	{
-		1000022,
-		"- Don't show sponsored ads if chat is supergroup.\n"
-	},
-	{
-		1000023,
-		"- Change remove user from \"Recent actions\" confirm text.\n"
-		"- Fix selected message can't deselect after forward.\n"
-	},
-	{
-		1000025,
-		"- Show dc in media viewer\n"
-	},
-	{
-		1000026,
-		"- Fix option \"Forward to Saved\" on text only message in channel\n"
-		"- Show Channel label at the bottom of message\n"
-		"- Hide Phone Number in settings\n"
-		"- Add shortcut \"Ctrl+T\" for global search\n"
-		"- [Option] Replace Edit button to Saved messages\n"
-	},
-	{
-		1000028,
-		"- Fix media viewer\n"
-	},
-	{
-		1000035,
-		"- More icons for chat folders.\n"
-
-		"- Improve some more sections design.\n"
-		
-		"- Update the OpenAL library to 1.22.0.\n"
-	},
-	{
-		1000036,
-		"- Settings > Advanced > Experimental adds an option "
-		"to open chats in separate windows.\n"
-
-		"- Fix possible crash in video chat reconnection.\n"
-
-		"- Fix possible crash after account switch.\n"
-	},
-	{
-		1000040,
+		4000003,
 		"- Animated emoji for messages.\n"
-
 		"- Premium: Privacy settings for voice messages.\n"
-
 		"- Premium: Gifting Telegram Premium "
 		"to any user from their profile page.\n"
+	},
+	{
+		4000004,
+		"- Allow sending animated emoji to Saved Messages "
+		"even without Telegram Premium.\n"
+
+		"- Premium: Suggest animated emoji by regular emoji "
+		"(can be disabled in Settings).\n"
+
+		"- Premium: Show all suggested premium stickers "
+		"in a special section of the stickers panel.\n"
+
+		"- Premium: Allow hiding premium stickers special section "
+		"of the stickers panel.\n"
+
+		"- Fix a memory leak in RTMP livestreams.\n"
+
+		"- Fix some bot webview bugs on macOS.\n"
+		
+		"- Fix forwarding of voice messages.\n"
 	}
 	};
 };

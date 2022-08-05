@@ -44,6 +44,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "media/clip/media_clip_reader.h"
 #include "apiwrap.h"
 #include "api/api_toggling_media.h" // Api::ToggleFavedSticker
+#include "api/api_premium.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_window.h"
 #include "styles/style_menu_icons.h"
@@ -76,7 +77,7 @@ struct StickersListWidget::Sticker {
 	std::shared_ptr<Data::DocumentMedia> documentMedia;
 	Lottie::Animation *lottie = nullptr;
 	Media::Clip::ReaderPointer webm;
-	QPixmap savedFrame;
+	QImage savedFrame;
 	QSize savedFrameFor;
 	QImage premiumLock;
 
@@ -180,6 +181,7 @@ StickersListWidget::StickersListWidget(
 , _addWidth(st::stickersTrendingAdd.font->width(_addText))
 , _settings(this, tr::lng_stickers_you_have(tr::now))
 , _previewTimer([=] { showPreview(); })
+, _premiumMark(std::make_unique<StickerPremiumMark>(&controller->session()))
 , _searchRequestTimer([=] { sendSearchRequest(); }) {
 	setMouseTracking(true);
 	setAttribute(Qt::WA_OpaquePaintEvent);
@@ -218,14 +220,10 @@ StickersListWidget::StickersListWidget(
 		TabbedSelector::Action::Update
 	) | rpl::start_to_stream(_choosingUpdated, lifetime());
 
-	style::PaletteChanged(
+	rpl::merge(
+		Data::AmPremiumValue(&session()) | rpl::to_empty,
+		session().api().premium().cloudSetUpdated()
 	) | rpl::start_with_next([=] {
-		_premiumLockGray = QImage();
-	}, lifetime());
-
-	Data::AmPremiumValue(
-		&session()
-	) | rpl::start_with_next([=](bool premium) {
 		refreshStickers();
 	}, lifetime());
 }
@@ -987,7 +985,7 @@ void StickersListWidget::clearHeavyIn(Set &set, bool clearSavedFrames) {
 	const auto lifetime = base::take(set.lottieLifetime);
 	for (auto &sticker : set.stickers) {
 		if (clearSavedFrames) {
-			sticker.savedFrame = QPixmap();
+			sticker.savedFrame = QImage();
 			sticker.savedFrameFor = QSize();
 		}
 		sticker.webm = nullptr;
@@ -1282,7 +1280,7 @@ void StickersListWidget::paintSticker(
 		return;
 	}
 
-	const auto locked = document->isPremiumSticker() && !session().premium();
+	const auto premium = document->isPremiumSticker();
 	const auto isLottie = document->sticker()->isLottie();
 	const auto isWebm = document->sticker()->isWebm();
 	if (isLottie
@@ -1318,9 +1316,7 @@ void StickersListWidget::paintSticker(
 			QRect(ppos, lottieFrame.size() / cIntRetinaFactor()),
 			lottieFrame);
 		if (sticker.savedFrame.isNull()) {
-			sticker.savedFrame = QPixmap::fromImage(
-				lottieFrame,
-				Qt::ColorOnly);
+			sticker.savedFrame = lottieFrame;
 			sticker.savedFrame.setDevicePixelRatio(cRetinaFactor());
 			sticker.savedFrameFor = _singleSize;
 		}
@@ -1334,23 +1330,25 @@ void StickersListWidget::paintSticker(
 			sticker.savedFrame.setDevicePixelRatio(cRetinaFactor());
 			sticker.savedFrameFor = _singleSize;
 		}
-		p.drawPixmapLeft(ppos, width(), frame);
+		p.drawImage(ppos, frame);
 	} else {
 		const auto image = media->getStickerSmall();
 		const auto useSavedFrame = !sticker.savedFrame.isNull()
 			&& (sticker.savedFrameFor == _singleSize);
-		const auto pixmap = useSavedFrame
-			? sticker.savedFrame
-			: image
-			? image->pixSingle(size, { .outer = size })
-			: QPixmap();
-		if (!pixmap.isNull()) {
+		if (useSavedFrame) {
+			p.drawImage(ppos, sticker.savedFrame);
+			if (premium) {
+				lottieFrame = sticker.savedFrame;
+			}
+		} else if (image) {
+			const auto pixmap = image->pixSingle(size, { .outer = size });
 			p.drawPixmapLeft(ppos, width(), pixmap);
 			if (sticker.savedFrame.isNull()) {
-				sticker.savedFrame = pixmap;
+				sticker.savedFrame = pixmap.toImage().convertToFormat(
+					QImage::Format_ARGB32_Premultiplied);
 				sticker.savedFrameFor = _singleSize;
 			}
-			if (locked) {
+			if (premium) {
 				lottieFrame = pixmap.toImage().convertToFormat(
 					QImage::Format_ARGB32_Premultiplied);
 			}
@@ -1373,30 +1371,15 @@ void StickersListWidget::paintSticker(
 		p.setOpacity(1.);
 	}
 
-	if (locked) {
-		validatePremiumLock(set, index, lottieFrame);
-		const auto &bg = lottieFrame.isNull()
-			? _premiumLockGray
-			: sticker.premiumLock;
-		const auto factor = style::DevicePixelRatio();
-		const auto radius = st::roundRadiusSmall;
-		const auto point = pos + QPoint(
-			(_singleSize.width() - (bg.width() / factor)) / 2,
-			_singleSize.height() - (bg.height() / factor) - radius);
-		p.drawImage(point, bg);
-
-		st::stickersPremiumLock.paint(p, point, width());
+	if (premium) {
+		_premiumMark->paint(
+			p,
+			lottieFrame,
+			sticker.premiumLock,
+			pos,
+			_singleSize,
+			width());
 	}
-}
-
-const QImage &StickersListWidget::validatePremiumLock(
-		Set &set,
-		int index,
-		const QImage &frame) {
-	auto &sticker = set.stickers[index];
-	auto &image = frame.isNull() ? _premiumLockGray : sticker.premiumLock;
-	ValidatePremiumLockBg(image, frame);
-	return image;
 }
 
 int StickersListWidget::stickersRight() const {
@@ -1443,6 +1426,8 @@ bool StickersListWidget::hasRemoveButton(int index) const {
 			return true;
 		}
 		return !set.stickers.empty() && _megagroupSet->canEditStickers();
+	} else if (set.id == Data::Stickers::PremiumSetId) {
+		return !set.stickers.empty();
 	}
 	return false;
 }
@@ -1685,10 +1670,6 @@ void StickersListWidget::mouseReleaseEvent(QMouseEvent *e) {
 			Assert(button->section >= 0 && button->section < sets.size());
 			if (sets[button->section].externalLayout) {
 				_localSetsManager->install(sets[button->section].id);
-			} else if (sets[button->section].id == Data::Stickers::MegagroupSetId) {
-				auto removeLocally = sets[button->section].stickers.empty()
-					|| !_megagroupSet->canEditStickers();
-				removeMegagroupSet(removeLocally);
 			} else {
 				removeSet(sets[button->section].id);
 			}
@@ -1875,16 +1856,18 @@ void StickersListWidget::refreshMySets() {
 	refreshRecentStickers(false);
 	refreshMegagroupStickers(GroupStickersPlace::Visible);
 
-	_premiumsIndex = -1;
-	for (auto i = 0, count = int(_mySets.size()); i != count; ++i) {
-		if (_mySets[i].id == Data::Stickers::PremiumSetId) {
-			_premiumsIndex = i;
-		}
-	}
+	const auto i = ranges::find(
+		_mySets,
+		Data::Stickers::PremiumSetId,
+		&Set::id);
+	_premiumsIndex = (i != end(_mySets)) ? int(i - begin(_mySets)) : -1;
 
 	for (const auto setId : defaultSetsOrder()) {
 		const auto externalLayout = false;
 		appendSet(_mySets, setId, externalLayout, AppendSkip::Archived);
+	}
+	if (_premiumsIndex >= 0) {
+		appendPremiumCloudSet();
 	}
 
 	if (_premiumsIndex >= 0 && _mySets[_premiumsIndex].stickers.empty()) {
@@ -1895,6 +1878,16 @@ void StickersListWidget::refreshMySets() {
 	refreshMegagroupStickers(GroupStickersPlace::Hidden);
 
 	takeHeavyData(_mySets, wasSets);
+}
+
+void StickersListWidget::appendPremiumCloudSet() {
+	Expects(_premiumsIndex >= 0 && _premiumsIndex < _mySets.size());
+
+	auto &set = _mySets[_premiumsIndex];
+	for (const auto &document : session().api().premium().cloudSet()) {
+		set.stickers.push_back(Sticker{ document });
+		++set.count;
+	}
 }
 
 void StickersListWidget::refreshFeaturedSets() {
@@ -2039,8 +2032,8 @@ bool StickersListWidget::appendSet(
 			const auto document = sticker.document;
 			if (document->isPremiumSticker()) {
 				to[_premiumsIndex].stickers.push_back(Sticker{ document });
+				++to[_premiumsIndex].count;
 			}
-			++to[_premiumsIndex].count;
 		}
 	}
 	return true;
@@ -2153,7 +2146,8 @@ void StickersListWidget::refreshRecentStickers(bool performResize) {
 }
 
 void StickersListWidget::refreshPremiumStickers() {
-	if (_isMasks) {
+	if (_isMasks
+		|| controller()->session().settings().skipPremiumStickersSet()) {
 		return;
 	}
 	clearSelection();
@@ -2636,7 +2630,14 @@ void StickersListWidget::removeMegagroupSet(bool locally) {
 }
 
 void StickersListWidget::removeSet(uint64 setId) {
-	if (auto box = MakeConfirmRemoveSetBox(&session(), setId)) {
+	if (setId == Data::Stickers::MegagroupSetId) {
+		const auto &sets = shownSets();
+		const auto i = ranges::find(sets, setId, &Set::id);
+		Assert(i != end(sets));
+		const auto removeLocally = i->stickers.empty()
+			|| !_megagroupSet->canEditStickers();
+		removeMegagroupSet(removeLocally);
+	} else if (auto box = MakeConfirmRemoveSetBox(&session(), setId)) {
 		checkHideWithBox(controller()->show(
 			std::move(box),
 			Ui::LayerOption::KeepOther));
@@ -2664,6 +2665,22 @@ StickersListWidget::~StickersListWidget() = default;
 object_ptr<Ui::BoxContent> MakeConfirmRemoveSetBox(
 		not_null<Main::Session*> session,
 		uint64 setId) {
+	if (setId == Data::Stickers::PremiumSetId) {
+		return Ui::MakeConfirmBox({
+			.text = tr::lng_stickers_remove_pack(
+				tr::now,
+				lt_sticker_pack,
+				tr::lng_premium_stickers(tr::now)),
+			.confirmed = [=](Fn<void()> &&close) {
+				close();
+				session->settings().setSkipPremiumStickersSet(true);
+				session->saveSettingsDelayed();
+				session->data().stickers().notifyUpdated(
+					Data::StickersType::Stickers);
+			},
+			.confirmText = tr::lng_stickers_remove_pack_confirm(),
+		});
+	}
 	const auto &sets = session->data().stickers().sets();
 	const auto it = sets.find(setId);
 	if (it == sets.cend()) {
@@ -2734,9 +2751,6 @@ object_ptr<Ui::BoxContent> MakeConfirmRemoveSetBox(
 				}
 				session->data().stickers().notifyUpdated(set->type());
 			}
-		},
-		.cancelled = [=](Fn<void()> &&close) {
-			close();
 		},
 		.confirmText = tr::lng_stickers_remove_pack_confirm(),
 	});

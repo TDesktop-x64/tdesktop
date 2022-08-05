@@ -667,6 +667,7 @@ void HistoryItem::applySentMessage(const MTPDmessage &data) {
 	setPostAuthor(data.vpost_author().value_or_empty());
 	contributeToSlowmode(data.vdate().v);
 	indexAsNewItem();
+	invalidateChatListEntry();
 	history()->owner().notifyItemDataChange(this);
 	history()->owner().requestItemTextRefresh(this);
 	history()->owner().updateDependentMessages(this);
@@ -686,6 +687,7 @@ void HistoryItem::applySentMessage(
 	if (!wasAlready) {
 		indexAsNewItem();
 	}
+	invalidateChatListEntry();
 }
 
 void HistoryItem::indexAsNewItem() {
@@ -1035,6 +1037,14 @@ Data::MessagePosition HistoryItem::position() const {
 	return { .fullId = fullId(), .date = date() };
 }
 
+bool HistoryItem::computeDropForwardedInfo() const {
+	const auto media = this->media();
+	return (media && media->dropForwardedInfo())
+		|| (history()->peer->isSelf()
+			&& !Has<HistoryMessageForwarded>()
+			&& (!media || !media->forceForwardedInfo()));
+}
+
 MsgId HistoryItem::replyToId() const {
 	if (const auto reply = Get<HistoryMessageReply>()) {
 		return reply->replyToId();
@@ -1308,6 +1318,10 @@ TextWithEntities HistoryItem::inReplyText() const {
 }
 
 Ui::Text::IsolatedEmoji HistoryItem::isolatedEmoji() const {
+	return {};
+}
+
+Ui::Text::OnlyCustomEmoji HistoryItem::onlyCustomEmoji() const {
 	return {};
 }
 

@@ -54,6 +54,15 @@ public:
 		Fn<void()> update,
 		SizeTag tag = SizeTag::Normal);
 
+	class Listener {
+	public:
+		virtual void customEmojiResolveDone(
+			not_null<DocumentData*> document) = 0;
+	};
+	void resolve(QStringView data, not_null<Listener*> listener);
+	void resolve(DocumentId documentId, not_null<Listener*> listener);
+	void unregisterListener(not_null<Listener*> listener);
+
 	[[nodiscard]] std::unique_ptr<Ui::CustomEmoji::Loader> createLoader(
 		not_null<DocumentData*> document,
 		SizeTag tag);
@@ -98,15 +107,21 @@ private:
 
 	std::array<
 		base::flat_map<
-			uint64,
+			DocumentId,
 			std::unique_ptr<Ui::CustomEmoji::Instance>>,
 		kSizeCount> _instances;
 	std::array<
 		base::flat_map<
-			uint64,
+			DocumentId,
 			std::vector<base::weak_ptr<CustomEmojiLoader>>>,
 		kSizeCount> _loaders;
-	base::flat_set<uint64> _pendingForRequest;
+	base::flat_map<
+		DocumentId,
+		base::flat_set<not_null<Listener*>>> _resolvers;
+	base::flat_map<
+		not_null<Listener*>,
+		base::flat_set<DocumentId>> _listeners;
+	base::flat_set<DocumentId> _pendingForRequest;
 	mtpRequestId _requestId = 0;
 
 	base::flat_map<crl::time, RepaintBunch> _repaints;
@@ -117,10 +132,14 @@ private:
 
 };
 
+[[nodiscard]] int FrameSizeFromTag(CustomEmojiManager::SizeTag tag);
+
 [[nodiscard]] QString SerializeCustomEmojiId(const CustomEmojiId &id);
 [[nodiscard]] QString SerializeCustomEmojiId(
 	not_null<DocumentData*> document);
 [[nodiscard]] CustomEmojiId ParseCustomEmojiData(QStringView data);
+
+[[nodiscard]] bool AllowEmojiWithoutPremium(not_null<PeerData*> peer);
 
 void InsertCustomEmoji(
 	not_null<Ui::InputField*> field,

@@ -198,8 +198,6 @@ private:
 	void clearSelected();
 	void setPinnedVisibility(bool shown);
 
-	void showPremiumToast(not_null<DocumentData*> document);
-
 	[[nodiscard]] Api::SendAction prepareSendAction(
 		Api::SendOptions options) const;
 	void send();

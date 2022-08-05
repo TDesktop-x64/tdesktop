@@ -17,7 +17,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/ui_utility.h"
 #include "ui/cached_round_corners.h"
 #include "boxes/sticker_set_box.h"
-#include "boxes/premium_preview_box.h"
 #include "lang/lang_keys.h"
 #include "layout/layout_position.h"
 #include "data/data_session.h"
@@ -453,6 +452,11 @@ auto EmojiListWidget::customChosen() const
 	return _customChosen.events();
 }
 
+auto EmojiListWidget::premiumChosen() const
+-> rpl::producer<not_null<DocumentData*>> {
+	return _premiumChosen.events();
+}
+
 void EmojiListWidget::visibleTopBottomUpdated(
 		int visibleTop,
 		int visibleBottom) {
@@ -776,7 +780,7 @@ void EmojiListWidget::paintEvent(QPaintEvent *e) {
 						drawCollapsedBadge(p, w - _areaPosition, info.count);
 						continue;
 					}
-					if (selected && !info.premiumRequired) {
+					if (selected) {
 						auto tl = w;
 						if (rtl()) {
 							tl.setX(width() - tl.x() - st::emojiPanArea.width());
@@ -1023,14 +1027,10 @@ void EmojiListWidget::selectEmoji(EmojiPtr emoji) {
 }
 
 void EmojiListWidget::selectCustom(not_null<DocumentData*> document) {
-	if (document->isPremiumEmoji() && !document->session().premium()) {
-		ShowPremiumPreviewBox(
-			controller(),
-			PremiumPreview::AnimatedEmoji,
-			{},
-			crl::guard(this, [=](not_null<Ui::BoxContent*> box) {
-				checkHideWithBox(box.get());
-			}));
+	if (document->isPremiumEmoji()
+		&& !document->session().premium()
+		&& !_allowWithoutPremium) {
+		_premiumChosen.fire_copy(document);
 		return;
 	}
 	Core::App().settings().incrementRecentEmoji({ RecentEmojiDocument{
@@ -1231,6 +1231,15 @@ uint64 EmojiListWidget::currentSet(int yOffset) const {
 	return sectionSetId(sectionInfoByOffset(yOffset).section);
 }
 
+void EmojiListWidget::setAllowWithoutPremium(bool allow) {
+	if (_allowWithoutPremium == allow) {
+		return;
+	}
+	_allowWithoutPremium = allow;
+	refreshCustom();
+	resizeToWidth(width());
+}
+
 QString EmojiListWidget::tooltipText() const {
 	const auto &replacements = Ui::Emoji::internal::GetAllReplacements();
 	const auto over = std::get_if<OverEmoji>(&_selected);
@@ -1285,7 +1294,9 @@ void EmojiListWidget::refreshCustom() {
 	auto old = base::take(_custom);
 	const auto session = &controller()->session();
 	const auto premiumPossible = session->premiumPossible();
-	const auto premiumMayBeBought = premiumPossible && !session->premium();
+	const auto premiumMayBeBought = premiumPossible
+		&& !session->premium()
+		&& !_allowWithoutPremium;
 	const auto owner = &session->data();
 	const auto &sets = owner->stickers().sets();
 	const auto push = [&](uint64 setId, bool installed) {

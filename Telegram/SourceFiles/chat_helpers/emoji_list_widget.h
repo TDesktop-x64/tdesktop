@@ -70,6 +70,7 @@ public:
 
 	void showSet(uint64 setId);
 	[[nodiscard]] uint64 currentSet(int yOffset) const;
+	void setAllowWithoutPremium(bool allow);
 
 	// Ui::AbstractTooltipShower interface.
 	QString tooltipText() const override;
@@ -81,6 +82,8 @@ public:
 	[[nodiscard]] rpl::producer<EmojiPtr> chosen() const;
 	[[nodiscard]] auto customChosen() const
 		-> rpl::producer<TabbedSelector::FileChosen>;
+	[[nodiscard]] auto premiumChosen() const
+		-> rpl::producer<not_null<DocumentData*>>;
 
 protected:
 	void visibleTopBottomUpdated(
@@ -274,6 +277,7 @@ private:
 	QVector<EmojiPtr> _emoji[kEmojiSectionCount];
 	std::vector<CustomSet> _custom;
 	base::flat_map<DocumentId, CustomEmojiInstance> _customEmoji;
+	bool _allowWithoutPremium = false;
 
 	int _rowsLeft = 0;
 	int _columnCount = 1;
@@ -296,6 +300,7 @@ private:
 
 	rpl::event_stream<EmojiPtr> _chosen;
 	rpl::event_stream<TabbedSelector::FileChosen> _customChosen;
+	rpl::event_stream<not_null<DocumentData*>> _premiumChosen;
 
 };
 

@@ -23,6 +23,30 @@ namespace Data {
 class StickersSet;
 } // namespace Data
 
+class StickerPremiumMark final {
+public:
+	explicit StickerPremiumMark(not_null<Main::Session*> session);
+
+	void paint(
+		QPainter &p,
+		const QImage &frame,
+		QImage &backCache,
+		QPoint position,
+		QSize singleSize,
+		int outerWidth);
+
+private:
+	void validateLock(const QImage &frame, QImage &backCache);
+	void validateStar();
+
+	QImage _lockGray;
+	QImage _star;
+	bool _premium = false;
+
+	rpl::lifetime _lifetime;
+
+};
+
 class StickerSetBox final : public Ui::BoxContent {
 public:
 	StickerSetBox(
@@ -63,5 +87,3 @@ private:
 	QPointer<Inner> _inner;
 
 };
-
-void ValidatePremiumLockBg(QImage &image, const QImage &frame);

@@ -754,12 +754,11 @@ bool RepliesWidget::confirmSendingFiles(
 		return false;
 	}
 
-	using SendLimit = SendFilesBox::SendLimit;
 	auto box = Box<SendFilesBox>(
 		controller(),
 		std::move(list),
 		_composeControls->getTextWithAppliedMarkdown(),
-		_history->peer->slowmodeApplied() ? SendLimit::One : SendLimit::Many,
+		_history->peer,
 		Api::SendType::Normal,
 		SendMenu::Type::SilentOnly); // #TODO replies schedule
 
@@ -1087,24 +1086,23 @@ void RepliesWidget::edit(
 		session().api().request(base::take(*saveEditMsgRequestId)).cancel();
 	});
 
-	const auto done = [=](const MTPUpdates &result, mtpRequestId requestId) {
+	const auto done = [=](mtpRequestId requestId) {
 		if (requestId == *saveEditMsgRequestId) {
 			*saveEditMsgRequestId = 0;
 			_composeControls->cancelEditMessage();
 		}
 	};
 
-	const auto fail = [=](const MTP::Error &error, mtpRequestId requestId) {
+	const auto fail = [=](const QString &error, mtpRequestId requestId) {
 		if (requestId == *saveEditMsgRequestId) {
 			*saveEditMsgRequestId = 0;
 		}
 
-		const auto &err = error.type();
-		if (ranges::contains(Api::kDefaultEditMessagesErrors, err)) {
+		if (ranges::contains(Api::kDefaultEditMessagesErrors, error)) {
 			controller()->show(Ui::MakeInformBox(tr::lng_edit_error()));
-		} else if (err == u"MESSAGE_NOT_MODIFIED"_q) {
+		} else if (error == u"MESSAGE_NOT_MODIFIED"_q) {
 			_composeControls->cancelEditMessage();
-		} else if (err == u"MESSAGE_EMPTY"_q) {
+		} else if (error == u"MESSAGE_EMPTY"_q) {
 			doSetInnerFocus();
 		} else {
 			controller()->show(Ui::MakeInformBox(tr::lng_edit_error()));
@@ -2061,7 +2059,7 @@ void RepliesWidget::listShowPremiumToast(not_null<DocumentData*> document) {
 	if (!_stickerToast) {
 		_stickerToast = std::make_unique<HistoryView::StickerToast>(
 			controller(),
-			_scroll.get(),
+			this,
 			[=] { _stickerToast = nullptr; });
 	}
 	_stickerToast->showFor(document);

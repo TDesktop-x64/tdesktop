@@ -1422,12 +1422,24 @@ void ComposeControls::initField() {
 	Ui::Connect(_field, &Ui::InputField::resized, [=] { updateHeight(); });
 	//Ui::Connect(_field, &Ui::InputField::focused, [=] { fieldFocused(); });
 	Ui::Connect(_field, &Ui::InputField::changed, [=] { fieldChanged(); });
-	InitMessageField(_window, _field, _unavailableEmojiPasted);
+	InitMessageField(_window, _field, [=](not_null<DocumentData*> emoji) {
+		if (_history && Data::AllowEmojiWithoutPremium(_history->peer)) {
+			return true;
+		}
+		if (_unavailableEmojiPasted) {
+			_unavailableEmojiPasted(emoji);
+		}
+		return false;
+	});
 	initAutocomplete();
+	const auto allow = [=](const auto &) {
+		return _history && Data::AllowEmojiWithoutPremium(_history->peer);
+	};
 	const auto suggestions = Ui::Emoji::SuggestionsController::Init(
 		_parent,
 		_field,
-		&_window->session());
+		&_window->session(),
+		{ .suggestCustomEmoji = true, .allowCustomWithoutPremium = allow });
 	_raiseEmojiSuggestions = [=] { suggestions->raise(); };
 
 	const auto rawTextEdit = _field->rawTextEdit().get();
@@ -1836,6 +1848,13 @@ void ComposeControls::initTabbedSelector() {
 	selector->customEmojiChosen(
 	) | rpl::start_with_next([=](FileChosen data) {
 		Data::InsertCustomEmoji(_field, data.document);
+	}, wrap->lifetime());
+
+	selector->premiumEmojiChosen(
+	) | rpl::start_with_next([=](not_null<DocumentData*> document) {
+		if (_unavailableEmojiPasted) {
+			_unavailableEmojiPasted(document);
+		}
 	}, wrap->lifetime());
 
 	selector->fileChosen(

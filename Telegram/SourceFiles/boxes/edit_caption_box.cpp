@@ -29,6 +29,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "editor/photo_editor_layer_widget.h"
 #include "history/history_drag_area.h"
 #include "history/history_item.h"
+#include "history/history.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
@@ -242,14 +243,20 @@ void EditCaptionBox::rebuildPreview() {
 }
 
 void EditCaptionBox::setupField() {
+	const auto peer = _historyItem->history()->peer;
+	const auto allow = [=](const auto&) {
+		return Data::AllowEmojiWithoutPremium(peer);
+	};
 	InitMessageFieldHandlers(
 		_controller,
 		_field.get(),
-		Window::GifPauseReason::Layer);
+		Window::GifPauseReason::Layer,
+		allow);
 	Ui::Emoji::SuggestionsController::Init(
 		getDelegate()->outerContainer(),
 		_field,
-		&_controller->session());
+		&_controller->session(),
+		{ .suggestCustomEmoji = true, .allowCustomWithoutPremium = allow });
 
 	_field->setSubmitSettings(
 		Core::App().settings().sendSubmitWay());
@@ -488,6 +495,7 @@ void EditCaptionBox::setupEmojiPanel() {
 		st::emojiPanMinHeight / 2,
 		st::emojiPanMinHeight);
 	_emojiPanel->hide();
+	_emojiPanel->selector()->setCurrentPeer(_historyItem->history()->peer);
 	_emojiPanel->selector()->emojiChosen(
 	) | rpl::start_with_next([=](EmojiPtr emoji) {
 		Ui::InsertEmojiAtCursor(_field->textCursor(), emoji);
@@ -496,6 +504,7 @@ void EditCaptionBox::setupEmojiPanel() {
 	) | rpl::start_with_next([=](Selector::FileChosen data) {
 		Data::InsertCustomEmoji(_field.get(), data.document);
 	}, lifetime());
+	_emojiPanel->selector()->showPromoForPremiumEmoji();
 
 	const auto filterCallback = [=](not_null<QEvent*> event) {
 		emojiFilterForGeometry(event);
@@ -714,20 +723,19 @@ void EditCaptionBox::save() {
 		return;
 	}
 
-	const auto done = crl::guard(this, [=](const MTPUpdates &updates) {
+	const auto done = crl::guard(this, [=] {
 		_saveRequestId = 0;
 		closeBox();
 	});
 
-	const auto fail = crl::guard(this, [=](const MTP::Error &error) {
+	const auto fail = crl::guard(this, [=](const QString &error) {
 		_saveRequestId = 0;
-		const auto &type = error.type();
-		if (ranges::contains(Api::kDefaultEditMessagesErrors, type)) {
+		if (ranges::contains(Api::kDefaultEditMessagesErrors, error)) {
 			_error = tr::lng_edit_error(tr::now);
 			update();
-		} else if (type == u"MESSAGE_NOT_MODIFIED"_q) {
+		} else if (error == u"MESSAGE_NOT_MODIFIED"_q) {
 			closeBox();
-		} else if (type == u"MESSAGE_EMPTY"_q) {
+		} else if (error == u"MESSAGE_EMPTY"_q) {
 			_field->setFocus();
 			_field->showError();
 			update();

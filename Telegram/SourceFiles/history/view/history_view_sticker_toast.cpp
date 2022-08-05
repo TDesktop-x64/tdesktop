@@ -18,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "ui/text/text_utilities.h"
 #include "boxes/sticker_set_box.h"
+#include "boxes/premium_preview_box.h"
 #include "lottie/lottie_single_player.h"
 #include "window/window_session_controller.h"
 #include "apiwrap.h"
@@ -41,6 +42,12 @@ StickerToast::StickerToast(
 
 StickerToast::~StickerToast() {
 	cancelRequest();
+	_hiding.push_back(_weak);
+	for (const auto &weak : base::take(_hiding)) {
+		if (const auto strong = weak.get()) {
+			delete strong->widget();
+		}
+	}
 }
 
 void StickerToast::showFor(not_null<DocumentData*> document) {
@@ -120,22 +127,34 @@ void StickerToast::cancelRequest() {
 void StickerToast::showWithTitle(const QString &title) {
 	Expects(_for != nullptr);
 
+	static auto counter = 0;
 	const auto setType = _for->sticker()->setType;
 	const auto isEmoji = (setType == Data::StickersType::Emoji);
+	const auto toSaved = isEmoji && !(++counter % 2);
 	const auto text = Ui::Text::Bold(
 		title
 	).append('\n').append(
-		(isEmoji
+		(toSaved
+			? tr::lng_animated_emoji_saved(tr::now, Ui::Text::RichLangValue)
+			: isEmoji
 			? tr::lng_animated_emoji_text(tr::now, Ui::Text::RichLangValue)
 			: tr::lng_sticker_premium_text(tr::now, Ui::Text::RichLangValue))
 	);
 	_st = st::historyPremiumToast;
 	const auto skip = _st.padding.top();
 	const auto size = _st.style.font->height * 2;
-	const auto view = tr::lng_sticker_premium_view(tr::now);
+	const auto view = toSaved
+		? tr::lng_animated_emoji_saved_open(tr::now)
+		: tr::lng_sticker_premium_view(tr::now);
 	_st.padding.setLeft(skip + size + skip);
 	_st.padding.setRight(st::historyPremiumViewSet.font->width(view)
 		- st::historyPremiumViewSet.width);
+
+	clearHiddenHiding();
+	if (_weak.get()) {
+		_hiding.push_back(_weak);
+	}
+
 	_weak = Ui::Toast::Show(_parent, Ui::Toast::Config{
 		.text = text,
 		.st = &_st,
@@ -194,11 +213,38 @@ void StickerToast::showWithTitle(const QString &title) {
 		setupLottiePreview(preview, size);
 	}
 	button->setClickedCallback([=] {
-		_controller->show(
-			Box<StickerSetBox>(_controller, _for->sticker()->set, setType),
-			Ui::LayerOption::KeepOther);
+		if (toSaved) {
+			_controller->showPeerHistory(
+				_controller->session().userPeerId(),
+				Window::SectionShow::Way::Forward);
+			hideToast();
+			return;
+		}
+		const auto id = _for->sticker()->set.id;
+		const auto &sets = _for->owner().stickers().sets();
+		const auto i = sets.find(id);
+		if (i != end(sets)
+			&& (i->second->flags & Data::StickersSetFlag::Installed)) {
+			ShowPremiumPreviewBox(
+				_controller,
+				PremiumPreview::AnimatedEmoji);
+		} else {
+			_controller->show(Box<StickerSetBox>(
+				_controller,
+				_for->sticker()->set,
+				setType));
+		}
 		hideToast();
 	});
+}
+
+void StickerToast::clearHiddenHiding() {
+	_hiding.erase(
+		ranges::remove(
+			_hiding,
+			nullptr,
+			&base::weak_ptr<Ui::Toast::Instance>::get),
+		end(_hiding));
 }
 
 void StickerToast::setupEmojiPreview(

@@ -300,7 +300,8 @@ void ShareBox::prepare() {
 	Ui::Emoji::SuggestionsController::Init(
 		getDelegate()->outerContainer(),
 		_comment->entity(),
-		_descriptor.session);
+		_descriptor.session,
+		{ .suggestCustomEmoji = true });
 
 	_select->raise();
 }
@@ -1378,7 +1379,17 @@ void FastShareMessage(
 						}
 					}
 					finish();
-				}).fail([=] {
+				}).fail([=](const MTP::Error &error) {
+					if (error.type() == u"VOICE_MESSAGES_FORBIDDEN"_q) {
+						if (show->valid()) {
+							Ui::Toast::Show(
+								show->toastParent(),
+								tr::lng_restricted_send_voice_messages(
+									tr::now,
+									lt_user,
+									peer->name));
+						}
+					}
 					finish();
 				}).afterRequest(history->sendRequestId).send();
 				return history->sendRequestId;

@@ -29,12 +29,18 @@ class CustomEmoji;
 
 namespace Ui::Emoji {
 
+using SuggestionsQuery = std::variant<QString, EmojiPtr>;
+
 class SuggestionsWidget final : public Ui::RpWidget {
 public:
-	SuggestionsWidget(QWidget *parent, not_null<Main::Session*> session);
+	SuggestionsWidget(
+		QWidget *parent,
+		not_null<Main::Session*> session,
+		bool suggestCustomEmoji,
+		Fn<bool(not_null<DocumentData*>)> allowCustomWithoutPremium);
 	~SuggestionsWidget();
 
-	void showWithQuery(const QString &query, bool force = false);
+	void showWithQuery(SuggestionsQuery query, bool force = false);
 	void selectFirstResult();
 	bool handleKeyEvent(int key);
 
@@ -55,6 +61,11 @@ private:
 		not_null<EmojiPtr> emoji;
 		QString replacement;
 	};
+	struct Custom {
+		not_null<DocumentData*> document;
+		not_null<EmojiPtr> emoji;
+		QString replacement;
+	};
 
 	bool eventHook(QEvent *e) override;
 	void paintEvent(QPaintEvent *e) override;
@@ -68,8 +79,14 @@ private:
 	void scrollByWheelEvent(not_null<QWheelEvent*> e);
 	void paintFadings(Painter &p) const;
 
-	[[nodiscard]] std::vector<Row> getRowsByQuery() const;
-	[[nodiscard]] std::vector<Row> prependCustom(std::vector<Row> rows);
+	[[nodiscard]] std::vector<Row> getRowsByQuery(const QString &text) const;
+	[[nodiscard]] base::flat_multi_map<int, Custom> lookupCustom(
+		const std::vector<Row> &rows) const;
+	[[nodiscard]] std::vector<Row> appendCustom(
+		std::vector<Row> rows);
+	[[nodiscard]] std::vector<Row> appendCustom(
+		std::vector<Row> rows,
+		const base::flat_multi_map<int, Custom> &custom);
 	void resizeToRows();
 	void setSelected(
 		int selected,
@@ -95,8 +112,10 @@ private:
 	void customEmojiRepaint();
 
 	const not_null<Main::Session*> _session;
-	QString _query;
+	SuggestionsQuery _query;
 	std::vector<Row> _rows;
+	bool _suggestCustomEmoji = false;
+	Fn<bool(not_null<DocumentData*>)> _allowCustomWithoutPremium;
 
 	base::flat_map<
 		not_null<DocumentData*>,
@@ -126,10 +145,9 @@ private:
 class SuggestionsController {
 public:
 	struct Options {
-		Options() : suggestExactFirstWord(true) {
-		}
-
-		bool suggestExactFirstWord;
+		bool suggestExactFirstWord = true;
+		bool suggestCustomEmoji = false;
+		Fn<bool(not_null<DocumentData*>)> allowCustomWithoutPremium;
 	};
 
 	SuggestionsController(
@@ -145,17 +163,23 @@ public:
 		const QString &replacement,
 		const QString &customEmojiData)> callback);
 
-	static SuggestionsController *Init(
+	static not_null<SuggestionsController*> Init(
+			not_null<QWidget*> outer,
+			not_null<Ui::InputField*> field,
+			not_null<Main::Session*> session) {
+		return Init(outer, field, session, {});
+	}
+	static not_null<SuggestionsController*> Init(
 		not_null<QWidget*> outer,
 		not_null<Ui::InputField*> field,
 		not_null<Main::Session*> session,
-		const Options &options = Options());
+		const Options &options);
 
 private:
 	void handleCursorPositionChange();
 	void handleTextChange();
-	void showWithQuery(const QString &query);
-	[[nodiscard]] QString getEmojiQuery();
+	void showWithQuery(SuggestionsQuery query);
+	[[nodiscard]] SuggestionsQuery getEmojiQuery();
 	void suggestionsUpdated(bool visible);
 	void updateGeometry();
 	void updateForceHidden();
@@ -183,7 +207,7 @@ private:
 	base::unique_qptr<QObject> _outerFilter;
 	base::Timer _showExactTimer;
 	bool _keywordsRefreshed = false;
-	QString _lastShownQuery;
+	SuggestionsQuery _lastShownQuery;
 	Options _options;
 
 	rpl::lifetime _lifetime;

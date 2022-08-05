@@ -622,6 +622,8 @@ PRIVATE
     history/view/media/history_view_call.cpp
     history/view/media/history_view_contact.h
     history/view/media/history_view_contact.cpp
+    history/view/media/history_view_custom_emoji.h
+    history/view/media/history_view_custom_emoji.cpp
     history/view/media/history_view_dice.h
     history/view/media/history_view_dice.cpp
     history/view/media/history_view_document.h
@@ -1183,8 +1185,6 @@ PRIVATE
     storage/storage_account.h
     storage/storage_cloud_blob.cpp
     storage/storage_cloud_blob.h
-    storage/storage_cloud_song_cover.cpp
-    storage/storage_cloud_song_cover.h
     storage/storage_domain.cpp
     storage/storage_domain.h
     storage/storage_facade.cpp

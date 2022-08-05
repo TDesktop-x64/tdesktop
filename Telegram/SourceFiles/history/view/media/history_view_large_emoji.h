@@ -10,10 +10,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/media/history_view_media_unwrapped.h"
 #include "ui/text/text_isolated_emoji.h"
 
-namespace Data {
-struct FileOrigin;
-} // namespace Data
-
 namespace Stickers {
 struct LargeEmojiImage;
 } // namespace Stickers
@@ -32,7 +28,7 @@ public:
 		const Ui::Text::IsolatedEmoji &emoji);
 	~LargeEmoji();
 
-	QSize size() override;
+	QSize countOptimalSize() override;
 	void draw(
 		Painter &p,
 		const PaintContext &context,

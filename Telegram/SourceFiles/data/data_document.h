@@ -289,6 +289,7 @@ private:
 		InlineThumbnailIsPath = 0x080,
 		ForceToCache = 0x100,
 		PremiumSticker = 0x200,
+		PossibleCoverThumbnail = 0x400,
 	};
 	using Flags = base::flags<Flag>;
 	friend constexpr bool is_flag_type(Flag) { return true; };
@@ -329,6 +330,8 @@ private:
 	void destroyLoader();
 
 	bool saveFromDataChecked();
+
+	void refreshPossibleCoverThumbnail();
 
 	const not_null<Data::Session*> _owner;
 

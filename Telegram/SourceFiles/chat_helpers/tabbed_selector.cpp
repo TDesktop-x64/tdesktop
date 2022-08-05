@@ -28,6 +28,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_session.h"
 #include "data/data_changes.h"
 #include "data/stickers/data_stickers.h"
+#include "data/stickers/data_custom_emoji.h" // AllowEmojiWithoutPremium.
+#include "boxes/premium_preview_box.h"
 #include "lang/lang_keys.h"
 #include "mainwindow.h"
 #include "apiwrap.h"
@@ -490,6 +492,11 @@ auto TabbedSelector::customEmojiChosen() const -> rpl::producer<FileChosen> {
 	return emoji()->customChosen();
 }
 
+auto TabbedSelector::premiumEmojiChosen() const
+-> rpl::producer<not_null<DocumentData*>> {
+	return emoji()->premiumChosen();
+}
+
 auto TabbedSelector::fileChosen() const -> rpl::producer<FileChosen> {
 	auto never = rpl::never<TabbedSelector::FileChosen>(
 	) | rpl::type_erased();
@@ -839,6 +846,18 @@ void TabbedSelector::setCurrentPeer(PeerData *peer) {
 	if (hasStickersTab()) {
 		stickers()->showMegagroupSet(peer ? peer->asMegagroup() : nullptr);
 	}
+	setAllowEmojiWithoutPremium(
+		peer && Data::AllowEmojiWithoutPremium(peer));
+}
+
+void TabbedSelector::showPromoForPremiumEmoji() {
+	premiumEmojiChosen(
+	) | rpl::start_with_next([=] {
+		ShowPremiumPreviewBox(
+			_controller,
+			PremiumPreview::AnimatedEmoji,
+			{});
+	}, lifetime());
 }
 
 void TabbedSelector::checkRestrictedPeer() {
@@ -921,6 +940,15 @@ void TabbedSelector::setRoundRadius(int radius) {
 	_roundRadius = radius;
 	if (_tabsSlider) {
 		_tabsSlider->setRippleTopRoundRadius(_roundRadius);
+	}
+}
+
+void TabbedSelector::setAllowEmojiWithoutPremium(bool allow) {
+	for (const auto &tab : _tabs) {
+		if (tab.type() == SelectorTab::Emoji) {
+			const auto emoji = static_cast<EmojiListWidget*>(tab.widget());
+			emoji->setAllowWithoutPremium(allow);
+		}
 	}
 }
 

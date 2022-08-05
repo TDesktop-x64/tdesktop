@@ -43,9 +43,13 @@ constexpr auto kAnimationDuration = crl::time(120);
 
 SuggestionsWidget::SuggestionsWidget(
 	QWidget *parent,
-	not_null<Main::Session*> session)
+	not_null<Main::Session*> session,
+	bool suggestCustomEmoji,
+	Fn<bool(not_null<DocumentData*>)> allowCustomWithoutPremium)
 : RpWidget(parent)
 , _session(session)
+, _suggestCustomEmoji(suggestCustomEmoji)
+, _allowCustomWithoutPremium(std::move(allowCustomWithoutPremium))
 , _oneWidth(st::emojiSuggestionSize)
 , _padding(st::emojiSuggestionsPadding) {
 	resize(
@@ -64,12 +68,19 @@ auto SuggestionsWidget::triggered() const -> rpl::producer<Chosen> {
 	return _triggered.events();
 }
 
-void SuggestionsWidget::showWithQuery(const QString &query, bool force) {
+void SuggestionsWidget::showWithQuery(SuggestionsQuery query, bool force) {
 	if (!force && (_query == query)) {
 		return;
 	}
 	_query = query;
-	auto rows = prependCustom(getRowsByQuery());
+	auto rows = [&] {
+		if (const auto emoji = std::get_if<EmojiPtr>(&query)) {
+			return appendCustom(
+				{},
+				lookupCustom({ Row(*emoji, (*emoji)->text()) }));
+		}
+		return appendCustom(getRowsByQuery(v::get<QString>(query)));
+	}();
 	if (rows.empty()) {
 		_toggleAnimated.fire(false);
 	}
@@ -92,16 +103,19 @@ void SuggestionsWidget::selectFirstResult() {
 	}
 }
 
-auto SuggestionsWidget::prependCustom(std::vector<Row> rows)
+auto SuggestionsWidget::appendCustom(std::vector<Row> rows)
 -> std::vector<Row> {
-	if (rows.empty()) {
+	const auto custom = lookupCustom(rows);
+	return appendCustom(std::move(rows), custom);
+}
+
+auto SuggestionsWidget::lookupCustom(const std::vector<Row> &rows) const
+-> base::flat_multi_map<int, Custom> {
+	if (rows.empty()
+		|| !_suggestCustomEmoji
+		|| !Core::App().settings().suggestAnimatedEmoji()) {
 		return {};
 	}
-	struct Custom {
-		not_null<DocumentData*> document;
-		not_null<EmojiPtr> emoji;
-		QString replacement;
-	};
 	auto custom = base::flat_multi_map<int, Custom>();
 	const auto premium = _session->premium();
 	const auto stickers = &_session->data().stickers();
@@ -111,20 +125,25 @@ auto SuggestionsWidget::prependCustom(std::vector<Row> rows)
 			continue;
 		}
 		for (const auto &document : i->second->stickers) {
-			if (!premium && document->isPremiumEmoji()) {
+			if (!premium
+				&& document->isPremiumEmoji()
+				&& (!_allowCustomWithoutPremium
+					|| !_allowCustomWithoutPremium(document))) {
 				// Skip the whole premium emoji set.
 				break;
 			}
 			if (const auto sticker = document->sticker()) {
 				if (const auto emoji = Ui::Emoji::Find(sticker->alt)) {
-					const auto j = ranges::find(
+					const auto original = emoji->original();
+					const auto j = ranges::find_if(
 						rows,
-						not_null{ emoji },
-						&Row::emoji);
+						[&](const Row &row) {
+							return row.emoji->original() == original;
+						});
 					if (j != end(rows)) {
 						custom.emplace(int(j - begin(rows)), Custom{
 							.document = document,
-							.emoji = j->emoji,
+							.emoji = emoji,
 							.replacement = j->replacement,
 						});
 					}
@@ -132,20 +151,20 @@ auto SuggestionsWidget::prependCustom(std::vector<Row> rows)
 			}
 		}
 	}
-	if (custom.empty()) {
-		return rows;
-	}
-	auto result = std::vector<Row>();
-	result.reserve(custom.size() + rows.size());
+	return custom;
+}
+
+auto SuggestionsWidget::appendCustom(
+	std::vector<Row> rows,
+	const base::flat_multi_map<int, Custom> &custom)
+-> std::vector<Row> {
+	rows.reserve(rows.size() + custom.size());
 	for (const auto &[position, one] : custom) {
-		result.push_back(Row(one.emoji, one.replacement));
-		result.back().document = one.document;
-		result.back().custom = resolveCustomEmoji(one.document);
+		rows.push_back(Row(one.emoji, one.replacement));
+		rows.back().document = one.document;
+		rows.back().custom = resolveCustomEmoji(one.document);
 	}
-	for (auto &row : rows) {
-		result.push_back(std::move(row));
-	}
-	return result;
+	return rows;
 }
 
 not_null<Ui::Text::CustomEmoji*> SuggestionsWidget::resolveCustomEmoji(
@@ -179,18 +198,19 @@ SuggestionsWidget::Row::Row(
 , replacement(replacement) {
 }
 
-auto SuggestionsWidget::getRowsByQuery() const -> std::vector<Row> {
-	if (_query.isEmpty()) {
+auto SuggestionsWidget::getRowsByQuery(const QString &text) const
+-> std::vector<Row> {
+	if (text.isEmpty()) {
 		return {};
 	}
-	const auto middle = (_query[0] == ':');
-	const auto real = middle ? _query.mid(1) : _query;
+	const auto middle = (text[0] == ':');
+	const auto real = middle ? text.mid(1) : text;
 	const auto simple = [&] {
-		if (!middle || _query.size() > 2) {
+		if (!middle || text.size() > 2) {
 			return false;
 		}
 		// Suggest :D and :-P only as exact matches.
-		return ranges::none_of(_query, [](QChar ch) { return ch.isLower(); });
+		return ranges::none_of(text, [](QChar ch) { return ch.isLower(); });
 	}();
 	const auto exact = !middle || simple;
 	const auto list = Core::App().emojiKeywords().query(real, exact);
@@ -623,7 +643,9 @@ SuggestionsController::SuggestionsController(
 	_suggestions = _container->setOwnedWidget(
 		object_ptr<Ui::Emoji::SuggestionsWidget>(
 			_container,
-			session));
+			session,
+			_options.suggestCustomEmoji,
+			_options.allowCustomWithoutPremium));
 
 	setReplaceCallback(nullptr);
 
@@ -673,7 +695,7 @@ SuggestionsController::SuggestionsController(
 	handleTextChange();
 }
 
-SuggestionsController *SuggestionsController::Init(
+not_null<SuggestionsController*> SuggestionsController::Init(
 		not_null<QWidget*> outer,
 		not_null<Ui::InputField*> field,
 		not_null<Main::Session*> session,
@@ -730,8 +752,14 @@ void SuggestionsController::handleTextChange() {
 	InvokeQueued(_container, [=] { _ignoreCursorPositionChange = false; });
 
 	const auto query = getEmojiQuery();
-	if (query.isEmpty() || _textChangeAfterKeyPress) {
-		const auto exact = (!query.isEmpty() && query[0] != ':');
+	if (v::is<EmojiPtr>(query)) {
+		showWithQuery(query);
+		_suggestions->selectFirstResult();
+		return;
+	}
+	const auto text = v::get<QString>(query);
+	if (text.isEmpty() || _textChangeAfterKeyPress) {
+		const auto exact = !text.isEmpty() && (text[0] != ':');
 		if (exact) {
 			const auto hidden = _container->isHidden()
 				|| _container->isHiding();
@@ -743,14 +771,14 @@ void SuggestionsController::handleTextChange() {
 	}
 }
 
-void SuggestionsController::showWithQuery(const QString &query) {
+void SuggestionsController::showWithQuery(SuggestionsQuery query) {
 	_showExactTimer.cancel();
 	const auto force = base::take(_keywordsRefreshed);
 	_lastShownQuery = query;
 	_suggestions->showWithQuery(_lastShownQuery, force);
 }
 
-QString SuggestionsController::getEmojiQuery() {
+SuggestionsQuery SuggestionsController::getEmojiQuery() {
 	if (!Core::App().settings().suggestEmoji()) {
 		return QString();
 	}
@@ -763,7 +791,7 @@ QString SuggestionsController::getEmojiQuery() {
 	const auto modernLimit = Core::App().emojiKeywords().maxQueryLength();
 	const auto legacyLimit = GetSuggestionMaxLength();
 	const auto position = cursor.position();
-	const auto findTextPart = [&] {
+	const auto findTextPart = [&]() -> SuggestionsQuery {
 		auto document = _field->document();
 		auto block = document->findBlock(position);
 		for (auto i = block.begin(); !i.atEnd(); ++i) {
@@ -776,8 +804,14 @@ QString SuggestionsController::getEmojiQuery() {
 				continue;
 			}
 			const auto format = fragment.charFormat();
-			if (format.isImageFormat()
-				|| format.objectType() == InputField::kCustomEmojiFormat) {
+			if (format.objectType() == InputField::kCustomEmojiFormat) {
+				continue;
+			} else if (format.isImageFormat()) {
+				const auto imageName = format.toImageFormat().name();
+				if (const auto emoji = Emoji::FromUrl(imageName)) {
+					_queryStartPosition = position - 1;
+					return emoji;
+				}
 				continue;
 			}
 			_queryStartPosition = from;
@@ -786,7 +820,11 @@ QString SuggestionsController::getEmojiQuery() {
 		return QString();
 	};
 
-	const auto text = findTextPart();
+	const auto part = findTextPart();
+	if (const auto emoji = std::get_if<EmojiPtr>(&part)) {
+		return *emoji;
+	}
+	const auto text = v::get<QString>(part);
 	if (text.isEmpty()) {
 		return QString();
 	}
@@ -828,12 +866,15 @@ void SuggestionsController::replaceCurrent(
 		const QString &replacement,
 		const QString &customEmojiData) {
 	const auto suggestion = getEmojiQuery();
-	if (suggestion.isEmpty()) {
+	const auto length = v::is<EmojiPtr>(suggestion)
+		? 1
+		: v::get<QString>(suggestion).size();
+	if (!length) {
 		showWithQuery(QString());
 	} else {
 		const auto cursor = _field->textCursor();
 		const auto position = cursor.position();
-		const auto from = position - suggestion.size();
+		const auto from = position - length;
 		_replaceCallback(from, position, replacement, customEmojiData);
 	}
 }

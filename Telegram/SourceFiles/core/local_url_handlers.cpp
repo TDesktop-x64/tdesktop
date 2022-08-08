@@ -526,7 +526,7 @@ bool HandleOpenMessage(
 	const auto params = url_parse_params(
 		match->captured(1),
 		qthelp::UrlParamNameTransform::ToLower);
-	const auto userId = params.value(qsl("user_id")).toInt();
+	const auto userId = params.value(qsl("user_id")).toLongLong();
 	const auto msgId = params.value(qsl("message_id")).toInt();
 	if (!userId) {
 		return false;
@@ -554,7 +554,7 @@ bool HandleUser(
 	const auto params = url_parse_params(
 				match->captured(1),
 		qthelp::UrlParamNameTransform::ToLower);
-	const auto userId = params.value(qsl("id")).toInt();
+	const auto userId = params.value(qsl("id")).toLongLong();
 	if (!userId) {
 		return false;
 	}

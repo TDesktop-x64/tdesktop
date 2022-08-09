@@ -179,7 +179,7 @@ void EditLinkBox(
 				const auto user = session->data().userLoaded(uid);
 				if (user != nullptr) {
 					const auto userId = UserId(uid);
-					linkUrl = "mention://user." + TextUtilities::MentionNameDataFromFields({userId.bare, user->accessHash()});
+					linkUrl = "mention://" + TextUtilities::MentionNameDataFromFields({.selfId = session->userId().bare, .userId = userId.bare, .accessHash = user->accessHash()});
 				} else {
 					url->showError();
 					return;
@@ -200,7 +200,7 @@ void EditLinkBox(
 				const auto user = session->data().userLoaded(uid);
 				if (user != nullptr) {
 					const auto userId = UserId(uid);
-					linkUrl = "mention://user." + TextUtilities::MentionNameDataFromFields({userId.bare, user->accessHash()});
+					linkUrl = "mention://" + TextUtilities::MentionNameDataFromFields({.selfId = session->userId().bare, .userId = userId.bare, .accessHash = user->accessHash()});
 				} else {
 					url->showError();
 					return;

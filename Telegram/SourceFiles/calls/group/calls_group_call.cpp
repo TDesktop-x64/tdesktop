@@ -2356,7 +2356,7 @@ void GroupCall::toggleRecording(
 }
 
 uint16_t getCustomBitrate() {
-	int option = GetEnhancedInt("radio_controller");
+	int option = GetEnhancedInt("bitrate");
 	switch (option) {
 		case 1:
 			return 64;
@@ -2471,7 +2471,7 @@ bool GroupCall::tryCreateController() {
 			});
 			return result;
 		},
-		.enableStereoMode = GetEnhancedBool("show_scheduled_button"),
+		.enableStereoMode = GetEnhancedBool("stereo_mode"),
 		.customBitrate = getCustomBitrate(),
 		.enableHDVideo = GetEnhancedBool("hd_video"),
 	};

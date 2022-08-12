@@ -185,11 +185,11 @@ namespace EnhancedSettings {
 			if (v.isDouble()) {
 				int value = v.toInt();
 				if (value < 0) {
-					gEnhancedOptions.insert("net_speed_boost", 0);
+					SetNetworkBoost(0);
 				} else if (value > 3) {
-					gEnhancedOptions.insert("net_speed_boost", 3);
+					SetNetworkBoost(3);
 				} else {
-					gEnhancedOptions.insert("net_speed_boost", value);
+					SetNetworkBoost(value);
 				}
 			}
 		});

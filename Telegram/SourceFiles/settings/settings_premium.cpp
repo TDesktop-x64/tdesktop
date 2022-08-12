@@ -52,8 +52,6 @@ namespace {
 using SectionCustomTopBarData = Info::Settings::SectionCustomTopBarData;
 
 constexpr auto kBodyAnimationPart = 0.90;
-constexpr auto kTitleAnimationPart = 0.15;
-
 constexpr auto kTitleAdditionalScale = 0.15;
 
 struct GiftRef {
@@ -772,7 +770,7 @@ QPointer<Ui::RpWidget> Premium::createPinnedToTop(
 						lt_count,
 						rpl::single(float64(gift.months)),
 						lt_user,
-						rpl::single(Ui::Text::Bold(peer->name)),
+						rpl::single(Ui::Text::Bold(peer->name())),
 						Ui::Text::RichLangValue);
 			}
 		}

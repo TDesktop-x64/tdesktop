@@ -54,6 +54,7 @@ class PathShiftGradient;
 } // namespace Ui
 
 namespace Dialogs::Ui {
+using namespace ::Ui;
 class VideoUserpic;
 } // namespace Dialogs::Ui
 

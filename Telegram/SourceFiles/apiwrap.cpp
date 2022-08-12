@@ -293,14 +293,20 @@ void ApiWrap::topPromotionDone(const MTPhelp_PromoData &proxy) {
 
 void ApiWrap::requestDeepLinkInfo(
 		const QString &path,
-		Fn<void(const MTPDhelp_deepLinkInfo &result)> callback) {
+		Fn<void(TextWithEntities message, bool updateRequired)> callback) {
 	request(_deepLinkInfoRequestId).cancel();
 	_deepLinkInfoRequestId = request(MTPhelp_GetDeepLinkInfo(
 		MTP_string(path)
 	)).done([=](const MTPhelp_DeepLinkInfo &result) {
 		_deepLinkInfoRequestId = 0;
 		if (result.type() == mtpc_help_deepLinkInfo) {
-			callback(result.c_help_deepLinkInfo());
+			const auto &data = result.c_help_deepLinkInfo();
+			callback(TextWithEntities{
+				qs(data.vmessage()),
+				Api::EntitiesFromMTP(
+					_session,
+					data.ventities().value_or_empty())
+			}, data.is_update_app());
 		}
 	}).fail([=] {
 		_deepLinkInfoRequestId = 0;
@@ -992,7 +998,7 @@ rpl::producer<bool> ApiWrap::dialogsLoadBlockedByDate() const {
 void ApiWrap::requestWallPaper(
 		const QString &slug,
 		Fn<void(const Data::WallPaper &)> done,
-		Fn<void(const MTP::Error &)> fail) {
+		Fn<void()> fail) {
 	if (_wallPaperSlug != slug) {
 		_wallPaperSlug = slug;
 		if (_wallPaperRequestId) {
@@ -1014,13 +1020,13 @@ void ApiWrap::requestWallPaper(
 				done(*paper);
 			}
 		} else if (const auto fail = base::take(_wallPaperFail)) {
-			fail(MTP::Error::Local("BAD_DOCUMENT", "In a wallpaper."));
+			fail();
 		}
 	}).fail([=](const MTP::Error &error) {
 		_wallPaperRequestId = 0;
 		_wallPaperSlug = QString();
 		if (const auto fail = base::take(_wallPaperFail)) {
-			fail(error);
+			fail();
 		}
 	}).send();
 }
@@ -1123,44 +1129,6 @@ void ApiWrap::gotUserFull(
 	_session->changes().peerUpdated(
 		user,
 		Data::PeerUpdate::Flag::FullInfo);
-}
-
-void ApiWrap::requestPeer(not_null<PeerData*> peer) {
-	if (_fullPeerRequests.contains(peer) || _peerRequests.contains(peer)) {
-		return;
-	}
-
-	const auto requestId = [&] {
-		const auto failHandler = [=] {
-			_peerRequests.remove(peer);
-		};
-		const auto chatHandler = [=](const MTPmessages_Chats &result) {
-			_peerRequests.remove(peer);
-			const auto &chats = result.match([](const auto &data) {
-				return data.vchats();
-			});
-			_session->data().applyMaximumChatVersions(chats);
-			_session->data().processChats(chats);
-		};
-		if (const auto user = peer->asUser()) {
-			return request(MTPusers_GetUsers(
-				MTP_vector<MTPInputUser>(1, user->inputUser)
-			)).done([=](const MTPVector<MTPUser> &result) {
-				_peerRequests.remove(user);
-				_session->data().processUsers(result);
-			}).fail(failHandler).send();
-		} else if (const auto chat = peer->asChat()) {
-			return request(MTPmessages_GetChats(
-				MTP_vector<MTPlong>(1, chat->inputChat)
-			)).done(chatHandler).fail(failHandler).send();
-		} else if (const auto channel = peer->asChannel()) {
-			return request(MTPchannels_GetChannels(
-				MTP_vector<MTPInputChannel>(1, channel->inputChannel)
-			)).done(chatHandler).fail(failHandler).send();
-		}
-		Unexpected("Peer type in requestPeer.");
-	}();
-	_peerRequests.emplace(peer, requestId);
 }
 
 void ApiWrap::requestPeerSettings(not_null<PeerData*> peer) {
@@ -1315,51 +1283,6 @@ void ApiWrap::markContentsRead(not_null<HistoryItem*> item) {
 			ids
 		)).done([=](const MTPmessages_AffectedMessages &result) {
 			applyAffectedMessages(result);
-		}).send();
-	}
-}
-
-void ApiWrap::requestPeers(const QList<PeerData*> &peers) {
-	QVector<MTPlong> chats;
-	QVector<MTPInputChannel> channels;
-	QVector<MTPInputUser> users;
-	chats.reserve(peers.size());
-	channels.reserve(peers.size());
-	users.reserve(peers.size());
-	for (const auto peer : peers) {
-		if (!peer
-			|| _fullPeerRequests.contains(peer)
-			|| _peerRequests.contains(peer)) {
-			continue;
-		}
-		if (const auto user = peer->asUser()) {
-			users.push_back(user->inputUser);
-		} else if (const auto chat = peer->asChat()) {
-			chats.push_back(chat->inputChat);
-		} else if (const auto channel = peer->asChannel()) {
-			channels.push_back(channel->inputChannel);
-		}
-	}
-	const auto handleChats = [=](const MTPmessages_Chats &result) {
-		_session->data().processChats(result.match([](const auto &data) {
-			return data.vchats();
-		}));
-	};
-	if (!chats.isEmpty()) {
-		request(MTPmessages_GetChats(
-			MTP_vector<MTPlong>(chats)
-		)).done(handleChats).send();
-	}
-	if (!channels.isEmpty()) {
-		request(MTPchannels_GetChannels(
-			MTP_vector<MTPInputChannel>(channels)
-		)).done(handleChats).send();
-	}
-	if (!users.isEmpty()) {
-		request(MTPusers_GetUsers(
-			MTP_vector<MTPInputUser>(users)
-		)).done([=](const MTPVector<MTPUser> &result) {
-			_session->data().processUsers(result);
 		}).send();
 	}
 }
@@ -3199,7 +3122,7 @@ void ApiWrap::forwardMessages(
 				? PeerId(0)
 				: self->id;
 			const auto messagePostAuthor = peer->isBroadcast()
-				? self->name
+				? self->name()
 				: QString();
 			history->addNewLocalMessage(
 				newId.msg,
@@ -3282,7 +3205,7 @@ void ApiWrap::sendSharedContact(
 		? PeerId()
 		: _session->userPeerId();
 	const auto messagePostAuthor = peer->isBroadcast()
-		? _session->user()->name
+		? _session->user()->name()
 		: QString();
 	const auto viaBotId = UserId();
 	const auto item = history->addNewLocalMessage(
@@ -3545,7 +3468,7 @@ void ApiWrap::sendMessage(MessageToSend &&message) {
 			sendFlags |= MTPmessages_SendMessage::Flag::f_send_as;
 		}
 		const auto messagePostAuthor = peer->isBroadcast()
-			? _session->user()->name
+			? _session->user()->name()
 			: QString();
 		if (action.options.scheduled) {
 			flags |= MessageFlag::IsOrWasScheduled;
@@ -3693,7 +3616,7 @@ void ApiWrap::sendInlineResult(
 		sendFlags |= MTPmessages_SendInlineBotResult::Flag::f_send_as;
 	}
 	const auto messagePostAuthor = peer->isBroadcast()
-		? _session->user()->name
+		? _session->user()->name()
 		: QString();
 
 	_session->data().registerMessageRandomId(randomId, newId);

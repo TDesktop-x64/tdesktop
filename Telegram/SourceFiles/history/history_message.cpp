@@ -1065,8 +1065,6 @@ void HistoryMessage::createComponents(CreateConfig &&config) {
 	} else {
 		_flags &= ~MessageFlag::HasReplyMarkup;
 	}
-	const auto from = displayFrom();
-	_fromNameVersion = from ? from->nameVersion : 1;
 }
 
 bool HistoryMessage::checkRepliesPts(
@@ -1957,7 +1955,7 @@ QString HistoryMessage::notificationHeader() const {
 	if (out() && isFromScheduled() && !_history->peer->isSelf()) {
 		return tr::lng_from_you(tr::now);
 	} else if (!_history->peer->isUser() && !isPost()) {
-		return from()->name;
+		return from()->name();
 	}
 	return QString();
 }

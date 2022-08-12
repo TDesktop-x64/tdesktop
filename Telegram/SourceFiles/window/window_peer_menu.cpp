@@ -1035,7 +1035,7 @@ void PeerMenuDeleteContact(
 	const auto text = tr::lng_sure_delete_contact(
 		tr::now,
 		lt_contact,
-		user->name);
+		user->name());
 	const auto deleteSure = [=](Fn<void()> &&close) {
 		close();
 		user->session().api().request(MTPcontacts_DeleteContacts(
@@ -1077,8 +1077,8 @@ void PeerMenuShareContactBox(
 			return;
 		}
 		auto recipient = peer->isUser()
-			? peer->name
-			: '\xAB' + peer->name + '\xBB';
+			? peer->name()
+			: '\xAB' + peer->name() + '\xBB';
 		navigation->parentController()->show(
 			Ui::MakeConfirmBox({
 				.text = tr::lng_forward_share_contact(
@@ -1149,7 +1149,7 @@ void PeerMenuCreatePoll(
 		const auto api = &peer->session().api();
 		api->polls().create(result.poll, action, crl::guard(weak, [=] {
 			weak->closeBox();
-		}), crl::guard(weak, [=](const MTP::Error &error) {
+		}), crl::guard(weak, [=] {
 			*lock = false;
 			weak->submitFailed(tr::lng_attach_failed(tr::now));
 		}));
@@ -1169,7 +1169,7 @@ void PeerMenuBlockUserBox(
 		: v::get<bool>(suggestReport);
 
 	const auto user = peer->asUser();
-	const auto name = user ? user->shortName() : peer->name;
+	const auto name = user ? user->shortName() : peer->name();
 	if (user) {
 		box->addRow(object_ptr<Ui::FlatLabel>(
 			box,
@@ -1215,7 +1215,7 @@ void PeerMenuBlockUserBox(
 			tr::lng_delete_all_from_user(
 				tr::now,
 				lt_user,
-				Ui::Text::Bold(peer->name),
+				Ui::Text::Bold(peer->name()),
 				Ui::Text::WithEntities),
 			true,
 			st::defaultBoxCheckbox))

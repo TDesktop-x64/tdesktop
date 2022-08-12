@@ -529,7 +529,7 @@ void FillMenu(
 			if (const auto real = resolveReal()) {
 				showBox(Box(
 					EditGroupCallTitleBox,
-					peer->name,
+					peer->name(),
 					real->title(),
 					livestream,
 					done));

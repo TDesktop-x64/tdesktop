@@ -543,9 +543,10 @@ QSize Message::performCountOptimalSize() {
 			// They will be added in resizeGetHeight() anyway.
 			if (displayFromName()) {
 				const auto from = item->displayFrom();
+				validateFromNameText(from);
 				const auto &name = from
-					? from->nameText()
-					: item->hiddenSenderInfo()->nameText;
+					? _fromName
+					: item->hiddenSenderInfo()->nameText();
 				auto namew = st::msgPadding.left()
 					+ name.maxWidth()
 					+ st::msgPadding.right();
@@ -750,7 +751,7 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 	if (bubble) {
 		if (displayFromName()
 			&& item->displayFrom()
-			&& item->displayFrom()->nameVersion > item->_fromNameVersion) {
+			&& (_fromNameVersion < item->displayFrom()->nameVersion())) {
 			fromNameUpdated(g.width());
 		}
 
@@ -1125,14 +1126,15 @@ void Message::paintFromName(
 				: item->isSponsored()
 				? st->boxTextFgGood()
 				: stm->msgServiceFg);
-			return &from->nameText();
+			validateFromNameText(from);
+			return &_fromName;
 		} else if (const auto info = item->hiddenSenderInfo()) {
 			p.setPen(!service
 				? FromNameFg(context, info->colorPeerId)
 				: item->isSponsored()
 				? st->boxTextFgGood()
 				: stm->msgServiceFg);
-			return &info->nameText;
+			return &info->nameText();
 		} else {
 			Unexpected("Corrupt sender information in message.");
 		}
@@ -1728,9 +1730,10 @@ bool Message::getStateFromName(
 			const auto from = item->displayFrom();
 			const auto nameText = [&]() -> const Ui::Text::String * {
 				if (from) {
-					return &from->nameText();
+					validateFromNameText(from);
+					return &_fromName;
 				} else if (const auto info = item->hiddenSenderInfo()) {
-					return &info->nameText;
+					return &info->nameText();
 				} else {
 					Unexpected("Corrupt forwarded information in message.");
 				}
@@ -2230,6 +2233,17 @@ void Message::refreshReactions() {
 			std::move(reactionsData));
 	} else {
 		_reactions->update(std::move(reactionsData), width());
+	}
+}
+
+void Message::validateFromNameText(PeerData *from) const {
+	const auto version = from ? from->nameVersion() : 0;
+	if (_fromNameVersion < version) {
+		_fromNameVersion = version;
+		_fromName.setText(
+			st::msgNameStyle,
+			from->name(),
+			Ui::NameTextOptions());
 	}
 }
 
@@ -2768,14 +2782,14 @@ void Message::fromNameUpdated(int width) const {
 		width -= st::msgPadding.right() + replyWidth;
 	}
 	const auto from = item->displayFrom();
-	item->_fromNameVersion = from ? from->nameVersion : 1;
+	validateFromNameText(from);
 	if (const auto via = item->Get<HistoryMessageVia>()) {
 		if (!displayForwardedFrom()) {
 			const auto nameText = [&]() -> const Ui::Text::String * {
 				if (from) {
-					return &from->nameText();
-				} else if (const auto info = item->hiddenSenderInfo()) {
-					return &info->nameText;
+					return &_fromName;
+				} else if (const auto info	= item->hiddenSenderInfo()) {
+					return &info->nameText();
 				} else {
 					Unexpected("Corrupted forwarded information in message.");
 				}

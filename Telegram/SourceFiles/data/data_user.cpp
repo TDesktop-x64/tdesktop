@@ -165,13 +165,7 @@ void UserData::setBotInfo(const MTPBotInfo &info) {
 }
 
 void UserData::setNameOrPhone(const QString &newNameOrPhone) {
-	if (nameOrPhone != newNameOrPhone) {
-		nameOrPhone = newNameOrPhone;
-		phoneText.setText(
-			st::msgNameStyle,
-			nameOrPhone,
-			Ui::NameTextOptions());
-	}
+	nameOrPhone = newNameOrPhone;
 }
 
 void UserData::madeAction(TimeId when) {
@@ -325,7 +319,8 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 		| Flag::HasPhoneCalls
 		| Flag::PhoneCallsPrivate
 		| Flag::CanReceiveGifts
-		| Flag::CanPinMessages;
+		| Flag::CanPinMessages
+		| Flag::VoiceMessagesForbidden;
 	user->setFlags((user->flags() & ~mask)
 		| (update.is_phone_calls_private() ? Flag::PhoneCallsPrivate : Flag())
 		| (update.is_phone_calls_available() ? Flag::HasPhoneCalls : Flag())

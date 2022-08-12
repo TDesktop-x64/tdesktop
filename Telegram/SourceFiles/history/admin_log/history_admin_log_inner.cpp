@@ -1477,7 +1477,7 @@ void InnerWidget::suggestRestrictParticipant(
 		} else {
 			sender = participant->asChannel();
 		}
-		const auto text = tr::lng_profile_sure_kick(tr::now, lt_user, sender->name);
+		const auto text = tr::lng_profile_sure_kick(tr::now, lt_user, sender->name());
 		auto editRestrictions = [=](bool hasAdminRights, ChatRestrictionsInfo currentRights) {
 			Ui::show(
 				Ui::MakeConfirmBox({

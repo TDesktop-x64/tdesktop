@@ -1406,7 +1406,7 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 			auto text = TextWithEntities();
 			if (result.size() > 1) {
 				text.append(
-					Ui::Text::Bold(error.second->name)
+					Ui::Text::Bold(error.second->name())
 				).append("\n\n");
 			}
 			text.append(error.first);
@@ -1538,7 +1538,7 @@ QPointer<Ui::BoxContent> ShowForwardNoQuoteMessagesBox(
 			auto text = TextWithEntities();
 			if (result.size() > 1) {
 				text.append(
-					Ui::Text::Bold(error.second->name)
+					Ui::Text::Bold(error.second->name())
 				).append("\n\n");
 			}
 			text.append(error.first);

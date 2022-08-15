@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_element.h"
 #include "history/view/history_view_cursor_state.h"
 #include "history/view/media/history_view_media_common.h"
+#include "main/main_session.h"
 #include "ui/image/image.h"
 #include "ui/chat/chat_style.h"
 #include "ui/effects/path_shift_gradient.h"

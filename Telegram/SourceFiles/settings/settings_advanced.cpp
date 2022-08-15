@@ -800,7 +800,7 @@ void Advanced::setupContent(not_null<Window::SessionController*> controller) {
 	if (cAutoUpdate()) {
 		addUpdate();
 	}
-	if (!HasUpdate()) {
+	//if (!HasUpdate()) {
 		AddSkip(content);
 		AddDivider(content);
 		AddSkip(content);
@@ -812,24 +812,7 @@ void Advanced::setupContent(not_null<Window::SessionController*> controller) {
 		)->setClickedCallback([=] {
 			_showOther.fire_copy(Experimental::Id());
 		});
-	}
-
-	AddSkip(content);
-	AddDivider(content);
-	AddSkip(content);
-
-	// Move experimental setting to Export Data upside
-	const auto experimental = content->add(
-		object_ptr<Ui::SlideWrap<Button>>(
-			content,
-			CreateButton(
-				content,
-				tr::lng_settings_experimental(),
-				st::settingsButtonNoIcon)));
-	experimental->toggle(true, anim::type::instant);
-	experimental->entity()->setClickedCallback([=] {
-		controller->showSettings(Experimental::Id());
-	});
+	//}
 
 	AddSkip(content);
 	AddDivider(content);

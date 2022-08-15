@@ -274,7 +274,11 @@ void Application::run() {
 	DEBUG_LOG(("Application Info: inited..."));
 
 	cChangeDateFormat(QLocale::system().dateFormat(QLocale::ShortFormat));
-	cChangeTimeFormat(QLocale::system().timeFormat(QLocale::ShortFormat));
+	if (GetEnhancedBool("show_seconds")) {
+		cChangeTimeFormat(QLocale::system().timeFormat(QLocale::LongFormat));
+	} else {
+		cChangeTimeFormat(QLocale::system().timeFormat(QLocale::ShortFormat));
+	}
 
 	DEBUG_LOG(("Application Info: starting app..."));
 

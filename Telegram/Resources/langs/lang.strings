@@ -3526,6 +3526,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_disable_link_warning" = "Disable open link warning";
 "lng_settings_hide_messages" = "Hide messages from blocked user";
 "lng_settings_disable_premium_animation" = "Disable Premium Animation";
+"kng_settings_show_seconds" = "Time with seconds";
 "lng_settings_restart_hint" = "WARNING: Changing options that are colored in red will take effect only after the app restarts.";
 
 "lng_settings_skip_message" = "Skip to next unread chat";

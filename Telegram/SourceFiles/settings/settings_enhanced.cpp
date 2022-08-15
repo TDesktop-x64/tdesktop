@@ -254,6 +254,20 @@ namespace Settings {
 			EnhancedSettings::Write();
 		}, container->lifetime());
 
+		AddButton(
+				inner,
+				tr::kng_settings_show_seconds(),
+				st::settingsButtonNoIcon
+		)->toggleOn(
+				rpl::single(GetEnhancedBool("show_seconds"))
+		)->toggledChanges(
+		) | rpl::filter([=](bool toggled) {
+			return (toggled != GetEnhancedBool("show_seconds"));
+		}) | rpl::start_with_next([=](bool toggled) {
+			SetEnhancedValue("show_seconds", toggled);
+			EnhancedSettings::Write();
+		}, container->lifetime());
+
 		auto hideBtn = AddButton(
 			inner,
 			tr::lng_settings_hide_messages(),

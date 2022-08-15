@@ -309,6 +309,7 @@ namespace EnhancedSettings {
 		settings.insert(qsl("disable_link_warning"), false);
 		settings.insert(qsl("blocked_user_spoiler_mode"), false);
 		settings.insert(qsl("disable_premium_animation"), false);
+		settings.insert(qsl("show_seconds"), false);
 
 		auto document = QJsonDocument();
 		document.setObject(settings);
@@ -354,6 +355,7 @@ namespace EnhancedSettings {
 		settings.insert(qsl("disable_link_warning"), GetEnhancedBool("disable_link_warning"));
 		settings.insert(qsl("blocked_user_spoiler_mode"), GetEnhancedBool("blocked_user_spoiler_mode"));
 		settings.insert(qsl("disable_premium_animation"), GetEnhancedBool("disable_premium_animation"));
+		settings.insert(qsl("show_seconds"), GetEnhancedBool("show_seconds"));
 
 		auto document = QJsonDocument();
 		document.setObject(settings);

@@ -416,7 +416,7 @@ StickersBox::StickersBox(
 StickersBox::StickersBox(
 	QWidget*,
 	not_null<Window::SessionController*> controller,
-	const MTPVector<MTPStickerSetCovered> &attachedSets)
+	const QVector<MTPStickerSetCovered> &attachedSets)
 : _controller(controller)
 , _api(&controller->session().mtp())
 , _section(Section::Attached)
@@ -460,8 +460,8 @@ void StickersBox::showAttachedStickers() {
 			}
 		}
 	};
-	for (const auto &set : _attachedSets.v) {
-		add(stickers->feedSetCovered(set));
+	for (const auto &set : _attachedSets) {
+		add(stickers->feedSet(set));
 	}
 	for (const auto &setId : _emojiSets) {
 		const auto i = stickers->sets().find(setId.id);
@@ -501,7 +501,7 @@ void StickersBox::getArchivedDone(
 	auto addedSet = false;
 	auto changedSets = false;
 	for (const auto &data : stickers.vsets().v) {
-		const auto set = session().data().stickers().feedSetCovered(data);
+		const auto set = session().data().stickers().feedSet(data);
 		const auto index = archived.indexOf(set->id);
 		if (archived.isEmpty() || index != archived.size() - 1) {
 			changedSets = true;
@@ -1030,6 +1030,8 @@ void StickersBox::saveChanges() {
 void StickersBox::setInnerFocus() {
 	if (_megagroupSet) {
 		_installed.widget()->setInnerFocus();
+	} else {
+		BoxContent::setInnerFocus();
 	}
 }
 
@@ -1075,7 +1077,8 @@ StickersBox::Inner::Row::~Row() {
 		const auto featured = !!(set->flags & SetFlag::Featured);
 		const auto special = !!(set->flags & SetFlag::Special);
 		const auto archived = !!(set->flags & SetFlag::Archived);
-		if (!installed && !featured && !special && !archived) {
+		const auto emoji = !!(set->flags & SetFlag::Emoji);
+		if (!installed && !featured && !special && !archived && !emoji) {
 			auto &sets = set->owner().stickers().setsRef();
 			if (const auto i = sets.find(set->id); i != end(sets)) {
 				sets.erase(i);

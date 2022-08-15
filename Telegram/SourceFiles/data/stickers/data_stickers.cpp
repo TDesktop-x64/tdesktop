@@ -364,7 +364,7 @@ void Stickers::applyArchivedResult(
 	auto masksCount = 0;
 	auto stickersCount = 0;
 	for (const auto &data : v) {
-		const auto set = feedSetCovered(data);
+		const auto set = feedSet(data);
 		if (set->flags & SetFlag::NotLoaded) {
 			setsToRequest.insert(set->id, set->accessHash);
 		}
@@ -736,6 +736,7 @@ void Stickers::somethingReceived(
 		const auto featured = !!(set->flags & SetFlag::Featured);
 		const auto special = !!(set->flags & SetFlag::Special);
 		const auto archived = !!(set->flags & SetFlag::Archived);
+		const auto emoji = !!(set->flags & SetFlag::Emoji);
 		const auto locked = (set->locked > 0);
 		if (!installed) { // remove not mine sets from recent stickers
 			for (auto i = recent.begin(); i != recent.cend();) {
@@ -747,7 +748,7 @@ void Stickers::somethingReceived(
 				}
 			}
 		}
-		if (installed || featured || special || archived || locked) {
+		if (installed || featured || special || archived || emoji || locked) {
 			++it;
 		} else {
 			it = sets.erase(it);
@@ -1062,8 +1063,9 @@ void Stickers::featuredReceived(
 		const auto featured = (set->flags & SetFlag::Featured);
 		const auto special = (set->flags & SetFlag::Special);
 		const auto archived = (set->flags & SetFlag::Archived);
+		const auto emoji = !!(set->flags & SetFlag::Emoji);
 		const auto locked = (set->locked > 0);
-		if (installed || featured || special || archived || locked) {
+		if (installed || featured || special || archived || emoji || locked) {
 			if (featured && (set->flags & SetFlag::Unread)) {
 				if (!(set->flags & SetFlag::Emoji)) {
 					++unreadCount;
@@ -1454,7 +1456,7 @@ not_null<StickersSet*> Stickers::feedSetFull(
 	return set;
 }
 
-not_null<StickersSet*> Stickers::feedSetCovered(
+not_null<StickersSet*> Stickers::feedSet(
 		const MTPStickerSetCovered &data) {
 	const auto set = data.match([&](const auto &data) {
 		return feedSet(data.vset());

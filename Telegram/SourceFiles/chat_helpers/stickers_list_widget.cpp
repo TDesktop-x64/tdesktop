@@ -346,7 +346,7 @@ void StickersListWidget::preloadMoreOfficial() {
 			const auto &list = data.vsets().v;
 			_officialOffset += list.size();
 			for (int i = 0, l = list.size(); i != l; ++i) {
-				const auto set = session().data().stickers().feedSetCovered(
+				const auto set = session().data().stickers().feedSet(
 					list[i]);
 				if (set->stickers.empty() && set->covers.empty()) {
 					continue;
@@ -763,7 +763,7 @@ void StickersListWidget::searchResultsDone(
 	}
 	auto &d = result.c_messages_foundStickerSets();
 	for (const auto &data : d.vsets().v) {
-		const auto set = session().data().stickers().feedSetCovered(data);
+		const auto set = session().data().stickers().feedSet(data);
 		if (set->stickers.empty() && set->covers.empty()) {
 			continue;
 		}
@@ -2723,13 +2723,6 @@ object_ptr<Ui::BoxContent> MakeConfirmRemoveSetBox(
 				}
 				set->flags &= ~SetFlag::Installed;
 				set->installDate = TimeId(0);
-				//
-				// Set can be in search results.
-				//
-				//if (!(set->flags & SetFlag::Featured)
-				//	&& !(set->flags & SetFlag::Special)) {
-				//	sets.erase(it);
-				//}
 				auto &orderRef = (set->type() == Data::StickersType::Emoji)
 					? session->data().stickers().emojiSetsOrderRef()
 					: (set->type() == Data::StickersType::Masks)

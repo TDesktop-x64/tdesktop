@@ -1494,7 +1494,6 @@ void ListWidget::elementStartInteraction(not_null<const Element*> view) {
 void ListWidget::elementStartPremium(
 		not_null<const Element*> view,
 		Element *replacing) {
-	_emojiInteractions->playPremiumEffect(view, replacing);
 	const auto already = !_emojiInteractions->playPremiumEffect(
 		view,
 		replacing);

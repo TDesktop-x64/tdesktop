@@ -20,31 +20,24 @@ namespace {
 using namespace TextUtilities;
 
 [[nodiscard]] QString CustomEmojiEntityData(
-		not_null<Main::Session*> session,
 		const MTPDmessageEntityCustomEmoji &data) {
 	return Data::SerializeCustomEmojiId({
-		.selfId = session->userId().bare,
 		.id = data.vdocument_id().v,
 	});
 }
 
 [[nodiscard]] std::optional<MTPMessageEntity> CustomEmojiEntity(
-		not_null<Main::Session*> session,
 		MTPint offset,
 		MTPint length,
 		const QString &data) {
 	const auto parsed = Data::ParseCustomEmojiData(data);
-	if (!parsed.id || parsed.selfId != session->userId().bare) {
-		return {};
-	}
-	const auto document = session->data().document(parsed.id);
-	if (!document->sticker()) {
+	if (!parsed.id) {
 		return {};
 	}
 	return MTP_messageEntityCustomEmoji(
 		offset,
 		length,
-		MTP_long(document->id));
+		MTP_long(parsed.id));
 }
 
 [[nodiscard]] std::optional<MTPMessageEntity> MentionNameEntity(
@@ -137,7 +130,7 @@ EntitiesInText EntitiesFromMTP(
 			}break;
 			case mtpc_messageEntityCustomEmoji: if (session) {
 				const auto &d = entity.c_messageEntityCustomEmoji();
-				result.push_back({ EntityType::CustomEmoji, d.voffset().v, d.vlength().v, CustomEmojiEntityData(session, d) });
+				result.push_back({ EntityType::CustomEmoji, d.voffset().v, d.vlength().v, CustomEmojiEntityData(d) });
 			}break;
 			}
 		}
@@ -191,7 +184,7 @@ MTPVector<MTPMessageEntity> EntitiesToMTP(
 		case EntityType::Pre: v.push_back(MTP_messageEntityPre(offset, length, MTP_string(entity.data()))); break;
 		case EntityType::Spoiler: v.push_back(MTP_messageEntitySpoiler(offset, length)); break;
 		case EntityType::CustomEmoji: {
-			if (const auto valid = CustomEmojiEntity(session, offset, length, entity.data())) {
+			if (const auto valid = CustomEmojiEntity(offset, length, entity.data())) {
 				v.push_back(*valid);
 			}
 		} break;

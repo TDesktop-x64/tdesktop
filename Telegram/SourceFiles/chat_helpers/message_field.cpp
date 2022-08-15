@@ -87,11 +87,10 @@ QString FieldTagMimeProcessor::operator()(QStringView mimeTag) {
 		} else if (Ui::InputField::IsCustomEmojiLink(tag)) {
 			const auto data = Ui::InputField::CustomEmojiEntityData(tag);
 			const auto emoji = Data::ParseCustomEmojiData(data);
-			if (emoji.selfId != id) {
+			if (!emoji.id) {
 				i = all.erase(i);
 				continue;
-			}
-			if (!_session->premium()) {
+			} else if (!_session->premium()) {
 				const auto document = _session->data().document(emoji.id);
 				if (document->isPremiumEmoji()) {
 					if (!_allowPremiumEmoji
@@ -650,8 +649,7 @@ void MessageLinksParser::parse() {
 		Expects(tag != tagsEnd);
 
 		if (Ui::InputField::IsValidMarkdownLink(tag->id)
-			&& !TextUtilities::IsMentionLink(tag->id)
-			&& !Ui::InputField::IsCustomEmojiLink(tag->id)) {
+			&& !TextUtilities::IsMentionLink(tag->id)) {
 			ranges.push_back({ tag->offset, tag->length, tag->id });
 		}
 		++tag;

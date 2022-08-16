@@ -268,11 +268,18 @@ TextWithEntities GeneratePermissionsChangeText(
 	const auto prevFlags = prevRights.flags;
 	const auto indefinitely = ChannelData::IsRestrictedForever(newUntil);
 	if (newFlags & Flag::ViewMessages) {
-		return tr::lng_admin_log_banned(
+		auto bannedText = tr::lng_admin_log_banned(
 			tr::now,
 			lt_user,
 			user,
 			Ui::Text::WithEntities);
+		if (!indefinitely) {
+			bannedText.text.append(' ' + tr::lng_admin_log_banned_until(
+				tr::now,
+				lt_date,
+				langDateTime(base::unixtime::parse(newUntil))));
+		}
+		return bannedText;
 	} else if (newFlags == 0
 		&& (prevFlags & Flag::ViewMessages)
 		&& !peerIsUser(participantId)) {

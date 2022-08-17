@@ -275,7 +275,8 @@ void Application::run() {
 
 	cChangeDateFormat(QLocale::system().dateFormat(QLocale::ShortFormat));
 	if (GetEnhancedBool("show_seconds")) {
-		cChangeTimeFormat(QLocale::system().timeFormat(QLocale::LongFormat));
+		auto format = QLocale::system().timeFormat(QLocale::LongFormat).remove(" t");
+		cChangeTimeFormat(format);
 	} else {
 		cChangeTimeFormat(QLocale::system().timeFormat(QLocale::ShortFormat));
 	}

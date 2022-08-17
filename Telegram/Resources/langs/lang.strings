@@ -3608,7 +3608,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_sure_upgrade_group" = "Are you sure you want to upgrade this group to supergroup?";
 "lng_chat_upgrade_warning" = "Note: This action can not be undone";
 
-"lng_user_not_found" = "404 User not found.\nNote: You must have \"seen\" that user before open this link.";
+"lng_user_not_found" = "404 - User not found.\nNote: You must have \"seen\" the user before opening this link.";
 
 "lng_title_forward_as_copy" = "Copy to...";
 "lng_title_multiple_forward" = "Forward to...";

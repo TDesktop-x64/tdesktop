@@ -256,7 +256,7 @@ namespace Settings {
 
 		auto secondsBtn = AddButton(
 			inner,
-			tr::kng_settings_show_seconds(),
+			tr::lng_settings_show_seconds(),
 			st::settingsButtonNoIcon
 		);
 		secondsBtn->setColorOverride(QColor(255, 0, 0));

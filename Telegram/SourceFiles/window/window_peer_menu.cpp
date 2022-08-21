@@ -1563,7 +1563,7 @@ QPointer<Ui::BoxContent> ShowForwardNoQuoteMessagesBox(
 
 			auto action = Api::SendAction(_history, Api::SendOptions{.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer), .scheduled = options.scheduled});
 			action.clearDraft = false;
-			if (_history->peer->isUser() || _history->peer->isChannel()) {
+			if (_history->peer->isUser() || _history->peer->isChannel() || _history->peer->isChat()) {
 				action.options.sendAs = nullptr;
 			}
 

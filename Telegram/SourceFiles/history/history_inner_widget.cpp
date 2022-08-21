@@ -2294,7 +2294,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 								const auto api = &item->history()->peer->session().api();
 								auto action = Api::SendAction(item->history()->peer->owner().history(item->history()->peer),Api::SendOptions{.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer)});
 								action.clearDraft = false;
-								if (item->history()->peer->isUser()) {
+								if (item->history()->peer->isUser() || item->history()->peer->isChat()) {
 									action.options.sendAs = nullptr;
 								}
 
@@ -2311,6 +2311,9 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 								const auto api = &item->history()->peer->session().api();
 								auto message = ApiWrap::MessageToSend(prepareSendAction(_history,Api::SendOptions{.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer)}));
 								message.textWithTags = {item->originalText().text,TextUtilities::ConvertEntitiesToTextTags(item->originalText().entities)};
+								if (item->history()->peer->isUser() || item->history()->peer->isChat()) {
+									message.action.options.sendAs = nullptr;
+								}
 								if (GetEnhancedBool("repeater_reply_to_orig_msg")) {
 									message.action.replyTo = item->idOriginal();
 								}
@@ -2322,7 +2325,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 									const auto api = &item->history()->peer->session().api();
 									auto action = Api::SendAction(item->history()->peer->owner().history(item->history()->peer), Api::SendOptions{ .sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer) });
 									action.clearDraft = false;
-									if (item->history()->peer->isUser()) {
+									if (item->history()->peer->isUser() || item->history()->peer->isChat()) {
 										action.options.sendAs = nullptr;
 									}
 									if (GetEnhancedBool("repeater_reply_to_orig_msg")) {
@@ -2342,7 +2345,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 									const auto document = item->media()->document();
 									const auto history = item->history()->peer->owner().history(item->history()->peer);
 									auto message = ApiWrap::MessageToSend(prepareSendAction(history, Api::SendOptions{ .sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer) }));
-									if (item->history()->peer->isUser()) {
+									if (item->history()->peer->isUser() || item->history()->peer->isChat()) {
 										message.action.options.sendAs = nullptr;
 									}
 									Api::SendExistingDocument(std::move(message), document);
@@ -2541,7 +2544,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 								const auto api = &item->history()->peer->session().api();
 								auto action = Api::SendAction(item->history()->peer->owner().history(item->history()->peer),Api::SendOptions{.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer)});
 								action.clearDraft = false;
-								if (item->history()->peer->isUser()) {
+								if (item->history()->peer->isUser() || item->history()->peer->isChat()) {
 									action.options.sendAs = nullptr;
 								}
 
@@ -2558,6 +2561,9 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 								const auto api = &item->history()->peer->session().api();
 								auto message = ApiWrap::MessageToSend(prepareSendAction(_history, Api::SendOptions{ .sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer) }));
 								message.textWithTags = { item->originalText().text, TextUtilities::ConvertEntitiesToTextTags(item->originalText().entities) };
+								if (item->history()->peer->isUser() || item->history()->peer->isChat()) {
+									message.action.options.sendAs = nullptr;
+								}
 								if (GetEnhancedBool("repeater_reply_to_orig_msg")) {
 									message.action.replyTo = item->idOriginal();
 								}
@@ -2569,7 +2575,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 									const auto api = &item->history()->peer->session().api();
 									auto action = Api::SendAction(item->history()->peer->owner().history(item->history()->peer),Api::SendOptions{.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer)});
 									action.clearDraft = false;
-									if (item->history()->peer->isUser()) {
+									if (item->history()->peer->isUser() || item->history()->peer->isChat()) {
 										action.options.sendAs = nullptr;
 									}
 
@@ -2586,7 +2592,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 									const auto document = item->media()->document();
 									const auto history = item->history()->peer->owner().history(item->history()->peer);
 									auto message = ApiWrap::MessageToSend(prepareSendAction(history, Api::SendOptions{ .sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer) }));
-									if (item->history()->peer->isUser()) {
+									if (item->history()->peer->isUser() || item->history()->peer->isChat()) {
 										message.action.options.sendAs = nullptr;
 									}
 									Api::SendExistingDocument(std::move(message), document);

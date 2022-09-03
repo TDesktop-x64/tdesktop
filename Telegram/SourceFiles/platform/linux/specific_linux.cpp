@@ -490,10 +490,6 @@ namespace Platform {
 void start() {
 	LOG(("Launcher filename: %1").arg(QGuiApplication::desktopFileName()));
 
-#ifndef DESKTOP_APP_DISABLE_WAYLAND_INTEGRATION
-	qputenv("QT_WAYLAND_SHELL_INTEGRATION", "desktop-app-xdg-shell;xdg-shell");
-#endif // !DESKTOP_APP_DISABLE_WAYLAND_INTEGRATION
-
 	qputenv("PULSE_PROP_application.name", AppName.utf8());
 	qputenv("PULSE_PROP_application.icon_name", GetIconName().toLatin1());
 
@@ -622,30 +618,10 @@ bool OpenSystemSettings(SystemSettingsType type) {
 	return true;
 }
 
-namespace ThirdParty {
-
-void start() {
-	LOG(("Icon theme: %1").arg(QIcon::themeName()));
-	LOG(("Fallback icon theme: %1").arg(QIcon::fallbackThemeName()));
-
-#ifndef DESKTOP_APP_DISABLE_WAYLAND_INTEGRATION
-	InvokeQueued(qApp, [] {
-		qunsetenv("QT_WAYLAND_SHELL_INTEGRATION");
-	});
-#endif // !DESKTOP_APP_DISABLE_WAYLAND_INTEGRATION
-}
-
-void finish() {
-}
-
-} // namespace ThirdParty
-
-} // namespace Platform
-
-void psNewVersion() {
-	Platform::InstallLauncher();
-	if (Local::oldSettingsVersion() > 0
-		&& Local::oldSettingsVersion() <= 4000002
+void NewVersionLaunched(int oldVersion) {
+	InstallLauncher();
+	if (oldVersion > 0
+		&& oldVersion <= 4000002
 		&& qEnvironmentVariableIsSet("WAYLAND_DISPLAY")
 		&& DesktopEnvironment::IsGnome()
 		&& !QFile::exists(cWorkingDir() + qsl("tdata/nowayland"))) {
@@ -656,7 +632,24 @@ void psNewVersion() {
 			Core::Restart(); // restart with X backend
 		}
 	}
+	if (oldVersion <= 4001001 && cAutoStart()) {
+		AutostartToggle(true);
+	}
 }
+
+namespace ThirdParty {
+
+void start() {
+	LOG(("Icon theme: %1").arg(QIcon::themeName()));
+	LOG(("Fallback icon theme: %1").arg(QIcon::fallbackThemeName()));
+}
+
+void finish() {
+}
+
+} // namespace ThirdParty
+
+} // namespace Platform
 
 void psSendToMenu(bool send, bool silent) {
 }

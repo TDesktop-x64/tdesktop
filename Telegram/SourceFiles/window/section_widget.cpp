@@ -346,15 +346,17 @@ bool ShowSendPremiumError(
 [[nodiscard]] auto ExtractDisabledReactions(
 	not_null<PeerData*> peer,
 	const std::vector<Data::Reaction> &list)
--> base::flat_map<QString, ReactionDisableType> {
-	auto result = base::flat_map<QString, ReactionDisableType>();
+-> base::flat_map<Data::ReactionId, ReactionDisableType> {
+	auto result = base::flat_map<Data::ReactionId, ReactionDisableType>();
 	const auto type = peer->isBroadcast()
 		? ReactionDisableType::Channel
 		: ReactionDisableType::Group;
-	if (const auto allowed = Data::PeerAllowedReactions(peer)) {
+	const auto &allowed = Data::PeerAllowedReactions(peer);
+	if (!allowed.some.empty()) {
 		for (const auto &reaction : list) {
-			if (reaction.premium && !allowed->contains(reaction.emoji)) {
-				result.emplace(reaction.emoji, type);
+			if (reaction.premium
+				&& !ranges::contains(allowed.some, reaction.id)) {
+				result.emplace(reaction.id, type);
 			}
 		}
 	}
@@ -364,21 +366,35 @@ bool ShowSendPremiumError(
 bool ShowReactPremiumError(
 		not_null<SessionController*> controller,
 		not_null<HistoryItem*> item,
-		const QString &emoji) {
-	if (item->chosenReaction() == emoji || controller->session().premium()) {
+		const Data::ReactionId &id) {
+	if (controller->session().premium()
+		|| ranges::contains(item->chosenReactions(), id)) {
 		return false;
 	}
 	const auto &list = controller->session().data().reactions().list(
 		Data::Reactions::Type::Active);
-	const auto i = ranges::find(list, emoji, &Data::Reaction::emoji);
+	const auto i = ranges::find(list, id, &Data::Reaction::id);
 	if (i == end(list) || !i->premium) {
-		return false;
+		if (!id.custom()) {
+			return false;
+		}
 	}
 	ShowPremiumPreviewBox(
 		controller,
 		PremiumPreview::Reactions,
 		ExtractDisabledReactions(item->history()->peer, list));
 	return true;
+}
+
+void ShowPremiumPromoBox(
+		not_null<SessionController*> controller,
+		not_null<HistoryItem*> item) {
+	const auto &list = controller->session().data().reactions().list(
+		Data::Reactions::Type::Active);
+	ShowPremiumPreviewBox(
+		controller,
+		PremiumPreview::Reactions,
+		ExtractDisabledReactions(item->history()->peer, list));
 }
 
 } // namespace Window

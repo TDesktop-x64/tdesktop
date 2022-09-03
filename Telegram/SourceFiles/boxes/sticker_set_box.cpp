@@ -305,6 +305,7 @@ private:
 	std::vector<Element> _elements;
 	std::unique_ptr<Lottie::MultiPlayer> _lottiePlayer;
 
+	mutable Ui::Text::CustomEmojiColored _colored;
 	base::flat_map<
 		not_null<DocumentData*>,
 		std::unique_ptr<Ui::Text::CustomEmoji>> _customEmoji;
@@ -1268,13 +1269,14 @@ void StickerSetBox::Inner::paintSticker(
 		(_singleSize.height() - size.height()) / 2);
 	auto lottieFrame = QImage();
 	if (element.emoji) {
-		element.emoji->paint(
-			p,
-			ppos.x(),
-			ppos.y(),
-			now,
-			st::windowBgOver->c,
-			paused);
+		_colored.color = st::profileVerifiedCheckBg->c;
+		element.emoji->paint(p, {
+			.preview = st::windowBgOver->c,
+			.colored = &_colored,
+			.now = now,
+			.position = ppos,
+			.paused = paused,
+		});
 	} else if (element.lottie && element.lottie->ready()) {
 		lottieFrame = element.lottie->frame();
 		p.drawImage(

@@ -188,6 +188,7 @@ TopBarWidget::TopBarWidget(
 		| UpdateFlag::Members
 		| UpdateFlag::SupportInfo
 		| UpdateFlag::Rights
+		| UpdateFlag::EmojiStatus
 	) | rpl::start_with_next([=](const Data::PeerUpdate &update) {
 		if (update.flags & UpdateFlag::HasCalls) {
 			if (update.peer->isUser()
@@ -204,6 +205,10 @@ TopBarWidget::TopBarWidget(
 				| UpdateFlag::Members
 				| UpdateFlag::SupportInfo)) {
 			updateOnlineDisplay();
+		}
+		if ((update.flags & UpdateFlag::EmojiStatus)
+			&& (_activeChat.key.peer() == update.peer)) {
+			this->update();
 		}
 	}, lifetime());
 
@@ -549,13 +554,7 @@ void TopBarWidget::paintTopBar(Painter &p) {
 				peer->topBarNameText(),
 				Ui::NameTextOptions());
 		}
-		const auto badgeStyle = Ui::PeerBadgeStyle{
-			&st::dialogsVerifiedIcon,
-			&st::dialogsPremiumIcon,
-			&st::attentionButtonFg,
-		};
-		const auto badgeWidth = Ui::DrawPeerBadgeGetWidth(
-			peer,
+		const auto badgeWidth = _titleBadge.drawGetWidth(
 			p,
 			QRect(
 				nameleft,
@@ -564,7 +563,18 @@ void TopBarWidget::paintTopBar(Painter &p) {
 				st::msgNameStyle.font->height),
 			_title.maxWidth(),
 			width(),
-			badgeStyle);
+			{
+				.peer = peer,
+				.verified = &st::dialogsVerifiedIcon,
+				.premium = &st::dialogsPremiumIcon,
+				.scam = &st::attentionButtonFg,
+				.premiumFg = &st::dialogsVerifiedIconBg,
+				.preview = st::windowBgOver->c,
+				.customEmojiRepaint = [=] { update(); },
+				.now = now,
+				.paused = _controller->isGifPausedAtLeastFor(
+					Window::GifPauseReason::Any),
+			});
 		const auto namewidth = availableWidth - badgeWidth;
 
 		p.setPen(st::dialogsNameFg);
@@ -721,6 +731,7 @@ void TopBarWidget::setActiveChat(
 	update();
 
 	if (peerChanged) {
+		_titleBadge.unload();
 		_titleNameVersion = 0;
 		_emojiInteractionSeen = nullptr;
 		_activeChatLifetime.destroy();

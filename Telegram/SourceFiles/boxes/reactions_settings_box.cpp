@@ -17,9 +17,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "history/history_message.h"
 #include "history/view/history_view_element.h"
-#include "history/view/history_view_react_button.h" // DefaultIconFactory
+#include "history/view/reactions/history_view_reactions_strip.h"
 #include "lang/lang_keys.h"
-#include "lottie/lottie_icon.h"
 #include "boxes/premium_preview_box.h"
 #include "main/main_session.h"
 #include "settings/settings_common.h"
@@ -33,6 +32,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/labels.h"
 #include "ui/widgets/scroll_area.h"
 #include "ui/wrap/vertical_layout.h"
+#include "ui/animated_icon.h"
 #include "window/section_widget.h"
 #include "window/window_session_controller.h"
 #include "styles/style_boxes.h"
@@ -60,7 +60,8 @@ PeerId GenerateUser(not_null<History*> history, const QString &name) {
 		MTP_int(0), // bot info version
 		MTPVector<MTPRestrictionReason>(), // restrictions
 		MTPstring(), // bot placeholder
-		MTPstring())); // lang code
+		MTPstring(), // lang code
+		MTPEmojiStatus()));
 	return peerId;
 }
 
@@ -221,14 +222,15 @@ void AddMessage(
 		emojiValue = std::move(emojiValue),
 		iconSize = st::settingsReactionMessageSize
 	](const QString &emoji) {
+		const auto id = Data::ReactionId{ emoji };
 		const auto &reactions = controller->session().data().reactions();
 		for (const auto &r : reactions.list(Data::Reactions::Type::Active)) {
-			if (emoji != r.emoji) {
+			if (r.id != id) {
 				continue;
 			}
 			const auto index = state->icons.flag ? 1 : 0;
 			state->icons.lifetimes[index] = rpl::lifetime();
-			AddReactionLottieIcon(
+			AddReactionAnimatedIcon(
 				container,
 				widget->geometryValue(
 				) | rpl::map([=](const QRect &r) {
@@ -249,9 +251,76 @@ void AddMessage(
 	}, widget->lifetime());
 }
 
+not_null<Ui::RpWidget*> AddReactionIconWrap(
+		not_null<Ui::RpWidget*> parent,
+		rpl::producer<QPoint> iconPositionValue,
+		int iconSize,
+		Fn<void(not_null<QWidget*>, QPainter&)> paintCallback,
+		rpl::producer<> &&destroys,
+		not_null<rpl::lifetime*> stateLifetime) {
+	struct State {
+		base::unique_qptr<Ui::RpWidget> widget;
+		Ui::Animations::Simple finalAnimation;
+	};
+
+	const auto state = stateLifetime->make_state<State>();
+	state->widget = base::make_unique_q<Ui::RpWidget>(parent);
+
+	const auto widget = state->widget.get();
+	widget->resize(iconSize, iconSize);
+	widget->setAttribute(Qt::WA_TransparentForMouseEvents);
+
+	std::move(
+		iconPositionValue
+	) | rpl::start_with_next([=](const QPoint &point) {
+		widget->moveToLeft(point.x(), point.y());
+	}, widget->lifetime());
+
+	const auto update = crl::guard(widget, [=] { widget->update(); });
+
+	widget->paintRequest(
+	) | rpl::start_with_next([=] {
+		auto p = QPainter(widget);
+
+		if (state->finalAnimation.animating()) {
+			const auto progress = 1. - state->finalAnimation.value(0.);
+			const auto size = widget->size();
+			const auto scaledSize = size * progress;
+			const auto scaledCenter = QPoint(
+				(size.width() - scaledSize.width()) / 2.,
+				(size.height() - scaledSize.height()) / 2.);
+			p.setOpacity(progress);
+			p.translate(scaledCenter);
+			p.scale(progress, progress);
+		}
+
+		paintCallback(widget, p);
+	}, widget->lifetime());
+
+	std::move(
+		destroys
+	) | rpl::take(1) | rpl::start_with_next([=, from = 0., to = 1.] {
+		state->finalAnimation.start(
+			[=](float64 value) {
+				update();
+				if (value == to) {
+					stateLifetime->destroy();
+				}
+			},
+			from,
+			to,
+			st::defaultPopupMenu.showDuration);
+	}, widget->lifetime());
+
+	widget->raise();
+	widget->show();
+
+	return widget;
+}
+
 } // namespace
 
-void AddReactionLottieIcon(
+void AddReactionAnimatedIcon(
 		not_null<Ui::RpWidget*> parent,
 		rpl::producer<QPoint> iconPositionValue,
 		int iconSize,
@@ -259,24 +328,17 @@ void AddReactionLottieIcon(
 		rpl::producer<> &&selects,
 		rpl::producer<> &&destroys,
 		not_null<rpl::lifetime*> stateLifetime) {
-
 	struct State {
 		struct Entry {
 			std::shared_ptr<Data::DocumentMedia> media;
-			std::shared_ptr<Lottie::Icon> icon;
+			std::shared_ptr<Ui::AnimatedIcon> icon;
 		};
 		Entry appear;
 		Entry select;
 		bool appearAnimated = false;
 		rpl::lifetime loadingLifetime;
-
-		base::unique_qptr<Ui::RpWidget> widget;
-
-		Ui::Animations::Simple finalAnimation;
 	};
-
 	const auto state = stateLifetime->make_state<State>();
-	state->widget = base::make_unique_q<Ui::RpWidget>(parent);
 
 	state->appear.media = reaction.appearAnimation->createMediaView();
 	state->select.media = reaction.selectAnimation->createMediaView();
@@ -302,35 +364,8 @@ void AddReactionLottieIcon(
 		}
 	}, state->loadingLifetime);
 
-	const auto widget = state->widget.get();
-	widget->resize(iconSize, iconSize);
-	widget->setAttribute(Qt::WA_TransparentForMouseEvents);
-
-	std::move(
-		iconPositionValue
-	) | rpl::start_with_next([=](const QPoint &point) {
-		widget->moveToLeft(point.x(), point.y());
-	}, widget->lifetime());
-
-	const auto update = crl::guard(widget, [=] { widget->update(); });
-
-	widget->paintRequest(
-	) | rpl::start_with_next([=] {
-		Painter p(widget);
-
-		if (state->finalAnimation.animating()) {
-			const auto progress = 1. - state->finalAnimation.value(0.);
-			const auto size = widget->size();
-			const auto scaledSize = size * progress;
-			const auto scaledCenter = QPoint(
-				(size.width() - scaledSize.width()) / 2.,
-				(size.height() - scaledSize.height()) / 2.);
-			p.setOpacity(progress);
-			p.translate(scaledCenter);
-			p.scale(progress, progress);
-		}
-
-		const auto paintFrame = [&](not_null<Lottie::Icon*> animation) {
+	const auto paintCallback = [=](not_null<QWidget*> widget, QPainter &p) {
+		const auto paintFrame = [&](not_null<Ui::AnimatedIcon*> animation) {
 			const auto frame = animation->frame();
 			p.drawImage(
 				QRect(
@@ -344,41 +379,73 @@ void AddReactionLottieIcon(
 		const auto appear = state->appear.icon.get();
 		if (appear && !state->appearAnimated) {
 			state->appearAnimated = true;
-			appear->animate(update, 0, appear->framesCount() - 1);
+			appear->animate(crl::guard(widget, [=] { widget->update(); }));
 		}
 		if (appear && appear->animating()) {
 			paintFrame(appear);
 		} else if (const auto select = state->select.icon.get()) {
 			paintFrame(select);
 		}
-	}, widget->lifetime());
+
+	};
+	const auto widget = AddReactionIconWrap(
+		parent,
+		std::move(iconPositionValue),
+		iconSize,
+		paintCallback,
+		std::move(destroys),
+		stateLifetime);
 
 	std::move(
 		selects
 	) | rpl::start_with_next([=] {
 		const auto select = state->select.icon.get();
 		if (select && !select->animating()) {
-			select->animate(update, 0, select->framesCount() - 1);
+			select->animate(crl::guard(widget, [=] { widget->update(); }));
 		}
 	}, widget->lifetime());
+}
 
-	std::move(
-		destroys
-	) | rpl::take(1) | rpl::start_with_next([=, from = 0., to = 1.] {
-		state->finalAnimation.start(
-			[=](float64 value) {
-				update();
-				if (value == to) {
-					stateLifetime->destroy();
-				}
-			},
-			from,
-			to,
-			st::defaultPopupMenu.showDuration);
-	}, widget->lifetime());
+void AddReactionCustomIcon(
+		not_null<Ui::RpWidget*> parent,
+		rpl::producer<QPoint> iconPositionValue,
+		int iconSize,
+		not_null<Window::SessionController*> controller,
+		DocumentId customId,
+		rpl::producer<> &&destroys,
+		not_null<rpl::lifetime*> stateLifetime) {
+	struct State {
+		std::unique_ptr<Ui::Text::CustomEmoji> custom;
+		Fn<void()> repaint;
+	};
+	const auto state = stateLifetime->make_state<State>();
+	static constexpr auto tag = Data::CustomEmojiManager::SizeTag::Normal;
+	state->custom = controller->session().data().customEmojiManager().create(
+		customId,
+		[=] { state->repaint(); },
+		tag);
 
-	widget->raise();
-	widget->show();
+	const auto paintCallback = [=](not_null<QWidget*> widget, QPainter &p) {
+		const auto ratio = style::DevicePixelRatio();
+		const auto size = Data::FrameSizeFromTag(tag) / ratio;
+		state->custom->paint(p, {
+			.preview = st::windowBgRipple->c,
+			.now = crl::now(),
+			.position = QPoint(
+				(widget->width() - size) / 2,
+				(widget->height() - size) / 2),
+			.paused = controller->isGifPausedAtLeastFor(
+				Window::GifPauseReason::Layer),
+		});
+	};
+	const auto widget = AddReactionIconWrap(
+		parent,
+		std::move(iconPositionValue),
+		iconSize,
+		paintCallback,
+		std::move(destroys),
+		stateLifetime);
+	state->repaint = crl::guard(widget, [=] { widget->update(); });
 }
 
 void ReactionsSettingsBox(
@@ -391,7 +458,9 @@ void ReactionsSettingsBox(
 
 	const auto &reactions = controller->session().data().reactions();
 	const auto state = box->lifetime().make_state<State>();
-	state->selectedEmoji = reactions.favorite();
+	state->selectedEmoji = v::is<QString>(reactions.favoriteId().data)
+		? v::get<QString>(reactions.favoriteId().data)
+		: QString();
 
 	const auto pinnedToTop = box->setPinnedToTopContent(
 		object_ptr<Ui::VerticalLayout>(box));
@@ -433,7 +502,7 @@ void ReactionsSettingsBox(
 		}
 
 		const auto iconSize = st::settingsReactionSize;
-		AddReactionLottieIcon(
+		AddReactionAnimatedIcon(
 			button,
 			button->sizeValue(
 			) | rpl::map([=, left = button->st().iconLeft](const QSize &s) {
@@ -450,17 +519,17 @@ void ReactionsSettingsBox(
 			rpl::never<>(),
 			&button->lifetime());
 
-		button->setClickedCallback([=, emoji = r.emoji] {
+		button->setClickedCallback([=, id = r.id] {
 			if (premium && !controller->session().premium()) {
-				ShowPremiumPreviewBox(
-					controller,
-					PremiumPreview::Reactions);
+				ShowPremiumPreviewBox(controller, PremiumPreview::Reactions);
 				return;
 			}
 			checkButton(button);
-			state->selectedEmoji = emoji;
+			state->selectedEmoji = v::is<QString>(id.data)
+				? v::get<QString>(id.data)
+				: QString();
 		});
-		if (r.emoji == state->selectedEmoji.current()) {
+		if (r.id == Data::ReactionId{ state->selectedEmoji.current() }) {
 			firstCheckedButton = button;
 		}
 	}
@@ -478,9 +547,9 @@ void ReactionsSettingsBox(
 	box->setWidth(st::boxWideWidth);
 	box->addButton(tr::lng_settings_save(), [=] {
 		const auto &data = controller->session().data();
-		const auto selectedEmoji = state->selectedEmoji.current();
-		if (data.reactions().favorite() != selectedEmoji) {
-			data.reactions().setFavorite(selectedEmoji);
+		const auto selected = state->selectedEmoji.current();
+		if (data.reactions().favoriteId() != Data::ReactionId{ selected }) {
+			data.reactions().setFavorite(Data::ReactionId{ selected });
 		}
 		box->closeBox();
 	});

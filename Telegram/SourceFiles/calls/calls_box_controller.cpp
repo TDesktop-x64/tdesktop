@@ -108,6 +108,21 @@ public:
 		Fn<void()> updateCallback) override;
 	void rightActionStopLastRipple() override;
 
+	int nameIconWidth() const override {
+		return 0;
+	}
+	int paintNameIconGetWidth(
+			Painter &p,
+			Fn<void()> repaint,
+			crl::time now,
+			int nameLeft,
+			int nameTop,
+			int nameWidth,
+			int availableWidth,
+			int outerWidth,
+			bool selected) override {
+		return 0;
+	}
 	QSize rightActionSize() const override {
 		return peer()->isUser() ? QSize(_st->width, _st->height) : QSize();
 	}

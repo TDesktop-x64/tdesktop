@@ -21,9 +21,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "inline_bots/bot_attach_web_view.h"
 #include "history/history.h"
 #include "history/history_item.h"
+#include "history/view/reactions/history_view_reactions.h"
+#include "history/view/reactions/history_view_reactions_button.h"
 #include "history/view/history_view_replies_section.h"
-#include "history/view/history_view_react_button.h"
-#include "history/view/history_view_reactions.h"
 #include "history/view/history_view_scheduled_section.h"
 #include "media/player/media_player_instance.h"
 #include "media/view/media_view_open_common.h"
@@ -142,6 +142,18 @@ void ActivateWindow(not_null<SessionController*> controller) {
 	window->raise();
 	window->activateWindow();
 	Ui::ActivateWindowDelayed(window);
+}
+
+bool IsPaused(
+		not_null<SessionController*> controller,
+		GifPauseReason level) {
+	return controller->isGifPausedAtLeastFor(level);
+}
+
+Fn<bool()> PausedIn(
+		not_null<SessionController*> controller,
+		GifPauseReason level) {
+	return [=] { return IsPaused(controller, level); };
 }
 
 bool operator==(const PeerThemeOverride &a, const PeerThemeOverride &b) {

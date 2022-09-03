@@ -17,8 +17,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/media/history_view_sticker.h"
 #include "history/view/media/history_view_large_emoji.h"
 #include "history/view/media/history_view_custom_emoji.h"
-#include "history/view/history_view_react_animation.h"
-#include "history/view/history_view_react_button.h"
+#include "history/view/reactions/history_view_reactions_animation.h"
+#include "history/view/reactions/history_view_reactions_button.h"
+#include "history/view/reactions/history_view_reactions.h"
 #include "history/view/history_view_cursor_state.h"
 #include "history/history.h"
 #include "base/unixtime.h"
@@ -356,15 +357,6 @@ void DateBadge::paint(
 	ServiceMessagePainter::PaintDate(p, st, text, width, y, w, chatWide);
 }
 
-ReactionAnimationArgs ReactionAnimationArgs::translated(
-		QPoint point) const {
-	return {
-		.emoji = emoji,
-		.flyIcon = flyIcon,
-		.flyFrom = flyFrom.translated(point),
-	};
-}
-
 Element::Element(
 	not_null<ElementDelegate*> delegate,
 	not_null<HistoryItem*> data,
@@ -432,6 +424,20 @@ void Element::prepareCustomEmojiPaint(
 		Painter &p,
 		const Ui::Text::String &text) const {
 	if (!text.hasCustomEmoji()) {
+		return;
+	}
+	clearCustomEmojiRepaint();
+	p.setInactive(delegate()->elementIsGifPaused());
+	if (!_heavyCustomEmoji) {
+		_heavyCustomEmoji = true;
+		history()->owner().registerHeavyViewPart(const_cast<Element*>(this));
+	}
+}
+
+void Element::prepareCustomEmojiPaint(
+		Painter &p,
+		const Reactions::InlineList &reactions) const {
+	if (!reactions.hasCustomEmoji()) {
 		return;
 	}
 	clearCustomEmojiRepaint();
@@ -1118,15 +1124,15 @@ void Element::animateReaction(ReactionAnimationArgs &&args) {
 
 void Element::animateUnreadReactions() {
 	const auto &recent = data()->recentReactions();
-	for (const auto &[emoji, list] : recent) {
+	for (const auto &[id, list] : recent) {
 		if (ranges::contains(list, true, &Data::RecentReaction::unread)) {
-			animateReaction({ .emoji = emoji });
+			animateReaction({ .id = id });
 		}
 	}
 }
 
 auto Element::takeReactionAnimations()
--> base::flat_map<QString, std::unique_ptr<Reactions::Animation>> {
+-> base::flat_map<Data::ReactionId, std::unique_ptr<Reactions::Animation>> {
 	return {};
 }
 

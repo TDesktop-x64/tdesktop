@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "info/profile/info_profile_values.h"
 
+#include "info/profile/info_profile_cover.h"
 #include "core/application.h"
 #include "core/click_handler_types.h"
 #include "countries/countries_instance.h"
@@ -452,27 +453,10 @@ rpl::producer<int> FullReactionsCountValue(
 		not_null<Main::Session*> session) {
 	const auto reactions = &session->data().reactions();
 	return rpl::single(rpl::empty) | rpl::then(
-		reactions->updates()
+		reactions->defaultUpdates()
 	) | rpl::map([=] {
 		return int(reactions->list(Data::Reactions::Type::Active).size());
 	}) | rpl::distinct_until_changed();
-}
-
-rpl::producer<int> AllowedReactionsCountValue(not_null<PeerData*> peer) {
-	if (peer->isUser()) {
-		return FullReactionsCountValue(&peer->session());
-	}
-	return peer->session().changes().peerFlagsValue(
-		peer,
-		UpdateFlag::Reactions
-	) | rpl::map([=] {
-		if (const auto chat = peer->asChat()) {
-			return int(chat->allowedReactions().size());
-		} else if (const auto channel = peer->asChannel()) {
-			return int(channel->allowedReactions().size());
-		}
-		Unexpected("Peer type in AllowedReactionsCountValue.");
-	});
 }
 
 template <typename Flag, typename Peer>
@@ -503,6 +487,17 @@ rpl::producer<Badge> BadgeValue(not_null<PeerData*> peer) {
 	}
 	return rpl::single(Badge::None);
 }
+
+rpl::producer<DocumentId> EmojiStatusIdValue(not_null<PeerData*> peer) {
+	if (const auto user = peer->asUser()) {
+		return user->session().changes().peerFlagsValue(
+			peer,
+			Data::PeerUpdate::Flag::EmojiStatus
+		) | rpl::map([=] { return user->emojiStatusId(); });
+	}
+	return rpl::single(DocumentId(0));
+}
+
 
 } // namespace Profile
 } // namespace Info

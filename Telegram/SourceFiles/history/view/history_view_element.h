@@ -20,6 +20,7 @@ struct HistoryMessageReply;
 
 namespace Data {
 struct Reaction;
+struct ReactionId;
 } // namespace Data
 
 namespace Window {
@@ -33,14 +34,11 @@ struct ChatPaintContext;
 class ChatStyle;
 } // namespace Ui
 
-namespace Lottie {
-class Icon;
-} // namespace Lottie
-
 namespace HistoryView {
 
 enum class PointState : char;
 enum class InfoDisplayType : char;
+struct ReactionAnimationArgs;
 struct StateRequest;
 struct TextState;
 class Media;
@@ -51,6 +49,7 @@ using PaintContext = Ui::ChatPaintContext;
 namespace Reactions {
 struct ButtonParameters;
 class Animation;
+class InlineList;
 } // namespace Reactions
 
 enum class Context : char {
@@ -238,14 +237,6 @@ struct DateBadge : public RuntimeComponent<DateBadge, Element> {
 
 };
 
-struct ReactionAnimationArgs {
-	QString emoji;
-	std::shared_ptr<Lottie::Icon> flyIcon;
-	QRect flyFrom;
-
-	[[nodiscard]] ReactionAnimationArgs translated(QPoint point) const;
-};
-
 class Element
 	: public Object
 	, public RuntimeComposer<Element>
@@ -431,6 +422,9 @@ public:
 	void prepareCustomEmojiPaint(
 		Painter &p,
 		const Ui::Text::String &text) const;
+	void prepareCustomEmojiPaint(
+		Painter &p,
+		const Reactions::InlineList &reactions) const;
 	void clearCustomEmojiRepaint() const;
 
 	[[nodiscard]] ClickHandlerPtr fromPhotoLink() const {
@@ -442,7 +436,9 @@ public:
 	virtual void animateReaction(ReactionAnimationArgs &&args);
 	void animateUnreadReactions();
 	[[nodiscard]] virtual auto takeReactionAnimations()
-		-> base::flat_map<QString, std::unique_ptr<Reactions::Animation>>;
+	-> base::flat_map<
+		Data::ReactionId,
+		std::unique_ptr<Reactions::Animation>>;
 
 	virtual ~Element();
 

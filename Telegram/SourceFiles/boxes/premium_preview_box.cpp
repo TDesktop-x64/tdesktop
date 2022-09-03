@@ -58,10 +58,12 @@ constexpr auto kStarOpacityOff = 0.1;
 constexpr auto kStarOpacityOn = 1.;
 constexpr auto kStarPeriod = 3 * crl::time(1000);
 
+using Data::ReactionId;
+
 struct Descriptor {
 	PremiumPreview section = PremiumPreview::Stickers;
 	DocumentData *requestedSticker = nullptr;
-	base::flat_map<QString, ReactionDisableType> disabled;
+	base::flat_map<ReactionId, ReactionDisableType> disabled;
 	bool fromSettings = false;
 	Fn<void()> hiddenCallback;
 	Fn<void(not_null<Ui::BoxContent*>)> shownCallback;
@@ -968,7 +970,7 @@ void ReactionPreview::paintEffect(QPainter &p) {
 [[nodiscard]] not_null<Ui::RpWidget*> ReactionsPreview(
 		not_null<Ui::RpWidget*> parent,
 		not_null<Window::SessionController*> controller,
-		const base::flat_map<QString, ReactionDisableType> &disabled,
+		const base::flat_map<ReactionId, ReactionDisableType> &disabled,
 		Fn<void()> readyCallback) {
 	struct State {
 		std::vector<std::unique_ptr<ReactionPreview>> entries;
@@ -994,7 +996,7 @@ void ReactionPreview::paintEffect(QPainter &p) {
 		Data::Reactions::Type::Active);
 	const auto count = ranges::count(list, true, &Data::Reaction::premium);
 	const auto rows = (count + kReactionsPerRow - 1) / kReactionsPerRow;
-	const auto inrowmax = (count + rows - 1) / rows;
+	const auto inrowmax = rows ? ((count + rows - 1) / rows) : 1;
 	const auto inrowless = (inrowmax * rows - count);
 	const auto inrowmore = rows - inrowless;
 	const auto inmaxrows = inrowmore * inrowmax;
@@ -1015,7 +1017,7 @@ void ReactionPreview::paintEffect(QPainter &p) {
 		if (!reaction.centerIcon || !reaction.aroundAnimation) {
 			continue;
 		}
-		const auto i = disabled.find(reaction.emoji);
+		const auto i = disabled.find(reaction.id);
 		const auto disable = (i != end(disabled))
 			? i->second
 			: ReactionDisableType::None;
@@ -1623,7 +1625,14 @@ void ShowStickerPreviewBox(
 void ShowPremiumPreviewBox(
 		not_null<Window::SessionController*> controller,
 		PremiumPreview section,
-		const base::flat_map<QString, ReactionDisableType> &disabled,
+		Fn<void(not_null<Ui::BoxContent*>)> shown) {
+	ShowPremiumPreviewBox(controller, section, {}, std::move(shown));
+}
+
+void ShowPremiumPreviewBox(
+		not_null<Window::SessionController*> controller,
+		PremiumPreview section,
+		const base::flat_map<ReactionId, ReactionDisableType> &disabled,
 		Fn<void(not_null<Ui::BoxContent*>)> shown) {
 	Show(controller, Descriptor{
 		.section = section,
@@ -1670,14 +1679,14 @@ void DoubledLimitsPreviewBox(
 		});
 	}
 	{
-		const auto premium = limits.dialogsFolderPinnedPremium();
+		const auto premium = limits.dialogsPinnedPremium();
 		entries.push_back(Ui::Premium::ListEntry{
 			tr::lng_premium_double_limits_subtitle_pins(),
 			tr::lng_premium_double_limits_about_pins(
 				lt_count,
 				rpl::single(float64(premium)),
 				Ui::Text::RichLangValue),
-			limits.dialogsFolderPinnedDefault(),
+			limits.dialogsPinnedDefault(),
 			premium,
 		});
 	}

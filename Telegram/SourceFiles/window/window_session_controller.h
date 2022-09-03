@@ -613,6 +613,13 @@ private:
 
 void ActivateWindow(not_null<SessionController*> controller);
 
+[[nodiscard]] bool IsPaused(
+	not_null<SessionController*> controller,
+	GifPauseReason level);
+[[nodiscard]] Fn<bool()> PausedIn(
+	not_null<SessionController*> controller,
+	GifPauseReason level);
+
 class Show : public Ui::Show {
 public:
 	explicit Show(not_null<SessionNavigation*> navigation);

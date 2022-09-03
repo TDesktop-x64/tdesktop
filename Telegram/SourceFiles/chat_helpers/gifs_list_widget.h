@@ -82,8 +82,7 @@ public:
 	void cancelled();
 	rpl::producer<> cancelRequests() const;
 
-	void fillContextMenu(
-		not_null<Ui::PopupMenu*> menu,
+	base::unique_qptr<Ui::PopupMenu> fillContextMenu(
 		SendMenu::Type type) override;
 
 	~GifsListWidget();
@@ -140,24 +139,8 @@ private:
 	void repaintItems(crl::time now = 0);
 	void showPreview();
 
-	MTP::Sender _api;
-
-	Section _section = Section::Gifs;
-	crl::time _lastScrolledAt = 0;
-	crl::time _lastUpdatedAt = 0;
-	base::Timer _updateInlineItems;
-	bool _inlineWithThumb = false;
-
 	void clearInlineRows(bool resultsDeleted);
-
-	std::map<
-		not_null<DocumentData*>,
-		std::unique_ptr<LayoutItem>> _gifLayouts;
 	LayoutItem *layoutPrepareSavedGif(not_null<DocumentData*> document);
-
-	std::map<
-		not_null<InlineResult*>,
-		std::unique_ptr<LayoutItem>> _inlineLayouts;
 	LayoutItem *layoutPrepareInlineResult(not_null<InlineResult*> result);
 
 	void deleteUnusedGifLayouts();
@@ -169,6 +152,23 @@ private:
 		int index,
 		Api::SendOptions options,
 		bool forceSend = false);
+
+	not_null<Window::SessionController*> _controller;
+
+	MTP::Sender _api;
+
+	Section _section = Section::Gifs;
+	crl::time _lastScrolledAt = 0;
+	crl::time _lastUpdatedAt = 0;
+	base::Timer _updateInlineItems;
+	bool _inlineWithThumb = false;
+
+	std::map<
+		not_null<DocumentData*>,
+		std::unique_ptr<LayoutItem>> _gifLayouts;
+	std::map<
+		not_null<InlineResult*>,
+		std::unique_ptr<LayoutItem>> _inlineLayouts;
 
 	Footer *_footer = nullptr;
 

@@ -113,7 +113,7 @@ int FrameGenerator::Impl::Read(void *opaque, uint8_t *buf, int buf_size) {
 int FrameGenerator::Impl::read(uint8_t *buf, int buf_size) {
 	const auto available = _bytes.size() - _deviceOffset;
 	if (available <= 0) {
-		return -1;
+		return AVERROR_EOF;
 	}
 	const auto fill = std::min(int(available), buf_size);
 	memcpy(buf, _bytes.data() + _deviceOffset, fill);
@@ -271,7 +271,6 @@ void FrameGenerator::Impl::jumpToStart() {
 		if ((result = av_seek_frame(_format.get(), _streamId, 0, AVSEEK_FLAG_BYTE)) < 0) {
 			if ((result = av_seek_frame(_format.get(), _streamId, 0, AVSEEK_FLAG_FRAME)) < 0) {
 				if ((result = av_seek_frame(_format.get(), _streamId, 0, 0)) < 0) {
-					char err[AV_ERROR_MAX_STRING_SIZE] = { 0 };
 					LOG(("Webm Error: Unable to av_seek_frame() to the start, ") + wrapError(result));
 					return;
 				}

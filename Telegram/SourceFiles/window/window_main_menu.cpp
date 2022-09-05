@@ -841,9 +841,6 @@ void MainMenu::paintEvent(QPaintEvent *e) {
 				Ui::NameTextOptions());
 			moveBadge();
 		}
-		const auto paused = _controller->isGifPausedAtLeastFor(
-			GifPauseReason::Layer);
-
 		p.setFont(st::semiboldFont);
 		p.setPen(st::windowBoldFg);
 		_name.drawLeftElided(

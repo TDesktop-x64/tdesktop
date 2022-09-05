@@ -16,6 +16,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "media/streaming/media_streaming_instance.h"
 #include "media/streaming/media_streaming_player.h"
 #include "media/streaming/media_streaming_document.h"
+#include "media/streaming/media_streaming_utility.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
 #include "ui/image/image.h"
@@ -133,6 +134,7 @@ bool Photo::hasHeavyPart() const {
 void Photo::unloadHeavyPart() {
 	stopAnimation();
 	_dataMedia = nullptr;
+	_imageCache = QImage();
 	_caption.unloadCustomEmoji();
 }
 
@@ -173,8 +175,10 @@ QSize Photo::countOptimalSize() {
 	maxWidth = qMax(maxActualWidth, th);
 	minHeight = qMax(th, st::minPhotoSize);
 	if (_parent->hasBubble() && !_caption.isEmpty()) {
-		auto captionw = maxActualWidth - st::msgPadding.left() - st::msgPadding.right();
-		minHeight += st::mediaCaptionSkip + _caption.countHeight(captionw);
+		maxWidth = qMax(maxWidth, st::msgPadding.left()
+			+ _caption.maxWidth()
+			+ st::msgPadding.right());
+		minHeight += st::mediaCaptionSkip + _caption.minHeight();
 		if (isBubbleBottom()) {
 			minHeight += st::msgPadding.bottom();
 		}
@@ -182,7 +186,7 @@ QSize Photo::countOptimalSize() {
 	return { maxWidth, minHeight };
 }
 
-QSize Photo::countCurrentSize(int newWidth) {
+QSize Photo::pixmapSizeFromData(int newWidth) const {
 	auto tw = style::ConvertScale(_data->width());
 	auto th = style::ConvertScale(_data->height());
 	if (tw > st::maxMediaSize) {
@@ -194,27 +198,38 @@ QSize Photo::countCurrentSize(int newWidth) {
 		th = st::maxMediaSize;
 	}
 
-	_pixw = qMin(newWidth, maxWidth());
-	_pixh = th;
-	if (tw > _pixw) {
-		_pixh = (_pixw * _pixh / tw);
+	auto pixw = qMin(newWidth, maxWidth());
+	auto pixh = th;
+	if (tw > pixw) {
+		pixh = (pixw * pixh / tw);
 	} else {
-		_pixw = tw;
+		pixw = tw;
 	}
-	if (_pixh > newWidth) {
-		_pixw = (_pixw * newWidth) / _pixh;
-		_pixh = newWidth;
+	if (pixh > newWidth) {
+		pixw = (pixw * newWidth) / pixh;
+		pixh = newWidth;
 	}
-	if (_pixw < 1) _pixw = 1;
-	if (_pixh < 1) _pixh = 1;
+	return { pixw, pixh };
+}
 
+QSize Photo::countCurrentSize(int newWidth) {
+	if (_serviceWidth) {
+		return { _serviceWidth, _serviceWidth };
+	}
 	const auto minWidth = std::clamp(
 		_parent->minWidthForMedia(),
 		(_parent->hasBubble() ? st::historyPhotoBubbleMinWidth : st::minPhotoSize),
 		std::min(newWidth, st::maxMediaSize));
-	newWidth = qMax(_pixw, minWidth);
-	auto newHeight = qMax(_pixh, st::minPhotoSize);
+	auto pix = pixmapSizeFromData(newWidth);
+	newWidth = qMax(pix.width(), minWidth);
+	auto newHeight = qMax(pix.height(), st::minPhotoSize);
 	if (_parent->hasBubble() && !_caption.isEmpty()) {
+		const auto maxWithCaption = qMin(
+			st::msgMaxWidth,
+			(st::msgPadding.left()
+				+ _caption.maxWidth()
+				+ st::msgPadding.right()));
+		newWidth = qMax(newWidth, maxWithCaption);
 		const auto captionw = newWidth
 			- st::msgPadding.left()
 			- st::msgPadding.right();
@@ -276,27 +291,8 @@ void Photo::draw(Painter &p, const PaintContext &context) const {
 			: ImageRoundRadius::Large;
 		const auto roundCorners = inWebPage ? RectPart::AllCorners : ((isBubbleTop() ? (RectPart::TopLeft | RectPart::TopRight) : RectPart::None)
 			| ((isRoundedInBubbleBottom() && _caption.isEmpty()) ? (RectPart::BottomLeft | RectPart::BottomRight) : RectPart::None));
-		const auto pix = [&] {
-			const auto size = QSize(_pixw, _pixh);
-			const auto args = Images::PrepareArgs{
-				.options = Images::RoundOptions(roundRadius, roundCorners),
-				.outer = QSize(paintw, painth),
-			};
-			if (const auto large = _dataMedia->image(PhotoSize::Large)) {
-				return large->pixSingle(size, args);
-			} else if (const auto thumbnail = _dataMedia->image(
-					PhotoSize::Thumbnail)) {
-				return thumbnail->pixSingle(size, args.blurred());
-			} else if (const auto small = _dataMedia->image(
-					PhotoSize::Small)) {
-				return small->pixSingle(size, args.blurred());
-			} else if (const auto blurred = _dataMedia->thumbnailInline()) {
-				return blurred->pixSingle(size, args.blurred());
-			} else {
-				return QPixmap();
-			}
-		}();
-		p.drawPixmap(rthumb.topLeft(), pix);
+		validateImageCache(rthumb.size(), roundRadius, roundCorners);
+		p.drawImage(rthumb.topLeft(), _imageCache);
 		if (context.selected()) {
 			Ui::FillComplexOverlayRect(p, st, rthumb, roundRadius, roundCorners);
 		}
@@ -362,6 +358,54 @@ void Photo::draw(Painter &p, const PaintContext &context) const {
 	}
 }
 
+void Photo::validateImageCache(
+		QSize outer,
+		ImageRoundRadius radius,
+		RectParts corners) const {
+	const auto intRadius = static_cast<int>(radius);
+	const auto intCorners = static_cast<int>(corners);
+	const auto large = _dataMedia->image(PhotoSize::Large);
+	const auto ratio = style::DevicePixelRatio();
+	const auto shouldBeBlurred = (large != nullptr) ? 0 : 1;
+	if (_imageCache.size() == (outer * ratio)
+		&& _imageCacheRoundRadius == intRadius
+		&& _imageCacheRoundCorners == intCorners
+		&& _imageCacheBlurred == shouldBeBlurred) {
+		return;
+	}
+	_imageCache = prepareImageCache(outer, radius, corners);
+	_imageCacheRoundRadius = intRadius;
+	_imageCacheRoundCorners = intCorners;
+	_imageCacheBlurred = shouldBeBlurred;
+}
+
+QImage Photo::prepareImageCache(
+		QSize outer,
+		ImageRoundRadius radius,
+		RectParts corners) const {
+	return Images::Round(prepareImageCache(outer), radius, corners);
+}
+
+QImage Photo::prepareImageCache(QSize outer) const {
+	using Size = PhotoSize;
+	const auto large = _dataMedia->image(Size::Large);
+	const auto ratio = style::DevicePixelRatio();
+	auto blurred = (Image*)nullptr;
+	if (const auto embedded = _dataMedia->thumbnailInline()) {
+		blurred = embedded;
+	} else if (const auto thumbnail = _dataMedia->image(Size::Thumbnail)) {
+		blurred = thumbnail;
+	} else if (const auto small = _dataMedia->image(Size::Small)) {
+		blurred = small;
+	} else {
+		blurred = large;
+	}
+	const auto resize = large
+		? ::Media::Streaming::DecideFrameResize(outer, large->size())
+		: ::Media::Streaming::ExpandDecision();
+	return PrepareWithBlurredBackground(outer, resize, large, blurred);
+}
+
 void Photo::paintUserpicFrame(
 		Painter &p,
 		const PaintContext &context,
@@ -374,7 +418,7 @@ void Photo::paintUserpicFrame(
 		checkStreamedIsStarted();
 	}
 
-	const auto size = QSize{ _pixw, _pixh };
+	const auto size = QSize(width(), height());
 	const auto rect = QRect(photoPosition, size);
 	const auto st = context.st;
 	const auto sti = context.imageStyle();
@@ -402,7 +446,6 @@ void Photo::paintUserpicFrame(
 		return;
 	}
 	const auto pix = [&] {
-		const auto size = QSize(_pixw, _pixh);
 		const auto args = Images::PrepareArgs{
 			.options = Images::Option::RoundCircle,
 		};

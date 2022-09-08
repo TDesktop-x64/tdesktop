@@ -34,11 +34,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/settings_common.h"
 #include "settings/settings_calls.h"
 #include "settings/settings_information.h"
-#include "info/profile/info_profile_cover.h"
+#include "info/profile/info_profile_badge.h"
+#include "info/profile/info_profile_emoji_status_panel.h"
 #include "base/qt_signal_producer.h"
 #include "boxes/about_box.h"
 #include "ui/boxes/confirm_box.h"
 #include "boxes/peer_list_controllers.h"
+#include "boxes/premium_preview_box.h"
 #include "calls/calls_box_controller.h"
 #include "lang/lang_keys.h"
 #include "core/click_handler_types.h"
@@ -339,14 +341,18 @@ MainMenu::MainMenu(
 	Ui::UserpicButton::Role::Custom,
 	st::mainMenuUserpic)
 , _toggleAccounts(this)
-, _badge(std::make_unique<Info::Profile::BadgeView>(
+, _setEmojiStatus(this, tr::lng_menu_set_status([](const QString &text) {
+	return Ui::Text::Link(text);
+}))
+, _emojiStatusPanel(std::make_unique<Info::Profile::EmojiStatusPanel>())
+, _badge(std::make_unique<Info::Profile::Badge>(
 	this,
 	st::settingsInfoPeerBadge,
 	controller->session().user(),
+	_emojiStatusPanel.get(),
 	[=] { return controller->isGifPausedAtLeastFor(GifPauseReason::Layer); },
 	kPlayStatusLimit,
-	Info::Profile::Badge::Premium))
-, _emojiStatusPanel(std::make_unique<Info::Profile::EmojiStatusPanel>())
+	Info::Profile::BadgeType::Premium))
 , _scroll(this, st::defaultSolidScroll)
 , _inner(_scroll->setOwnedWidget(
 	object_ptr<Ui::VerticalLayout>(_scroll.data())))
@@ -372,6 +378,7 @@ MainMenu::MainMenu(
 
 	setupUserpicButton();
 	setupAccountsToggle();
+	setupSetEmojiStatus();
 	setupAccounts();
 	setupArchive();
 	setupMenu();
@@ -439,7 +446,7 @@ MainMenu::MainMenu(
 		moveBadge();
 	}, lifetime());
 	_badge->setPremiumClickCallback([=] {
-		_emojiStatusPanel->show(_controller, _badge->widget());
+		chooseEmojiStatus();
 	});
 
 	_controller->session().downloaderTaskFinished(
@@ -447,14 +454,6 @@ MainMenu::MainMenu(
 		update();
 	}, lifetime());
 
-	_controller->session().changes().peerUpdates(
-		_controller->session().user(),
-		Data::PeerUpdate::Flag::PhoneNumber
-	) | rpl::start_with_next([=] {
-		updatePhone();
-	}, lifetime());
-
-	updatePhone();
 	initResetScaleButton();
 }
 
@@ -620,15 +619,13 @@ void MainMenu::setupAccountsToggle() {
 	_toggleAccounts->addClickHandler([=](Qt::MouseButton button) {
 		if (button == Qt::LeftButton) {
 			toggleAccounts();
-		} else if (button == Qt::RightButton) {
-			const auto menu = Ui::CreateChild<Ui::PopupMenu>(
-				_toggleAccounts.data());
-
-			menu->addAction(tr::lng_profile_copy_phone(tr::now), [=] {
-				QGuiApplication::clipboard()->setText(_phoneText);
-			});
-			menu->popup(QCursor::pos());
 		}
+	});
+}
+
+void MainMenu::setupSetEmojiStatus() {
+	_setEmojiStatus->overrideLinkClickHandler([=] {
+		chooseEmojiStatus();
 	});
 }
 
@@ -771,8 +768,6 @@ void MainMenu::setupMenu() {
 			_nightThemeSwitches.fire_copy(*darkMode);
 		}
 	}, _nightThemeToggle->lifetime());
-
-	updatePhone();
 }
 
 void MainMenu::resizeEvent(QResizeEvent *e) {
@@ -787,6 +782,10 @@ void MainMenu::updateControlsGeometry() {
 	if (_resetScaleButton) {
 		_resetScaleButton->moveToRight(0, 0);
 	}
+	_setEmojiStatus->moveToLeft(
+		st::mainMenuCoverStatusLeft,
+		st::mainMenuCoverStatusTop,
+		width());
 	_toggleAccounts->setGeometry(
 		0,
 		st::mainMenuCoverNameTop,
@@ -812,13 +811,12 @@ void MainMenu::updateInnerControlsGeometry() {
 	}
 }
 
-void MainMenu::updatePhone() {
-	if (GetEnhancedBool("show_phone_number")) {
-		_phoneText = Ui::FormatPhone(_controller->session().user()->phone());
+void MainMenu::chooseEmojiStatus() {
+	if (const auto widget = _badge->widget()) {
+		_emojiStatusPanel->show(_controller, widget, _badge->sizeTag());
 	} else {
-		_phoneText = tr::lng_info_mobile_hidden(tr::now);
+		ShowPremiumPreviewBox(_controller, PremiumPreview::EmojiStatus);
 	}
-	update();
 }
 
 void MainMenu::paintEvent(QPaintEvent *e) {
@@ -852,13 +850,6 @@ void MainMenu::paintEvent(QPaintEvent *e) {
 					? (st::semiboldFont->spacew + _badge->widget()->width())
 					: 0)),
 			width());
-		p.setFont(st::mainMenuPhoneFont);
-		p.setPen(st::windowSubTextFg);
-		p.drawTextLeft(
-			st::mainMenuCoverStatusLeft,
-			st::mainMenuCoverStatusTop,
-			width(),
-			_phoneText);
 	}
 }
 

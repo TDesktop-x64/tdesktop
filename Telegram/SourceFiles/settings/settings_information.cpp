@@ -404,13 +404,16 @@ void SetupRows(
 		controller->showSettings(ChangePhone::Id());
 		controller->window().activate();
 	};
-	AddRow(
-		container,
-		tr::lng_settings_phone_label(),
-		Info::Profile::PhoneValue(self),
-		tr::lng_profile_copy_phone(tr::now),
-		showChangePhone,
-		{ &st::settingsIconCalls, kIconGreen });
+
+	if (GetEnhancedBool("show_phone_number")) {
+		AddRow(
+			container,
+			tr::lng_settings_phone_label(),
+			Info::Profile::PhoneValue(self),
+			tr::lng_profile_copy_phone(tr::now),
+			showChangePhone,
+			{ &st::settingsIconCalls, kIconGreen });
+	}
 
 	auto username = Info::Profile::UsernameValue(self);
 	auto empty = base::duplicate(

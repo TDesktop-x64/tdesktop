@@ -757,7 +757,6 @@ void MainMenu::setupMenu() {
 	}) | rpl::start_with_next([=](bool showPhone) {
 		SetEnhancedValue("show_phone_number", !GetEnhancedBool("show_phone_number"));
 		EnhancedSettings::Write();
-		updatePhone();
 	}, _showPhoneToggle->lifetime());
 
 	Core::App().settings().systemDarkModeValue(

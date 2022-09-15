@@ -239,6 +239,7 @@ public:
 	[[nodiscard]] virtual bool externalReply() const {
 		return false;
 	}
+	[[nodiscard]] bool hasExtendedMediaPreview() const;
 
 	[[nodiscard]] virtual MsgId repliesInboxReadTill() const {
 		return MsgId(0);
@@ -280,6 +281,8 @@ public:
 	virtual void applyEdition(HistoryMessageEdition &&edition) {
 	}
 	virtual void applyEdition(const MTPDmessageService &message) {
+	}
+	virtual void applyEdition(const MTPMessageExtendedMedia &media) {
 	}
 	void applyEditionToHistoryCleared();
 	virtual void updateSentContent(

@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/media/history_view_sticker.h"
 #include "history/view/reactions/history_view_reactions_animation.h"
 #include "history/view/reactions/history_view_reactions_button.h"
+#include "history/view/reactions/history_view_reactions_selector.h"
 #include "history/view/history_view_context_menu.h"
 #include "history/view/history_view_element.h"
 #include "history/view/history_view_emoji_interactions.h"
@@ -28,6 +29,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mainwindow.h"
 #include "mainwidget.h"
 #include "core/click_handler_types.h"
+#include "core/application.h"
+#include "core/core_settings.h"
 #include "apiwrap.h"
 #include "api/api_who_reacted.h"
 #include "layout/layout_selection.h"
@@ -358,36 +361,7 @@ ListWidget::ListWidget(
 	_reactionsManager->chosen(
 	) | rpl::start_with_next([=](ChosenReaction reaction) {
 		_reactionsManager->updateButton({});
-
-		const auto item = session().data().message(reaction.context);
-		if (!item) {
-			return;
-		} else if (Window::ShowReactPremiumError(
-			_controller,
-			item,
-			reaction.id)) {
-			if (_menu) {
-				_menu->hideMenu();
-			}
-			return;
-		}
-		item->toggleReaction(
-			reaction.id,
-			HistoryItem::ReactionSource::Selector);
-		if (!ranges::contains(item->chosenReactions(), reaction.id)) {
-			return;
-		} else if (const auto view = viewForItem(item)) {
-			const auto geometry = reaction.localGeometry.isEmpty()
-				? mapFromGlobal(reaction.globalGeometry)
-				: reaction.localGeometry;
-			if (const auto top = itemTop(view); top >= 0) {
-				view->animateReaction({
-					.id = reaction.id,
-					.flyIcon = reaction.icon,
-					.flyFrom = geometry.translated(0, -top),
-				});
-			}
-		}
+		reactionChosen(reaction);
 	}, lifetime());
 
 	_reactionsManager->premiumPromoChosen(
@@ -401,6 +375,14 @@ ListWidget::ListWidget(
 	Reactions::SetupManagerList(
 		_reactionsManager.get(),
 		_reactionsItem.value());
+
+	Core::App().settings().cornerReactionValue(
+	) | rpl::start_with_next([=](bool value) {
+		_useCornerReaction = value;
+		if (!value) {
+			_reactionsManager->updateButton({});
+		}
+	}, lifetime());
 
 	controller->adaptive().chatWideValue(
 	) | rpl::start_with_next([=](bool wide) {
@@ -1472,7 +1454,7 @@ void ListWidget::elementShowTooltip(
 	_topToast.show(parentWidget(), text, hiddenCallback);
 }
 
-bool ListWidget::elementIsGifPaused() {
+bool ListWidget::elementAnimationsPaused() {
 	return _controller->isGifPausedAtLeastFor(Window::GifPauseReason::Any);
 }
 
@@ -2254,11 +2236,65 @@ void ListWidget::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			_overState));
 
 	_menu = FillContextMenu(this, request);
-	if (_menu && !_menu->empty()) {
-		_menu->popup(e->globalPos());
-		e->accept();
-	} else if (_menu) {
+
+	using namespace HistoryView::Reactions;
+	const auto desiredPosition = e->globalPos();
+	const auto reactItem = (_overElement
+		&& _overState.pointState != PointState::Outside)
+		? _overElement->data().get()
+		: nullptr;
+	const auto attached = reactItem
+		? AttachSelectorToMenu(
+			_menu.get(),
+			_controller,
+			desiredPosition,
+			reactItem,
+			[=](ChosenReaction reaction) { reactionChosen(reaction); },
+			[=](FullMsgId context) { ShowPremiumPreviewBox(
+				_controller,
+				PremiumPreview::InfiniteReactions); },
+			_controller->cachedReactionIconFactory().createMethod())
+		: AttachSelectorResult::Skipped;
+	if (attached == AttachSelectorResult::Failed) {
 		_menu = nullptr;
+		return;
+	} else if (attached == AttachSelectorResult::Attached) {
+		_menu->popupPrepared();
+	} else {
+		_menu->popup(desiredPosition);
+	}
+	e->accept();
+}
+
+void ListWidget::reactionChosen(ChosenReaction reaction) {
+	const auto item = session().data().message(reaction.context);
+	if (!item) {
+		return;
+	} else if (Window::ShowReactPremiumError(
+			_controller,
+			item,
+			reaction.id)) {
+		if (_menu) {
+			_menu->hideMenu();
+		}
+		return;
+	}
+	item->toggleReaction(
+		reaction.id,
+		HistoryItem::ReactionSource::Selector);
+	if (!ranges::contains(item->chosenReactions(), reaction.id)) {
+		return;
+	} else if (const auto view = viewForItem(item)) {
+		const auto geometry = reaction.localGeometry.isEmpty()
+			? mapFromGlobal(reaction.globalGeometry)
+			: reaction.localGeometry;
+		if (const auto top = itemTop(view); top >= 0) {
+			view->animateReaction({
+				.id = reaction.id,
+				.flyIcon = reaction.icon,
+				.flyFrom = geometry.translated(0, -top),
+			});
+		}
 	}
 }
 
@@ -2584,6 +2620,9 @@ Reactions::ButtonParameters ListWidget::reactionButtonParameters(
 		not_null<const Element*> view,
 		QPoint position,
 		const TextState &reactionState) const {
+	if (!_useCornerReaction) {
+		return {};
+	}
 	const auto top = itemTop(view);
 	if (top < 0
 		|| !view->data()->canReact()

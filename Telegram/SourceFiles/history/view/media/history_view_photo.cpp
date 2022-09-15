@@ -139,6 +139,10 @@ void Photo::unloadHeavyPart() {
 }
 
 QSize Photo::countOptimalSize() {
+	if (_serviceWidth > 0) {
+		return { _serviceWidth, _serviceWidth };
+	}
+
 	if (_parent->media() != this) {
 		_caption = Ui::Text::String();
 	} else if (_caption.hasSkipBlock()) {
@@ -147,33 +151,15 @@ QSize Photo::countOptimalSize() {
 			_parent->skipBlockHeight());
 	}
 
-	auto maxWidth = 0;
-	auto minHeight = 0;
-
-	auto tw = style::ConvertScale(_data->width());
-	auto th = style::ConvertScale(_data->height());
-	if (!tw || !th) {
-		tw = th = 1;
-	}
-	if (tw > st::maxMediaSize) {
-		th = (st::maxMediaSize * th) / tw;
-		tw = st::maxMediaSize;
-	}
-	if (th > st::maxMediaSize) {
-		tw = (st::maxMediaSize * tw) / th;
-		th = st::maxMediaSize;
-	}
-
-	if (_serviceWidth > 0) {
-		return { _serviceWidth, _serviceWidth };
-	}
+	const auto scaled = CountDesiredMediaSize(
+		{ _data->width(), _data->height() });
 	const auto minWidth = std::clamp(
 		_parent->minWidthForMedia(),
 		(_parent->hasBubble() ? st::historyPhotoBubbleMinWidth : st::minPhotoSize),
 		st::maxMediaSize);
-	const auto maxActualWidth = qMax(tw, minWidth);
-	maxWidth = qMax(maxActualWidth, th);
-	minHeight = qMax(th, st::minPhotoSize);
+	const auto maxActualWidth = qMax(scaled.width(), minWidth);
+	auto maxWidth = qMax(maxActualWidth, scaled.height());
+	auto minHeight = qMax(scaled.height(), st::minPhotoSize);
 	if (_parent->hasBubble() && !_caption.isEmpty()) {
 		maxWidth = qMax(maxWidth, st::msgPadding.left()
 			+ _caption.maxWidth()
@@ -186,41 +172,19 @@ QSize Photo::countOptimalSize() {
 	return { maxWidth, minHeight };
 }
 
-QSize Photo::pixmapSizeFromData(int newWidth) const {
-	auto tw = style::ConvertScale(_data->width());
-	auto th = style::ConvertScale(_data->height());
-	if (tw > st::maxMediaSize) {
-		th = (st::maxMediaSize * th) / tw;
-		tw = st::maxMediaSize;
-	}
-	if (th > st::maxMediaSize) {
-		tw = (st::maxMediaSize * tw) / th;
-		th = st::maxMediaSize;
-	}
-
-	auto pixw = qMin(newWidth, maxWidth());
-	auto pixh = th;
-	if (tw > pixw) {
-		pixh = (pixw * pixh / tw);
-	} else {
-		pixw = tw;
-	}
-	if (pixh > newWidth) {
-		pixw = (pixw * newWidth) / pixh;
-		pixh = newWidth;
-	}
-	return { pixw, pixh };
-}
-
 QSize Photo::countCurrentSize(int newWidth) {
 	if (_serviceWidth) {
 		return { _serviceWidth, _serviceWidth };
 	}
+	const auto thumbMaxWidth = qMin(newWidth, st::maxMediaSize);
 	const auto minWidth = std::clamp(
 		_parent->minWidthForMedia(),
 		(_parent->hasBubble() ? st::historyPhotoBubbleMinWidth : st::minPhotoSize),
-		std::min(newWidth, st::maxMediaSize));
-	auto pix = pixmapSizeFromData(newWidth);
+		thumbMaxWidth);
+	auto pix = CountPhotoMediaSize(
+		CountDesiredMediaSize({ _data->width(), _data->height() }),
+		newWidth,
+		maxWidth());
 	newWidth = qMax(pix.width(), minWidth);
 	auto newHeight = qMax(pix.height(), st::minPhotoSize);
 	if (_parent->hasBubble() && !_caption.isEmpty()) {
@@ -229,7 +193,7 @@ QSize Photo::countCurrentSize(int newWidth) {
 			(st::msgPadding.left()
 				+ _caption.maxWidth()
 				+ st::msgPadding.right()));
-		newWidth = qMax(newWidth, maxWithCaption);
+		newWidth = qMin(qMax(newWidth, maxWithCaption), thumbMaxWidth);
 		const auto captionw = newWidth
 			- st::msgPadding.left()
 			- st::msgPadding.right();
@@ -336,7 +300,7 @@ void Photo::draw(Painter &p, const PaintContext &context) const {
 	// date
 	if (!_caption.isEmpty()) {
 		p.setPen(stm->historyTextFg);
-		_parent->prepareCustomEmojiPaint(p, _caption);
+		_parent->prepareCustomEmojiPaint(p, context, _caption);
 		_caption.draw(p, st::msgPadding.left(), painty + painth + st::mediaCaptionSkip, captionw, style::al_left, 0, -1, context.selection);
 	} else if (!inWebPage) {
 		auto fullRight = paintx + paintw;
@@ -389,7 +353,6 @@ QImage Photo::prepareImageCache(
 QImage Photo::prepareImageCache(QSize outer) const {
 	using Size = PhotoSize;
 	const auto large = _dataMedia->image(Size::Large);
-	const auto ratio = style::DevicePixelRatio();
 	auto blurred = (Image*)nullptr;
 	if (const auto embedded = _dataMedia->thumbnailInline()) {
 		blurred = embedded;
@@ -426,7 +389,6 @@ void Photo::paintUserpicFrame(
 	if (_streamed
 		&& _streamed->instance.player().ready()
 		&& !_streamed->instance.player().videoSize().isEmpty()) {
-		const auto paused = _parent->delegate()->elementIsGifPaused();
 		auto request = ::Media::Streaming::FrameRequest();
 		request.outer = size * cIntRetinaFactor();
 		request.resize = size * cIntRetinaFactor();
@@ -439,7 +401,7 @@ void Photo::paintUserpicFrame(
 		} else {
 			_streamed->frozenFrame = QImage();
 			p.drawImage(rect, _streamed->instance.frame(request));
-			if (!paused) {
+			if (!context.paused) {
 				_streamed->instance.markFrameShown();
 			}
 		}
@@ -815,7 +777,7 @@ void Photo::handleStreamingError(::Media::Streaming::Error &&error) {
 void Photo::repaintStreamedContent() {
 	if (_streamed && !_streamed->frozenFrame.isNull()) {
 		return;
-	} else if (_parent->delegate()->elementIsGifPaused()) {
+	} else if (_parent->delegate()->elementAnimationsPaused()) {
 		return;
 	}
 	repaint();

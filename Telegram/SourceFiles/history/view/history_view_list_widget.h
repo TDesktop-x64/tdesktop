@@ -287,7 +287,7 @@ public:
 	void elementShowTooltip(
 		const TextWithEntities &text,
 		Fn<void()> hiddenCallback) override;
-	bool elementIsGifPaused() override;
+	bool elementAnimationsPaused() override;
 	bool elementHideReply(not_null<const Element*> view) override;
 	bool elementShownUnread(not_null<const Element*> view) override;
 	void elementSendBotCommand(
@@ -417,6 +417,7 @@ private:
 	QPoint mapPointToItem(QPoint point, const Element *view) const;
 
 	void showContextMenu(QContextMenuEvent *e, bool showFromTouch = false);
+	void reactionChosen(ChosenReaction reaction);
 
 	[[nodiscard]] int findItemIndexByY(int y) const;
 	[[nodiscard]] not_null<Element*> findItemByY(int y) const;
@@ -587,6 +588,7 @@ private:
 
 	std::unique_ptr<HistoryView::Reactions::Manager> _reactionsManager;
 	rpl::variable<HistoryItem*> _reactionsItem;
+	bool _useCornerReaction = false;
 
 	int _minHeight = 0;
 	int _visibleTop = 0;

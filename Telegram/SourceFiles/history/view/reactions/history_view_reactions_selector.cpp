@@ -639,8 +639,6 @@ ChosenReaction Selector::lookupChosen(const Data::ReactionId &id) const {
 	if (result.icon.isNull()) {
 		return result;
 	}
-	const auto between = st::reactionCornerSkip;
-	const auto oneHeight = (st::reactionCornerSize.height() + between);
 	const auto rect = QRect(_skipx + index * _size, _skipy, _size, _size);
 	const auto imageSize = _strip->computeOverSize();
 	result.globalGeometry = mapToGlobal(QRect(
@@ -780,10 +778,8 @@ void Selector::createList(not_null<Window::SessionController*> controller) {
 		})
 	).data();
 
-	rpl::merge(
-		_list->customChosen(),
-		_list->premiumChosen()
-	) | rpl::start_with_next([=](TabbedSelector::FileChosen data) {
+	_list->customChosen(
+	) | rpl::start_with_next([=](ChatHelpers::FileChosen data) {
 		const auto id = DocumentId{ data.document->id };
 		const auto i = defaultReactionIds.find(id);
 		const auto reactionId = (i != end(defaultReactionIds))

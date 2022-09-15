@@ -229,10 +229,6 @@ struct Message::CommentsButton {
 	QImage cachedUserpics;
 	ClickHandlerPtr link;
 	QPoint lastPoint;
-
-	QString rightActionCountString;
-	int rightActionCount = 0;
-	int rightActionCountWidth = 0;
 };
 
 struct Message::FromNameStatus {
@@ -612,7 +608,7 @@ QSize Message::performCountOptimalSize() {
 		minHeight = 0;
 	}
 	if (const auto markup = item->inlineReplyMarkup()) {
-		if (!markup->inlineKeyboard) {
+		if (!markup->inlineKeyboard && !markup->hiddenBy(item->media())) {
 			markup->inlineKeyboard = std::make_unique<ReplyKeyboard>(
 				item,
 				std::make_unique<KeyboardStyle>(st::msgBotKbButton));
@@ -620,7 +616,7 @@ QSize Message::performCountOptimalSize() {
 
 		// if we have a text bubble we can resize it to fit the keyboard
 		// but if we have only media we don't do that
-		if (hasVisibleText()) {
+		if (hasVisibleText() && markup->inlineKeyboard) {
 			accumulate_max(maxWidth, markup->inlineKeyboard->naturalWidth());
 		}
 	}
@@ -754,7 +750,7 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 		g.setHeight(g.height() - reactionsHeight);
 		const auto reactionsPosition = QPoint(reactionsLeft + g.left(), g.top() + g.height() + st::mediaInBubbleSkip);
 		p.translate(reactionsPosition);
-		prepareCustomEmojiPaint(p, *_reactions);
+		prepareCustomEmojiPaint(p, context, *_reactions);
 		_reactions->paint(p, context, g.width(), context.clip.translated(-reactionsPosition));
 		if (context.reactionInfo) {
 			context.reactionInfo->position = reactionsPosition;
@@ -816,7 +812,7 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 			trect.setHeight(trect.height() - reactionsHeight);
 			const auto reactionsPosition = QPoint(trect.left(), trect.top() + trect.height() + reactionsTop);
 			p.translate(reactionsPosition);
-			prepareCustomEmojiPaint(p, *_reactions);
+			prepareCustomEmojiPaint(p, context, *_reactions);
 			_reactions->paint(p, context, g.width(), context.clip.translated(-reactionsPosition));
 			if (context.reactionInfo) {
 				context.reactionInfo->position = reactionsPosition;
@@ -1167,7 +1163,7 @@ void Message::paintFromName(
 				.position = QPoint(
 					x - 2 * _fromNameStatus->skip,
 					y + _fromNameStatus->skip),
-				.paused = delegate()->elementIsGifPaused(),
+				.paused = context.paused,
 			});
 		} else {
 			st::dialogsPremiumIcon.paint(p, x, y, width(), color);
@@ -1313,7 +1309,7 @@ void Message::paintText(
 	const auto stm = context.messageStyle();
 	p.setPen(stm->historyTextFg);
 	p.setFont(st::msgFont);
-	prepareCustomEmojiPaint(p, item->_text);
+	prepareCustomEmojiPaint(p, context, item->_text);
 	item->_text.draw(
 		p,
 		trect.x(),

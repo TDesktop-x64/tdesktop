@@ -26,10 +26,11 @@ versionMinor = ''
 versionPatch = ''
 versionAlpha = '0'
 versionBeta = False
-for arg in sys.argv:
-  match = re.match(r'^\s*(\d+)\.(\d+)(\.(\d+)(\.(\d+|beta))?)?\s*$', arg)
+versionUpstream = ''
+if len(sys.argv) >= 3:
+  match = re.match(r'^\s*(\d+)\.(\d+)(\.(\d+)(\.(\d+|beta))?)?\s*$', sys.argv[1])
   if match:
-    inputVersion = arg
+    inputVersion = sys.argv[1]
     versionOriginal = inputVersion
     versionMajor = match.group(1)
     versionMinor = match.group(2)
@@ -40,6 +41,9 @@ for arg in sys.argv:
         versionBeta = True
       else:
         versionAlpha = match.group(6)
+  match = re.match(r'^\s*(\d+)\.(\d+)(\.(\d+)(\.(\d+|beta))?)?\s*$', sys.argv[2])
+  if match:
+    versionUpstream = sys.argv[2]
 
 if not len(versionMajor):
   print("Wrong version parameter")
@@ -129,6 +133,7 @@ replaceInFile(scriptPath + '/../SourceFiles/core/version.h', [
   [ r'(AppVersion\s+=\s+)\d+', r'\g<1>' + versionFull ],
   [ r'(AppVersionStr\s+=\s+)[^;]+', r'\g<1>"' + versionStrSmall + '"' ],
   [ r'(AppBetaVersion\s+=\s+)[a-z]+', r'\g<1>' + ('true' if versionBeta else 'false') ],
+  [ r'(UpstreamVersion\s+=\s+)[^;]+', r'\g<1>"' + versionUpstream + '"' ],
 ])
 
 parts = [versionMajor, versionMinor, versionPatch, versionAlpha]

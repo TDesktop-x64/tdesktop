@@ -73,8 +73,8 @@ struct ExpandDecision {
 [[nodiscard]] ExpandDecision DecideFrameResize(
 	QSize outer,
 	QSize original,
-	int minVisibleNominator = 3, // If we cut out no more than 0.25 of
-	int minVisibleDenominator = 4); // the original, let's expand.
+	int minVisibleNominator = 1, // If we cut out no more than 0.25 of
+	int minVisibleDenominator = 1); // the original, let's expand.
 [[nodiscard]] ExpandDecision DecideVideoFrameResize(
 	QSize outer,
 	QSize original);

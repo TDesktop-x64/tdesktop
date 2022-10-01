@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/unixtime.h"
 #include "base/qt/qt_key_modifiers.h"
+#include "base/qt/qt_common_adapters.h"
 #include "history/history.h"
 #include "history/history_message.h"
 #include "history/history_item_components.h"

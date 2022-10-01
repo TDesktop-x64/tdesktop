@@ -259,7 +259,7 @@ void Application::run() {
 	Ui::InitTextOptions();
 	Ui::StartCachedCorners();
 	Ui::Emoji::Init();
-	Ui::PrepareDefaultSpoilerMess();
+	Ui::PrepareTextSpoilerMask();
 	startEmojiImageLoader();
 	startSystemDarkModeViewer();
 	Media::Player::start(_audio.get());
@@ -1213,11 +1213,9 @@ void Application::closeWindow(not_null<Window::Controller*> window) {
 
 void Application::closeChatFromWindows(not_null<PeerData*> peer) {
 	for (const auto &[history, window] : _secondaryWindows) {
-		if (!window) {
-			continue;
-		}
 		if (history->peer == peer) {
 			closeWindow(window.get());
+			break;
 		} else if (const auto session = window->sessionController()) {
 			if (session->activeChatCurrent().peer() == peer) {
 				session->showPeerHistory(

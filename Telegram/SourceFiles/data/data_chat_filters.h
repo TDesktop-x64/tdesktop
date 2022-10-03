@@ -129,6 +129,10 @@ public:
 		-> const std::vector<SuggestedFilter> &;
 	[[nodiscard]] rpl::producer<> suggestedUpdated() const;
 
+	void backupFilters();
+	void restoreFilters();
+	[[nodiscard]] bool hasBackup() const;
+
 private:
 	void load(bool force);
 	void received(const QVector<MTPDialogFilter> &list);
@@ -140,6 +144,7 @@ private:
 	const not_null<Session*> _owner;
 
 	std::vector<ChatFilter> _list;
+	std::vector<ChatFilter> _list_backup;
 	base::flat_map<FilterId, std::unique_ptr<Dialogs::MainList>> _chatsLists;
 	rpl::event_stream<> _listChanged;
 	mtpRequestId _loadRequestId = 0;

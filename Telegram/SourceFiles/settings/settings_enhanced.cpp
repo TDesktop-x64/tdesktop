@@ -441,18 +441,18 @@ namespace Settings {
 		AddButton(
 				container,
 				tr::lng_settings_hide_all_chats(),
-				st::settingsOptionDisabled
+				st::settingsButtonNoIcon
 		)->toggleOn(
-				rpl::single(false)
+				rpl::single(GetEnhancedBool("hide_all_chats"))
 		)->toggledValue(
 		) | rpl::filter([](bool enabled) {
 			return (enabled != GetEnhancedBool("hide_all_chats"));
 		}) | rpl::start_with_next([=](bool enabled) {
-			Ui::Toast::Show(tr::lng_settings_experimental_irrelevant(tr::now));
-			//SetEnhancedValue("hide_all_chats", enabled);
-			//EnhancedSettings::Write();
-			//controller->reloadFiltersMenu();
-			//App::wnd()->fixOrder();
+			//Ui::Toast::Show(tr::lng_settings_experimental_irrelevant(tr::now));
+			SetEnhancedValue("hide_all_chats", enabled);
+			EnhancedSettings::Write();
+			controller->reloadFiltersMenu();
+			App::wnd()->fixOrder();
 		}, container->lifetime());
 
 		AddButton(

@@ -534,6 +534,20 @@ const std::vector<ChatFilter> &ChatFilters::list() const {
 	return _list;
 }
 
+void ChatFilters::backupFilters() {
+	if (_list_backup.empty()) {
+		_list_backup = _list;
+	}
+}
+
+void ChatFilters::restoreFilters() {
+	_list = _list_backup;
+}
+
+bool ChatFilters::hasBackup() const {
+	return _list_backup.size() > 1;
+}
+
 FilterId ChatFilters::defaultId() const {
 	return lookupId(0);
 }

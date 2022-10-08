@@ -941,7 +941,7 @@ void Filler::fillHistoryActions() {
 	addPinnedMessages();
 	addCreatePoll();
 	addThemeEdit();
-	addViewDiscussion();
+	// addViewDiscussion();
 	addExportChat();
 	addReport();
 	addClearHistory();

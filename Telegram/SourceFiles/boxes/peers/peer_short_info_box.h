@@ -39,6 +39,7 @@ struct PeerShortInfoFields {
 	TextWithEntities about;
 	QString username;
 	bool isBio = false;
+	QString user_id;
 };
 
 struct PeerShortInfoUserpic {
@@ -165,6 +166,7 @@ private:
 	[[nodiscard]] rpl::producer<QString> phoneValue() const;
 	[[nodiscard]] rpl::producer<QString> usernameValue() const;
 	[[nodiscard]] rpl::producer<TextWithEntities> aboutValue() const;
+	[[nodiscard]] rpl::producer<QString> userIdValue() const;
 
 	const PeerShortInfoType _type = PeerShortInfoType::User;
 

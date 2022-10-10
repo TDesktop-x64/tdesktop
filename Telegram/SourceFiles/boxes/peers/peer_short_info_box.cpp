@@ -749,6 +749,10 @@ void PeerShortInfoBox::prepareRows() {
 		tr::lng_info_username_label(),
 		usernameValue() | Ui::Text::ToWithEntities(),
 		tr::lng_context_copy_mention(tr::now));
+	addInfoOneLine(
+		rpl::single(QString("ID")),
+		userIdValue() | Ui::Text::ToWithEntities(),
+		tr::lng_context_copy_text(tr::now));
 }
 
 RectParts PeerShortInfoBox::customCornersFilling() {
@@ -814,5 +818,11 @@ rpl::producer<QString> PeerShortInfoBox::usernameValue() const {
 rpl::producer<TextWithEntities> PeerShortInfoBox::aboutValue() const {
 	return _fields.value() | rpl::map([](const PeerShortInfoFields &fields) {
 		return fields.about;
+	}) | rpl::distinct_until_changed();
+}
+
+rpl::producer<QString> PeerShortInfoBox::userIdValue() const {
+	return _fields.value() | rpl::map([](const PeerShortInfoFields &fields) {
+		return fields.user_id;
 	}) | rpl::distinct_until_changed();
 }

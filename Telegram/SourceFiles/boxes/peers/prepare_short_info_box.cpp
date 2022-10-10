@@ -219,6 +219,7 @@ void ProcessFullPhoto(
 				? ('@' + username)
 				: QString()),
 			.isBio = (user && !user->isBot()),
+			.user_id = QString::number(peer->id.value),
 		};
 	});
 }

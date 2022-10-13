@@ -1067,6 +1067,11 @@ requestsRejectButton: RoundButton(defaultLightButton) {
 	height: 30px;
 	textTop: 6px;
 }
+requestsBanButton: RoundButton(defaultActiveButton) {
+	width: -28px;
+	height: 30px;
+	textTop: 6px;
+}
 requestAcceptPosition: point(71px, 58px);
 requestButtonsSkip: 9px;
 

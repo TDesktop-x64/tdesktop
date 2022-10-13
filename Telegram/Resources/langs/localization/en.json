@@ -123,5 +123,7 @@
 
     "lng_proxy_remove_all": "Remove all proxies",
     
-    "lng_copy_profile_id": "ID copied to clipboard."
+    "lng_copy_profile_id": "ID copied to clipboard.",
+
+    "lng_group_requests_ban": "Ban"
 }

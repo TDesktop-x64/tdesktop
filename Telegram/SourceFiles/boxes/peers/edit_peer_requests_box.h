@@ -52,7 +52,7 @@ private:
 
 	void appendRow(not_null<UserData*> user, TimeId date);
 	void refreshDescription();
-	void processRequest(not_null<UserData*> user, bool approved);
+	void processRequest(not_null<UserData*> user, bool approved, bool banned);
 
 	void subscribeToMigration();
 	void migrate(not_null<ChatData*> chat, not_null<ChannelData*> channel);

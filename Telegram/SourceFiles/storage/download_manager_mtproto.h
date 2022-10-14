@@ -23,7 +23,7 @@ namespace Storage {
 // Because we start downloading with some part size
 // and then we get a CDN-redirect where we support only
 // fixed part size download for hash checking.
-constexpr auto kDownloadPartSize = 128 * 1024;
+constexpr auto kDownloadPartSize = 1024 * 1024;
 
 class DownloadMtprotoTask;
 

@@ -184,10 +184,10 @@ void JoinAsAction::prepare() {
 	rpl::combine(
 		tr::lng_group_call_display_as_header(),
 		Info::Profile::NameValue(_peer)
-	) | rpl::start_with_next([=](QString text, TextWithEntities name) {
+	) | rpl::start_with_next([=](QString text, QString name) {
 		const auto &padding = st::groupCallJoinAsPadding;
 		_text.setMarkedText(_st.itemStyle, { text }, MenuTextOptions);
-		_name.setMarkedText(_st.itemStyle, name, MenuTextOptions);
+		_name.setMarkedText(_st.itemStyle, { name }, MenuTextOptions);
 		const auto textWidth = _text.maxWidth();
 		const auto nameWidth = _name.maxWidth();
 		const auto textLeft = padding.left()
@@ -219,7 +219,7 @@ QPoint JoinAsAction::prepareRippleStartPosition() const {
 }
 
 QImage JoinAsAction::prepareRippleMask() const {
-	return Ui::RippleAnimation::rectMask(size());
+	return Ui::RippleAnimation::RectMask(size());
 }
 
 int JoinAsAction::contentHeight() const {
@@ -367,7 +367,7 @@ QPoint RecordingAction::prepareRippleStartPosition() const {
 }
 
 QImage RecordingAction::prepareRippleMask() const {
-	return Ui::RippleAnimation::rectMask(size());
+	return Ui::RippleAnimation::RectMask(size());
 }
 
 int RecordingAction::contentHeight() const {
@@ -457,7 +457,7 @@ void LeaveBox(
 				st::boxRowPadding.right(),
 				st::boxRowPadding.bottom()))
 		: nullptr;
-	const auto weak = base::make_weak(call.get());
+	const auto weak = base::make_weak(call);
 	auto label = scheduled
 		? tr::lng_group_call_close()
 		: tr::lng_group_call_leave();
@@ -490,7 +490,7 @@ void FillMenu(
 		Fn<void()> chooseJoinAs,
 		Fn<void()> chooseShareScreenSource,
 		Fn<void(object_ptr<Ui::BoxContent>)> showBox) {
-	const auto weak = base::make_weak(call.get());
+	const auto weak = base::make_weak(call);
 	const auto resolveReal = [=] {
 		const auto real = peer->groupCall();
 		const auto strong = weak.get();

@@ -1486,7 +1486,8 @@ Link::Link(
 	not_null<Delegate*> delegate,
 	not_null<HistoryItem*> parent,
 	Data::Media *media)
-: ItemBase(delegate, parent) {
+: ItemBase(delegate, parent)
+, _text(st::msgMinWidth) {
 	AddComponents(Info::Bit());
 
 	auto textWithEntities = parent->originalText();

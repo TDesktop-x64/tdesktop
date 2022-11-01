@@ -113,6 +113,7 @@ PRIVATE
     api/api_chat_participants.h
     api/api_cloud_password.cpp
     api/api_cloud_password.h
+    api/api_common.cpp
     api/api_common.h
     api/api_confirm_phone.cpp
     api/api_confirm_phone.h
@@ -162,6 +163,8 @@ PRIVATE
     api/api_unread_things.h
     api/api_updates.cpp
     api/api_updates.h
+    api/api_user_names.cpp
+    api/api_user_names.h
     api/api_user_privacy.cpp
     api/api_user_privacy.h
     api/api_views.cpp
@@ -178,6 +181,8 @@ PRIVATE
     boxes/peers/add_participants_box.h
     boxes/peers/edit_contact_box.cpp
     boxes/peers/edit_contact_box.h
+    boxes/peers/edit_forum_topic_box.cpp
+    boxes/peers/edit_forum_topic_box.h
     boxes/peers/edit_linked_chat_box.cpp
     boxes/peers/edit_linked_chat_box.h
     boxes/peers/edit_participant_box.cpp
@@ -199,6 +204,8 @@ PRIVATE
     boxes/peers/edit_peer_requests_box.h
     boxes/peers/edit_peer_type_box.cpp
     boxes/peers/edit_peer_type_box.h
+    boxes/peers/edit_peer_usernames_list.cpp
+    boxes/peers/edit_peer_usernames_list.h
     boxes/peers/peer_short_info_box.cpp
     boxes/peers/peer_short_info_box.h
     boxes/peers/prepare_short_info_box.cpp
@@ -247,8 +254,6 @@ PRIVATE
     boxes/local_storage_box.h
     boxes/max_invite_box.cpp
     boxes/max_invite_box.h
-    boxes/mute_settings_box.cpp
-    boxes/mute_settings_box.h
     boxes/enhanced_options_box.cpp
     boxes/enhanced_options_box.h
     boxes/peer_list_box.cpp
@@ -471,6 +476,12 @@ PRIVATE
     data/data_emoji_statuses.h
     data/data_folder.cpp
     data/data_folder.h
+    data/data_forum.cpp
+    data/data_forum.h
+    data/data_forum_icons.cpp
+    data/data_forum_icons.h
+    data/data_forum_topic.cpp
+    data/data_forum_topic.h
     data/data_file_click_handler.cpp
     data/data_file_click_handler.h
     data/data_file_origin.cpp
@@ -537,12 +548,16 @@ PRIVATE
     data/data_sponsored_messages.h
     data/data_streaming.cpp
     data/data_streaming.h
+    data/data_thread.cpp
+    data/data_thread.h
     data/data_types.cpp
     data/data_types.h
     data/data_user.cpp
     data/data_user.h
     data/data_user_photos.cpp
     data/data_user_photos.h
+    data/data_user_names.cpp
+    data/data_user_names.h
     data/data_wall_paper.cpp
     data/data_wall_paper.h
     data/data_web_page.cpp
@@ -615,6 +630,8 @@ PRIVATE
     history/view/controls/history_view_compose_controls.h
     history/view/controls/history_view_compose_search.cpp
     history/view/controls/history_view_compose_search.h
+    history/view/controls/history_view_forward_panel.cpp
+    history/view/controls/history_view_forward_panel.h
     history/view/controls/history_view_ttl_button.cpp
     history/view/controls/history_view_ttl_button.h
     history/view/controls/history_view_voice_record_bar.cpp
@@ -672,8 +689,6 @@ PRIVATE
     history/view/media/history_view_web_page.h
     history/view/reactions/history_view_reactions.cpp
     history/view/reactions/history_view_reactions.h
-    history/view/reactions/history_view_reactions_animation.cpp
-    history/view/reactions/history_view_reactions_animation.h
     history/view/reactions/history_view_reactions_button.cpp
     history/view/reactions/history_view_reactions_button.h
     history/view/reactions/history_view_reactions_list.cpp
@@ -690,6 +705,8 @@ PRIVATE
     history/view/history_view_contact_status.h
     history/view/history_view_context_menu.cpp
     history/view/history_view_context_menu.h
+    history/view/history_view_corner_buttons.cpp
+    history/view/history_view_corner_buttons.h
     history/view/history_view_cursor_state.cpp
     history/view/history_view_cursor_state.h
     history/view/history_view_element.cpp
@@ -964,6 +981,8 @@ PRIVATE
     media/view/media_view_playback_progress.cpp
     media/view/media_view_playback_progress.h
     media/view/media_view_open_common.h
+    menu/menu_item_download_files.cpp
+    menu/menu_item_download_files.h
     menu/menu_mute.cpp
     menu/menu_mute.h
     menu/menu_send.cpp
@@ -1233,9 +1252,13 @@ PRIVATE
     ui/chat/choose_send_as.h
     ui/chat/choose_theme_controller.cpp
     ui/chat/choose_theme_controller.h
+    ui/effects/emoji_fly_animation.cpp
+    ui/effects/emoji_fly_animation.h
     ui/effects/message_sending_animation_common.h
     ui/effects/message_sending_animation_controller.cpp
     ui/effects/message_sending_animation_controller.h
+    ui/effects/reaction_fly_animation.cpp
+    ui/effects/reaction_fly_animation.h
     ui/effects/send_action_animations.cpp
     ui/effects/send_action_animations.h
     ui/image/image.cpp

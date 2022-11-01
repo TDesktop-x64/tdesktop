@@ -20,6 +20,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_user.h"
 #include "data/data_session.h"
 #include "data/data_message_reaction_id.h"
+#include "data/stickers/data_custom_emoji.h"
 #include "lang/lang_keys.h"
 #include "ui/text/format_values.h"
 #include "ui/text/text_utilities.h"
@@ -210,12 +211,13 @@ TextWithEntities GenerateAdminChangeText(
 		{ Flag::EditMessages, tr::lng_admin_log_admin_edit_messages },
 		{ Flag::DeleteMessages, tr::lng_admin_log_admin_delete_messages },
 		{ Flag::BanUsers, tr::lng_admin_log_admin_ban_users },
-		{ Flag::InviteUsers, invitePhrase },
+		{ Flag::InviteByLinkOrAdd, invitePhrase },
+		{ Flag::ManageTopics, tr::lng_admin_log_admin_manage_topics },
 		{ Flag::PinMessages, tr::lng_admin_log_admin_pin_messages },
 		{ Flag::ManageCall, tr::lng_admin_log_admin_manage_calls },
 		{ Flag::AddAdmins, tr::lng_admin_log_admin_add_admins },
 	};
-	phraseMap[Flag::InviteUsers] = invitePhrase;
+	phraseMap[Flag::InviteByLinkOrAdd] = invitePhrase;
 	phraseMap[Flag::ManageCall] = callPhrase;
 
 	if (!channel->isMegagroup()) {
@@ -252,7 +254,8 @@ QString GeneratePermissionsChangeText(
 		{ Flag::EmbedLinks, tr::lng_admin_log_banned_embed_links },
 		{ Flag::SendPolls, tr::lng_admin_log_banned_send_polls },
 		{ Flag::ChangeInfo, tr::lng_admin_log_admin_change_info },
-		{ Flag::InviteUsers, tr::lng_admin_log_admin_invite_users },
+		{ Flag::AddParticipants, tr::lng_admin_log_admin_invite_users },
+		{ Flag::CreateTopics, tr::lng_admin_log_admin_create_topics },
 		{ Flag::PinMessages, tr::lng_admin_log_admin_pin_messages },
 	};
 	return CollectChanges(phraseMap, prevRights.flags, newRights.flags);
@@ -616,6 +619,43 @@ TextWithEntities GenerateDefaultBannedRightsChangeText(
 	return result;
 }
 
+[[nodiscard]] bool IsTopicClosed(const MTPForumTopic &topic) {
+	return topic.match([](const MTPDforumTopic &data) {
+		return data.is_closed();
+	}, [](const MTPDforumTopicDeleted &) {
+		return false;
+	});
+}
+
+[[nodiscard]] TextWithEntities GenerateTopicLink(
+		not_null<ChannelData*> channel,
+		const MTPForumTopic &topic) {
+	return topic.match([&](const MTPDforumTopic &data) {
+		const auto wrapIcon = [](DocumentId id) {
+			return TextWithEntities{
+				"@",
+				{ EntityInText(
+					EntityType::CustomEmoji,
+					0,
+					1,
+					Data::SerializeCustomEmojiId({ .id = id }))
+				},
+			};
+		};
+		auto result = (data.vicon_emoji_id() && data.vicon_emoji_id()->v)
+			? wrapIcon(data.vicon_emoji_id()->v)
+			: TextWithEntities();
+		result.append(qs(data.vtitle()));
+		return Ui::Text::Link(
+			std::move(result),
+			u"internal:url:https://t.me/c/%1/%2"_q.arg(
+				peerToChannel(channel->id).bare).arg(
+					data.vid().v));
+	}, [](const MTPDforumTopicDeleted &) {
+		return TextWithEntities{ u"Deleted"_q };
+	});
+}
+
 } // namespace
 
 OwnedItem::OwnedItem(std::nullptr_t) {
@@ -702,8 +742,14 @@ void GenerateItems(
 	using LogJoinByRequest =
 		MTPDchannelAdminLogEventActionParticipantJoinByRequest;
 	using LogNoForwards = MTPDchannelAdminLogEventActionToggleNoForwards;
-	using LogActionSendMessage = MTPDchannelAdminLogEventActionSendMessage;
-	using LogEventActionChangeAvailableReactions = MTPDchannelAdminLogEventActionChangeAvailableReactions;
+	using LogSendMessage = MTPDchannelAdminLogEventActionSendMessage;
+	using LogChangeAvailableReactions = MTPDchannelAdminLogEventActionChangeAvailableReactions;
+	using LogChangeUsernames = MTPDchannelAdminLogEventActionChangeUsernames;
+	using LogToggleForum = MTPDchannelAdminLogEventActionToggleForum;
+	using LogCreateTopic = MTPDchannelAdminLogEventActionCreateTopic;
+	using LogEditTopic = MTPDchannelAdminLogEventActionEditTopic;
+	using LogDeleteTopic = MTPDchannelAdminLogEventActionDeleteTopic;
+	using LogPinTopic = MTPDchannelAdminLogEventActionPinTopic;
 
 	const auto session = &history->session();
 	const auto id = event.vid().v;
@@ -978,7 +1024,7 @@ void GenerateItems(
 			ExtractSentDate(action.vmessage()));
 	};
 
-	const auto createParticipantJoin = [&]() {
+	const auto createParticipantJoin = [&](const LogJoin&) {
 		const auto text = (channel->isMegagroup()
 			? tr::lng_admin_log_participant_joined
 			: tr::lng_admin_log_participant_joined_channel)(
@@ -989,7 +1035,7 @@ void GenerateItems(
 		addSimpleServiceMessage(text);
 	};
 
-	const auto createParticipantLeave = [&]() {
+	const auto createParticipantLeave = [&](const LogLeave&) {
 		const auto text = (channel->isMegagroup()
 			? tr::lng_admin_log_participant_left
 			: tr::lng_admin_log_participant_left_channel)(
@@ -1463,7 +1509,7 @@ void GenerateItems(
 		addSimpleServiceMessage(text);
 	};
 
-	const auto createSendMessage = [&](const LogActionSendMessage &data) {
+	const auto createSendMessage = [&](const LogSendMessage &data) {
 		const auto text = tr::lng_admin_log_sent_message(
 			tr::now,
 			lt_from,
@@ -1482,7 +1528,7 @@ void GenerateItems(
 	};
 
 	const auto createChangeAvailableReactions = [&](
-			const LogEventActionChangeAvailableReactions &data) {
+			const LogChangeAvailableReactions &data) {
 		const auto text = data.vnew_value().match([&](
 				const MTPDchatReactionsNone&) {
 			return tr::lng_admin_log_reactions_disabled(
@@ -1520,79 +1566,202 @@ void GenerateItems(
 		addSimpleServiceMessage(text);
 	};
 
-	action.match([&](const LogTitle &data) {
-		createChangeTitle(data);
-	}, [&](const LogAbout &data) {
-		createChangeAbout(data);
-	}, [&](const LogUsername &data) {
-		createChangeUsername(data);
-	}, [&](const LogPhoto &data) {
-		createChangePhoto(data);
-	}, [&](const LogInvites &data) {
-		createToggleInvites(data);
-	}, [&](const LogSign &data) {
-		createToggleSignatures(data);
-	}, [&](const LogPin &data) {
-		createUpdatePinned(data);
-	}, [&](const LogEdit &data) {
-		createEditMessage(data);
-	}, [&](const LogDelete &data) {
-		createDeleteMessage(data);
-	}, [&](const LogJoin &) {
-		createParticipantJoin();
-	}, [&](const LogLeave &) {
-		createParticipantLeave();
-	}, [&](const LogInvite &data) {
-		createParticipantInvite(data);
-	}, [&](const LogBan &data) {
-		createParticipantToggleBan(data);
-	}, [&](const LogPromote &data) {
-		createParticipantToggleAdmin(data);
-	}, [&](const LogSticker &data) {
-		createChangeStickerSet(data);
-	}, [&](const LogPreHistory &data) {
-		createTogglePreHistoryHidden(data);
-	}, [&](const LogPermissions &data) {
-		createDefaultBannedRights(data);
-	}, [&](const LogPoll &data) {
-		createStopPoll(data);
-	}, [&](const LogDiscussion &data) {
-		createChangeLinkedChat(data);
-	}, [&](const LogLocation &data) {
-		createChangeLocation(data);
-	}, [&](const LogSlowMode &data) {
-		createToggleSlowMode(data);
-	}, [&](const LogStartCall &data) {
-		createStartGroupCall(data);
-	}, [&](const LogDiscardCall &data) {
-		createDiscardGroupCall(data);
-	}, [&](const LogMute &data) {
-		createParticipantMute(data);
-	}, [&](const LogUnmute &data) {
-		createParticipantUnmute(data);
-	}, [&](const LogCallSetting &data) {
-		createToggleGroupCallSetting(data);
-	}, [&](const LogJoinByInvite &data) {
-		createParticipantJoinByInvite(data);
-	}, [&](const LogInviteDelete &data) {
-		createExportedInviteDelete(data);
-	}, [&](const LogInviteRevoke &data) {
-		createExportedInviteRevoke(data);
-	}, [&](const LogInviteEdit &data) {
-		createExportedInviteEdit(data);
-	}, [&](const LogVolume &data) {
-		createParticipantVolume(data);
-	}, [&](const LogTTL &data) {
-		createChangeHistoryTTL(data);
-	}, [&](const LogJoinByRequest &data) {
-		createParticipantJoinByRequest(data);
-	}, [&](const LogNoForwards &data) {
-		createToggleNoForwards(data);
-	}, [&](const LogActionSendMessage &data) {
-		createSendMessage(data);
-	}, [&](const LogEventActionChangeAvailableReactions &data) {
-		createChangeAvailableReactions(data);
-	});
+	const auto createChangeUsernames = [&](const LogChangeUsernames &data) {
+		const auto newValue = data.vnew_value().v;
+		const auto oldValue = data.vprev_value().v;
+
+		const auto list = [&](const auto &tlList) {
+			auto result = TextWithEntities();
+			for (const auto &tlValue : tlList) {
+				result.append(PrepareText(
+					history->session().createInternalLinkFull(qs(tlValue)),
+					QString()));
+				result.append('\n');
+			}
+			return result;
+		};
+
+		if (newValue.size() == oldValue.size()) {
+			if (newValue.size() == 1) {
+				const auto tl = MTP_channelAdminLogEventActionChangeUsername(
+					newValue.front(),
+					oldValue.front());
+				tl.match([&](const LogUsername &data) {
+					createChangeUsername(data);
+				}, [](const auto &) {
+				});
+				return;
+			} else {
+				const auto wasReordered = [&] {
+					for (const auto &newLink : newValue) {
+						if (!ranges::contains(oldValue, newLink)) {
+							return false;
+						}
+					}
+					return true;
+				}();
+				if (wasReordered) {
+					auto resultText = fromLinkText;
+					addSimpleServiceMessage(resultText.append({
+						.text = channel->isMegagroup()
+							? QString(" reordered group links:")
+							: QString(" reordered channel links:"),
+					}));
+					const auto body = makeSimpleTextMessage(list(newValue));
+					body->addLogEntryOriginal(
+						id,
+						"Previous order",
+						list(oldValue));
+					addPart(body);
+					return;
+				}
+			}
+		}
+		auto resultText = fromLinkText;
+		addSimpleServiceMessage(resultText.append({
+			.text = channel->isMegagroup()
+				? QString(" changed list of group links:")
+				: QString(" changed list of channel links:"),
+		}));
+		const auto body = makeSimpleTextMessage(list(newValue));
+		body->addLogEntryOriginal(
+			id,
+			"Previous links",
+			list(oldValue));
+		addPart(body);
+	};
+
+	const auto createToggleForum = [&](const LogToggleForum &data) {
+		const auto enabled = (data.vnew_value().type() == mtpc_boolTrue);
+		const auto text = (enabled
+			? tr::lng_admin_log_topics_enabled
+			: tr::lng_admin_log_topics_disabled)(
+				tr::now,
+				lt_from,
+				fromLinkText,
+				Ui::Text::WithEntities);
+		addSimpleServiceMessage(text);
+	};
+
+	const auto createCreateTopic = [&](const LogCreateTopic &data) {
+		auto topicLink = GenerateTopicLink(channel, data.vtopic());
+		addSimpleServiceMessage(tr::lng_admin_log_topics_created(
+			tr::now,
+			lt_from,
+			fromLinkText,
+			lt_topic,
+			topicLink,
+			Ui::Text::WithEntities));
+	};
+
+	const auto createEditTopic = [&](const LogEditTopic &data) {
+		const auto prevLink = GenerateTopicLink(channel, data.vprev_topic());
+		const auto nowLink = GenerateTopicLink(channel, data.vnew_topic());
+		if (prevLink != nowLink) {
+			addSimpleServiceMessage(tr::lng_admin_log_topics_changed(
+				tr::now,
+				lt_from,
+				fromLinkText,
+				lt_topic,
+				prevLink,
+				lt_new_topic,
+				nowLink,
+				Ui::Text::WithEntities));
+		}
+		const auto wasClosed = IsTopicClosed(data.vprev_topic());
+		const auto nowClosed = IsTopicClosed(data.vnew_topic());
+		if (nowClosed != wasClosed) {
+			addSimpleServiceMessage((nowClosed
+				? tr::lng_admin_log_topics_closed
+				: tr::lng_admin_log_topics_reopened)(
+					tr::now,
+					lt_from,
+					fromLinkText,
+					lt_topic,
+					nowLink,
+					Ui::Text::WithEntities));
+		}
+	};
+
+	const auto createDeleteTopic = [&](const LogDeleteTopic &data) {
+		auto topicLink = GenerateTopicLink(channel, data.vtopic());
+		if (!topicLink.entities.empty()) {
+			topicLink.entities.erase(topicLink.entities.begin());
+		}
+		addSimpleServiceMessage(tr::lng_admin_log_topics_deleted(
+			tr::now,
+			lt_from,
+			fromLinkText,
+			lt_topic,
+			topicLink,
+			Ui::Text::WithEntities));
+	};
+
+	const auto createPinTopic = [&](const LogPinTopic &data) {
+		if (const auto &topic = data.vnew_topic()) {
+			auto topicLink = GenerateTopicLink(channel, *topic);
+			addSimpleServiceMessage(tr::lng_admin_log_topics_pinned(
+				tr::now,
+				lt_from,
+				fromLinkText,
+				lt_topic,
+				topicLink,
+				Ui::Text::WithEntities));
+		} else if (const auto &previous = data.vprev_topic()) {
+			auto topicLink = GenerateTopicLink(channel, *previous);
+			addSimpleServiceMessage(tr::lng_admin_log_topics_unpinned(
+				tr::now,
+				lt_from,
+				fromLinkText,
+				lt_topic,
+				topicLink,
+				Ui::Text::WithEntities));
+		}
+	};
+
+	action.match(
+		createChangeTitle,
+		createChangeAbout,
+		createChangeUsername,
+		createChangePhoto,
+		createToggleInvites,
+		createToggleSignatures,
+		createUpdatePinned,
+		createEditMessage,
+		createDeleteMessage,
+		createParticipantJoin,
+		createParticipantLeave,
+		createParticipantInvite,
+		createParticipantToggleBan,
+		createParticipantToggleAdmin,
+		createChangeStickerSet,
+		createTogglePreHistoryHidden,
+		createDefaultBannedRights,
+		createStopPoll,
+		createChangeLinkedChat,
+		createChangeLocation,
+		createToggleSlowMode,
+		createStartGroupCall,
+		createDiscardGroupCall,
+		createParticipantMute,
+		createParticipantUnmute,
+		createToggleGroupCallSetting,
+		createParticipantJoinByInvite,
+		createExportedInviteDelete,
+		createExportedInviteRevoke,
+		createExportedInviteEdit,
+		createParticipantVolume,
+		createChangeHistoryTTL,
+		createParticipantJoinByRequest,
+		createToggleNoForwards,
+		createSendMessage,
+		createChangeAvailableReactions,
+		createChangeUsernames,
+		createToggleForum,
+		createCreateTopic,
+		createEditTopic,
+		createDeleteTopic,
+		createPinTopic);
 }
 
 } // namespace AdminLog

@@ -25,6 +25,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/share_box.h"
 #include "history/view/history_view_schedule_box.h"
 #include "history/history_message.h" // GetErrorTextForSending.
+#include "history/history.h"
 #include "data/data_histories.h"
 #include "data/data_session.h"
 #include "base/timer_rpl.h"
@@ -134,7 +135,7 @@ object_ptr<ShareBox> ShareInviteLinkBox(
 		showToast(tr::lng_group_invite_copied(tr::now));
 	};
 	auto submitCallback = [=](
-			std::vector<not_null<PeerData*>> &&result,
+			std::vector<not_null<Data::Thread*>> &&result,
 			TextWithTags &&comment,
 			Api::SendOptions options,
 			Data::ForwardOptions) {
@@ -143,13 +144,12 @@ object_ptr<ShareBox> ShareInviteLinkBox(
 		}
 
 		const auto error = [&] {
-			for (const auto peer : result) {
+			for (const auto thread : result) {
 				const auto error = GetErrorTextForSending(
-					peer,
-					{},
-					comment);
+					thread,
+					{ .text = &comment });
 				if (!error.isEmpty()) {
-					return std::make_pair(error, peer);
+					return std::make_pair(error, thread);
 				}
 			}
 			return std::make_pair(QString(), result.front());
@@ -158,7 +158,7 @@ object_ptr<ShareBox> ShareInviteLinkBox(
 			auto text = TextWithEntities();
 			if (result.size() > 1) {
 				text.append(
-					Ui::Text::Bold(error.second->name())
+					Ui::Text::Bold(error.second->chatListName())
 				).append("\n\n");
 			}
 			text.append(error.first);
@@ -184,10 +184,9 @@ object_ptr<ShareBox> ShareInviteLinkBox(
 		}
 		const auto owner = &peer->owner();
 		auto &api = peer->session().api();
-		for (const auto peer : result) {
-			const auto history = owner->history(peer);
+		for (const auto thread : result) {
 			auto message = Api::MessageToSend(
-				Api::SendAction(history, options));
+				Api::SendAction(thread, options));
 			message.textWithTags = comment;
 			message.action.clearDraft = false;
 			api.sendMessage(std::move(message));
@@ -197,8 +196,8 @@ object_ptr<ShareBox> ShareInviteLinkBox(
 		}
 		showToast(tr::lng_share_done(tr::now));
 	};
-	auto filterCallback = [](PeerData *peer) {
-		return peer->canWrite();
+	auto filterCallback = [](not_null<Data::Thread*> thread) {
+		return thread->canWrite(); // #TODO forum share
 	};
 
 	const auto scheduleStyle = [&] {
@@ -246,7 +245,7 @@ void SettingsBox(
 		not_null<GroupCall*> call) {
 	using namespace Settings;
 
-	const auto weakCall = base::make_weak(call.get());
+	const auto weakCall = base::make_weak(call);
 	const auto weakBox = Ui::MakeWeak(box);
 
 	struct State {
@@ -628,7 +627,8 @@ void SettingsBox(
 		const auto lookupLink = [=] {
 			if (const auto group = peer->asMegagroup()) {
 				return group->hasUsername()
-					? group->session().createInternalLinkFull(group->username)
+					? group->session().createInternalLinkFull(
+						group->username())
 					: group->inviteLink();
 			} else if (const auto chat = peer->asChat()) {
 				return chat->inviteLink();

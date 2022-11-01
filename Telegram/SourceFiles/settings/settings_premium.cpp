@@ -671,7 +671,7 @@ TopBarUser::TopBarUser(
 		Info::Profile::NameValue(peer)
 	) | rpl::start_with_next([=](
 			DocumentData *document,
-			TextWithEntities name) {
+			const QString &name) {
 		if (document) {
 			_emojiStatus = std::make_unique<EmojiStatusTopBar>(
 				document,
@@ -713,7 +713,7 @@ TopBarUser::TopBarUser(
 			_emojiStatus = nullptr;
 		}
 
-		updateTitle(document, name, controller);
+		updateTitle(document, { name }, controller);
 		updateAbout(document);
 
 		auto event = QResizeEvent(size(), size());
@@ -988,7 +988,7 @@ TopBar::TopBar(
 		ActivateClickHandler(_about, handler, {
 			button,
 			QVariant::fromValue(ClickHandlerContext{
-				.sessionWindow = base::make_weak(controller.get()),
+				.sessionWindow = base::make_weak(controller),
 				.botStartAutoSubmit = true,
 			})
 		});
@@ -1795,7 +1795,7 @@ not_null<Ui::GradientButton*> CreateSubscribeButton(
 			UrlClickHandler::Open(
 				local,
 				QVariant::fromValue(ClickHandlerContext{
-					.sessionWindow = base::make_weak(controller.get()),
+					.sessionWindow = base::make_weak(controller),
 					.botStartAutoSubmit = true,
 				}));
 		} else {

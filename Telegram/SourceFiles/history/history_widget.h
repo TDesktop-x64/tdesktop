@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "history/view/history_view_corner_buttons.h"
 #include "history/history_drag_area.h"
 #include "history/history_view_highlight_manager.h"
 #include "history/history_view_top_toast.h"
@@ -15,18 +16,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "chat_helpers/field_autocomplete.h"
 #include "window/section_widget.h"
 #include "ui/widgets/input_fields.h"
-#include "ui/effects/animations.h"
-#include "ui/rp_widget.h"
 #include "mtproto/sender.h"
 #include "base/flags.h"
-#include "base/timer.h"
 
 struct FileLoadResult;
 enum class SendMediaType;
 class MessageLinksParser;
 struct InlineBotQuery;
 struct AutocompleteQuery;
-class History;
 
 namespace MTP {
 class Error;
@@ -62,7 +59,6 @@ class InnerDropdown;
 class DropdownMenu;
 class PlainShadow;
 class IconButton;
-class HistoryDownButton;
 class EmojiButton;
 class SendButton;
 class SilentToggle;
@@ -98,6 +94,7 @@ class ComposeSearch;
 namespace Controls {
 class RecordLock;
 class VoiceRecordBar;
+class ForwardPanel;
 class TTLButton;
 } // namespace Controls
 } // namespace HistoryView
@@ -107,11 +104,14 @@ class HistoryInner;
 
 extern const char kOptionAutoScrollInactiveChat[];
 
-class HistoryWidget final : public Window::AbstractSectionWidget {
+class HistoryWidget final
+	: public Window::AbstractSectionWidget
+	, private HistoryView::CornerButtonsDelegate {
 public:
 	using FieldHistoryAction = Ui::InputField::HistoryAction;
 	using RecordLock = HistoryView::Controls::RecordLock;
 	using VoiceRecordBar = HistoryView::Controls::VoiceRecordBar;
+	using ForwardPanel = HistoryView::Controls::ForwardPanel;
 
 	HistoryWidget(
 		QWidget *parent,
@@ -150,8 +150,6 @@ public:
 
 	bool confirmSendingFiles(const QStringList &files);
 	bool confirmSendingFiles(not_null<const QMimeData*> data);
-	void sendFileConfirmed(const std::shared_ptr<FileLoadResult> &file,
-		const std::optional<FullMsgId> &oldId = std::nullopt);
 
 	static bool hasHiddenPinnedMessage(not_null<PeerData*> peer);
 	static bool switchPinnedHidden(not_null<PeerData*> peer, bool hidden);
@@ -193,13 +191,10 @@ public:
 	bool cancelReply(bool lastKeyboardUsed = false);
 	void cancelEdit();
 	void updateForwarding();
-	void updateForwardingTexts();
 
-	void clearReplyReturns();
 	void pushReplyReturn(not_null<HistoryItem*> item);
-	QList<MsgId> replyReturns();
-	void setReplyReturns(PeerId peer, const QList<MsgId> &replyReturns);
-	void calcNextReplyReturn();
+	[[nodiscard]] QVector<FullMsgId> replyReturns() const;
+	void setReplyReturns(PeerId peer, QVector<FullMsgId> replyReturns);
 
 	void updatePreview();
 	void previewCancel();
@@ -228,7 +223,6 @@ public:
 	void clearSupportPreloadRequest();
 	void clearDelayedShowAtRequest();
 	void clearDelayedShowAt();
-	void saveFieldToHistoryLocalDraft();
 
 	void toggleChooseChatTheme(not_null<PeerData*> peer);
 	[[nodiscard]] Ui::ChatTheme *customChatTheme() const;
@@ -274,7 +268,7 @@ public:
 
 	// Tabbed selector management.
 	bool pushTabbedSelectorToThirdSection(
-		not_null<PeerData*> peer,
+		not_null<Data::Thread*> thread,
 		const Window::SectionShow &params) override;
 	bool returnTabbedSelector() override;
 
@@ -326,16 +320,19 @@ private:
 	};
 	using TextUpdateEvents = base::flags<TextUpdateEvent>;
 	friend inline constexpr bool is_flag_type(TextUpdateEvent) { return true; };
-	struct CornerButton {
-		template <typename ...Args>
-		CornerButton(Args &&...args) : widget(std::forward<Args>(args)...) {
-		}
 
-		Ui::Animations::Simple animation;
-		bool shown = false;
-		object_ptr<Ui::HistoryDownButton> widget;
-	};
+	void cornerButtonsShowAtPosition(
+		Data::MessagePosition position) override;
+	Data::Thread *cornerButtonsThread() override;
+	FullMsgId cornerButtonsCurrentId() override;
+	bool cornerButtonsIgnoreVisibility() override;
+	std::optional<bool> cornerButtonsDownShown() override;
+	bool cornerButtonsUnreadMayBeShown() override;
+	bool cornerButtonsHas(HistoryView::CornerButtonType type) override;
+
 	void checkSuggestToGigagroup();
+	void processReply();
+	void setReplyFieldsFromProcessing();
 
 	void initTabbedSelector();
 	void initVoiceRecordBar();
@@ -351,7 +348,6 @@ private:
 	void insertHashtagOrBotCommand(
 		QString str,
 		FieldAutocomplete::ChooseMethod method);
-	void insertMention(UserData *user);
 	void cancelInlineBot();
 	void saveDraft(bool delayed = false);
 	void saveCloudDraft();
@@ -359,6 +355,7 @@ private:
 	void checkFieldAutocomplete();
 	void showMembersDropdown();
 	void windowIsVisibleChanged();
+	void saveFieldToHistoryLocalDraft();
 
 	// Checks if we are too close to the top or to the bottom
 	// in the scroll area and preloads history if needed.
@@ -385,10 +382,8 @@ private:
 	void fullInfoUpdated();
 	void toggleTabbedSelectorMode();
 	void recountChatWidth();
-	void historyDownClicked();
-	void showNextUnreadMention();
-	void showNextUnreadReaction();
 	void handlePeerUpdate();
+	bool updateCanSendMessage();
 	void setMembersShowAreaActive(bool active);
 	void handleHistoryChange(not_null<const History*> history);
 	void showAboutTopPromotion();
@@ -418,15 +413,9 @@ private:
 	void animationCallback();
 	void updateOverStates(QPoint pos);
 	void chooseAttach(std::optional<bool> overrideSendImagesAsPhotos = {});
-	void cornerButtonsAnimationFinish();
 	void sendButtonClicked();
 	void newItemAdded(not_null<HistoryItem*> item);
 	void maybeMarkReactionsRead(not_null<HistoryItem*> item);
-
-	void updateCornerButtonsPositions();
-	void updateHistoryDownVisibility();
-	void updateUnreadThingsVisibility();
-	void updateCornerButtonVisibility(CornerButton &button, bool shown);
 
 	bool canSendFiles(not_null<const QMimeData*> data) const;
 	bool confirmSendingFiles(
@@ -488,7 +477,6 @@ private:
 	int countMembersDropdownHeightMax() const;
 
 	void updateReplyToName();
-	void checkForwardingInfo();
 	bool editingMessage() const {
 		return _editMsgId != 0;
 	}
@@ -632,9 +620,8 @@ private:
 	Ui::Text::String _replyToName;
 	int _replyToNameVersion = 0;
 
-	Data::ResolvedForwardDraft _toForward;
-	Ui::Text::String _toForwardFrom, _toForwardText;
-	int _toForwardNameVersion = 0;
+	MsgId _processingReplyId = 0;
+	HistoryItem *_processingReplyItem = nullptr;
 
 	MsgId _editMsgId = 0;
 
@@ -673,9 +660,6 @@ private:
 
 	bool _replyForwardPressed = false;
 
-	HistoryItem *_replyReturn = nullptr;
-	QList<MsgId> _replyReturns;
-
 	PeerData *_peer = nullptr;
 
 	bool _canSendMessages = false;
@@ -709,9 +693,7 @@ private:
 	bool _synteticScrollEvent = false;
 	Ui::Animations::Simple _scrollToAnimation;
 
-	CornerButton _historyDown;
-	CornerButton _unreadMentions;
-	CornerButton _unreadReactions;
+	HistoryView::CornerButtons _cornerButtons;
 
 	const object_ptr<FieldAutocomplete> _fieldAutocomplete;
 	object_ptr<Support::Autocomplete> _supportAutocomplete;
@@ -744,6 +726,7 @@ private:
 	object_ptr<Ui::IconButton> _scheduled = { nullptr };
 	std::unique_ptr<HistoryView::Controls::TTLButton> _ttlInfo;
 	const std::unique_ptr<VoiceRecordBar> _voiceRecordBar;
+	const std::unique_ptr<ForwardPanel> _forwardPanel;
 	std::unique_ptr<HistoryView::ComposeSearch> _composeSearch;
 	bool _cmdStartShown = false;
 	object_ptr<Ui::InputField> _field;

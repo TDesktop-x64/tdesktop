@@ -160,7 +160,7 @@ void Row::elementAddRipple(
 	}
 	auto &ripple = *pointer;
 	if (!ripple) {
-		auto mask = Ui::RippleAnimation::roundRectMask(
+		auto mask = Ui::RippleAnimation::RoundRectMask(
 			(element == kAcceptButton
 				? _delegate->rowAcceptButtonSize()
 				: element == kRejectButton

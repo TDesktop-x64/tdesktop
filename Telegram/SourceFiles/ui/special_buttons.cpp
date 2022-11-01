@@ -127,7 +127,7 @@ HistoryDownButton::HistoryDownButton(QWidget *parent, const style::TwoIconButton
 }
 
 QImage HistoryDownButton::prepareRippleMask() const {
-	return Ui::RippleAnimation::ellipseMask(QSize(_st.rippleAreaSize, _st.rippleAreaSize));
+	return Ui::RippleAnimation::EllipseMask(QSize(_st.rippleAreaSize, _st.rippleAreaSize));
 }
 
 QPoint HistoryDownButton::prepareRippleStartPosition() const {
@@ -149,7 +149,7 @@ void HistoryDownButton::paintEvent(QPaintEvent *e) {
 		st.align = style::al_center;
 		st.font = st::historyToDownBadgeFont;
 		st.size = st::historyToDownBadgeSize;
-		st.sizeId = Dialogs::Ui::UnreadBadgeInHistoryToDown;
+		st.sizeId = Dialogs::Ui::UnreadBadgeSize::HistoryToDown;
 		Dialogs::Ui::PaintUnreadBadge(p, unreadString, width(), 0, st, 4);
 	}
 }
@@ -388,19 +388,33 @@ void UserpicButton::paintEvent(QPaintEvent *e) {
 		paintUserpicFrame(p, photoPosition);
 	}
 
-	if (_role == Role::ChangePhoto || _role == Role::ChoosePhoto) {
-		auto over = isOver() || isDown();
-		if (over) {
-			PainterHighQualityEnabler hq(p);
-			p.setPen(Qt::NoPen);
-			p.setBrush(_userpicHasImage
-				? st::msgDateImgBg
-				: _st.changeButton.textBgOver);
+	const auto fillShape = [&](const style::color &color) {
+		PainterHighQualityEnabler hq(p);
+		p.setPen(Qt::NoPen);
+		p.setBrush(color);
+		if (_peer && _peer->isForum()) {
+			p.drawRoundedRect(
+				photoLeft,
+				photoTop,
+				_st.photoSize,
+				_st.photoSize,
+				st::roundRadiusLarge,
+				st::roundRadiusLarge);
+		} else {
 			p.drawEllipse(
 				photoLeft,
 				photoTop,
 				_st.photoSize,
 				_st.photoSize);
+		}
+	};
+
+	if (_role == Role::ChangePhoto || _role == Role::ChoosePhoto) {
+		auto over = isOver() || isDown();
+		if (over) {
+			fillShape(_userpicHasImage
+				? st::msgDateImgBg
+				: _st.changeButton.textBgOver);
 		}
 		paintRipple(
 			p,
@@ -438,16 +452,7 @@ void UserpicButton::paintEvent(QPaintEvent *e) {
 				_st.photoSize,
 				barHeight);
 			p.setClipRect(rect);
-			{
-				PainterHighQualityEnabler hq(p);
-				p.setPen(Qt::NoPen);
-				p.setBrush(_st.uploadBg);
-				p.drawEllipse(
-					photoLeft,
-					photoTop,
-					_st.photoSize,
-					_st.photoSize);
-			}
+			fillShape(_st.uploadBg);
 			auto iconLeft = (_st.uploadIconPosition.x() < 0)
 				? (_st.photoSize - _st.uploadIcon.width()) / 2
 				: _st.uploadIconPosition.x();
@@ -478,7 +483,16 @@ void UserpicButton::paintUserpicFrame(Painter &p, QPoint photoPosition) {
 		auto size = QSize{ _st.photoSize, _st.photoSize };
 		request.outer = size * cIntRetinaFactor();
 		request.resize = size * cIntRetinaFactor();
-		request.radius = ImageRoundRadius::Ellipse;
+		const auto forum = _peer && _peer->isForum();
+		if (forum) {
+			request.rounding = Images::CornersMaskRef(
+				Images::CornersMask(ImageRoundRadius::Large));
+		} else {
+			if (_ellipseMask.size() != request.outer) {
+				_ellipseMask = Images::EllipseMask(size);
+			}
+			request.mask = _ellipseMask;
+		}
 		p.drawImage(QRect(photoPosition, size), _streamed->frame(request));
 		if (!paused) {
 			_streamed->markFrameShown();
@@ -499,7 +513,7 @@ QPoint UserpicButton::countPhotoPosition() const {
 }
 
 QImage UserpicButton::prepareRippleMask() const {
-	return Ui::RippleAnimation::ellipseMask(QSize(
+	return Ui::RippleAnimation::EllipseMask(QSize(
 		_st.photoSize,
 		_st.photoSize));
 }
@@ -775,7 +789,10 @@ void UserpicButton::setImage(QImage &&image) {
 		size * cIntRetinaFactor(),
 		Qt::IgnoreAspectRatio,
 		Qt::SmoothTransformation);
-	_userpic = Ui::PixmapFromImage(Images::Circle(std::move(small)));
+	const auto forum = _peer && _peer->isForum();
+	_userpic = Ui::PixmapFromImage(forum
+		? Images::Round(std::move(small), Images::Option::RoundLarge)
+		: Images::Circle(std::move(small)));
 	_userpic.setDevicePixelRatio(cRetinaFactor());
 	_userpicCustom = _userpicHasImage = true;
 	_result = std::move(image);
@@ -893,7 +910,7 @@ QPoint SilentToggle::prepareRippleStartPosition() const {
 }
 
 QImage SilentToggle::prepareRippleMask() const {
-	return RippleAnimation::ellipseMask(
+	return RippleAnimation::EllipseMask(
 		QSize(_st.rippleAreaSize, _st.rippleAreaSize));
 }
 

@@ -48,6 +48,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_peer_menu.h"
 #include "apiwrap.h"
 #include "api/api_peer_photo.h"
+#include "api/api_user_names.h"
 #include "core/file_utilities.h"
 #include "base/call_delayed.h"
 #include "base/unixtime.h"
@@ -134,22 +135,25 @@ ComposedBadge::ComposedBadge(
 		}
 	}, lifetime());
 
+	auto textWidth = _text.value() | rpl::map([=] {
+		return button->fullTextWidth();
+	});
 	rpl::combine(
 		_unreadWidth.events_starting_with(_unread ? _unread->width() : 0),
 		_premiumWidth.events_starting_with(_badge.widget()
 			? _badge.widget()->width()
 			: 0),
-		_text.value(),
+		std::move(textWidth),
 		button->sizeValue()
 	) | rpl::start_with_next([=](
 			int unreadWidth,
 			int premiumWidth,
-			const QString &text,
+			int textWidth,
 			const QSize &buttonSize) {
 		const auto &st = button->st();
 		const auto skip = st.style.font->spacew;
 		const auto textRightPosition = st.padding.left()
-			+ st.style.font->width(text)
+			+ textWidth
 			+ skip;
 		const auto minWidth = unreadWidth + premiumWidth + skip;
 		const auto maxTextWidth = buttonSize.width()
@@ -313,7 +317,7 @@ void SetupPhoto(
 	) | rpl::start_with_next([=](
 			int max,
 			int photoWidth,
-			const TextWithEntities&,
+			const QString&,
 			int statusWidth) {
 		photo->moveToLeft(
 			(max - photoWidth) / 2,
@@ -398,7 +402,7 @@ void SetupRows(
 	AddRow(
 		container,
 		tr::lng_settings_name_label(),
-		Info::Profile::NameValue(self),
+		Info::Profile::NameValue(self) | Ui::Text::ToWithEntities(),
 		tr::lng_profile_copy_fullname(tr::now),
 		[=] { controller->show(Box<EditNameBox>(self)); },
 		{ &st::settingsIconUser, kIconLightBlue });
@@ -445,12 +449,19 @@ void SetupRows(
 			"internal:edit_username" });
 		return result;
 	});
+	session->api().usernames().requestToCache(session->user());
 	AddRow(
 		container,
 		std::move(label),
 		std::move(value),
 		tr::lng_context_copy_mention(tr::now),
-		[=] { controller->show(Box<UsernameBox>(session)); },
+		[=] {
+			const auto box = controller->show(Box(UsernamesBox, session));
+			box->boxClosing(
+			) | rpl::start_with_next([=] {
+				session->api().usernames().requestToCache(session->user());
+			}, box->lifetime());
+		},
 		{ &st::settingsIconMention, kIconLightOrange });
 
 	AddSkip(container);
@@ -972,7 +983,7 @@ Dialogs::Ui::UnreadBadgeStyle Style() {
 	auto result = Dialogs::Ui::UnreadBadgeStyle();
 	result.font = st::mainMenuBadgeFont;
 	result.size = st::mainMenuBadgeSize;
-	result.sizeId = Dialogs::Ui::UnreadBadgeInMainMenu;
+	result.sizeId = Dialogs::Ui::UnreadBadgeSize::MainMenu;
 	return result;
 }
 

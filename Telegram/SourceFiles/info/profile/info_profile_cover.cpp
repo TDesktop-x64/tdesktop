@@ -282,9 +282,6 @@ Cover::Cover(
 	: nullptr)
 , _name(this, _st.name)
 , _status(this, _st.status)
-, _id(
-	this,
-	st::infoProfileMegagroupStatusLabel)
 , _refreshStatusTimer([this] { refreshStatusText(); }) {
 	_peer->updateFull();
 
@@ -485,15 +482,6 @@ void Cover::refreshStatusGeometry(int newWidth) {
 	auto statusWidth = newWidth - _st.statusLeft - _st.rightSkip;
 	_status->resizeToWidth(statusWidth);
 	_status->moveToLeft(_st.statusLeft, _st.statusTop, newWidth);
-		newWidth);
-	_id->resizeToWidth(statusWidth);
-	auto scale = 20;
-	if (cScreenScale() > 100) {
-		scale = cScreenScale() / 100 * 6 + 20;
-	}
-	_id->moveToLeft(
-		st::infoProfileStatusLeft,
-		st::infoProfileStatusTop + scale,
 }
 
 } // namespace Info::Profile

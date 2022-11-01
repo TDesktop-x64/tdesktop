@@ -3563,8 +3563,8 @@ RowDescriptor InnerWidget::computeJump(
 		const auto needSkip = [&] {
 			return (result.key.folder() != nullptr)
 				|| (GetEnhancedBool("skip_to_next")
-					&& !result.key.entry()->chatListUnreadCount()
-					&& !result.key.entry()->chatListUnreadMark())
+					&& !result.key.entry()->chatListUnreadState().messages
+					&& !result.key.entry()->chatListUnreadState().marks)
 				|| (session().supportMode()
 					&& !result.key.entry()->chatListBadgesState().unread);
 		};

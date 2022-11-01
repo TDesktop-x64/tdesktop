@@ -91,7 +91,7 @@ rpl::producer<TextWithEntities> StringValue(QString text) {
 	return rpl::single(QString("%1").arg(text)) | Ui::Text::ToWithEntities();
 }
 
-rpl::producer<TextWithEntities> NameValue(not_null<PeerData*> peer) {
+rpl::producer<QString> NameValue(not_null<PeerData*> peer) {
 	return peer->session().changes().peerFlagsValue(
 		peer,
 		UpdateFlag::Name

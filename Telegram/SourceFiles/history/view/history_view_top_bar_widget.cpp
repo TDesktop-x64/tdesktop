@@ -1137,6 +1137,9 @@ void TopBarWidget::updateControlsVisibility() {
 		&& !_chooseForReportReason
 		&& !_narrowMode);
 	_infoToggle->setVisible(hasInfo
+		&& !isOneColumn
+		&& _controller->canShowThirdSection()
+		&& !_chooseForReportReason);
 	const auto isAdmin = [&] {
 		if (const auto peer = _activeChat.key.peer()) {
 			if (peer->isMegagroup() || peer->isChannel()) {

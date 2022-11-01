@@ -1311,14 +1311,14 @@ void Filler::fillArchiveActions() {
 void PeerMenuHidePinnedMessage(not_null<PeerData*> peer) {
 	auto hidden = HistoryWidget::switchPinnedHidden(peer, true);
 	if (hidden) {
-		peer->session().changes().historyUpdated(peer->owner().history(peer), Data::HistoryUpdate::Flag::PinnedMessages);
+		peer->session().changes().historyUpdated(peer->owner().history(peer), Data::HistoryUpdate::Flag::IsPinned);
 	}
 }
 
 void PeerMenuUnhidePinnedMessage(not_null<PeerData*> peer) {
 	auto unhidden = HistoryWidget::switchPinnedHidden(peer, false);
 	if (unhidden) {
-		peer->session().changes().historyUpdated(peer->owner().history(peer), Data::HistoryUpdate::Flag::PinnedMessages);
+		peer->session().changes().historyUpdated(peer->owner().history(peer), Data::HistoryUpdate::Flag::IsPinned);
 	}
 }
 
@@ -1713,7 +1713,7 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 	const auto data = std::make_shared<ShareData>(history->peer, std::move(items), std::move(successCallback));
 
 	auto submitCallback = [=](
-			std::vector<not_null<PeerData*>> &&result,
+			std::vector<not_null<Data::Thread*>> &&result,
 			TextWithTags &&comment,
 			Api::SendOptions options,
 			Data::ForwardOptions forwardOptions) {
@@ -1729,8 +1729,7 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 			for (const auto peer : result) {
 				const auto error = GetErrorTextForSending(
 					peer,
-					items,
-					comment);
+					{ .forward = &items });
 				if (!error.isEmpty()) {
 					return std::make_pair(error, peer);
 				}
@@ -1741,7 +1740,7 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 			auto text = TextWithEntities();
 			if (result.size() > 1) {
 				text.append(
-					Ui::Text::Bold(error.second->name())
+					Ui::Text::Bold(error.second->peer()->name())
 				).append("\n\n");
 			}
 			text.append(error.first);
@@ -1772,8 +1771,8 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 		auto &api = owner->session().api();
 		auto &histories = owner->histories();
 		const auto requestType = Data::Histories::RequestType::Send;
-		for (const auto peer : result) {
-			const auto history = owner->history(peer);
+		for (const auto thread : result) {
+			const auto history = owner->history(thread->peer());
 			if (!comment.text.isEmpty()) {
 				auto message = ApiWrap::MessageToSend(prepareSendAction(history, Api::SendOptions()));
 				message.textWithTags = comment;
@@ -1788,7 +1787,8 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 						data->peer->input,
 						MTP_vector<MTPint>(msgIds),
 						MTP_vector<MTPlong>(generateRandom()),
-						peer->input,
+						thread->peer()->input,
+						MTP_int(0),
 						MTP_int(options.scheduled),
 						MTP_inputPeerEmpty()
 				)).done([=](const MTPUpdates &updates, mtpRequestId requestId) {
@@ -1810,8 +1810,8 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 			data->submitCallback();
 		}
 	};
-	auto filterCallback = [](PeerData *peer) {
-		return peer->canWrite();
+	auto filterCallback = [](auto thread)  {
+		return thread->canWrite();
 	};
 	*weak = Ui::show(Box<ShareBox>(ShareBox::Descriptor{
 		.session = session,
@@ -1845,7 +1845,7 @@ QPointer<Ui::BoxContent> ShowForwardNoQuoteMessagesBox(
 	const auto data = std::make_shared<ShareData>(history->peer, std::move(items), std::move(successCallback));
 
 	auto submitCallback = [=](
-			std::vector<not_null<PeerData*>> &&result,
+			std::vector<not_null<Data::Thread*>> &&result,
 			TextWithTags &&comment,
 			Api::SendOptions options,
 			Data::ForwardOptions forwardOptions) {
@@ -1861,8 +1861,7 @@ QPointer<Ui::BoxContent> ShowForwardNoQuoteMessagesBox(
 			for (const auto peer : result) {
 				const auto error = GetErrorTextForSending(
 					peer,
-					items,
-					comment);
+					{ .forward = &items });
 				if (!error.isEmpty()) {
 					return std::make_pair(error, peer);
 				}
@@ -1873,7 +1872,7 @@ QPointer<Ui::BoxContent> ShowForwardNoQuoteMessagesBox(
 			auto text = TextWithEntities();
 			if (result.size() > 1) {
 				text.append(
-					Ui::Text::Bold(error.second->name())
+					Ui::Text::Bold(error.second->peer()->name())
 				).append("\n\n");
 			}
 			text.append(error.first);
@@ -1883,8 +1882,8 @@ QPointer<Ui::BoxContent> ShowForwardNoQuoteMessagesBox(
 
 		auto &api = owner->session().api();
 
-		for (const auto peer : result) {
-			const auto _history = owner->history(peer);
+		for (const auto thread : result) {
+			const auto _history = owner->history(thread->peer());
 			if (!comment.text.isEmpty()) {
 				auto message = ApiWrap::MessageToSend(prepareSendAction(_history, Api::SendOptions()));
 				message.textWithTags = comment;
@@ -1910,8 +1909,8 @@ QPointer<Ui::BoxContent> ShowForwardNoQuoteMessagesBox(
 			data->submitCallback();
 		}
 	};
-	auto filterCallback = [](PeerData *peer) {
-		return peer->canWrite();
+	auto filterCallback = [](auto thread)  {
+		return thread->canWrite();
 	};
 	*weak = Ui::show(Box<ShareBox>(ShareBox::Descriptor{
 		.session = session,

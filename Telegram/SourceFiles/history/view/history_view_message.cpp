@@ -810,11 +810,6 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 			fromNameUpdated(g.width());
 		}
 
-		// sponsored move to right
-		if (const auto sponsored = item->isSponsored()) {
-			displayTail = RectPart::FullRight;
-		}
-
 		Ui::PaintBubble(
 			p,
 			Ui::ComplexBubble{

@@ -379,6 +379,7 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 			Window::Show(controller),
 			QString()));
 		const auto usernameLabel = usernameLine.text;
+		if (user->isBot()) {
 			const auto copyUsername = Ui::CreateChild<Ui::IconButton>(
 				usernameLabel->parentWidget(),
 				st::infoProfileLabeledButtonCopy);

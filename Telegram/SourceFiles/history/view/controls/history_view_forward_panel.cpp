@@ -255,10 +255,7 @@ void ForwardPanel::editOptions(
 		}
 		auto data = base::take(_data);
 		_to->owningHistory()->setForwardDraft(_to->topicRootId(), {});
-		Window::ShowForwardMessagesBox(controller, {
-			.ids = _to->owner().itemsToIds(data.items),
-			.options = data.options,
-		});
+		Window::ShowForwardMessagesBox(controller, _to->owner().itemsToIds(data.items));
 	});
 	if (hasOnlyForcedForwardedInfo) {
 		changeRecipient();

@@ -722,10 +722,10 @@ std::vector<RestrictionLabel> RestrictionLabels(
 	auto result = std::vector<RestrictionLabel>{
 		{ Flag::SendMessages, tr::lng_rights_chat_send_text(tr::now) },
 		{ Flag::SendMedia, tr::lng_rights_chat_send_media(tr::now) },
-		{ Flag::SendStickers
-			| Flag::SendGifs
-			| Flag::SendGames
-			| Flag::SendInline, tr::lng_rights_chat_send_stickers(tr::now) },
+		{ Flag::SendStickers, tr::lng_rights_chat_send_stickers2(tr::now) },
+		{ Flag::SendGifs, tr::lng_rights_chat_send_gifs(tr::now) },
+		{ Flag::SendGames, tr::lng_rights_chat_send_games(tr::now) },
+		{ Flag::SendInline, tr::lng_rights_chat_use_inline(tr::now) },
 		{ Flag::EmbedLinks, tr::lng_rights_chat_send_links(tr::now) },
 		{ Flag::SendPolls, tr::lng_rights_chat_send_polls(tr::now) },
 		{ Flag::AddParticipants, tr::lng_rights_chat_add_members(tr::now) },

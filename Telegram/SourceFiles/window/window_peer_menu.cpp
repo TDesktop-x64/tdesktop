@@ -501,7 +501,6 @@ void Filler::addTogglePin() {
 	}
 	const auto controller = _controller;
 	const auto filterId = _request.filterId;
-	const auto peer = _peer;
 	const auto thread = _request.key.thread();
 	if (!thread || thread->fixedOnTopIndex()) {
 		return;
@@ -517,7 +516,7 @@ void Filler::addTogglePin() {
 			TogglePinnedThread(controller, strong, filterId);
 		}
 	};
-	const auto pinAction = _addAction(
+	_addAction(
 		pinText(),
 		pinToggle,
 		(thread->isPinnedDialog(filterId)
@@ -1939,7 +1938,6 @@ QPointer<Ui::BoxContent> ShowShareGameBox(
 		const auto confirm = std::make_shared<QPointer<Ui::BoxContent>>();
 		auto send = crl::guard(thread, [=] {
 			ShareBotGame(bot, thread, shortName);
-			using Way = Window::SectionShow::Way;
 			if (const auto strong = *weak) {
 				strong->closeBox();
 			}
@@ -2009,25 +2007,21 @@ QPointer<Ui::BoxContent> ShowDropMediaBox(
 			callback();
 		}
 	};
-	auto initBox = [](not_null<PeerListBox*> box) {
-		box->addButton(tr::lng_cancel(), [box] {
+	auto initBox = [=](not_null<PeerListBox*> box) {
+		box->addButton(tr::lng_cancel(), [=] {
 			box->closeBox();
 		});
+
+		forum->destroyed(
+		) | rpl::start_with_next([=] {
+			box->closeBox();
+		}, box->lifetime());
 	};
 	*weak = navigation->parentController()->show(Box<PeerListBox>(
 		std::make_unique<ChooseTopicBoxController>(
 			forum,
 			std::move(chosen)),
-		[=](not_null<PeerListBox*> box) {
-			box->addButton(tr::lng_cancel(), [=] {
-				box->closeBox();
-			});
-
-			forum->destroyed(
-			) | rpl::start_with_next([=] {
-				box->closeBox();
-			}, box->lifetime());
-		}));
+		std::move(initBox)));
 	return weak->data();
 }
 

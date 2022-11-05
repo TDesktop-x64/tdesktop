@@ -273,6 +273,10 @@ QPixmap PinnedWidget::grabForShowAnimation(const Window::SectionSlideParams &par
 	return result;
 }
 
+void PinnedWidget::checkActivation() {
+	_inner->checkActivation();
+}
+
 void PinnedWidget::doSetInnerFocus() {
 	_inner->setFocus();
 }
@@ -433,6 +437,7 @@ void PinnedWidget::showAnimatedHook(
 
 void PinnedWidget::showFinishedHook() {
 	_topBar->setAnimatingMode(false);
+	_inner->showFinished();
 }
 
 bool PinnedWidget::floatPlayerHandleWheelEvent(QEvent *e) {
@@ -566,7 +571,7 @@ void PinnedWidget::listUpdateDateLink(
 }
 
 bool PinnedWidget::listElementHideReply(not_null<const Element*> view) {
-	return false;
+	return (view->data()->replyToId() == _thread->topicRootId());
 }
 
 bool PinnedWidget::listElementShownUnread(not_null<const Element*> view) {

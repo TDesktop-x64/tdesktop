@@ -2401,9 +2401,25 @@ void HistoryWidget::showHistory(
 		showAboutTopPromotion();
 
 		{
-			auto &sponsored = session().data().sponsoredMessages();
-			sponsored.request(_history);
-			_scroll->setTrackingContent(sponsored.canHaveFor(_history));
+			_scroll->setTrackingContent(false);
+			const auto checkState = crl::guard(this, [=] {
+				auto &sponsored = session().data().sponsoredMessages();
+				using State = Data::SponsoredMessages::State;
+				const auto state = sponsored.state(_history);
+				if (state == State::AppendToEnd) {
+					_scroll->setTrackingContent(
+						sponsored.canHaveFor(_history));
+				} else if (state == State::InjectToMiddle) {
+					if (_list) {
+						_list->setCanHaveFromUserpicsSponsored(true);
+					}
+					injectSponsoredMessages();
+				}
+			});
+			session().data().sponsoredMessages().request(
+				_history,
+				checkState);
+			checkState();
 		}
 	} else {
 		_chooseForReport = nullptr;
@@ -2465,6 +2481,14 @@ void HistoryWidget::setHistory(History *history) {
 		registerDraftSource();
 	}
 	refreshAttachBotsMenu();
+}
+
+void HistoryWidget::injectSponsoredMessages() const {
+	session().data().sponsoredMessages().inject(
+		_history,
+		_showAtMsgId,
+		_scroll->height() * 2,
+		_scroll->width());
 }
 
 void HistoryWidget::refreshAttachBotsMenu() {
@@ -2699,7 +2723,7 @@ std::optional<QString> HistoryWidget::writeRestriction() const {
 	if (result) {
 		return result;
 	} else if (_peer && _peer->isForum()) {
-		return u"You can reply to messages in topics."_q;
+		return tr::lng_forum_replies_only(tr::now);
 	}
 	return std::nullopt;
 }
@@ -2832,11 +2856,7 @@ void HistoryWidget::updateControlsVisibility() {
 		if (_inlineResults) {
 			_inlineResults->hide();
 		}
-		if (!_field->isHidden()) {
-			_field->hide();
-			updateControlsGeometry();
-			update();
-		}
+		hideFieldIfVisible();
 	} else if (editingMessage() || _canSendMessages) {
 		checkFieldAutocomplete();
 		_unblock->hide();
@@ -2947,14 +2967,21 @@ void HistoryWidget::updateControlsVisibility() {
 			_inlineResults->hide();
 		}
 		_kbScroll->hide();
-		if (!_field->isHidden()) {
-			_field->hide();
-			updateControlsGeometry();
-			update();
-		}
+		hideFieldIfVisible();
 	}
 	//checkTabbedSelectorToggleTooltip();
 	updateMouseTracking();
+}
+
+void HistoryWidget::hideFieldIfVisible() {
+	if (_field->isHidden()) {
+		return;
+	} else if (InFocusChain(_field)) {
+		setFocus();
+	}
+	_field->hide();
+	updateControlsGeometry();
+	update();
 }
 
 void HistoryWidget::showAboutTopPromotion() {
@@ -3019,10 +3046,10 @@ void HistoryWidget::newItemAdded(not_null<HistoryItem*> item) {
 	}
 
 	// If we get here in non-resized state we can't rely on results of
-	// doWeReadServerHistory() and mark chat as read.
+	// markingMessagesRead() and mark chat as read.
 	// If we receive N messages being not at bottom:
 	// - on first message we set unreadcount += 1, firstUnreadMessage.
-	// - on second we get wrong doWeReadServerHistory() and read both.
+	// - on second we get wrong markingMessagesRead() and read both.
 	session().data().sendHistoryChangeNotifications();
 
 	if (item->isSending()) {
@@ -3032,7 +3059,7 @@ void HistoryWidget::newItemAdded(not_null<HistoryItem*> item) {
 	}
 	if (item->showNotification()) {
 		destroyUnreadBar();
-		if (doWeReadServerHistory()) {
+		if (markingMessagesRead()) {
 			if (item->isUnreadMention() && !item->isUnreadMedia()) {
 				session().api().markContentsRead(item);
 			}
@@ -3056,7 +3083,7 @@ void HistoryWidget::maybeMarkReactionsRead(not_null<HistoryItem*> item) {
 	}
 	const auto view = item->mainView();
 	const auto itemTop = _list->itemTop(view);
-	if (itemTop <= 0 || !doWeReadMentions()) {
+	if (itemTop <= 0 || !markingContentsRead()) {
 		return;
 	}
 	const auto reactionCenter
@@ -3079,8 +3106,9 @@ void HistoryWidget::unreadCountUpdated() {
 			}
 		});
 	} else {
-		_cornerButtons.updateJumpDownVisibility(
-			_history->chatListBadgesState().unreadCounter);
+		_cornerButtons.updateJumpDownVisibility(_history->peer->isForum()
+			? 0
+			: _history->chatListBadgesState().unreadCounter);
 	}
 }
 
@@ -3190,7 +3218,7 @@ void HistoryWidget::messagesReceived(PeerData *peer, const MTPmessages_Messages 
 		_preloadDownRequest = 0;
 		preloadHistoryIfNeeded();
 		if (_history->loadedAtBottom()) {
-			checkHistoryActivation();
+			checkActivation();
 		}
 	} else if (_firstLoadRequest == requestId) {
 		if (toMigrated) {
@@ -3254,23 +3282,23 @@ void HistoryWidget::windowShown() {
 	updateControlsGeometry();
 }
 
-bool HistoryWidget::doWeReadServerHistory() const {
-	return doWeReadMentions() && !session().supportMode();
+bool HistoryWidget::markingMessagesRead() const {
+	return markingContentsRead() && !session().supportMode();
 }
 
-bool HistoryWidget::doWeReadMentions() const {
+bool HistoryWidget::markingContentsRead() const {
 	return _history
 		&& _list
 		&& _historyInited
 		&& !_firstLoadRequest
 		&& !_delayedShowAtRequest
 		&& !_a_show.animating()
-		&& controller()->widget()->doWeMarkAsRead();
+		&& controller()->widget()->markingAsRead();
 }
 
-void HistoryWidget::checkHistoryActivation() {
+void HistoryWidget::checkActivation() {
 	if (_list) {
-		_list->checkHistoryActivation();
+		_list->checkActivation();
 	}
 }
 
@@ -3405,7 +3433,7 @@ void HistoryWidget::loadMessagesDown() {
 	auto loadMigrated = _migrated && !(_migrated->isEmpty() || _migrated->loadedAtBottom() || (!_history->isEmpty() && !_history->loadedAtTop()));
 	auto from = loadMigrated ? _migrated : _history;
 	if (from->loadedAtBottom()) {
-		session().data().sponsoredMessages().request(_history);
+		session().data().sponsoredMessages().request(_history, nullptr);
 		return;
 	}
 
@@ -4136,7 +4164,7 @@ void HistoryWidget::doneShow() {
 	if (_requestsBar) {
 		_requestsBar->finishAnimating();
 	}
-	checkHistoryActivation();
+	checkActivation();
 	controller()->widget()->setInnerFocus();
 	_preserveScrollTop = false;
 	checkSuggestToGigagroup();
@@ -5832,6 +5860,7 @@ void HistoryWidget::addMessagesToBack(
 	if (!_firstLoadRequest) {
 		updateHistoryGeometry(false, true, { ScrollChangeNoJumpToBottom, 0 });
 	}
+	injectSponsoredMessages();
 }
 
 void HistoryWidget::updateBotKeyboard(History *h, bool force) {
@@ -6254,7 +6283,8 @@ void HistoryWidget::updatePinnedViewer() {
 		|| _delayedShowAtRequest
 		|| _scroll->isHidden()
 		|| !_history
-		|| !_historyInited) {
+		|| !_historyInited
+		|| !_pinnedTracker) {
 		return;
 	}
 	const auto visibleBottom = _scroll->scrollTop() + _scroll->height();
@@ -6442,8 +6472,8 @@ void HistoryWidget::checkPinnedBarState() {
 	}));
 
 	controller()->adaptive().oneColumnValue(
-	) | rpl::start_with_next([=](bool one) {
-		_pinnedBar->setShadowGeometryPostprocess([=](QRect geometry) {
+	) | rpl::start_with_next([=, raw = _pinnedBar.get()](bool one) {
+		raw->setShadowGeometryPostprocess([=](QRect geometry) {
 			if (!one) {
 				geometry.setLeft(geometry.left() + st::lineWidth);
 			}
@@ -6530,6 +6560,9 @@ void HistoryWidget::setChooseReportMessagesDetails(
 }
 
 void HistoryWidget::refreshPinnedBarButton(bool many, HistoryItem *item) {
+	if (!_pinnedBar) {
+		return; // It can be in process of hiding.
+	}
 	const auto openSection = [=] {
 		const auto id = _pinnedTracker
 			? _pinnedTracker->currentMessageId()

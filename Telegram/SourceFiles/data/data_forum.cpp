@@ -18,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_unread_things.h"
 #include "main/main_session.h"
 #include "base/random.h"
+#include "base/unixtime.h"
 #include "apiwrap.h"
 #include "lang/lang_keys.h"
 #include "core/application.h"
@@ -225,6 +226,13 @@ void Forum::applyReceivedTopics(
 				).first->second.get()
 				: i->second.get();
 			raw->applyTopic(data);
+			if (creating) {
+				if (const auto last = _history->chatListMessage()
+					; last && last->topicRootId() == rootId) {
+					_history->lastItemDialogsView().itemInvalidated(last);
+					_history->updateChatListEntry();
+				}
+			}
 			if (callback) {
 				callback(raw);
 			}
@@ -248,9 +256,6 @@ void Forum::requestSomeStale() {
 		const auto rootId = *i;
 		i = _staleRootIds.erase(i);
 
-		if (_topicRequests.contains(rootId)) {
-			continue;
-		}
 		rootIds.push_back(MTP_int(rootId));
 		if (rootIds.size() == kStalePerRequest) {
 			break;
@@ -272,10 +277,12 @@ void Forum::requestSomeStale() {
 				channel()->inputChannel,
 				MTP_vector<MTPint>(rootIds))
 		).done([=](const MTPmessages_ForumTopics &result) {
+			_staleRequestId = 0;
 			applyReceivedTopics(result);
 			call();
 			finish();
 		}).fail([=] {
+			_staleRequestId = 0;
 			call();
 			finish();
 		}).send();
@@ -294,42 +301,29 @@ void Forum::finishTopicRequest(MsgId rootId) {
 }
 
 void Forum::requestTopic(MsgId rootId, Fn<void()> done) {
-	_staleRootIds.remove(rootId);
-
 	auto &request = _topicRequests[rootId];
 	if (done) {
 		request.callbacks.push_back(std::move(done));
 	}
-	if (request.id) {
-		return;
+	if (!request.id
+		&& _staleRootIds.emplace(rootId).second
+		&& (_staleRootIds.size() == 1)) {
+		crl::on_main(&session(), [peer = channel()] {
+			if (const auto forum = peer->forum()) {
+				forum->requestSomeStale();
+			}
+		});
 	}
-	const auto call = [=] {
-		finishTopicRequest(rootId);
-	};
-	const auto type = Histories::RequestType::History;
-	auto &histories = owner().histories();
-	request.id = histories.sendRequest(_history, type, [=](
-			Fn<void()> finish) {
-		return session().api().request(
-			MTPchannels_GetForumTopicsByID(
-				channel()->inputChannel,
-				MTP_vector<MTPint>(1, MTP_int(rootId.bare)))
-		).done([=](const MTPmessages_ForumTopics &result) {
-			applyReceivedTopics(result);
-			call();
-			finish();
-		}).fail([=] {
-			call();
-			finish();
-		}).send();
-	});
 }
 
 ForumTopic *Forum::applyTopicAdded(
 		MsgId rootId,
 		const QString &title,
 		int32 colorId,
-		DocumentId iconId) {
+		DocumentId iconId,
+		PeerId creatorId,
+		TimeId date,
+		bool my) {
 	Expects(rootId != 0);
 
 	const auto i = _topics.find(rootId);
@@ -342,6 +336,9 @@ ForumTopic *Forum::applyTopicAdded(
 	raw->applyTitle(title);
 	raw->applyColorId(colorId);
 	raw->applyIconId(iconId);
+	raw->applyCreator(creatorId);
+	raw->applyCreationDate(date);
+	raw->applyIsMy(my);
 	if (!creating(rootId)) {
 		raw->addToChatList(FilterId(), topicsList());
 		_chatsListChanges.fire({});
@@ -355,7 +352,14 @@ MsgId Forum::reserveCreatingId(
 		DocumentId iconId) {
 	const auto result = owner().nextLocalMessageId();
 	_creatingRootIds.emplace(result);
-	applyTopicAdded(result, title, colorId, iconId);
+	const auto topic = applyTopicAdded(
+		result,
+		title,
+		colorId,
+		iconId,
+		session().userPeerId(),
+		base::unixtime::now(),
+		true);
 	return result;
 }
 
@@ -426,9 +430,8 @@ ForumTopic *Forum::enforceTopicFor(MsgId rootId) {
 	if (i != end(_topics)) {
 		return i->second.get();
 	}
-	const auto result = applyTopicAdded(rootId, {}, {}, {});
 	requestTopic(rootId);
-	return result;
+	return applyTopicAdded(rootId, {}, {}, {}, {}, {}, {});
 }
 
 bool Forum::topicDeleted(MsgId rootId) const {

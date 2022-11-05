@@ -146,6 +146,13 @@ RepliesMemento::RepliesMemento(
 	}
 }
 
+void RepliesMemento::setFromTopic(not_null<Data::ForumTopic*> topic) {
+	_replies = topic->replies();
+	if (!_list.aroundPosition()) {
+		_list = *topic->listMemento();
+	}
+}
+
 void RepliesMemento::setReadInformation(
 		MsgId inboxReadTillId,
 		int unreadCount,
@@ -396,10 +403,14 @@ RepliesWidget::~RepliesWidget() {
 	base::take(_sendAction);
 	session().api().saveCurrentDraftToCloud();
 	controller()->sendingAnimation().clear();
-	if (_topic && _topic->creating()) {
-		_emptyPainter = nullptr;
-		_topic->discard();
-		_topic = nullptr;
+	if (_topic) {
+		if (_topic->creating()) {
+			_emptyPainter = nullptr;
+			_topic->discard();
+			_topic = nullptr;
+		} else {
+			_inner->saveState(_topic->listMemento());
+		}
 	}
 	_history->owner().sendActionManager().repliesPainterRemoved(
 		_history,
@@ -495,6 +506,9 @@ void RepliesWidget::setupTopicViewer() {
 			} else {
 				refreshReplies();
 				refreshTopBarActiveChat();
+				if (_topic) {
+					subscribeToPinnedMessages();
+				}
 			}
 			_inner->update();
 		}
@@ -545,21 +559,29 @@ void RepliesWidget::subscribeToTopic() {
 	}, _topicLifetime);
 
 	if (!_topic->creating()) {
-		using EntryUpdateFlag = Data::EntryUpdate::Flag;
-		session().changes().entryUpdates(
-			EntryUpdateFlag::HasPinnedMessages
-		) | rpl::start_with_next([=](const Data::EntryUpdate &update) {
-			if (_pinnedTracker
-				&& (update.flags & EntryUpdateFlag::HasPinnedMessages)
-				&& (_topic == update.entry.get())) {
-				checkPinnedBarState();
-			}
-		}, lifetime());
+		subscribeToPinnedMessages();
 
-		setupPinnedTracker();
+		if (!_topic->creatorId()) {
+			_topic->forum()->requestTopic(_topic->rootId());
+		}
 	}
 
 	_cornerButtons.updateUnreadThingsVisibility();
+}
+
+void RepliesWidget::subscribeToPinnedMessages() {
+	using EntryUpdateFlag = Data::EntryUpdate::Flag;
+	session().changes().entryUpdates(
+		EntryUpdateFlag::HasPinnedMessages
+	) | rpl::start_with_next([=](const Data::EntryUpdate &update) {
+		if (_pinnedTracker
+			&& (update.flags & EntryUpdateFlag::HasPinnedMessages)
+			&& (_topic == update.entry.get())) {
+			checkPinnedBarState();
+		}
+	}, lifetime());
+
+	setupPinnedTracker();
 }
 
 void RepliesWidget::setTopic(Data::ForumTopic *topic) {
@@ -1467,7 +1489,7 @@ void RepliesWidget::refreshUnreadCountBadge(std::optional<int> count) {
 }
 
 void RepliesWidget::updatePinnedViewer() {
-	if (_scroll->isHidden() || !_topic) {
+	if (_scroll->isHidden() || !_topic || !_pinnedTracker) {
 		return;
 	}
 	const auto visibleBottom = _scroll->scrollTop() + _scroll->height();
@@ -1619,8 +1641,8 @@ void RepliesWidget::checkPinnedBarState() {
 	}));
 
 	controller()->adaptive().oneColumnValue(
-	) | rpl::start_with_next([=](bool one) {
-		_pinnedBar->setShadowGeometryPostprocess([=](QRect geometry) {
+	) | rpl::start_with_next([=, raw = _pinnedBar.get()](bool one) {
+		raw->setShadowGeometryPostprocess([=](QRect geometry) {
 			if (!one) {
 				geometry.setLeft(geometry.left() + st::lineWidth);
 			}
@@ -1662,6 +1684,9 @@ void RepliesWidget::checkPinnedBarState() {
 }
 
 void RepliesWidget::refreshPinnedBarButton(bool many, HistoryItem *item) {
+	if (!_pinnedBar) {
+		return; // It can be in process of hiding.
+	}
 	const auto openSection = [=] {
 		const auto id = _pinnedTracker
 			? _pinnedTracker->currentMessageId()
@@ -1882,6 +1907,10 @@ QPixmap RepliesWidget::grabForShowAnimation(const Window::SectionSlideParams &pa
 		_pinnedBar->hide();
 	}
 	return result;
+}
+
+void RepliesWidget::checkActivation() {
+	_inner->checkActivation();
 }
 
 void RepliesWidget::doSetInnerFocus() {
@@ -2248,6 +2277,7 @@ void RepliesWidget::showFinishedHook() {
 	} else {
 		_composeControls->showFinished();
 	}
+	_inner->showFinished();
 	if (_rootView) {
 		_rootView->show();
 	}
@@ -2350,16 +2380,12 @@ void RepliesWidget::listSelectionChanged(SelectedItems &&items) {
 }
 
 void RepliesWidget::listMarkReadTill(not_null<HistoryItem*> item) {
-	if (true/*doWeReadServerHistory()*/) { // #TODO forum active
-		_replies->readTill(item);
-	}
+	_replies->readTill(item);
 }
 
 void RepliesWidget::listMarkContentsRead(
 		const base::flat_set<not_null<HistoryItem*>> &items) {
-	if (true/*doWeReadMentions()*/) { // #TODO forum active
-		session().api().markContentsRead(items);
-	}
+	session().api().markContentsRead(items);
 }
 
 MessagesBarData RepliesWidget::listMessagesBar(

@@ -308,7 +308,9 @@ Widget::Widget(
 	QObject::connect(
 		_filter->rawTextEdit().get(),
 		&QTextEdit::cursorPositionChanged,
-		[=] { filterCursorMoved(); });
+		this,
+		[=] { filterCursorMoved(); },
+		Qt::QueuedConnection); // So getLastText() works already.
 
 	if (!Core::UpdaterDisabled()) {
 		Core::UpdateChecker checker;
@@ -2376,7 +2378,7 @@ bool Widget::cancelSearch() {
 	auto clearingQuery = !currentSearchQuery().isEmpty();
 	auto clearingInChat = false;
 	cancelSearchRequest();
-	if (!clearingQuery && _searchInChat) {
+	if (!clearingQuery && (_searchInChat || _searchFromAuthor)) {
 		if (controller()->adaptive().isOneColumn()) {
 			if (const auto thread = _searchInChat.thread()) {
 				controller()->showThread(thread);

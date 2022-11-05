@@ -801,7 +801,8 @@ not_null<HistoryItem*> History::addNewLocalMessage(
 		makeMessage(
 			id,
 			from,
-			textWithEntities),
+			textWithEntities,
+			nullptr),
 		true);
 }
 
@@ -1236,7 +1237,10 @@ void History::applyServiceChanges(
 				item->id,
 				qs(data.vtitle()),
 				data.vicon_color().v,
-				data.vicon_emoji_id().value_or(DocumentId()));
+				data.vicon_emoji_id().value_or(DocumentId()),
+				item->from()->id,
+				item->date(),
+				item->out());
 		}
 	}, [&](const MTPDmessageActionTopicEdit &data) {
 		if (const auto topic = item->topic()) {

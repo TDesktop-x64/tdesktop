@@ -1485,7 +1485,6 @@ else()
         target_link_libraries(Telegram
         PRIVATE
             desktop-app::external_glibmm
-            desktop-app::external_glib
         )
     endif()
 

@@ -45,6 +45,7 @@ void SendBotCallbackData(
 		int row,
 		int column,
 		std::optional<Core::CloudPasswordResult> password,
+		Fn<void()> done = nullptr,
 		Fn<void(const QString &)> handleError = nullptr) {
 	if (!item->isRegular()) {
 		return;
@@ -56,11 +57,7 @@ void SendBotCallbackData(
 	const auto bot = item->getMessageBot();
 	const auto fullId = item->fullId();
 	const auto getButton = [=] {
-		return HistoryMessageMarkupButton::Get(
-			owner,
-			fullId,
-			row,
-			column);
+		return HistoryMessageMarkupButton::Get(owner, fullId, row, column);
 	};
 	const auto button = getButton();
 	if (!button || button->requestId) {
@@ -92,6 +89,11 @@ void SendBotCallbackData(
 		MTP_bytes(sendData),
 		password ? password->result : MTP_inputCheckPasswordEmpty()
 	)).done([=](const MTPmessages_BotCallbackAnswer &result) {
+		const auto guard = gsl::finally([&] {
+			if (done) {
+				done();
+			}
+		});
 		const auto item = owner->message(fullId);
 		if (!item) {
 			return;
@@ -139,6 +141,11 @@ void SendBotCallbackData(
 			show->hideLayer();
 		}
 	}).fail([=](const MTP::Error &error) {
+		const auto guard = gsl::finally([&] {
+			if (handleError) {
+				handleError(error.type());
+			}
+		});
 		const auto item = owner->message(fullId);
 		if (!item) {
 			return;
@@ -147,9 +154,6 @@ void SendBotCallbackData(
 		if (const auto button = getButton()) {
 			button->requestId = 0;
 			owner->requestItemRepaint(item);
-		}
-		if (handleError) {
-			handleError(error.type());
 		}
 	}).send();
 
@@ -204,7 +208,8 @@ void SendBotCallbackDataWithPassword(
 	api->cloudPassword().reload();
 	const auto weak = base::make_weak(controller);
 	const auto show = std::make_shared<Window::Show>(controller);
-	SendBotCallbackData(controller, item, row, column, std::nullopt, [=](const QString &error) {
+	SendBotCallbackData(controller, item, row, column, {}, {}, [=](
+			const QString &error) {
 		auto box = PrePasswordErrorBox(
 			error,
 			session,
@@ -250,7 +255,11 @@ void SendBotCallbackDataWithPassword(
 						if (!strongController) {
 							return;
 						}
-						SendBotCallbackData(strongController, item, row, column, result, [=](const QString &error) {
+						SendBotCallbackData(strongController, item, row, column, result, [=] {
+							if (*box) {
+								(*box)->closeBox();
+							}
+						}, [=](const QString &error) {
 							if (*box) {
 								(*box)->handleCustomCheckError(error);
 							}

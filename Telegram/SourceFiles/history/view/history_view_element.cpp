@@ -693,17 +693,6 @@ auto Element::contextDependentServiceText() -> TextWithLinks {
 		return {};
 	}
 	const auto from = item->from();
-	const auto wrapIcon = [](DocumentId id) {
-		return TextWithEntities{
-			"@",
-			{ EntityInText(
-				EntityType::CustomEmoji,
-				0,
-				1,
-				Data::SerializeCustomEmojiId({ .id = id }))
-			},
-		};
-	};
 	const auto topicUrl =  u"internal:url:https://t.me/c/%1/%2"_q
 		.arg(peerToChannel(peerId).bare)
 		.arg(topicRootId.bare);
@@ -718,11 +707,9 @@ auto Element::contextDependentServiceText() -> TextWithLinks {
 	const auto wrapTopic = [&](
 			const QString &title,
 			std::optional<DocumentId> iconId) {
-		auto result = TextWithEntities{ title };
-		auto full = (iconId && *iconId)
-			? wrapIcon(*iconId).append(' ').append(std::move(result))
-			: result;
-		return Ui::Text::Link(std::move(full), topicUrl);
+		return Ui::Text::Link(
+			Data::ForumTopicIconWithTitle(iconId.value_or(0), title),
+			topicUrl);
 	};
 	const auto wrapParentTopic = [&] {
 		const auto forum = history()->asForum();
@@ -786,7 +773,7 @@ auto Element::contextDependentServiceText() -> TextWithLinks {
 					lt_link,
 					placeholderLink(),
 					lt_emoji,
-					wrapIcon(iconId),
+					Data::SingleCustomEmoji(iconId),
 					Ui::Text::WithEntities),
 				{ from->createOpenLink() },
 			};

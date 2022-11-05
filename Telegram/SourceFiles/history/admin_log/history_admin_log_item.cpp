@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_text_entities.h"
 #include "data/data_channel.h"
 #include "data/data_file_origin.h"
+#include "data/data_forum_topic.h"
 #include "data/data_user.h"
 #include "data/data_session.h"
 #include "data/data_message_reaction_id.h"
@@ -631,23 +632,10 @@ TextWithEntities GenerateDefaultBannedRightsChangeText(
 		not_null<ChannelData*> channel,
 		const MTPForumTopic &topic) {
 	return topic.match([&](const MTPDforumTopic &data) {
-		const auto wrapIcon = [](DocumentId id) {
-			return TextWithEntities{
-				"@",
-				{ EntityInText(
-					EntityType::CustomEmoji,
-					0,
-					1,
-					Data::SerializeCustomEmojiId({ .id = id }))
-				},
-			};
-		};
-		auto result = (data.vicon_emoji_id() && data.vicon_emoji_id()->v)
-			? wrapIcon(data.vicon_emoji_id()->v)
-			: TextWithEntities();
-		result.append(qs(data.vtitle()));
 		return Ui::Text::Link(
-			std::move(result),
+			Data::ForumTopicIconWithTitle(
+				data.vicon_emoji_id().value_or_empty(),
+				qs(data.vtitle())),
 			u"internal:url:https://t.me/c/%1/%2"_q.arg(
 				peerToChannel(channel->id).bare).arg(
 					data.vid().v));
@@ -1601,27 +1589,50 @@ void GenerateItems(
 					return true;
 				}();
 				if (wasReordered) {
-					auto resultText = fromLinkText;
-					addSimpleServiceMessage(resultText.append({
-						.text = channel->isMegagroup()
-							? QString(" reordered group links:")
-							: QString(" reordered channel links:"),
-					}));
+					addSimpleServiceMessage((channel->isMegagroup()
+						? tr::lng_admin_log_reordered_link_group
+						: tr::lng_admin_log_reordered_link_channel)(
+							tr::now,
+							lt_from,
+							fromLinkText,
+							Ui::Text::WithEntities));
 					const auto body = makeSimpleTextMessage(list(newValue));
 					body->addLogEntryOriginal(
 						id,
-						"Previous order",
+						tr::lng_admin_log_previous_links_order(tr::now),
 						list(oldValue));
 					addPart(body);
 					return;
 				}
 			}
+		} else if (std::abs(newValue.size() - oldValue.size()) == 1) {
+			const auto activated = newValue.size() > oldValue.size();
+			const auto changed = [&] {
+				const auto value = activated ? oldValue : newValue;
+				for (const auto &link : (activated ? newValue : oldValue)) {
+					if (!ranges::contains(value, link)) {
+						return qs(link);
+					}
+				}
+				return QString();
+			}();
+			addSimpleServiceMessage((activated
+				? tr::lng_admin_log_activated_link
+				: tr::lng_admin_log_deactivated_link)(
+					tr::now,
+					lt_from,
+					fromLinkText,
+					lt_link,
+					{ changed },
+					Ui::Text::WithEntities));
+			return;
 		}
+		// Probably will never happen.
 		auto resultText = fromLinkText;
 		addSimpleServiceMessage(resultText.append({
 			.text = channel->isMegagroup()
-				? QString(" changed list of group links:")
-				: QString(" changed list of channel links:"),
+				? u" changed list of group links:"_q
+				: u" changed list of channel links:"_q,
 		}));
 		const auto body = makeSimpleTextMessage(list(newValue));
 		body->addLogEntryOriginal(

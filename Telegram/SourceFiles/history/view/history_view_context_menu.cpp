@@ -1357,7 +1357,7 @@ std::vector<StickerSetIdentifier> CollectEmojiPacks(
 		for (const auto &entity : item->originalText().entities) {
 			if (entity.type() == EntityType::CustomEmoji) {
 				const auto data = Data::ParseCustomEmojiData(entity.data());
-				push(data.id);
+				push(data);
 			}
 		}
 		break;

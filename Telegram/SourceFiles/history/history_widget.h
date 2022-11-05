@@ -129,10 +129,10 @@ public:
 	void setGeometryWithTopMoved(const QRect &newGeometry, int topDelta);
 
 	void windowShown();
-	[[nodiscard]] bool doWeReadServerHistory() const;
-	[[nodiscard]] bool doWeReadMentions() const;
+	[[nodiscard]] bool markingMessagesRead() const;
+	[[nodiscard]] bool markingContentsRead() const;
 	bool skipItemRepaint();
-	void checkHistoryActivation();
+	void checkActivation();
 
 	void leaveToChildEvent(QEvent *e, QWidget *child) override;
 
@@ -387,6 +387,7 @@ private:
 	void setMembersShowAreaActive(bool active);
 	void handleHistoryChange(not_null<const History*> history);
 	void showAboutTopPromotion();
+	void hideFieldIfVisible();
 	void unreadCountUpdated();
 	void closeCurrent();
 
@@ -610,6 +611,8 @@ private:
 	void setupSendAsToggle();
 	void refreshSendAsToggle();
 	void refreshAttachBotsMenu();
+
+	void injectSponsoredMessages() const;
 
 	bool kbWasHidden() const;
 

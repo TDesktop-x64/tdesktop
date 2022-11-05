@@ -13,6 +13,8 @@
 # syntax=docker/dockerfile:1
 
 FROM centos:7 AS builder-base
+ENV LIBRARY_PATH /usr/local/lib64:/usr/local/lib:/lib64:/lib:/usr/lib64:/usr/lib
+ENV LD_LIBRARY_PATH $LIBRARY_PATH
 ENV PKG_CONFIG_PATH /usr/local/lib64/pkgconfig:/usr/local/lib/pkgconfig:/usr/local/share/pkgconfig
 
 RUN yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm \
@@ -44,16 +46,18 @@ RUN mkdir /opt/cmake \
 	&& rm {{ CMAKE_FILE }}
 
 FROM builder-base AS builder
+{%- if LTO %}
 ENV AR gcc-ar
 ENV RANLIB gcc-ranlib
 ENV NM gcc-nm
-ENV CFLAGS {% if DEBUG %}-g{% endif %} -Ofast {% if DEBUG %}-flto -ffat-lto-objects{% endif %} -pipe -fPIC -fstack-protector-all -fstack-clash-protection -DNDEBUG -D_FORTIFY_SOURCE=2 -D_GLIBCXX_ASSERTIONS
+{%- endif %}
+ENV CFLAGS {% if DEBUG %}-g{% endif %} -Ofast {% if LTO %}-flto=auto -ffat-lto-objects{% endif %} -pipe -fPIC -fstack-protector-all -fstack-clash-protection -DNDEBUG -D_FORTIFY_SOURCE=2 -D_GLIBCXX_ASSERTIONS
 ENV CXXFLAGS $CFLAGS
 
 FROM builder AS patches
 RUN git clone {{ GIT }}/desktop-app/patches.git \
 	&& cd patches \
-	&& git checkout 355c563138 \
+	&& git checkout b3b5f5cf92 \
 	&& rm -rf .git
 
 FROM builder AS nasm
@@ -80,7 +84,7 @@ RUN git clone -b v3.4.2 --depth=1 {{ GIT }}/libffi/libffi.git \
 FROM builder AS zlib
 RUN git clone -b v1.2.11 --depth=1 {{ GIT }}/madler/zlib.git \
 	&& cd zlib \
-	&& ./configure --static \
+	&& ./configure \
 	&& make -j$(nproc) \
 	&& make DESTDIR="{{ LibrariesPath }}/zlib-cache" install \
 	&& cd .. \
@@ -625,48 +629,23 @@ RUN git clone -b xkbcommon-1.3.1 --depth=1 {{ GIT }}/xkbcommon/libxkbcommon.git 
 	&& cd .. \
 	&& rm -rf libxkbcommon
 
-FROM builder AS mm-common
-RUN git clone -b 1.0.3 --depth=1 {{ GIT }}/GNOME/mm-common.git \
-	&& cd mm-common \
-	&& NOCONFIGURE=1 ./autogen.sh \
-	&& ./configure --enable-network \
-	&& make -j$(nproc) \
-	&& make DESTDIR="{{ LibrariesPath }}/mm-common-cache" install \
-	&& cd .. \
-	&& rm -rf mm-common
-
-FROM builder AS libsigcplusplus
-COPY --link --from=mm-common {{ LibrariesPath }}/mm-common-cache /
-
-RUN git clone -b 2.10.7 --depth=1 {{ GIT }}/libsigcplusplus/libsigcplusplus.git \
-	&& cd libsigcplusplus \
-	&& export ACLOCAL_PATH="/usr/local/share/aclocal" \
-	&& NOCONFIGURE=1 ./autogen.sh \
-	&& ./configure \
-		--enable-maintainer-mode \
-		--enable-static \
-		--disable-documentation \
-	&& make -j$(nproc) \
-	&& make DESTDIR="{{ LibrariesPath }}/libsigcplusplus-cache" install \
-	&& cd .. \
-	&& rm -rf libsigcplusplus
-
 FROM patches AS glibmm
-COPY --link --from=mm-common {{ LibrariesPath }}/mm-common-cache /
-COPY --link --from=libsigcplusplus {{ LibrariesPath }}/libsigcplusplus-cache /
+COPY --link --from=libffi {{ LibrariesPath }}/libffi-cache /
 
-# equals to glib version of Ubuntu 14.04
-RUN git clone -b 2.40.0 --depth=1 {{ GIT }}/GNOME/glibmm.git \
+RUN git clone -b 2.74.0 --depth=1 {{ GIT }}/GNOME/glibmm.git \
 	&& cd glibmm \
 	&& git apply ../patches/glibmm.patch \
-	&& export ACLOCAL_PATH="/usr/local/share/aclocal" \
-	&& NOCONFIGURE=1 ./autogen.sh \
-	&& ./configure \
-		--enable-maintainer-mode \
-		--enable-static \
-		--disable-documentation \
-	&& make -j$(nproc) \
-	&& make DESTDIR="{{ LibrariesPath }}/glibmm-cache" install \
+	&& meson build \
+		--buildtype=plain \
+		--default-library=both \
+		-Dbuild-documentation=false \
+		-Dbuild-examples=false \
+		-Dsigc++-3.0:build-documentation=false \
+		-Dsigc++-3.0:build-examples=false \
+		-Dglib:tests=false \
+		-Dmm-common:use-network=true \
+	&& meson compile -C build \
+	&& DESTDIR="{{ LibrariesPath }}/glibmm-cache" meson install -C build \
 	&& cd .. \
 	&& rm -rf glibmm
 
@@ -692,6 +671,10 @@ RUN git clone -b {{ QT_TAG }} --depth=1 git://code.qt.io/qt/qt5.git qt_{{ QT }} 
 	&& git submodule update --init --recursive --depth=1 qtbase qtdeclarative qtwayland qtimageformats qtsvg qt5compat qtshadertools \
 	&& cd qtbase \
 	&& find ../../patches/qtbase_{{ QT }} -type f -print0 | sort -z | xargs -r0 git apply \
+	&& cd ../qtdeclarative \
+	&& sed -i '/add_subdirectory(quickcontrols2)/d' src/CMakeLists.txt \
+	&& sed -i '/add_subdirectory(quickdialogs2)/d' src/CMakeLists.txt \
+	&& sed -i '/add_subdirectory(quicknativestyle)/d' src/CMakeLists.txt \
 	&& cd .. \
 	&& ./configure -prefix "{{ QT_PREFIX }}" \
 		CMAKE_BUILD_TYPE=None \
@@ -807,7 +790,6 @@ COPY --link --from=ffmpeg {{ LibrariesPath }}/ffmpeg-cache /
 COPY --link --from=openal {{ LibrariesPath }}/openal-cache /
 COPY --link --from=openssl {{ LibrariesPath }}/openssl-cache /
 COPY --link --from=xkbcommon {{ LibrariesPath }}/xkbcommon-cache /
-COPY --link --from=libsigcplusplus {{ LibrariesPath }}/libsigcplusplus-cache /
 COPY --link --from=glibmm {{ LibrariesPath }}/glibmm-cache /
 COPY --link --from=qt {{ LibrariesPath }}/qt-cache /
 COPY --link --from=breakpad {{ LibrariesPath }}/breakpad-cache /

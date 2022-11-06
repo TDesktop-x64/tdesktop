@@ -443,20 +443,18 @@ void Cover::refreshStatusText() {
 		}));
 	}
 
-	QLocale::setDefault(QLocale::Language::French);
-
 	auto idText = TextWithEntities();
 	auto id = QString();
 
 	if (_peer->isChat()) {
 		id = QString("-%1").arg(_peer->id.to<ChatId>().bare);
-		idText = Ui::Text::Link(QString("ID: -%L1").arg(_peer->id.to<ChatId>().bare));
+		idText = Ui::Text::Link(QString("ID: -%L1").arg(_peer->id.to<ChatId>().bare).replace(",", " "));
 	} else if (_peer->isMegagroup() || _peer->isChannel()) {
 		id = QString("-100%1").arg(_peer->id.to<ChannelId>().bare);
-		idText = Ui::Text::Link(QString("ID: -1 00%L1").arg(_peer->id.to<ChannelId>().bare));
+		idText = Ui::Text::Link(QString("ID: -1 00%L1").arg(_peer->id.to<ChannelId>().bare).replace(",", " "));
 	} else {
 		id = QString("%1").arg(_peer->id.to<UserId>().bare);
-		idText = Ui::Text::Link(QString("ID: %L1").arg(_peer->id.to<UserId>().bare));
+		idText = Ui::Text::Link(QString("ID: %L1").arg(_peer->id.to<UserId>().bare).replace(",", " "));
 	}
 	_id->setMarkedText(idText);
 

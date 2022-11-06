@@ -183,13 +183,8 @@ parts:
       - dpkg-dev
     stage-packages:
       - libxkbcommon0
-      - fonts-ubuntu
-      - dmz-cursor-theme
-      - light-themes
-      - adwaita-icon-theme
-      - gnome-themes-standard
       - shared-mime-info
-      - libgdk-pixbuf2.0-0
+      - libgdk-pixbuf-2.0-0
       - locales-all
       - xdg-user-dirs
     stage:
@@ -223,6 +218,7 @@ parts:
     source-tag: 2.72.1
     plugin: meson
     build-packages:
+      - curl
       - meson
       - ninja-build
       - libglib2.0-dev
@@ -236,6 +232,7 @@ parts:
       - -Dbuild-examples=false
       - -Dsigc++-3.0:build-documentation=false
       - -Dsigc++-3.0:build-examples=false
+      - -Dsigc++-3.0:validation=false
       - -Dmm-common:use-network=true
     prime:
       - -./usr/include

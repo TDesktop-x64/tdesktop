@@ -285,6 +285,9 @@ Cover::Cover(
 	: nullptr)
 , _name(this, _st.name)
 , _status(this, _st.status)
+, _id(
+	this,
+	_st.status)
 , _refreshStatusTimer([this] { refreshStatusText(); }) {
 	_peer->updateFull();
 
@@ -442,6 +445,26 @@ void Cover::refreshStatusText() {
 
 	QLocale::setDefault(QLocale::Language::French);
 
+	auto idText = TextWithEntities();
+	auto id = QString();
+
+	if (_peer->isChat()) {
+		id = QString("-%1").arg(_peer->id.to<ChatId>().bare);
+		idText = Ui::Text::Link(QString("ID: -%L1").arg(_peer->id.to<ChatId>().bare));
+	} else if (_peer->isMegagroup() || _peer->isChannel()) {
+		id = QString("-100%1").arg(_peer->id.to<ChannelId>().bare);
+		idText = Ui::Text::Link(QString("ID: -1 00%L1").arg(_peer->id.to<ChannelId>().bare));
+	} else {
+		id = QString("%1").arg(_peer->id.to<UserId>().bare);
+		idText = Ui::Text::Link(QString("ID: %L1").arg(_peer->id.to<UserId>().bare));
+	}
+	_id->setMarkedText(idText);
+
+	_id->setLink(1, std::make_shared<LambdaClickHandler>([=] {
+		QGuiApplication::clipboard()->setText(id);
+		Ui::Toast::Show(tr::lng_copy_profile_id(tr::now));
+	}));
+
 	refreshStatusGeometry(width());
 }
 
@@ -465,6 +488,16 @@ void Cover::refreshStatusGeometry(int newWidth) {
 	auto statusWidth = newWidth - _st.statusLeft - _st.rightSkip;
 	_status->resizeToWidth(statusWidth);
 	_status->moveToLeft(_st.statusLeft, _st.statusTop, newWidth);
+
+	_id->resizeToWidth(statusWidth);
+	auto scale = 20;
+	if (cScreenScale() > 100) {
+		scale = cScreenScale() / 100 * 6 + 20;
+	}
+	_id->moveToLeft(
+		_st.statusLeft,
+		_st.statusTop + scale,
+		newWidth);
 }
 
 } // namespace Info::Profile

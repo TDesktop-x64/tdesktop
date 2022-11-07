@@ -1963,7 +1963,11 @@ void ListWidget::checkActivation() {
 	for (const auto &view : ranges::views::reverse(_items)) {
 		const auto bottom = itemTop(view) + view->height();
 		if (_visibleBottom + _itemsRevealHeight >= bottom) {
-			delegate()->listMarkReadTill(view->data());
+			const auto item = view->data();
+			if (item->isRegular()) {
+				delegate()->listMarkReadTill(item);
+				return;
+			}
 		}
 	}
 }
@@ -3653,7 +3657,6 @@ void ListWidget::refreshAttachmentsFromTill(int from, int till) {
 	if (till == int(_items.size())) {
 		_items.back()->setAttachToNext(false);
 	}
-	updateSize();
 }
 
 void ListWidget::refreshItem(not_null<const Element*> view) {

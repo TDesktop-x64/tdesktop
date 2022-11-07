@@ -689,7 +689,7 @@ void ActionsFiller::addInviteToGroupAction(
 }
 
 void ActionsFiller::addShareContactAction(not_null<UserData*> user) {
-	const auto controller = _controller;
+	const auto controller = _controller->parentController();
 	AddActionButton(
 		_wrap,
 		tr::lng_info_share_contact(),

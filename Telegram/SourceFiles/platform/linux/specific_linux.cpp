@@ -247,29 +247,6 @@ bool GenerateDesktopFile(
 	}
 }
 
-QString AppRuntimeDirectory() {
-	static const auto Result = [&] {
-		auto runtimeDir = QStandardPaths::writableLocation(
-			QStandardPaths::RuntimeLocation);
-
-		if (KSandbox::isFlatpak()) {
-			runtimeDir += qsl("/app/") + base::FlatpakID();
-		}
-
-		if (!QFileInfo::exists(runtimeDir)) { // non-systemd distros
-			runtimeDir = QDir::tempPath();
-		}
-
-		if (!runtimeDir.endsWith('/')) {
-			runtimeDir += '/';
-		}
-
-		return runtimeDir;
-	}();
-
-	return Result;
-}
-
 } // namespace
 
 void SetApplicationIcon(const QIcon &icon) {
@@ -277,16 +254,7 @@ void SetApplicationIcon(const QIcon &icon) {
 }
 
 QString SingleInstanceLocalServerName(const QString &hash) {
-	const auto idealSocketPath = AppRuntimeDirectory()
-		+ hash
-		+ '-'
-		+ cGUIDStr();
-
-	if ((idealSocketPath.size() + 1) >= sizeof(sockaddr_un().sun_path)) {
-		return AppRuntimeDirectory() + hash;
-	} else {
-		return idealSocketPath;
-	}
+	return QDir::tempPath() + '/' + hash + '-' + cGUIDStr();
 }
 
 std::optional<bool> IsDarkMode() {
@@ -435,6 +403,17 @@ namespace Platform {
 
 void start() {
 	QGuiApplication::setDesktopFileName([] {
+		if (KSandbox::isFlatpak()) {
+			return qEnvironmentVariable("FLATPAK_ID") + qsl(".desktop");
+		}
+
+		if (KSandbox::isSnap()) {
+			return qEnvironmentVariable("SNAP_INSTANCE_NAME")
+				+ '_'
+				+ cExeName()
+				+ qsl(".desktop");
+		}
+
 		if (!Core::UpdaterDisabled() && !cExeName().isEmpty()) {
 			const auto appimagePath = qsl("file://%1%2").arg(
 				cExeDir(),
@@ -451,7 +430,7 @@ void start() {
 				AppName.utf16().replace(' ', '_'));
 		}
 
-		return qsl(QT_STRINGIFY(TDESKTOP_LAUNCHER_BASENAME) ".desktop");
+		return qsl("telegramdesktop.desktop");
 	}());
 
 	LOG(("Launcher filename: %1").arg(QGuiApplication::desktopFileName()));

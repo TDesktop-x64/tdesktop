@@ -25,6 +25,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_drafts.h"
 #include "data/data_folder.h"
 #include "data/data_forum.h"
+#include "data/data_forum_icons.h"
 #include "data/data_session.h"
 #include "data/data_channel.h"
 #include "data/data_forum_topic.h"
@@ -425,9 +426,16 @@ void InnerWidget::changeOpenedForum(ChannelData *forum) {
 	stopReorderPinned();
 	clearSelection();
 
+	if (forum) {
+		saveChatsFilterScrollState(_filterId);
+	}
 	_filterId = forum
 		? 0
 		: _controller->activeChatsFilterCurrent();
+	if (const auto old = now ? now->forum() : nullptr) {
+		// If we close it inside forum destruction we should not schedule.
+		old->owner().forumIcons().scheduleUserpicsReset(old);
+	}
 	_openedForum = forum ? forum->forum() : nullptr;
 	_st = forum ? &st::forumTopicRow : &st::defaultDialogRow;
 
@@ -444,6 +452,10 @@ void InnerWidget::changeOpenedForum(ChannelData *forum) {
 	refreshWithCollapsedRows(true);
 	if (_loadMoreCallback) {
 		_loadMoreCallback();
+	}
+
+	if (!forum) {
+		restoreChatsFilterScrollState(_filterId);
 	}
 }
 
@@ -2966,7 +2978,7 @@ void InnerWidget::switchToFilter(FilterId filterId) {
 		_mustScrollTo.fire({ 0, 0 });
 		return;
 	}
-	_chatsFilterScrollStates[_filterId] = -pos().y();
+	saveChatsFilterScrollState(_filterId);
 	if (_openedFolder) {
 		_filterId = filterId;
 	} else {
@@ -2977,15 +2989,23 @@ void InnerWidget::switchToFilter(FilterId filterId) {
 	}
 	refreshEmptyLabel();
 	{
-		const auto it = _chatsFilterScrollStates.find(filterId);
-		if (it != end(_chatsFilterScrollStates)) {
-			const auto skip = found
-				// Don't save a scroll state for very flexible chat filters.
-				&& (filterIt->flags() & (Data::ChatFilter::Flag::NoRead));
-			if (!skip) {
-				_mustScrollTo.fire({ it->second, -1 });
-			}
+		const auto skip = found
+			// Don't save a scroll state for very flexible chat filters.
+			&& (filterIt->flags() & (Data::ChatFilter::Flag::NoRead));
+		if (!skip) {
+			restoreChatsFilterScrollState(filterId);
 		}
+	}
+}
+
+void InnerWidget::saveChatsFilterScrollState(FilterId filterId) {
+	_chatsFilterScrollStates[filterId] = -pos().y();
+}
+
+void InnerWidget::restoreChatsFilterScrollState(FilterId filterId) {
+	const auto it = _chatsFilterScrollStates.find(filterId);
+	if (it != end(_chatsFilterScrollStates)) {
+		_mustScrollTo.fire({ it->second, -1 });
 	}
 }
 
@@ -3315,7 +3335,7 @@ void InnerWidget::repaintDialogRowCornerStatus(not_null<History*> history) {
 }
 
 void InnerWidget::userOnlineUpdated(not_null<UserData*> user) {
-	if (!user->isSelf()) {
+	if (user->isSelf()) {
 		return;
 	}
 	const auto history = session().data().historyLoaded(user);

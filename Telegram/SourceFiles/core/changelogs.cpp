@@ -50,7 +50,7 @@ std::map<int, const char*> BetaLogs() {
 		"- Fix forwarding of voice messages.\n"
 	},
 	{
-		4001002,
+		1000042,
 		"- New reaction selector above the right click menu.\n"
 
 		"- Premium: Set any custom emoji reactions in private chats.\n"
@@ -60,7 +60,7 @@ std::map<int, const char*> BetaLogs() {
 		"- Insert or copy custom emoji from pack preview.\n"
 	},
 	{
-		4002001,
+		1000043,
 		"- Improve scaling / cropping for photos / video files.\n"
 
 		"- Improve touch support in channel comments.\n"
@@ -68,7 +68,7 @@ std::map<int, const char*> BetaLogs() {
 		"- Nice animation for spoilers.\n"
 	},
 	{
-		4002002,
+		1000045,
 		"- Fix crash in spoiler revealing in media captions.\n"
 
 		"- Fix spoiler revealing in media viewer captions.\n"

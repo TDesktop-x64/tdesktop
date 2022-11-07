@@ -1152,7 +1152,10 @@ void TopBarWidget::updateControlsVisibility() {
 		return false;
 	}();
 	_recentActions->setVisible(isAdmin);
-	const auto isGroup = [&] {
+	const auto needShow = [&] {
+		if (_activeChat.section == Section::ChatsList) {
+			return false;
+		}
 		if (const auto peer = _activeChat.key.peer()) {
 			if (peer->isMegagroup()) {
 				return true;
@@ -1165,7 +1168,7 @@ void TopBarWidget::updateControlsVisibility() {
 		}
 		return false;
 	}();
-	_admins->setVisible(isGroup);
+	_admins->setVisible(needShow);
 	_infoToggle->setVisible(historyMode
 		&& !_activeChat.key.folder()
 		&& !isOneColumn

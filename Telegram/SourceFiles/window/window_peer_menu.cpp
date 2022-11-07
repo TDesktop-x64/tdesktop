@@ -1197,9 +1197,9 @@ void Filler::fillContextMenuActions() {
 	addInfo();
 	addToggleArchive();
 	addTogglePin();
-	if (ViewProfileInChatsListContextMenu.value()) {
-		addInfo();
-	}
+	//if (ViewProfileInChatsListContextMenu.value()) {
+	//	addInfo();
+	//}
 	addToggleMuteSubmenu(false);
 	addToggleUnreadMark();
 	addToggleTopicClosed();

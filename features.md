@@ -51,3 +51,6 @@
 47. Allow pin Voice Chat window to top
 48. Allow open link without warning
 49. [Hide messages from blocked user](https://t.me/tg_x64/519)
+50. Disable Premium Animation
+51. Message time with seconds
+52. Ban button for Join Requests

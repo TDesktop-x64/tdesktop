@@ -8,10 +8,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_context_menu.h"
 
 #include "api/api_attached_stickers.h"
+#include "api/api_common.h"
 #include "api/api_editing.h"
 #include "api/api_polls.h"
 #include "api/api_report.h"
 #include "api/api_ringtones.h"
+#include "api/api_sending.h"
 #include "api/api_who_reacted.h"
 #include "api/api_toggling_media.h" // Api::ToggleFavedSticker
 #include "base/unixtime.h"
@@ -26,6 +28,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/media/history_view_media.h"
 #include "history/view/media/history_view_web_page.h"
 #include "history/view/reactions/history_view_reactions_list.h"
+#include "main/main_session.h"
+#include "main/session/send_as_peers.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/menu/menu_item_base.h"
 #include "ui/image/image.h"
@@ -473,6 +477,136 @@ void AddMsgsFromUserAction(
 			menu->addAction(tr::lng_context_show_messages_from(tr::now), [=] {
 				App::searchByHashtag(QString(), peer, item->from());
 			}, &st::menuIconInfo);
+		}
+	}
+}
+
+Api::SendAction prepareSendAction(
+		History *history, Api::SendOptions options) {
+	auto result = Api::SendAction(history, options);
+	result.replyTo = 0;
+	if (history->peer->isUser()) {
+		result.options.sendAs = nullptr;
+	}
+	return result;
+}
+
+void AddRepeaterAction(
+		not_null<Ui::PopupMenu*> menu,
+		const ContextMenuRequest& request,
+		not_null<ListWidget*> list) {
+	const auto item = request.item;
+	if (!request.selectedItems.empty() || !item) {
+		return;
+	}
+	const auto itemId = item->fullId();
+	const auto _history = item->history();
+	auto fwdSubmenu = std::make_unique<Ui::PopupMenu>(list, st::popupMenuWithIcons);
+	auto repeatSubmenu = std::make_unique<Ui::PopupMenu>(list, st::popupMenuWithIcons);
+	if ((item->history()->peer->isMegagroup() || item->history()->peer->isChat() || item->history()->peer->isUser())) {
+		if (GetEnhancedBool("show_repeater_option")) {
+			if (item->allowsForward()) {
+				repeatSubmenu->addAction(tr::lng_context_repeat_msg(tr::now), [=] {
+					const auto api = &item->history()->peer->session().api();
+					auto action = Api::SendAction(item->history()->peer->owner().history(item->history()->peer), Api::SendOptions{ .sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer) });
+					action.clearDraft = false;
+					if (item->history()->peer->isUser() || item->history()->peer->isChat()) {
+						action.options.sendAs = nullptr;
+					}
+
+					if (item->topic()) {
+						action.replyTo = item->topicRootId();
+						action.topicRootId = item->topicRootId();
+					}
+
+					const auto history = item->history()->peer->owner().history(item->history()->peer);
+					auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = std::move(MessageIdsList(1, itemId)) });
+
+					api->forwardMessages(std::move(resolved), action, [] {
+						Ui::Toast::Show(tr::lng_share_done(tr::now));
+					});
+				}, &st::menuIconDiscussion);
+			}
+			if (!item->isService() && !item->emptyText() && item->media() == nullptr) {
+				repeatSubmenu->addAction(tr::lng_context_repeat_msg_no_fwd(tr::now), [=] {
+					const auto api = &item->history()->peer->session().api();
+					auto message = ApiWrap::MessageToSend(prepareSendAction(_history->peer->owner().history(item->history()->peer), Api::SendOptions{ .sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer) }));
+					message.textWithTags = { item->originalText().text,TextUtilities::ConvertEntitiesToTextTags(item->originalText().entities) };
+					if (item->history()->peer->isUser() || item->history()->peer->isChat()) {
+						message.action.options.sendAs = nullptr;
+					}
+					if (item->topic()) {
+						message.action.replyTo = item->topicRootId();
+						message.action.topicRootId = item->topicRootId();
+					}
+					if (GetEnhancedBool("repeater_reply_to_orig_msg")) {
+						message.action.replyTo = item->idOriginal();
+					}
+					api->sendMessage(std::move(message));
+				}, &st::menuIconDiscussion);
+			}
+			else if (!item->isService() && item->media()->document() != nullptr && item->media()->document()->sticker() != nullptr) {
+				if (item->allowsForward()) {
+					repeatSubmenu->addAction(tr::lng_context_repeat_msg_no_fwd(tr::now), [=] {
+						const auto api = &item->history()->peer->session().api();
+						auto action = Api::SendAction(item->history()->peer->owner().history(item->history()->peer), Api::SendOptions{ .sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer) });
+						action.clearDraft = false;
+						if (item->history()->peer->isUser() || item->history()->peer->isChat()) {
+							action.options.sendAs = nullptr;
+						}
+						if (item->topic()) {
+							action.replyTo = item->topicRootId();
+							action.topicRootId = item->topicRootId();
+						}
+						if (GetEnhancedBool("repeater_reply_to_orig_msg")) {
+							action.replyTo = item->idOriginal();
+						}
+
+						const auto history = item->history()->peer->owner().history(item->history()->peer);
+						auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = std::move(MessageIdsList(1, itemId)), .options = Data::ForwardOptions::NoSenderNames });
+
+						api->forwardMessages(std::move(resolved), action, [] {
+							Ui::Toast::Show(tr::lng_share_done(tr::now));
+						});
+						}, &st::menuIconDiscussion);
+				}
+				else {
+					repeatSubmenu->addAction(tr::lng_context_repeat_msg_no_fwd(tr::now), [=] {
+						const auto document = item->media()->document();
+						const auto history = item->history()->peer->owner().history(item->history()->peer);
+						auto message = ApiWrap::MessageToSend(prepareSendAction(history, Api::SendOptions{ .sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer) }));
+						if (item->history()->peer->isUser() || item->history()->peer->isChat()) {
+							message.action.options.sendAs = nullptr;
+						}
+						if (item->topic()) {
+							message.action.replyTo = item->topicRootId();
+							message.action.topicRootId = item->topicRootId();
+						}
+						Api::SendExistingDocument(std::move(message), document);
+					}, &st::menuIconDiscussion);
+				}
+			}
+			if (item->allowsForward()) {
+				fwdSubmenu->addAction(tr::lng_forward_to_saved_message(tr::now), [=] {
+					const auto api = &item->history()->peer->session().api();
+					auto action = Api::SendAction(item->history()->peer->owner().history(api->session().user()->asUser()));
+					action.clearDraft = false;
+					action.generateLocal = false;
+
+					const auto history = item->history()->peer->owner().history(api->session().user()->asUser());
+					auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = std::move(MessageIdsList( 1, itemId )) });
+
+					api->forwardMessages(std::move(resolved), action, [] {
+						Ui::Toast::Show(tr::lng_share_done(tr::now));
+					});
+				}, &st::menuIconFave);
+			}
+			if (!fwdSubmenu->empty()) {
+				menu->addAction(tr::lng_context_forward(tr::now), std::move(fwdSubmenu), &st::menuIconForward);
+			}
+			if (GetEnhancedBool("show_repeater_option") && !repeatSubmenu->empty()) {
+				menu->addAction(tr::lng_context_repeater(tr::now), std::move(repeatSubmenu), &st::menuIconDiscussion);
+			}
 		}
 	}
 }
@@ -1006,6 +1140,7 @@ void AddMessageActions(
 	AddPostLinkAction(menu, request);
 	AddForwardAction(menu, request, list);
 	AddMsgsFromUserAction(menu, request, list);
+	AddRepeaterAction(menu, request, list);
 	AddSendNowAction(menu, request, list);
 	AddDeleteAction(menu, request, list);
 	AddDownloadFilesAction(menu, request, list);

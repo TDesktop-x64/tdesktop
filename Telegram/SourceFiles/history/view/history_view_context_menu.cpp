@@ -21,6 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item.h"
 #include "history/history_message.h"
 #include "history/history_item_text.h"
+#include "history/history_item_components.h"
 #include "history/view/history_view_schedule_box.h"
 #include "history/view/media/history_view_media.h"
 #include "history/view/media/history_view_web_page.h"
@@ -451,6 +452,29 @@ bool AddForwardMessageAction(
 		}
 	}, &st::menuIconForward);
 	return true;
+}
+
+void AddMsgsFromUserAction(
+		not_null<Ui::PopupMenu*> menu,
+		const ContextMenuRequest& request,
+		not_null<ListWidget*> list) {
+	const auto item = request.item;
+	if (!request.selectedItems.empty() || !item) {
+		return;
+	}
+	const auto peer = item->history()->peer;
+	if (peer->isChat() || peer->isMegagroup()) {
+		const auto msgSigned = item->Get<HistoryMessageSigned>();
+		if (msgSigned) {
+			menu->addAction(tr::lng_context_show_messages_from(tr::now), [=] {
+				App::searchByHashtag(msgSigned->author, peer, item->from());
+			}, &st::menuIconInfo);
+		} else {
+			menu->addAction(tr::lng_context_show_messages_from(tr::now), [=] {
+				App::searchByHashtag(QString(), peer, item->from());
+			}, &st::menuIconInfo);
+		}
+	}
 }
 
 void AddForwardAction(
@@ -981,6 +1005,7 @@ void AddMessageActions(
 		not_null<ListWidget*> list) {
 	AddPostLinkAction(menu, request);
 	AddForwardAction(menu, request, list);
+	AddMsgsFromUserAction(menu, request, list);
 	AddSendNowAction(menu, request, list);
 	AddDeleteAction(menu, request, list);
 	AddDownloadFilesAction(menu, request, list);

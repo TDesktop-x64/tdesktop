@@ -2329,9 +2329,6 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				_menu->addAction(tr::lng_context_forward_selected(tr::now), [=] {
 					_widget->forwardSelected();
 				}, &st::menuIconForward);
-				_menu->addAction(tr::lng_context_forward_selected_no_quote(tr::now), [=] {
-					_widget->forwardNoQuoteSelected();
-				}, &st::menuIconForward);
 				_menu->addAction(tr::lng_forward_to_saved_message(tr::now), [=] {
 					_widget->forwardSelectedToSavedMessages();
 				}, &st::menuIconFave);
@@ -2359,9 +2356,6 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					}, &st::menuIconForward);
 					fwdSubmenu->addAction(tr::lng_context_forward_msg(tr::now), [=] {
 						forwardItem(itemId);
-					}, &st::menuIconForward);
-					fwdSubmenu->addAction(tr::lng_context_forward_msg_no_quote(tr::now), [=] {
-						forwardItemNoQuote(itemId);
 					}, &st::menuIconForward);
 				}
 				if ((item->history()->peer->isMegagroup() || item->history()->peer->isChat() || item->history()->peer->isUser())) {
@@ -2584,9 +2578,6 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				_menu->addAction(tr::lng_context_forward_selected(tr::now), [=] {
 					_widget->forwardSelected();
 				}, &st::menuIconForward);
-				_menu->addAction(tr::lng_context_forward_selected_no_quote(tr::now), [=] {
-					_widget->forwardNoQuoteSelected();
-				}, &st::menuIconForward);
 				_menu->addAction(tr::lng_forward_to_saved_message(tr::now), [=] {
 					_widget->forwardSelectedToSavedMessages();
 				}, &st::menuIconFave);
@@ -2612,9 +2603,6 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					}, &st::menuIconForward);
 					fwdSubmenu->addAction(tr::lng_context_forward_msg(tr::now), [=] {
 						forwardAsGroup(itemId);
-					}, &st::menuIconForward);
-					fwdSubmenu->addAction(tr::lng_context_forward_msg_no_quote(tr::now), [=] {
-						forwardAsGroupNoQuote(itemId);
 					}, &st::menuIconForward);
 				}
 				if ((item->history()->peer->isMegagroup() || item->history()->peer->isChat() || item->history()->peer->isUser())) {
@@ -4299,18 +4287,6 @@ void HistoryInner::forwardAsGroup(FullMsgId itemId) {
 	}
 }
 
-void HistoryInner::forwardItemNoQuote(FullMsgId itemId) {
-	Window::ShowForwardNoQuoteMessagesBox(_controller, { 1, itemId });
-}
-
-void HistoryInner::forwardAsGroupNoQuote(FullMsgId itemId) {
-	if (const auto item = session().data().message(itemId)) {
-		Window::ShowForwardNoQuoteMessagesBox(
-			_controller,
-			session().data().itemOrItsGroup(item));
-	}
-}
-
 void HistoryInner::deleteItem(FullMsgId itemId) {
 	if (const auto item = session().data().message(itemId)) {
 		deleteItem(item);
@@ -4538,13 +4514,6 @@ void HistoryInner::setupShortcuts() {
 			auto selectedState = getSelectionState();
 			if (selectedState.count > 0 && selectedState.canForwardCount == selectedState.count) {
 				_widget->forwardSelected();
-			}
-			return true;
-		});
-		request->check(Command::FastCopy, 1) && request->handle([=] {
-			auto selectedState = getSelectionState();
-			if (selectedState.count > 0 && selectedState.canForwardCount == selectedState.count) {
-				_widget->forwardNoQuoteSelected();
 			}
 			return true;
 		});

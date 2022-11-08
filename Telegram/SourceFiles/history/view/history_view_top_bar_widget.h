@@ -95,9 +95,6 @@ public:
 	[[nodiscard]] rpl::producer<> forwardSelectionRequest() const {
 		return _forwardSelection.events();
 	}
-	[[nodiscard]] rpl::producer<> forwardNoQuoteSelectionRequest() const {
-		return _forwardNoQuoteSelection.events();
-	}
 	[[nodiscard]] rpl::producer<> savedMessagesSelectionRequest() const {
 		return _savedMessagesSelection.events();
 	}
@@ -207,7 +204,7 @@ private:
 	Ui::Animations::Simple _searchShown;
 
 	object_ptr<Ui::RoundButton> _clear;
-	object_ptr<Ui::RoundButton> _forward, _sendNow, _delete, _forwardNoQuote, _savedMessages, _oldForward;
+	object_ptr<Ui::RoundButton> _forward, _sendNow, _delete, _savedMessages, _oldForward;
 	object_ptr<Ui::InputField> _searchField = { nullptr };
 	object_ptr<Ui::FadeWrapScaled<Ui::IconButton>> _chooseFromUser
 		= { nullptr };
@@ -252,7 +249,6 @@ private:
 
 	rpl::event_stream<> _oldForwardSelection;
 	rpl::event_stream<> _forwardSelection;
-	rpl::event_stream<> _forwardNoQuoteSelection;
 	rpl::event_stream<> _savedMessagesSelection;
 	rpl::event_stream<> _sendNowSelection;
 	rpl::event_stream<> _deleteSelection;

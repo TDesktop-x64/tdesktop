@@ -98,7 +98,6 @@ TopBarWidget::TopBarWidget(
 , _forward(this, GetEnhancedBool("show_emoji_button_as_text") ? tr::lng_selected_forward_text() : tr::lng_selected_forward_emoji(), st::defaultActiveButton)
 , _sendNow(this, tr::lng_selected_send_now(), st::defaultActiveButton)
 , _delete(this, GetEnhancedBool("show_emoji_button_as_text") ? tr::lng_selected_delete_text() : tr::lng_selected_delete_emoji(), st::defaultActiveButton)
-, _forwardNoQuote(this, GetEnhancedBool("show_emoji_button_as_text") ? tr::lng_selected_forward_no_quote_text() : tr::lng_selected_forward_no_quote_emoji(), st::defaultActiveButton)
 , _savedMessages(this, GetEnhancedBool("show_emoji_button_as_text") ? tr::lng_forward_to_saved_message_text() : tr::lng_forward_to_saved_message_emoji(), st::defaultActiveButton)
 , _oldForward(this, GetEnhancedBool("show_emoji_button_as_text") ? tr::lng_selected_forward_text_classic() : tr::lng_selected_forward_emoji_classic(), st::defaultActiveButton)
 , _back(this, st::historyTopBarBack)
@@ -123,8 +122,6 @@ TopBarWidget::TopBarWidget(
 	_oldForward->setWidthChangedCallback([=] { updateControlsGeometry(); });
 	_forward->setClickedCallback([=] { _forwardSelection.fire({}); });
 	_forward->setWidthChangedCallback([=] { updateControlsGeometry(); });
-	_forwardNoQuote->setClickedCallback([=] { _forwardNoQuoteSelection.fire({}); });
-	_forwardNoQuote->setWidthChangedCallback([=] { updateControlsGeometry(); });
 	_savedMessages->setClickedCallback([=] { _savedMessagesSelection.fire({}); });
 	_savedMessages->setWidthChangedCallback([=] { updateControlsGeometry(); });
 	_sendNow->setClickedCallback([=] { _sendNowSelection.fire({}); });
@@ -925,7 +922,6 @@ void TopBarWidget::updateControlsGeometry() {
 		_oldForward->hide();
 	}
 	_forward->setFullWidth(buttonFullWidth);
-	_forwardNoQuote->setFullWidth(buttonFullWidth);
 	_savedMessages->setFullWidth(buttonFullWidth);
 	_sendNow->setFullWidth(buttonFullWidth);
 	_delete->setFullWidth(buttonFullWidth);
@@ -942,11 +938,6 @@ void TopBarWidget::updateControlsGeometry() {
 	_forward->moveToLeft(buttonsLeft, selectedButtonsTop);
 	if (!_forward->isHidden()) {
 		buttonsLeft += _forward->width() + st::topBarActionSkip;
-	}
-
-	_forwardNoQuote->moveToLeft(buttonsLeft, selectedButtonsTop);
-	if (!_forwardNoQuote->isHidden()) {
-		buttonsLeft += _forwardNoQuote->width() + st::topBarActionSkip;
 	}
 
 	_savedMessages->moveToLeft(buttonsLeft, selectedButtonsTop);
@@ -1065,7 +1056,6 @@ void TopBarWidget::updateControlsVisibility() {
 	_clear->show();
 	_delete->setVisible(_canDelete);
 	_forward->setVisible(_canForward);
-	_forwardNoQuote->setVisible(_canForward);
 	_savedMessages->setVisible(_canForward);
 	_sendNow->setVisible(_canSendNow);
 
@@ -1277,7 +1267,6 @@ void TopBarWidget::showSelected(SelectedState state) {
 			_oldForward->setNumbersText(_selectedCount);
 		}
 		_forward->setNumbersText(_selectedCount);
-		_forwardNoQuote->setNumbersText(_selectedCount);
 		_savedMessages->setNumbersText(_selectedCount);
 		_sendNow->setNumbersText(_selectedCount);
 		_delete->setNumbersText(_selectedCount);
@@ -1286,7 +1275,6 @@ void TopBarWidget::showSelected(SelectedState state) {
 				_oldForward->finishNumbersAnimation();
 			}
 			_forward->finishNumbersAnimation();
-			_forwardNoQuote->finishNumbersAnimation();
 			_savedMessages->finishNumbersAnimation();
 			_sendNow->finishNumbersAnimation();
 			_delete->finishNumbersAnimation();

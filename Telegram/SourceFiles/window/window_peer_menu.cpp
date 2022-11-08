@@ -1711,6 +1711,18 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 	const auto session = &history->session();
 	const auto data = std::make_shared<ShareData>(history->peer, std::move(items), std::move(successCallback));
 
+	const auto itemsList = owner->idsToItems(data->msgIds);
+	const auto hasCaptions = ranges::any_of(itemsList, [](auto item) {
+		return item->media()
+			&& !item->originalText().text.isEmpty()
+			&& item->media()->allowsEditCaption();
+	});
+	const auto hasOnlyForcedForwardedInfo = hasCaptions
+		? false
+		: ranges::all_of(itemsList, [](auto item) {
+			return item->media() && item->media()->forceForwardedInfo();
+	});
+
 	auto submitCallback = [=](
 			std::vector<not_null<Data::Thread*>> &&result,
 			TextWithTags &&comment,
@@ -1725,12 +1737,12 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 		}
 
 		const auto error = [&] {
-			for (const auto peer : result) {
+			for (const auto thread : result) {
 				const auto error = GetErrorTextForSending(
-					peer,
-					{ .forward = &items });
+					thread,
+					{ .forward = &items, .text = &comment });
 				if (!error.isEmpty()) {
-					return std::make_pair(error, peer);
+					return std::make_pair(error, thread);
 				}
 			}
 			return std::make_pair(QString(), result.front());
@@ -1739,7 +1751,7 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 			auto text = TextWithEntities();
 			if (result.size() > 1) {
 				text.append(
-					Ui::Text::Bold(error.second->peer()->name())
+					Ui::Text::Bold(error.second->chatListName())
 				).append("\n\n");
 			}
 			text.append(error.first);
@@ -1747,20 +1759,22 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 			return;
 		}
 
-		const auto sendFlags = MTPmessages_ForwardMessages::Flag(0)
-			| MTPmessages_ForwardMessages::Flag::f_with_my_score
-			| (options.silent
-				? MTPmessages_ForwardMessages::Flag::f_silent
-				: MTPmessages_ForwardMessages::Flag(0))
-			| (options.scheduled
-				? MTPmessages_ForwardMessages::Flag::f_schedule_date
-				: MTPmessages_ForwardMessages::Flag(0));
+		using Flag = MTPmessages_ForwardMessages::Flag;
+		const auto commonSendFlags = Flag(0)
+			| Flag::f_with_my_score
+			| (options.scheduled ? Flag::f_schedule_date : Flag(0))
+			| ((forwardOptions != Data::ForwardOptions::PreserveInfo)
+				? Flag::f_drop_author
+				: Flag(0))
+			| ((forwardOptions == Data::ForwardOptions::NoNamesAndCaptions)
+				? Flag::f_drop_media_captions
+				: Flag(0));
 		auto msgIds = QVector<MTPint>();
 		msgIds.reserve(data->msgIds.size());
-		for (const auto fullId : data->msgIds) {
+		for (const auto &fullId : data->msgIds) {
 			msgIds.push_back(MTP_int(fullId.msg));
 		}
-		auto generateRandom = [&] {
+		const auto generateRandom = [&] {
 			auto result = QVector<MTPlong>(data->msgIds.size());
 			for (auto &value : result) {
 				value = base::RandomValue<MTPlong>();
@@ -1771,28 +1785,37 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 		auto &histories = owner->histories();
 		const auto requestType = Data::Histories::RequestType::Send;
 		for (const auto thread : result) {
-			const auto history = owner->history(thread->peer());
+			const auto topicRootId = thread->topicRootId();
+			const auto peer = thread->peer();
 			if (!comment.text.isEmpty()) {
-				auto message = ApiWrap::MessageToSend(prepareSendAction(history, Api::SendOptions()));
+				auto message = Api::MessageToSend(
+					Api::SendAction(thread, options));
 				message.textWithTags = comment;
 				message.action.options = options;
 				message.action.clearDraft = false;
+				message.action.topicRootId = topicRootId;
 				api.sendMessage(std::move(message));
 			}
 			histories.sendRequest(history, requestType, [=](Fn<void()> finish) {
 				auto &api = history->session().api();
-				history->sendRequestId = api.request(MTPmessages_ForwardMessages(
+				const auto sendFlags = commonSendFlags
+					| (topicRootId ? Flag::f_top_msg_id : Flag(0))
+					| (ShouldSendSilent(peer, options)
+						? Flag::f_silent
+						: Flag(0));
+				history->sendRequestId = api.request(
+					MTPmessages_ForwardMessages(
 						MTP_flags(sendFlags),
 						data->peer->input,
 						MTP_vector<MTPint>(msgIds),
 						MTP_vector<MTPlong>(generateRandom()),
-						thread->peer()->input,
-						MTP_int(0),
+						peer->input,
+						MTP_int(topicRootId),
 						MTP_int(options.scheduled),
-						MTP_inputPeerEmpty()
-				)).done([=](const MTPUpdates &updates, mtpRequestId requestId) {
+						MTP_inputPeerEmpty() // send_as
+				)).done([=](const MTPUpdates &updates, mtpRequestId reqId) {
 					history->session().api().applyUpdates(updates);
-					data->requests.remove(requestId);
+					data->requests.remove(reqId);
 					if (data->requests.empty()) {
 						Ui::Toast::Show(tr::lng_share_done(tr::now));
 						Ui::hideLayer();
@@ -1805,9 +1828,6 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 			});
 			data->requests.insert(history->sendRequestId);
 		}
-		if (data->submitCallback) {
-			data->submitCallback();
-		}
 	};
 	auto filterCallback = [](auto thread)  {
 		return thread->canWrite();
@@ -1816,7 +1836,13 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 		.session = session,
 		.submitCallback = std::move(submitCallback),
 		.filterCallback = std::move(filterCallback),
-		.title = tr::lng_title_multiple_forward()}));
+		.title = tr::lng_title_multiple_forward(),
+		.forwardOptions = {
+			.messagesCount = int(data->msgIds.size()),
+			.show = !hasOnlyForcedForwardedInfo,
+			.hasCaptions = hasCaptions,
+		},
+	}));
 	return weak->data();
 }
 

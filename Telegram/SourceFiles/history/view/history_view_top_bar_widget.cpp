@@ -1141,6 +1141,9 @@ void TopBarWidget::updateControlsVisibility() {
 		&& _controller->canShowThirdSection()
 		&& !_chooseForReportReason);
 	const auto isAdmin = [&] {
+		if (_activeChat.section == Section::ChatsList) {
+			return false;
+		}
 		if (const auto peer = _activeChat.key.peer()) {
 			if (peer->isMegagroup() || peer->isChannel()) {
 				const auto channel = peer->asChannel();

@@ -772,7 +772,7 @@ HistoryFileLayout {
 }
 
 msgFileThumbRadiusSmall: 4px;
-msgFileThumbRadiusLarge: 12px;
+msgFileThumbRadiusLarge: 4px;
 msgFileLayout: HistoryFileLayout {
 	padding: margins(12px, 8px, 10px, 8px);
 	nameTop: 12px;

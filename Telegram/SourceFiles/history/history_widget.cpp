@@ -3834,6 +3834,9 @@ void HistoryWidget::hideChildWidgets() {
 	if (_chooseTheme) {
 		_chooseTheme->hide();
 	}
+	if (_contactStatus) {
+		_contactStatus->hide();
+	}
 	hideChildren();
 }
 
@@ -6414,20 +6417,15 @@ void HistoryWidget::checkPinnedBarState() {
 		: currentPinnedId.msg;
 	if (universalPinnedId == hiddenId) {
 		if (_pinnedBar) {
+			_pinnedBar->setContent(rpl::single(Ui::MessageBarContent()));
 			_pinnedTracker->reset();
-			auto qobject = base::unique_qptr{
-				Ui::WrapAsQObject(this, std::move(_pinnedBar)).get()
-			};
-			auto destroyer = [this, object = std::move(qobject)]() mutable {
-				object = nullptr;
-				_pinnedBarHeight = 0;
-				updateHistoryGeometry();
-				updateControlsGeometry();
-			};
-			base::call_delayed(
-				st::defaultMessageBar.duration,
-				this,
-				std::move(destroyer));
+			_hidingPinnedBar = base::take(_pinnedBar);
+			const auto raw = _hidingPinnedBar.get();
+			base::call_delayed(st::defaultMessageBar.duration, this, [=] {
+				if (_hidingPinnedBar.get() == raw) {
+					clearHidingPinnedBar();
+				}
+			});
 		}
 		return;
 	}
@@ -6435,6 +6433,7 @@ void HistoryWidget::checkPinnedBarState() {
 		return;
 	}
 
+	clearHidingPinnedBar();
 	_pinnedBar = std::make_unique<Ui::PinnedBar>(this, [=] {
 		return controller()->isGifPausedAtLeastFor(
 			Window::GifPauseReason::Any);
@@ -6519,6 +6518,17 @@ void HistoryWidget::checkPinnedBarState() {
 	if (_a_show.animating()) {
 		_pinnedBar->hide();
 	}
+}
+
+void HistoryWidget::clearHidingPinnedBar() {
+	if (!_hidingPinnedBar) {
+		return;
+	}
+	if (const auto delta = -_pinnedBarHeight) {
+		_pinnedBarHeight = 0;
+		setGeometryWithTopMoved(geometry(), delta);
+	}
+	_hidingPinnedBar = nullptr;
 }
 
 void HistoryWidget::checkMessagesTTL() {
@@ -7765,6 +7775,8 @@ void HistoryWidget::drawField(Painter &p, const QRect &rect) {
 					.availableWidth = width() - replyLeft - _fieldBarCancel->width() - st::msgReplyPadding.right(),
 					.palette = &st::historyComposeAreaPalette,
 					.spoiler = Ui::Text::DefaultSpoilerCache(),
+					.now = crl::now(),
+					.paused = p.inactive(),
 					.elisionLines = 1,
 				});
 			} else {

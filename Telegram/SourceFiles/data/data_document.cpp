@@ -155,6 +155,7 @@ QString FileNameUnsafe(
 			return path;
 		}
 	}();
+	if (path.isEmpty()) return QString();
 	if (name.isEmpty()) name = qsl(".unknown");
 	if (name.at(0) == QChar::fromLatin1('.')) {
 		if (!QDir().exists(path)) QDir().mkpath(path);
@@ -1118,7 +1119,7 @@ bool DocumentData::saveFromData() {
 
 bool DocumentData::saveFromDataSilent() {
 	return !filepath(true).isEmpty()
-		|| (!Core::App().settings().askDownloadPath()
+		|| (Core::App().canSaveFileWithoutAskingForPath()
 			&& saveFromDataChecked());
 }
 

@@ -378,6 +378,18 @@ bool AddForwardSelectedAction(
 			ExtractIdsList(request.selectedItems),
 			callback);
 	}, &st::menuIconForward);
+	menu->addAction(tr::lng_context_forward_selected_no_quote(tr::now), [=] {
+		const auto weak = Ui::MakeWeak(list);
+		const auto callback = [=] {
+			if (const auto strong = weak.data()) {
+				strong->cancelSelection();
+			}
+		};
+		Window::ShowForwardNoQuoteMessagesBox(
+				request.navigation,
+				ExtractIdsList(request.selectedItems),
+				callback);
+	}, &st::menuIconForward);
 	menu->addAction(tr::lng_forward_to_saved_message(tr::now), [=] {
 		const auto weak = Ui::MakeWeak(list);
 		const auto items = ExtractIdsList(request.selectedItems);
@@ -432,6 +444,15 @@ bool AddForwardMessageAction(
 				(asGroup
 					? owner->itemOrItsGroup(item)
 					: MessageIdsList{ 1, itemId }));
+		}
+	}, &st::menuIconForward);
+	menu->addAction(tr::lng_context_forward_msg_no_quote(tr::now), [=] {
+		if (const auto item = owner->message(itemId)) {
+			Window::ShowForwardNoQuoteMessagesBox(
+					request.navigation,
+					(asGroup
+					 ? owner->itemOrItsGroup(item)
+					 : MessageIdsList{ 1, itemId }));
 		}
 	}, &st::menuIconForward);
 	return true;

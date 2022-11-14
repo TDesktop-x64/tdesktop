@@ -1846,6 +1846,105 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 	return weak->data();
 }
 
+QPointer<Ui::BoxContent> ShowForwardNoQuoteMessagesBox(
+		not_null<Window::SessionNavigation*> navigation,
+		MessageIdsList &&items,
+		FnMut<void()> &&successCallback) {
+	struct ShareData {
+		ShareData(not_null<PeerData*> peer, MessageIdsList &&ids, FnMut<void()> &&callback)
+		: peer(peer)
+		, msgIds(std::move(ids))
+		, submitCallback(std::move(callback)) {
+		}
+		not_null<PeerData*> peer;
+		MessageIdsList msgIds;
+		base::flat_set<mtpRequestId> requests;
+		FnMut<void()> submitCallback;
+	};
+	const auto weak = std::make_shared<QPointer<ShareBox>>();
+	const auto item = App::wnd()->sessionController()->session().data().message(items[0]);
+	const auto history = item->history();
+	const auto owner = &history->owner();
+	const auto session = &history->session();
+	const auto isGroup = (owner->groups().find(item) != nullptr);
+	const auto data = std::make_shared<ShareData>(history->peer, std::move(items), std::move(successCallback));
+
+	auto submitCallback = [=](
+			std::vector<not_null<Data::Thread*>> &&result,
+			TextWithTags &&comment,
+			Api::SendOptions options,
+			Data::ForwardOptions forwardOptions) {
+		if (!data->requests.empty()) {
+			return; // Share clicked already.
+		}
+		auto items = history->owner().idsToItems(data->msgIds);
+		if (items.empty() || result.empty()) {
+			return;
+		}
+
+		const auto error = [&] {
+			for (const auto peer : result) {
+				const auto error = GetErrorTextForSending(
+					peer,
+					{ .forward = &items });
+				if (!error.isEmpty()) {
+					return std::make_pair(error, peer);
+				}
+			}
+			return std::make_pair(QString(), result.front());
+		}();
+		if (!error.first.isEmpty()) {
+			auto text = TextWithEntities();
+			if (result.size() > 1) {
+				text.append(
+					Ui::Text::Bold(error.second->peer()->name())
+				).append("\n\n");
+			}
+			text.append(error.first);
+			Ui::show(Ui::MakeInformBox(text), Ui::LayerOption::KeepOther);
+			return;
+		}
+
+		auto &api = owner->session().api();
+
+		for (const auto thread : result) {
+			const auto _history = owner->history(thread->peer());
+			if (!comment.text.isEmpty()) {
+				auto message = ApiWrap::MessageToSend(prepareSendAction(_history, Api::SendOptions()));
+				message.textWithTags = comment;
+				message.action.options = options;
+				message.action.clearDraft = false;
+				api.sendMessage(std::move(message));
+			}
+
+			auto action = Api::SendAction(_history, Api::SendOptions{.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer), .scheduled = options.scheduled});
+			action.clearDraft = false;
+			if (_history->peer->isUser() || _history->peer->isChannel() || _history->peer->isChat()) {
+				action.options.sendAs = nullptr;
+			}
+
+			auto resolved = _history->resolveForwardDraft(Data::ForwardDraft{.ids = data->msgIds, .options = Data::ForwardOptions::NoSenderNames});
+
+			api.forwardMessages(std::move(resolved), action, [] {
+				Ui::Toast::Show(tr::lng_share_done(tr::now));
+				Ui::hideLayer();
+			});
+		}
+		if (data->submitCallback) {
+			data->submitCallback();
+		}
+	};
+	auto filterCallback = [](auto thread)  {
+		return thread->canWrite();
+	};
+	*weak = Ui::show(Box<ShareBox>(ShareBox::Descriptor{
+		.session = session,
+		.submitCallback = std::move(submitCallback),
+		.filterCallback = std::move(filterCallback),
+		.title = tr::lng_title_forward_as_copy()}));
+	return weak->data();
+}
+
 QPointer<Ui::BoxContent> ShowForwardMessagesBox(
 		not_null<Window::SessionNavigation*> navigation,
 		MessageIdsList &&items,

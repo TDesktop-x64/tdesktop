@@ -3903,6 +3903,25 @@ void ConfirmForwardSelectedItems(not_null<ListWidget*> widget) {
 	});
 }
 
+void ConfirmForwardNoQuoteSelectedItems(not_null<ListWidget*> widget) {
+	const auto items = widget->getSelectedItems();
+	if (items.empty()) {
+		return;
+	}
+	for (const auto &item : items) {
+		if (!item.canForward) {
+			return;
+		}
+	}
+	auto ids = widget->getSelectedIds();
+	const auto weak = Ui::MakeWeak(widget);
+	Window::ShowForwardNoQuoteMessagesBox(widget->controller(), std::move(ids), [=] {
+		if (const auto strong = weak.data()) {
+			strong->cancelSelection();
+		}
+	});
+}
+
 MessageIdsList ExtractIdsList(const SelectedItems &items) {
 	return ranges::views::all(
 			items

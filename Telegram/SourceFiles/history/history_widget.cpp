@@ -934,6 +934,10 @@ HistoryWidget::HistoryWidget(
 	) | rpl::start_with_next([=] {
 		forwardSelected();
 	}, _topBar->lifetime());
+	_topBar->forwardNoQuoteSelectionRequest(
+	) | rpl::start_with_next([=] {
+		forwardNoQuoteSelected();
+	}, _topBar->lifetime());
 	_topBar->savedMessagesSelectionRequest(
 	) | rpl::start_with_next([=] {
 		forwardSelectedToSavedMessages();
@@ -7458,6 +7462,18 @@ void HistoryWidget::forwardSelected() {
 	}
 	const auto weak = Ui::MakeWeak(this);
 	Window::ShowNewForwardMessagesBox(controller(), getSelectedItems(), [=] {
+		if (const auto strong = weak.data()) {
+			strong->clearSelected();
+		}
+	});
+}
+
+void HistoryWidget::forwardNoQuoteSelected() {
+	if (!_list) {
+		return;
+	}
+	const auto weak = Ui::MakeWeak(this);
+	Window::ShowForwardNoQuoteMessagesBox(controller(), getSelectedItems(), [=] {
 		if (const auto strong = weak.data()) {
 			strong->clearSelected();
 		}

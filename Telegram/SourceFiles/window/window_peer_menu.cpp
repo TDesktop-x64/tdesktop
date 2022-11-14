@@ -1866,7 +1866,6 @@ QPointer<Ui::BoxContent> ShowForwardNoQuoteMessagesBox(
 	const auto history = item->history();
 	const auto owner = &history->owner();
 	const auto session = &history->session();
-	const auto isGroup = (owner->groups().find(item) != nullptr);
 	const auto data = std::make_shared<ShareData>(history->peer, std::move(items), std::move(successCallback));
 
 	auto submitCallback = [=](
@@ -1883,12 +1882,12 @@ QPointer<Ui::BoxContent> ShowForwardNoQuoteMessagesBox(
 		}
 
 		const auto error = [&] {
-			for (const auto peer : result) {
+			for (const auto thread : result) {
 				const auto error = GetErrorTextForSending(
-					peer,
-					{ .forward = &items });
+					thread,
+					{ .forward = &items, .text = &comment });
 				if (!error.isEmpty()) {
-					return std::make_pair(error, peer);
+					return std::make_pair(error, thread);
 				}
 			}
 			return std::make_pair(QString(), result.front());
@@ -1897,7 +1896,7 @@ QPointer<Ui::BoxContent> ShowForwardNoQuoteMessagesBox(
 			auto text = TextWithEntities();
 			if (result.size() > 1) {
 				text.append(
-					Ui::Text::Bold(error.second->peer()->name())
+					Ui::Text::Bold(error.second->chatListName())
 				).append("\n\n");
 			}
 			text.append(error.first);
@@ -1905,33 +1904,66 @@ QPointer<Ui::BoxContent> ShowForwardNoQuoteMessagesBox(
 			return;
 		}
 
+		using Flag = MTPmessages_ForwardMessages::Flag;
+		const auto commonSendFlags = (options.scheduled ? Flag::f_schedule_date : Flag(0)) | Flag::f_drop_author;
+		auto msgIds = QVector<MTPint>();
+		msgIds.reserve(data->msgIds.size());
+		for (const auto &fullId : data->msgIds) {
+			msgIds.push_back(MTP_int(fullId.msg));
+		}
+		const auto generateRandom = [&] {
+			auto result = QVector<MTPlong>(data->msgIds.size());
+			for (auto &value : result) {
+				value = base::RandomValue<MTPlong>();
+			}
+			return result;
+		};
 		auto &api = owner->session().api();
-
+		auto &histories = owner->histories();
+		const auto requestType = Data::Histories::RequestType::Send;
 		for (const auto thread : result) {
-			const auto _history = owner->history(thread->peer());
+			const auto topicRootId = thread->topicRootId();
+			const auto peer = thread->peer();
 			if (!comment.text.isEmpty()) {
-				auto message = ApiWrap::MessageToSend(prepareSendAction(_history, Api::SendOptions()));
+				auto message = Api::MessageToSend(
+					Api::SendAction(thread, options));
 				message.textWithTags = comment;
 				message.action.options = options;
 				message.action.clearDraft = false;
+				message.action.topicRootId = topicRootId;
 				api.sendMessage(std::move(message));
 			}
-
-			auto action = Api::SendAction(_history, Api::SendOptions{.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer), .scheduled = options.scheduled});
-			action.clearDraft = false;
-			if (_history->peer->isUser() || _history->peer->isChannel() || _history->peer->isChat()) {
-				action.options.sendAs = nullptr;
-			}
-
-			auto resolved = _history->resolveForwardDraft(Data::ForwardDraft{.ids = data->msgIds, .options = Data::ForwardOptions::NoSenderNames});
-
-			api.forwardMessages(std::move(resolved), action, [] {
-				Ui::Toast::Show(tr::lng_share_done(tr::now));
-				Ui::hideLayer();
+			histories.sendRequest(history, requestType, [=](Fn<void()> finish) {
+				auto &api = history->session().api();
+				const auto sendFlags = commonSendFlags
+					| (topicRootId ? Flag::f_top_msg_id : Flag(0))
+					| (ShouldSendSilent(peer, options)
+						? Flag::f_silent
+						: Flag(0));
+				history->sendRequestId = api.request(
+					MTPmessages_ForwardMessages(
+						MTP_flags(sendFlags),
+						data->peer->input,
+						MTP_vector<MTPint>(msgIds),
+						MTP_vector<MTPlong>(generateRandom()),
+						peer->input,
+						MTP_int(topicRootId),
+						MTP_int(options.scheduled),
+						MTP_inputPeerEmpty() // send_as
+				)).done([=](const MTPUpdates &updates, mtpRequestId reqId) {
+					history->session().api().applyUpdates(updates);
+					data->requests.remove(reqId);
+					if (data->requests.empty()) {
+						Ui::Toast::Show(tr::lng_share_done(tr::now));
+						Ui::hideLayer();
+					}
+					finish();
+				}).fail([=](const MTP::Error &error) {
+					finish();
+				}).afterRequest(history->sendRequestId).send();
+				return history->sendRequestId;
 			});
-		}
-		if (data->submitCallback) {
-			data->submitCallback();
+			data->requests.insert(history->sendRequestId);
 		}
 	};
 	auto filterCallback = [](auto thread)  {
@@ -1941,7 +1973,11 @@ QPointer<Ui::BoxContent> ShowForwardNoQuoteMessagesBox(
 		.session = session,
 		.submitCallback = std::move(submitCallback),
 		.filterCallback = std::move(filterCallback),
-		.title = tr::lng_title_forward_as_copy()}));
+		.title = tr::lng_title_forward_as_copy(),
+		.forwardOptions = {
+			.messagesCount = int(data->msgIds.size()),
+		},
+	}));
 	return weak->data();
 }
 

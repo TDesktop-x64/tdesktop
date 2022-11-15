@@ -1869,7 +1869,7 @@ void OverlayWidget::forwardMedia() {
 		: FullMsgId();
 	if (id) {
 		close();
-		Window::ShowNewForwardMessagesBox(active.front(), { 1, id });
+		Window::ShowNewForwardMessagesBox(active.front(), { 1, id }, false);
 	}
 }
 

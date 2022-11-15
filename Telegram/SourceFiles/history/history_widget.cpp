@@ -7461,7 +7461,7 @@ void HistoryWidget::forwardSelected() {
 		return;
 	}
 	const auto weak = Ui::MakeWeak(this);
-	Window::ShowNewForwardMessagesBox(controller(), getSelectedItems(), [=] {
+	Window::ShowNewForwardMessagesBox(controller(), getSelectedItems(), false, [=] {
 		if (const auto strong = weak.data()) {
 			strong->clearSelected();
 		}
@@ -7473,7 +7473,7 @@ void HistoryWidget::forwardNoQuoteSelected() {
 		return;
 	}
 	const auto weak = Ui::MakeWeak(this);
-	Window::ShowForwardNoQuoteMessagesBox(controller(), getSelectedItems(), [=] {
+	Window::ShowNewForwardMessagesBox(controller(), getSelectedItems(), true, [=] {
 		if (const auto strong = weak.data()) {
 			strong->clearSelected();
 		}

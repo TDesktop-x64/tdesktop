@@ -4288,26 +4288,28 @@ void HistoryInner::oldForwardAsGroup(FullMsgId itemId) {
 }
 
 void HistoryInner::forwardItem(FullMsgId itemId) {
-	Window::ShowNewForwardMessagesBox(_controller, { 1, itemId });
+	Window::ShowNewForwardMessagesBox(_controller, { 1, itemId }, false);
 }
 
 void HistoryInner::forwardAsGroup(FullMsgId itemId) {
 	if (const auto item = session().data().message(itemId)) {
 		Window::ShowNewForwardMessagesBox(
 			_controller,
-			session().data().itemOrItsGroup(item));
+			session().data().itemOrItsGroup(item),
+			false);
 	}
 }
 
 void HistoryInner::forwardItemNoQuote(FullMsgId itemId) {
-	Window::ShowForwardNoQuoteMessagesBox(_controller, { 1, itemId });
+	Window::ShowNewForwardMessagesBox(_controller, { 1, itemId }, true);
 }
 
 void HistoryInner::forwardAsGroupNoQuote(FullMsgId itemId) {
 	if (const auto item = session().data().message(itemId)) {
-		Window::ShowForwardNoQuoteMessagesBox(
+		Window::ShowNewForwardMessagesBox(
 			_controller,
-			session().data().itemOrItsGroup(item));
+			session().data().itemOrItsGroup(item),
+			true);
 	}
 }
 

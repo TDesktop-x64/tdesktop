@@ -122,6 +122,7 @@ Fn<void()> DeleteAndLeaveHandler(
 QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 	not_null<Window::SessionNavigation*> navigation,
 	MessageIdsList &&items,
+	bool no_quote,
 	FnMut<void()> &&successCallback = nullptr);
 
 QPointer<Ui::BoxContent> ShowForwardMessagesBox(
@@ -136,11 +137,6 @@ QPointer<Ui::BoxContent> ShowDropMediaBox(
 	not_null<Window::SessionNavigation*> navigation,
 	std::shared_ptr<QMimeData> data,
 	not_null<Data::Forum*> forum,
-	FnMut<void()> &&successCallback = nullptr);
-
-QPointer<Ui::BoxContent> ShowForwardNoQuoteMessagesBox(
-	not_null<Window::SessionNavigation*> navigation,
-	MessageIdsList &&items,
 	FnMut<void()> &&successCallback = nullptr);
 
 QPointer<Ui::BoxContent> ShowSendNowMessagesBox(

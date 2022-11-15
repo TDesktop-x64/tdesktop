@@ -1688,10 +1688,11 @@ Api::SendAction prepareSendAction(
 	return result;
 }
 
-// Source from kotatogram
+// Source from share box
 QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 		not_null<Window::SessionNavigation*> navigation,
 		MessageIdsList &&items,
+		bool no_quote,
 		FnMut<void()> &&successCallback) {
 	struct ShareData {
 		ShareData(not_null<PeerData*> peer, MessageIdsList &&ids, FnMut<void()> &&callback)
@@ -1760,15 +1761,20 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 		}
 
 		using Flag = MTPmessages_ForwardMessages::Flag;
-		const auto commonSendFlags = Flag(0)
-			| Flag::f_with_my_score
-			| (options.scheduled ? Flag::f_schedule_date : Flag(0))
-			| ((forwardOptions != Data::ForwardOptions::PreserveInfo)
-				? Flag::f_drop_author
-				: Flag(0))
-			| ((forwardOptions == Data::ForwardOptions::NoNamesAndCaptions)
-				? Flag::f_drop_media_captions
-				: Flag(0));
+		auto commonSendFlags = MTPmessages_ForwardMessages::Flags(0);
+		if (no_quote) {
+			commonSendFlags = (options.scheduled ? Flag::f_schedule_date : Flag(0)) | Flag::f_drop_author;
+		} else {
+			commonSendFlags = commonSendFlags
+				| Flag::f_with_my_score
+				| (options.scheduled ? Flag::f_schedule_date : Flag(0))
+				| ((forwardOptions != Data::ForwardOptions::PreserveInfo)
+					? Flag::f_drop_author
+					: Flag(0))
+				| ((forwardOptions == Data::ForwardOptions::NoNamesAndCaptions)
+					? Flag::f_drop_media_captions
+					: Flag(0));
+		}
 		auto msgIds = QVector<MTPint>();
 		msgIds.reserve(data->msgIds.size());
 		for (const auto &fullId : data->msgIds) {
@@ -1836,146 +1842,11 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 		.session = session,
 		.submitCallback = std::move(submitCallback),
 		.filterCallback = std::move(filterCallback),
-		.title = tr::lng_title_multiple_forward(),
+		.title = no_quote ? tr::lng_title_forward_as_copy() : tr::lng_title_multiple_forward(),
 		.forwardOptions = {
 			.messagesCount = int(data->msgIds.size()),
 			.show = !hasOnlyForcedForwardedInfo,
 			.hasCaptions = hasCaptions,
-		},
-	}));
-	return weak->data();
-}
-
-QPointer<Ui::BoxContent> ShowForwardNoQuoteMessagesBox(
-		not_null<Window::SessionNavigation*> navigation,
-		MessageIdsList &&items,
-		FnMut<void()> &&successCallback) {
-	struct ShareData {
-		ShareData(not_null<PeerData*> peer, MessageIdsList &&ids, FnMut<void()> &&callback)
-		: peer(peer)
-		, msgIds(std::move(ids))
-		, submitCallback(std::move(callback)) {
-		}
-		not_null<PeerData*> peer;
-		MessageIdsList msgIds;
-		base::flat_set<mtpRequestId> requests;
-		FnMut<void()> submitCallback;
-	};
-	const auto weak = std::make_shared<QPointer<ShareBox>>();
-	const auto item = App::wnd()->sessionController()->session().data().message(items[0]);
-	const auto history = item->history();
-	const auto owner = &history->owner();
-	const auto session = &history->session();
-	const auto data = std::make_shared<ShareData>(history->peer, std::move(items), std::move(successCallback));
-
-	auto submitCallback = [=](
-			std::vector<not_null<Data::Thread*>> &&result,
-			TextWithTags &&comment,
-			Api::SendOptions options,
-			Data::ForwardOptions forwardOptions) {
-		if (!data->requests.empty()) {
-			return; // Share clicked already.
-		}
-		auto items = history->owner().idsToItems(data->msgIds);
-		if (items.empty() || result.empty()) {
-			return;
-		}
-
-		const auto error = [&] {
-			for (const auto thread : result) {
-				const auto error = GetErrorTextForSending(
-					thread,
-					{ .forward = &items, .text = &comment });
-				if (!error.isEmpty()) {
-					return std::make_pair(error, thread);
-				}
-			}
-			return std::make_pair(QString(), result.front());
-		}();
-		if (!error.first.isEmpty()) {
-			auto text = TextWithEntities();
-			if (result.size() > 1) {
-				text.append(
-					Ui::Text::Bold(error.second->chatListName())
-				).append("\n\n");
-			}
-			text.append(error.first);
-			Ui::show(Ui::MakeInformBox(text), Ui::LayerOption::KeepOther);
-			return;
-		}
-
-		using Flag = MTPmessages_ForwardMessages::Flag;
-		const auto commonSendFlags = (options.scheduled ? Flag::f_schedule_date : Flag(0)) | Flag::f_drop_author;
-		auto msgIds = QVector<MTPint>();
-		msgIds.reserve(data->msgIds.size());
-		for (const auto &fullId : data->msgIds) {
-			msgIds.push_back(MTP_int(fullId.msg));
-		}
-		const auto generateRandom = [&] {
-			auto result = QVector<MTPlong>(data->msgIds.size());
-			for (auto &value : result) {
-				value = base::RandomValue<MTPlong>();
-			}
-			return result;
-		};
-		auto &api = owner->session().api();
-		auto &histories = owner->histories();
-		const auto requestType = Data::Histories::RequestType::Send;
-		for (const auto thread : result) {
-			const auto topicRootId = thread->topicRootId();
-			const auto peer = thread->peer();
-			if (!comment.text.isEmpty()) {
-				auto message = Api::MessageToSend(
-					Api::SendAction(thread, options));
-				message.textWithTags = comment;
-				message.action.options = options;
-				message.action.clearDraft = false;
-				message.action.topicRootId = topicRootId;
-				api.sendMessage(std::move(message));
-			}
-			histories.sendRequest(history, requestType, [=](Fn<void()> finish) {
-				auto &api = history->session().api();
-				const auto sendFlags = commonSendFlags
-					| (topicRootId ? Flag::f_top_msg_id : Flag(0))
-					| (ShouldSendSilent(peer, options)
-						? Flag::f_silent
-						: Flag(0));
-				history->sendRequestId = api.request(
-					MTPmessages_ForwardMessages(
-						MTP_flags(sendFlags),
-						data->peer->input,
-						MTP_vector<MTPint>(msgIds),
-						MTP_vector<MTPlong>(generateRandom()),
-						peer->input,
-						MTP_int(topicRootId),
-						MTP_int(options.scheduled),
-						MTP_inputPeerEmpty() // send_as
-				)).done([=](const MTPUpdates &updates, mtpRequestId reqId) {
-					history->session().api().applyUpdates(updates);
-					data->requests.remove(reqId);
-					if (data->requests.empty()) {
-						Ui::Toast::Show(tr::lng_share_done(tr::now));
-						Ui::hideLayer();
-					}
-					finish();
-				}).fail([=](const MTP::Error &error) {
-					finish();
-				}).afterRequest(history->sendRequestId).send();
-				return history->sendRequestId;
-			});
-			data->requests.insert(history->sendRequestId);
-		}
-	};
-	auto filterCallback = [](auto thread)  {
-		return thread->canWrite();
-	};
-	*weak = Ui::show(Box<ShareBox>(ShareBox::Descriptor{
-		.session = session,
-		.submitCallback = std::move(submitCallback),
-		.filterCallback = std::move(filterCallback),
-		.title = tr::lng_title_forward_as_copy(),
-		.forwardOptions = {
-			.messagesCount = int(data->msgIds.size()),
 		},
 	}));
 	return weak->data();

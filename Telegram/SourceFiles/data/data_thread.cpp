@@ -169,9 +169,7 @@ void Thread::setUnreadMarkFlag(bool unread) {
 }
 
 void Thread::setHasPinnedMessages(bool has) {
-	if (hasPinnedMessages() == has) {
-		return;
-	} else if (has) {
+	if (has) {
 		_flags |= Flag::HasPinnedMessages;
 	} else {
 		_flags &= ~Flag::HasPinnedMessages;

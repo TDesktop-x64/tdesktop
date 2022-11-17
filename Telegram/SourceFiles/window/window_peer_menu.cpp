@@ -1310,14 +1310,14 @@ void Filler::fillArchiveActions() {
 void PeerMenuHidePinnedMessage(not_null<PeerData*> peer) {
 	auto hidden = HistoryWidget::switchPinnedHidden(peer, true);
 	if (hidden) {
-		peer->session().changes().historyUpdated(peer->owner().history(peer), Data::HistoryUpdate::Flag::IsPinned);
+		peer->owner().history(peer)->setHasPinnedMessages(true);
 	}
 }
 
 void PeerMenuUnhidePinnedMessage(not_null<PeerData*> peer) {
 	auto unhidden = HistoryWidget::switchPinnedHidden(peer, false);
 	if (unhidden) {
-		peer->session().changes().historyUpdated(peer->owner().history(peer), Data::HistoryUpdate::Flag::IsPinned);
+		peer->owner().history(peer)->setHasPinnedMessages(true);
 	}
 }
 

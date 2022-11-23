@@ -55,6 +55,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/delete_messages_box.h"
 #include "boxes/premium_preview_box.h"
 #include "boxes/peers/edit_participant_box.h"
+#include "core/crash_reports.h"
 #include "data/data_session.h"
 #include "data/data_sponsored_messages.h"
 #include "data/data_changes.h"
@@ -137,7 +138,10 @@ void ListWidget::enumerateItems(Method method) {
 	if (TopToBottom) {
 		Assert(itemTop(from->get()) + from->get()->height() > _visibleTop);
 	} else {
-		Assert(itemTop(from->get()) < _visibleBottom);
+		if (itemTop(from->get()) >= _visibleBottom) {
+			setGeometryCrashAnnotations(*from);
+			Unexpected("itemTop(from->get()) >= _visibleBottom");
+		}
 	}
 
 	while (true) {
@@ -149,7 +153,10 @@ void ListWidget::enumerateItems(Method method) {
 		if (TopToBottom) {
 			Assert(itembottom > _visibleTop);
 		} else {
-			Assert(itemtop < _visibleBottom);
+			if (itemtop >= _visibleBottom) {
+				setGeometryCrashAnnotations(view);
+				Unexpected("itemtop >= _visibleBottom");
+			}
 		}
 
 		if (!method(view, itemtop, itembottom)) {
@@ -440,6 +447,39 @@ void ListWidget::refreshViewer() {
 		std::swap(_slice, slice);
 		refreshRows(slice);
 	}, _viewerLifetime);
+}
+
+void ListWidget::setGeometryCrashAnnotations(not_null<Element*> view) {
+	CrashReports::SetAnnotation(
+		"Geometry",
+		u"size: %1x%2, visibleTop: %3, visibleBottom: %4, top: %5"_q
+		.arg(width())
+		.arg(height())
+		.arg(_visibleTop)
+		.arg(_visibleBottom)
+		.arg(_itemsTop));
+	const auto logItems = [&] {
+		auto items = QStringList();
+		auto top = _itemsTop;
+		auto index = 0;
+		for (const auto &some : _items) {
+			items.push_back(u"(%1)%2=%3,%4,%5"_q
+				.arg(index++)
+				.arg(top)
+				.arg(itemTop(some))
+				.arg(some->y())
+				.arg(some->height()));
+			top += some->height();
+		}
+		return items.join(';');
+	};
+	CrashReports::SetAnnotation("Chosen", u"%1,%2,%3"_q
+		.arg(itemTop(view))
+		.arg(view->y())
+		.arg(view->height()));
+	CrashReports::SetAnnotation("Before", logItems());
+	updateSize();
+	CrashReports::SetAnnotation("After", logItems());
 }
 
 void ListWidget::refreshRows(const Data::MessagesSlice &old) {
@@ -3167,7 +3207,6 @@ void ListWidget::mouseActionFinish(
 	};
 
 	auto activated = ClickHandler::unpressed();
-
 	auto simpleSelectionChange = pressState.itemId
 		&& !_pressWasInactive
 		&& (button != Qt::RightButton)

@@ -46,6 +46,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/report_messages_box.h"
 #include "boxes/sticker_set_box.h"
 #include "boxes/stickers_box.h"
+#include "boxes/translate_box.h"
 #include "data/data_photo.h"
 #include "data/data_photo_media.h"
 #include "data/data_document.h"
@@ -1213,6 +1214,19 @@ base::unique_qptr<Ui::PopupMenu> FillContextMenu(
 			}
 		}, &st::menuIconCopy);
 	}
+	if (request.overSelection
+		&& !Ui::SkipTranslate(list->getSelectedText().rich)) {
+		const auto owner = &view->history()->owner();
+		result->addAction(tr::lng_context_translate_selected(tr::now), [=] {
+			if (const auto item = owner->message(itemId)) {
+				list->controller()->show(Box(
+					Ui::TranslateBox,
+					item->history()->peer,
+					MsgId(),
+					list->getSelectedText().rich));
+			}
+		}, &st::menuIconTranslate);
+	}
 
 	AddTopMessageActions(result, request, list);
 	if (lnkPhoto && request.selectedItems.empty()) {
@@ -1246,6 +1260,19 @@ base::unique_qptr<Ui::PopupMenu> FillContextMenu(
 					}
 				}
 			}, &st::menuIconCopy);
+		}
+		if (!link
+			&& (view->hasVisibleText() || mediaHasTextForCopy)
+			&& !Ui::SkipTranslate(item->originalText())) {
+			result->addAction(tr::lng_context_translate(tr::now), [=] {
+				if (const auto item = owner->message(itemId)) {
+					list->controller()->show(Box(
+						Ui::TranslateBox,
+						item->history()->peer,
+						item->fullId().msg,
+						item->originalText()));
+				}
+			}, &st::menuIconTranslate);
 		}
 	}
 

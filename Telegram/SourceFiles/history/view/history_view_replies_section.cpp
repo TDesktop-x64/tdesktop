@@ -1815,8 +1815,7 @@ std::optional<bool> RepliesWidget::cornerButtonsDownShown() {
 }
 
 bool RepliesWidget::cornerButtonsUnreadMayBeShown() {
-	return _inner->loadedAtBottomKnown()
-		&& !_composeControls->isLockPresent();
+	return _loaded && !_composeControls->isLockPresent();
 }
 
 bool RepliesWidget::cornerButtonsHas(CornerButtonType type) {

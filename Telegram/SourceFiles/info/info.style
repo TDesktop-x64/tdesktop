@@ -326,6 +326,8 @@ infoTopicCover: InfoProfileCover(infoProfileMegagroupCover) {
 	statusTop: 38px;
 }
 
+infoProfileInaccessibleUserpic: icon {{ "info/inaccessible_userpic", historyPeerUserpicFg }};
+
 infoVerifiedCheckPosition: point(4px, 2px);
 infoVerifiedCheck: icon {
 	{ "profile_verified_star", profileVerifiedCheckBg },
@@ -400,6 +402,7 @@ infoLabeledOneLine: FlatLabel(defaultFlatLabel) {
 	style: TextStyle(defaultTextStyle) {
 		lineHeight: 19px;
 	}
+	margin: margins(5px, 5px, 5px, 5px);
 }
 infoLabelSkip: 2px;
 infoLabel: FlatLabel(infoLabeledOneLine) {

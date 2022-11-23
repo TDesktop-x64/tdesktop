@@ -1,8 +1,8 @@
 {%- set GIT = "https://github.com" -%}
 {%- set GIT_FREEDESKTOP = GIT ~ "/gitlab-freedesktop-mirrors" -%}
-{%- set QT = "6_4_0" -%}
-{%- set QT_TAG = "v6.4.0" -%}
-{%- set QT_PREFIX = "/usr/local/desktop-app/Qt-6.4.0" -%}
+{%- set QT = "6_4_1" -%}
+{%- set QT_TAG = "v6.4.1" -%}
+{%- set QT_PREFIX = "/usr/local/desktop-app/Qt-6.4.1" -%}
 {%- set OPENSSL_VER = "1_1_1" -%}
 {%- set OPENSSL_PREFIX = "/usr/local/desktop-app/openssl-1.1.1" -%}
 {%- set CMAKE_VER = "3.24.3" -%}
@@ -56,7 +56,7 @@ ENV CXXFLAGS $CFLAGS
 FROM builder AS patches
 RUN git clone {{ GIT }}/desktop-app/patches.git \
 	&& cd patches \
-	&& git checkout b3b5f5cf92 \
+	&& git checkout 4f755b92cb \
 	&& rm -rf .git
 
 FROM builder AS nasm
@@ -97,6 +97,28 @@ RUN git clone -b v5.2.5 https://git.tukaani.org/xz.git \
 	&& DESTDIR="{{ LibrariesPath }}/xz-cache" cmake --install build \
 	&& cd .. \
 	&& rm -rf xz
+
+FROM builder AS protobuf
+RUN git clone --recursive -b v21.9 https://github.com/protocolbuffers/protobuf \
+    && cd protobuf \
+    && git clone https://github.com/abseil/abseil-cpp third_party/abseil-cpp \
+    && cd third_party/abseil-cpp \
+    && git checkout 273292d1cf \
+    && cd ../.. \
+    && mkdir build \
+    && cd build \
+    && cmake -GNinja .. \
+    	-DCMAKE_BUILD_TYPE=None \
+		-DCMAKE_C_FLAGS="$CFLAGS" \
+		-DCMAKE_CXX_FLAGS="$CXXFLAGS" \
+        -Dprotobuf_BUILD_TESTS=OFF \
+        -Dprotobuf_BUILD_PROTOBUF_BINARIES=ON \
+        -Dprotobuf_BUILD_LIBPROTOC=ON \
+        -Dprotobuf_WITH_ZLIB_DEFAULT=OFF \
+        -Dprotobuf_DEBUG_POSTFIX="" \
+    && cmake --build . --parallel \
+    && cd .. \
+    && rm -rf .git
 
 FROM patches AS libproxy
 RUN git clone -b 0.4.17 --depth=1 {{ GIT }}/libproxy/libproxy.git \
@@ -759,6 +781,7 @@ FROM builder-base
 COPY --link --from=libffi {{ LibrariesPath }}/libffi-cache /
 COPY --link --from=zlib {{ LibrariesPath }}/zlib-cache /
 COPY --link --from=xz {{ LibrariesPath }}/xz-cache /
+COPY --link --from=protobuf {{ LibrariesPath }}/protobuf protobuf
 COPY --link --from=libproxy {{ LibrariesPath }}/libproxy-cache /
 COPY --link --from=lcms2 {{ LibrariesPath }}/lcms2-cache /
 COPY --link --from=brotli {{ LibrariesPath }}/brotli-cache /

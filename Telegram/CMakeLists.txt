@@ -289,6 +289,8 @@ PRIVATE
     boxes/sticker_set_box.h
     boxes/stickers_box.cpp
     boxes/stickers_box.h
+    boxes/translate_box.cpp
+    boxes/translate_box.h
     boxes/url_auth_box.cpp
     boxes/url_auth_box.h
     boxes/username_box.cpp
@@ -585,6 +587,8 @@ PRIVATE
     dialogs/ui/dialogs_layout.h
     dialogs/ui/dialogs_message_view.cpp
     dialogs/ui/dialogs_message_view.h
+    dialogs/ui/dialogs_topics_view.cpp
+    dialogs/ui/dialogs_topics_view.h
     dialogs/ui/dialogs_video_userpic.cpp
     dialogs/ui/dialogs_video_userpic.h
     editor/color_picker.cpp
@@ -1129,6 +1133,7 @@ PRIVATE
     platform/platform_integration.h
     platform/platform_main_window.h
     platform/platform_notifications_manager.h
+    platform/platform_specific.cpp
     platform/platform_specific.h
     platform/platform_tray.h
     platform/platform_window_title.h
@@ -1687,8 +1692,8 @@ endif()
 
 if (LINUX AND DESKTOP_APP_USE_PACKAGED)
     include(GNUInstallDirs)
-    configure_file("../lib/xdg/telegramdesktop.metainfo.xml" "${CMAKE_CURRENT_BINARY_DIR}/telegramdesktop.metainfo.xml" @ONLY)
-    generate_appdata_changelog(Telegram "${CMAKE_SOURCE_DIR}/changelog.txt" "${CMAKE_CURRENT_BINARY_DIR}/telegramdesktop.metainfo.xml")
+    configure_file("../lib/xdg/org.telegram.desktop.metainfo.xml" "${CMAKE_CURRENT_BINARY_DIR}/org.telegram.desktop.metainfo.xml" @ONLY)
+    generate_appdata_changelog(Telegram "${CMAKE_SOURCE_DIR}/changelog.txt" "${CMAKE_CURRENT_BINARY_DIR}/org.telegram.desktop.metainfo.xml")
     install(TARGETS Telegram RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" BUNDLE DESTINATION "${CMAKE_INSTALL_BINDIR}")
     install(FILES "Resources/art/icon16.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/16x16/apps" RENAME "telegram.png")
     install(FILES "Resources/art/icon32.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/32x32/apps" RENAME "telegram.png")
@@ -1697,6 +1702,6 @@ if (LINUX AND DESKTOP_APP_USE_PACKAGED)
     install(FILES "Resources/art/icon128.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/128x128/apps" RENAME "telegram.png")
     install(FILES "Resources/art/icon256.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps" RENAME "telegram.png")
     install(FILES "Resources/art/icon512.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/512x512/apps" RENAME "telegram.png")
-    install(FILES "../lib/xdg/telegramdesktop.desktop" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications")
-    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/telegramdesktop.metainfo.xml" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/metainfo")
+    install(FILES "../lib/xdg/org.telegram.desktop.desktop" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications")
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/org.telegram.desktop.metainfo.xml" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/metainfo")
 endif()

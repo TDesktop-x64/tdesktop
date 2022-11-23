@@ -2297,14 +2297,37 @@ void Updates::feedUpdate(const MTPUpdate &update) {
 		const auto &d = update.c_updateChannelPinnedTopic();
 		const auto peerId = peerFromChannel(d.vchannel_id());
 		if (const auto peer = session().data().peerLoaded(peerId)) {
-			const auto rootId = d.vtopic_id().value_or_empty();
+			const auto rootId = d.vtopic_id().v;
 			if (const auto topic = peer->forumTopicFor(rootId)) {
-				session().data().setChatPinned(topic, 0, true);
+				session().data().setChatPinned(topic, 0, d.is_pinned());
 			} else if (const auto forum = peer->forum()) {
-				if (rootId) {
-					forum->requestTopic(rootId);
-				} else {
-					forum->unpinTopic();
+				forum->requestTopic(rootId);
+			}
+		}
+	} break;
+
+	case mtpc_updateChannelPinnedTopics: {
+		const auto &d = update.c_updateChannelPinnedTopics();
+		const auto peerId = peerFromChannel(d.vchannel_id());
+		if (const auto peer = session().data().peerLoaded(peerId)) {
+			if (const auto forum = peer->forum()) {
+				const auto done = [&] {
+					const auto list = d.vorder();
+					if (!list) {
+						return false;
+					}
+					const auto &order = list->v;
+					const auto notLoaded = [&](const MTPint &topicId) {
+						return !forum->topicFor(topicId.v);
+					};
+					if (!ranges::none_of(order, notLoaded)) {
+						return false;
+					}
+					session().data().applyPinnedTopics(forum, order);
+					return true;
+				}();
+				if (!done) {
+					forum->reloadTopics();
 				}
 			}
 		}

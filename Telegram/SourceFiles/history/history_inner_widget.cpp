@@ -55,6 +55,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/report_messages_box.h"
 #include "boxes/sticker_set_box.h"
 #include "boxes/premium_preview_box.h"
+#include "boxes/translate_box.h"
 #include "chat_helpers/message_field.h"
 #include "chat_helpers/emoji_interactions.h"
 #include "history/history_widget.h"
@@ -568,7 +569,7 @@ bool HistoryInner::hasSelectRestriction() const {
 }
 
 void HistoryInner::messagesReceived(
-		PeerData *peer,
+		not_null<PeerData*> peer,
 		const QVector<MTPMessage> &messages) {
 	if (_history->peer == peer) {
 		_history->addOlderSlice(messages);
@@ -583,7 +584,9 @@ void HistoryInner::messagesReceived(
 	}
 }
 
-void HistoryInner::messagesReceivedDown(PeerData *peer, const QVector<MTPMessage> &messages) {
+void HistoryInner::messagesReceivedDown(
+		not_null<PeerData*> peer,
+		const QVector<MTPMessage> &messages) {
 	if (_history->peer == peer) {
 		const auto oldLoaded = _migrated
 			&& _history->isEmpty()
@@ -2298,13 +2301,24 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 	if (lnkPhoto || lnkDocument) {
 		const auto item = _dragStateItem;
 		const auto itemId = item ? item->fullId() : FullMsgId();
-		if (isUponSelected > 0 && !hasCopyRestrictionForSelected()) {
-			_menu->addAction(
-				(isUponSelected > 1
-					? tr::lng_context_copy_selected_items(tr::now)
-					: tr::lng_context_copy_selected(tr::now)),
-				[=] { copySelectedText(); },
-				&st::menuIconCopy);
+		if (isUponSelected > 0) {
+			if (!hasCopyRestrictionForSelected()) {
+				_menu->addAction(
+					(isUponSelected > 1
+						? tr::lng_context_copy_selected_items(tr::now)
+						: tr::lng_context_copy_selected(tr::now)),
+					[=] { copySelectedText(); },
+					&st::menuIconCopy);
+			}
+			if (!Ui::SkipTranslate(getSelectedText().rich)) {
+				_menu->addAction(tr::lng_context_translate_selected({}), [=] {
+					_controller->show(Box(
+						Ui::TranslateBox,
+						item->history()->peer,
+						MsgId(),
+						getSelectedText().rich));
+				}, &st::menuIconTranslate);
+			}
 		}
 		addItemActions(item, item);
 		if (!selectedState.count) {
@@ -2503,6 +2517,15 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					[=] { copySelectedText(); },
 					&st::menuIconCopy);
 			}
+			if (!Ui::SkipTranslate(getSelectedText().rich)) {
+				_menu->addAction(tr::lng_context_translate_selected({}), [=] {
+					_controller->show(Box(
+						Ui::TranslateBox,
+						item->history()->peer,
+						MsgId(),
+						getSelectedText().rich));
+				}, &st::menuIconTranslate);
+			}
 			addItemActions(item, item);
 		} else {
 			addItemActions(item, albumPartItem);
@@ -2559,6 +2582,19 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					_menu->addAction(tr::lng_context_copy_text(tr::now), [=] {
 						copyContextText(itemId);
 					}, &st::menuIconCopy);
+				}
+				if (!item->isService()
+					&& view
+					&& actionText.isEmpty()
+					&& (view->hasVisibleText() || mediaHasTextForCopy)
+					&& !Ui::SkipTranslate(item->originalText())) {
+					_menu->addAction(tr::lng_context_translate(tr::now), [=] {
+						_controller->show(Box(
+							Ui::TranslateBox,
+							item->history()->peer,
+							item->fullId().msg,
+							item->originalText()));
+					}, &st::menuIconTranslate);
 				}
 			}
 		}

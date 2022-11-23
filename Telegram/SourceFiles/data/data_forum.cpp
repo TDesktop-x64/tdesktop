@@ -37,14 +37,16 @@ constexpr auto kTopicsFirstLoad = 20;
 constexpr auto kLoadedTopicsMinCount = 20;
 constexpr auto kTopicsPerPage = 500;
 constexpr auto kStalePerRequest = 100;
+constexpr auto kShowTopicNamesCount = 8;
 // constexpr auto kGeneralColorId = 0xA9A9A9;
 
 } // namespace
 
 Forum::Forum(not_null<History*> history)
 : _history(history)
-, _topicsList(&session(), FilterId(0), rpl::single(1)) {
+, _topicsList(&session(), {}, owner().maxPinnedChatsLimitValue(this)) {
 	Expects(_history->peer->isChannel());
+
 
 	if (_history->inChatList()) {
 		preloadTopics();
@@ -95,13 +97,6 @@ not_null<Dialogs::MainList*> Forum::topicsList() {
 	return &_topicsList;
 }
 
-void Forum::unpinTopic() {
-	const auto list = _topicsList.pinned();
-	while (!list->order().empty()) {
-		list->setPinned(list->order().front(), false);
-	}
-}
-
 rpl::producer<> Forum::destroyed() const {
 	return channel()->flagsValue(
 	) | rpl::filter([=](const ChannelData::Flags::Change &update) {
@@ -147,9 +142,12 @@ void Forum::requestTopics() {
 		MTP_int(_offset.topicId),
 		MTP_int(loadCount)
 	)).done([=](const MTPmessages_ForumTopics &result) {
+		const auto previousOffset = _offset;
 		applyReceivedTopics(result, _offset);
 		const auto &list = result.data().vtopics().v;
-		if (list.isEmpty() || list.size() == result.data().vcount().v) {
+		if (list.isEmpty()
+			|| list.size() == result.data().vcount().v
+			|| (_offset == previousOffset)) {
 			_topicsList.setLoaded();
 		}
 		_requestId = 0;
@@ -157,6 +155,7 @@ void Forum::requestTopics() {
 		if (_topicsList.loaded()) {
 			_chatsListLoadedEvents.fire({});
 		}
+		reorderLastTopics();
 		requestSomeStale();
 	}).fail([=](const MTP::Error &error) {
 		_requestId = 0;
@@ -176,6 +175,11 @@ void Forum::applyTopicDeleted(MsgId rootId) {
 		const auto raw = i->second.get();
 		Core::App().notifications().clearFromTopic(raw);
 		owner().removeChatListEntry(raw);
+
+		if (ranges::contains(_lastTopics, not_null(raw))) {
+			reorderLastTopics();
+		}
+
 		_topicDestroyed.fire(raw);
 		_topics.erase(i);
 
@@ -184,6 +188,65 @@ void Forum::applyTopicDeleted(MsgId rootId) {
 			_history->peer->id,
 			rootId));
 		_history->setForwardDraft(rootId, {});
+	}
+}
+
+void Forum::reorderLastTopics() {
+	// We want first kShowChatNamesCount histories, by last message date.
+	const auto pred = [](not_null<ForumTopic*> a, not_null<ForumTopic*> b) {
+		const auto aItem = a->chatListMessage();
+		const auto bItem = b->chatListMessage();
+		const auto aDate = aItem ? aItem->date() : TimeId(0);
+		const auto bDate = bItem ? bItem->date() : TimeId(0);
+		return aDate > bDate;
+	};
+	_lastTopics.clear();
+	_lastTopics.reserve(kShowTopicNamesCount + 1);
+	auto &&topics = ranges::views::all(
+		*_topicsList.indexed()
+	) | ranges::views::transform([](not_null<Dialogs::Row*> row) {
+		return row->topic();
+	});
+	auto nonPinnedChecked = 0;
+	for (const auto topic : topics) {
+		const auto i = ranges::upper_bound(
+			_lastTopics,
+			not_null(topic),
+			pred);
+		if (size(_lastTopics) < kShowTopicNamesCount
+			|| i != end(_lastTopics)) {
+			_lastTopics.insert(i, topic);
+		}
+		if (size(_lastTopics) > kShowTopicNamesCount) {
+			_lastTopics.pop_back();
+		}
+		if (!topic->isPinnedDialog(FilterId())
+			&& ++nonPinnedChecked >= kShowTopicNamesCount) {
+			break;
+		}
+	}
+	++_lastTopicsVersion;
+	_history->updateChatListEntry();
+}
+
+int Forum::recentTopicsListVersion() const {
+	return _lastTopicsVersion;
+}
+
+void Forum::recentTopicsInvalidate(not_null<ForumTopic*> topic) {
+	if (ranges::contains(_lastTopics, topic)) {
+		++_lastTopicsVersion;
+		_history->updateChatListEntry();
+	}
+}
+
+const std::vector<not_null<ForumTopic*>> &Forum::recentTopics() const {
+	return _lastTopics;
+}
+
+void Forum::listMessageChanged(HistoryItem *from, HistoryItem *to) {
+	if (from || to) {
+		reorderLastTopics();
 	}
 }
 
@@ -207,7 +270,16 @@ void Forum::applyReceivedTopics(
 	owner().processChats(data.vchats());
 	owner().processMessages(data.vmessages(), NewMessageType::Existing);
 	channel()->ptsReceived(data.vpts().v);
-	const auto &list = data.vtopics().v;
+	applyReceivedTopics(data.vtopics(), std::move(callback));
+	if (!_staleRootIds.empty()) {
+		requestSomeStale();
+	}
+}
+
+void Forum::applyReceivedTopics(
+		const MTPVector<MTPForumTopic> &topics,
+		Fn<void(not_null<ForumTopic*>)> callback) {
+	const auto &list = topics.v;
 	for (const auto &topic : list) {
 		const auto rootId = topic.match([&](const auto &data) {
 			return data.vid().v;
@@ -237,9 +309,6 @@ void Forum::applyReceivedTopics(
 				callback(raw);
 			}
 		});
-	}
-	if (!_staleRootIds.empty()) {
-		requestSomeStale();
 	}
 }
 
@@ -342,6 +411,7 @@ ForumTopic *Forum::applyTopicAdded(
 	if (!creating(rootId)) {
 		raw->addToChatList(FilterId(), topicsList());
 		_chatsListChanges.fire({});
+		reorderLastTopics();
 	}
 	return raw;
 }
@@ -393,6 +463,8 @@ void Forum::created(MsgId rootId, MsgId realId) {
 			realId,
 			std::move(topic)
 		).first->second->setRealRootId(realId);
+
+		reorderLastTopics();
 	}
 	owner().notifyItemIdChange({ id, rootId });
 }

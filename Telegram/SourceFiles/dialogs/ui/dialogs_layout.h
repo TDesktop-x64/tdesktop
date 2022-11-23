@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "ui/cached_round_corners.h"
+
 namespace style {
 struct DialogRow;
 } // namespace style
@@ -35,8 +37,24 @@ using namespace ::Ui;
 
 class VideoUserpic;
 
+struct TopicJumpCorners {
+	Ui::CornersPixmaps normal;
+	Ui::CornersPixmaps inverted;
+	QPixmap small;
+	int invertedRadius = 0;
+	int smallKey = 0; // = `-radius` if top right else `radius`.
+};
+
+struct TopicJumpCache {
+	TopicJumpCorners corners;
+	TopicJumpCorners over;
+	TopicJumpCorners selected;
+	TopicJumpCorners rippleMask;
+};
+
 struct PaintContext {
 	not_null<const style::DialogRow*> st;
+	TopicJumpCache *topicJumpCache = nullptr;
 	Data::Folder *folder = nullptr;
 	Data::Forum *forum = nullptr;
 	FilterId filter = 0;
@@ -44,6 +62,7 @@ struct PaintContext {
 	int width = 0;
 	bool active = false;
 	bool selected = false;
+	bool topicJumpSelected = false;
 	bool paused = false;
 	bool search = false;
 	bool narrow = false;

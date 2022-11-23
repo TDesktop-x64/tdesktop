@@ -84,7 +84,6 @@ std::unique_ptr<Data::Forum> MegagroupInfo::takeForumData() {
 		return result;
 	}
 	return nullptr;
-
 }
 
 ChannelData::ChannelData(not_null<Data::Session*> owner, PeerId id)
@@ -896,6 +895,12 @@ void ChannelData::setAllowedReactions(Data::AllowedReactions value) {
 
 const Data::AllowedReactions &ChannelData::allowedReactions() const {
 	return _allowedReactions;
+}
+
+void ChannelData::processTopics(const MTPVector<MTPForumTopic> &topics) {
+	if (const auto forum = this->forum()) {
+		forum->applyReceivedTopics(topics);
+	}
 }
 
 namespace Data {

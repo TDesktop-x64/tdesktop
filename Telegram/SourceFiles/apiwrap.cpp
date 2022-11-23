@@ -39,6 +39,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_web_page.h"
 #include "data/data_folder.h"
 #include "data/data_forum_topic.h"
+#include "data/data_forum.h"
 #include "data/data_media_types.h"
 #include "data/data_sparse_ids.h"
 #include "data/data_search_controller.h"
@@ -384,10 +385,8 @@ void ApiWrap::checkChatInvite(
 }
 
 void ApiWrap::savePinnedOrder(Data::Folder *folder) {
-	const auto &order = _session->data().pinnedChatsOrder(
-		folder,
-		FilterId());
-	const auto input = [](const Dialogs::Key &key) {
+	const auto &order = _session->data().pinnedChatsOrder(folder);
+	const auto input = [](Dialogs::Key key) {
 		if (const auto history = key.history()) {
 			return MTP_inputDialogPeer(history->peer->input);
 		} else if (const auto folder = key.folder()) {
@@ -406,6 +405,29 @@ void ApiWrap::savePinnedOrder(Data::Folder *folder) {
 		MTP_int(folder ? folder->id() : 0),
 		MTP_vector(peers)
 	)).send();
+}
+
+void ApiWrap::savePinnedOrder(not_null<Data::Forum*> forum) {
+	const auto &order = _session->data().pinnedChatsOrder(forum);
+	const auto input = [](Dialogs::Key key) {
+		if (const auto topic = key.topic()) {
+			return MTP_int(topic->rootId().bare);
+		}
+		Unexpected("Key type in pinnedDialogsOrder().");
+	};
+	auto topics = QVector<MTPint>();
+	topics.reserve(order.size());
+	ranges::transform(
+		order,
+		ranges::back_inserter(topics),
+		input);
+	request(MTPchannels_ReorderPinnedForumTopics(
+		MTP_flags(MTPchannels_ReorderPinnedForumTopics::Flag::f_force),
+		forum->channel()->inputChannel,
+		MTP_vector(topics)
+	)).done([=](const MTPUpdates &result) {
+		applyUpdates(result);
+	}).send();
 }
 
 void ApiWrap::toggleHistoryArchived(
@@ -2870,18 +2892,18 @@ void ApiWrap::requestMessageAfterDate(
 			};
 			const auto list = result.match([&](
 					const MTPDmessages_messages &data) {
-				return handleMessages(result.c_messages_messages());
+				return handleMessages(data);
 			}, [&](const MTPDmessages_messagesSlice &data) {
-				return handleMessages(result.c_messages_messagesSlice());
+				return handleMessages(data);
 			}, [&](const MTPDmessages_channelMessages &data) {
-				const auto &messages = result.c_messages_channelMessages();
-				if (peer && peer->isChannel()) {
-					peer->asChannel()->ptsReceived(messages.vpts().v);
+				if (const auto channel = peer->asChannel()) {
+					channel->ptsReceived(data.vpts().v);
+					channel->processTopics(data.vtopics());
 				} else {
 					LOG(("API Error: received messages.channelMessages when "
 						"no channel was passed! (ApiWrap::jumpToDate)"));
 				}
-				return handleMessages(messages);
+				return handleMessages(data);
 			}, [&](const MTPDmessages_messagesNotModified &) {
 				LOG(("API Error: received messages.messagesNotModified! "
 					"(ApiWrap::jumpToDate)"));
@@ -3352,7 +3374,10 @@ void ApiWrap::sendFiles(
 		std::shared_ptr<SendingAlbum> album,
 		const SendAction &action) {
 	const auto haveCaption = !caption.text.isEmpty();
-	if (haveCaption && !list.canAddCaption(album != nullptr)) {
+	if (haveCaption
+		&& !list.canAddCaption(
+			album != nullptr,
+			type == SendMediaType::Photo)) {
 		auto message = MessageToSend(action);
 		message.textWithTags = base::take(caption);
 		message.action.clearDraft = false;

@@ -417,8 +417,21 @@ void Widget::chosenRow(const ChosenRow &row) {
 	const auto openSearchResult = !controller()->selectingPeer()
 		&& row.filteredRow;
 	const auto history = row.key.history();
-	if (const auto topic = row.key.topic()) {
-		controller()->content()->chooseThread(topic, row.message.fullId.msg);
+	const auto topicJump = history
+		? history->peer->forumTopicFor(row.message.fullId.msg)
+		: nullptr;
+	if (topicJump) {
+		if (!controller()->adaptive().isOneColumn()) {
+			controller()->openForum(history->peer->asChannel());
+		}
+		controller()->content()->chooseThread(
+			topicJump,
+			ShowAtUnreadMsgId);
+		return;
+	} else if (const auto topic = row.key.topic()) {
+		controller()->content()->chooseThread(
+			topic,
+			row.message.fullId.msg);
 	} else if (history && history->peer->isForum() && !row.message.fullId) {
 		controller()->openForum(history->peer->asChannel());
 		return;
@@ -1685,6 +1698,7 @@ void Widget::searchReceived(
 		if (const auto peer = searchInPeer()) {
 			if (const auto channel = peer->asChannel()) {
 				channel->ptsReceived(data.vpts().v);
+				channel->processTopics(data.vtopics());
 			} else {
 				LOG(("API Error: "
 					"received messages.channelMessages when no channel "
@@ -2376,7 +2390,7 @@ bool Widget::cancelSearch() {
 	auto clearingInChat = false;
 	cancelSearchRequest();
 	if (!clearingQuery && (_searchInChat || _searchFromAuthor)) {
-		if (controller()->adaptive().isOneColumn()) {
+		if (_searchInChat && controller()->adaptive().isOneColumn()) {
 			if (const auto thread = _searchInChat.thread()) {
 				controller()->showThread(thread);
 			} else {

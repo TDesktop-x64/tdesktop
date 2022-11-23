@@ -204,6 +204,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_filter_pin_limit2#one" = "Unpin some of the currently pinned ones or subscribe to **Telegram Premium** to double the limit to **{count}** chat.";
 "lng_filter_pin_limit2#other" = "Unpin some of the currently pinned ones or subscribe to **Telegram Premium** to double the limit to **{count}** chats.";
 
+"lng_forum_pin_limit#one" = "Sorry, you can't pin more than **{count}** topic to the top.";
+"lng_forum_pin_limit#other" = "Sorry, you can't pin more than **{count}** topics to the top.";
+
 "lng_fave_sticker_limit_title#one" = "The Limit of {count} Stickers Reached";
 "lng_fave_sticker_limit_title#other" = "The Limit of {count} Stickers Reached";
 "lng_fave_sticker_limit_more#one" = "An older sticker was replaced with this one.\nYou can {link} to {count} sticker.";
@@ -2262,6 +2265,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_context_delete_from_disk" = "Delete from disk";
 "lng_context_delete_all_files" = "Delete all files";
 "lng_context_save_custom_sound" = "Save for notifications";
+"lng_context_translate" = "Translate";
+"lng_context_translate_selected" = "Translate Selected Text";
 
 "lng_context_animated_emoji" = "This message contains emoji from **{name} pack**.";
 "lng_context_animated_emoji_many#one" = "This message contains emoji from **{count} pack**.";
@@ -3392,6 +3397,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_language_not_ready_title" = "Insufficient data";
 "lng_language_not_ready_about" = "Unfortunately, this custom language pack ({lang_name}) doesn't contain data for 64Gram Desktop. You can contribute to this language pack using the {link}.";
 "lng_language_not_ready_link" = "translations platform";
+
+"lng_translate_box_original" = "Original";
+"lng_translate_box_error" = "Translate failed.";
+
+"lng_translate_settings_subtitle" = "Translate Messages";
+"lng_translate_settings_show" = "Show Translate Button";
+"lng_translate_settings_choose" = "Do Not Translate";
+"lng_translate_settings_about" = "The 'Translate' button will appear when you open a context menu on a text message.";
 
 "lng_launch_exe_warning" = "This file has a {extension} extension.\nAre you sure you want to run it?";
 "lng_launch_svg_warning" = "Opening this file can potentially expose your IP address to its sender. Continue?";

@@ -331,7 +331,7 @@ private:
 };
 
 History *FindWastedPin(not_null<Data::Session*> data, Data::Folder *folder) {
-	const auto &order = data->pinnedChatsOrder(folder, FilterId());
+	const auto &order = data->pinnedChatsOrder(folder);
 	for (const auto &pinned : order) {
 		if (const auto history = pinned.history()) {
 			if (history->peer->isChat()
@@ -352,29 +352,41 @@ void AddChatMembers(
 
 bool PinnedLimitReached(
 		not_null<Window::SessionController*> controller,
-		not_null<History*> history,
-		FilterId filterId) {
-	Expects(filterId != 0 || history->folderKnown());
-
-	const auto owner = &history->owner();
-	const auto folder = history->folder();
-	if (owner->pinnedCanPin(folder, filterId, history)) {
+		not_null<Data::Thread*> thread) {
+	const auto owner = &thread->owner();
+	if (owner->pinnedCanPin(thread)) {
 		return false;
 	}
 	// Some old chat, that was converted, maybe is still pinned.
-	const auto wasted = filterId ? nullptr : FindWastedPin(owner, folder);
+	const auto history = thread->asHistory();
+	if (!history) {
+		controller->show(Box(ForumPinsLimitBox, thread->asTopic()->forum()));
+		return true;
+	}
+	const auto folder = history->folder();
+	const auto wasted = FindWastedPin(owner, folder);
 	if (wasted) {
 		owner->setChatPinned(wasted, FilterId(), false);
 		owner->setChatPinned(history, FilterId(), true);
 		history->session().api().savePinnedOrder(folder);
-	} else if (filterId) {
-		controller->show(
-			Box(FilterPinsLimitBox, &history->session(), filterId));
 	} else if (folder) {
 		controller->show(Box(FolderPinsLimitBox, &history->session()));
 	} else {
 		controller->show(Box(PinsLimitBox, &history->session()));
 	}
+	return true;
+}
+
+bool PinnedLimitReached(
+		not_null<Window::SessionController*> controller,
+		not_null<History*> history,
+		FilterId filterId) {
+	const auto owner = &history->owner();
+	if (owner->pinnedCanPin(filterId, history)) {
+		return false;
+	}
+	controller->show(
+		Box(FilterPinsLimitBox, &history->session(), filterId));
 	return true;
 }
 
@@ -385,11 +397,9 @@ void TogglePinnedThread(
 		return;
 	}
 	const auto owner = &thread->owner();
-	const auto isPinned = !thread->isPinnedDialog(0);
-	if (const auto history = thread->asHistory()) {
-		if (isPinned && PinnedLimitReached(controller, history, 0)) {
-			return;
-		}
+	const auto isPinned = !thread->isPinnedDialog(FilterId());
+	if (isPinned && PinnedLimitReached(controller, thread)) {
+		return;
 	}
 
 	owner->setChatPinned(thread, FilterId(), isPinned);

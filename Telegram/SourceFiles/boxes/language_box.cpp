@@ -23,18 +23,21 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/text_options.h"
 #include "ui/painter.h"
 #include "storage/localstorage.h"
+#include "boxes/translate_box.h"
 #include "ui/boxes/confirm_box.h"
 #include "mainwidget.h"
 #include "mainwindow.h"
 #include "core/application.h"
 #include "lang/lang_instance.h"
 #include "lang/lang_cloud_manager.h"
+#include "settings/settings_common.h"
 #include "styles/style_layers.h"
 #include "styles/style_boxes.h"
 #include "styles/style_info.h"
 #include "styles/style_passport.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_menu_icons.h"
+#include "styles/style_settings.h"
 
 #include <QtGui/QGuiApplication>
 #include <QtGui/QClipboard>
@@ -1095,7 +1098,52 @@ void LanguageBox::prepare() {
 
 	setTitle(tr::lng_languages());
 
-	const auto select = createMultiSelect();
+	const auto topContainer = Ui::CreateChild<Ui::VerticalLayout>(this);
+	Settings::AddSubsectionTitle(
+		topContainer,
+		tr::lng_translate_settings_subtitle());
+
+	const auto translateEnabled = Settings::AddButton(
+		topContainer,
+		tr::lng_translate_settings_show(),
+		st::settingsButtonNoIcon
+	)->toggleOn(rpl::single(Core::App().settings().translateButtonEnabled()));
+
+	translateEnabled->toggledValue(
+	) | rpl::filter([](bool checked) {
+		return (checked != Core::App().settings().translateButtonEnabled());
+	}) | rpl::start_with_next([=](bool checked) {
+		Core::App().settings().setTranslateButtonEnabled(checked);
+		Core::App().saveSettingsDelayed();
+	}, translateEnabled->lifetime());
+
+	const auto label = lifetime().make_state<rpl::event_stream<QLocale>>();
+	const auto translateSkip = Settings::AddButtonWithLabel(
+		topContainer,
+		tr::lng_translate_settings_choose(),
+		label->events() | rpl::map(Ui::LanguageName),
+		st::settingsButtonNoIcon);
+	label->fire(QLocale(Core::App().settings().skipTranslationForLanguage()));
+	translateSkip->setClickedCallback([=] {
+		Ui::BoxShow(this).showBox(
+			Box(Ui::ChooseLanguageBox, [=](QLocale locale) {
+				label->fire(QLocale(locale));
+				Core::App().settings().setSkipTranslationForLanguage(
+					locale.language());
+			}),
+			Ui::LayerOption::KeepOther);
+	});
+	Settings::AddSkip(topContainer);
+	Settings::AddDividerText(
+		topContainer,
+		tr::lng_translate_settings_about());
+
+	const auto select = topContainer->add(
+		object_ptr<Ui::MultiSelect>(
+			topContainer,
+			st::defaultMultiSelect,
+			tr::lng_participant_filter()));
+	topContainer->resizeToWidth(st::boxWidth);
 
 	using namespace rpl::mappers;
 
@@ -1103,13 +1151,13 @@ void LanguageBox::prepare() {
 	const auto inner = setInnerWidget(
 		object_ptr<Content>(this, recent, official),
 		st::boxScroll,
-		select->height());
+		topContainer->height());
 	inner->resizeToWidth(st::boxWidth);
 
 	const auto max = lifetime().make_state<int>(0);
 	rpl::combine(
 		inner->heightValue(),
-		select->heightValue(),
+		topContainer->heightValue(),
 		_1 + _2
 	) | rpl::start_with_next([=](int height) {
 		accumulate_max(*max, height);
@@ -1178,16 +1226,6 @@ int LanguageBox::rowsInPage() const {
 
 void LanguageBox::setInnerFocus() {
 	_setInnerFocus();
-}
-
-not_null<Ui::MultiSelect*> LanguageBox::createMultiSelect() {
-	const auto result = Ui::CreateChild<Ui::MultiSelect>(
-		this,
-		st::defaultMultiSelect,
-		tr::lng_participant_filter());
-	result->resizeToWidth(st::boxWidth);
-	result->moveToLeft(0, 0);
-	return result;
 }
 
 base::binary_guard LanguageBox::Show() {

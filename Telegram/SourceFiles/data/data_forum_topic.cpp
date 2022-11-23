@@ -42,7 +42,7 @@ namespace {
 
 using UpdateFlag = TopicUpdate::Flag;
 
-constexpr auto kUserpicLoopsCount = 2;
+constexpr auto kUserpicLoopsCount = 1;
 
 } // namespace
 
@@ -178,6 +178,9 @@ ForumTopic::ForumTopic(not_null<Forum*> forum, MsgId rootId)
 	}) | rpl::start_with_next([=](
 			std::optional<int> previous,
 			std::optional<int> now) {
+		if (previous.value_or(0) != now.value_or(0)) {
+			_forum->recentTopicsInvalidate(this);
+		}
 		notifyUnreadStateChange(unreadStateFor(
 			previous.value_or(0),
 			previous.has_value()));
@@ -296,6 +299,8 @@ void ForumTopic::readTillEnd() {
 void ForumTopic::applyTopic(const MTPDforumTopic &data) {
 	Expects(_rootId == data.vid().v);
 
+	const auto min = data.is_short();
+
 	applyCreator(peerFromMTP(data.vfrom_id()));
 	applyCreationDate(data.vdate().v);
 
@@ -307,32 +312,31 @@ void ForumTopic::applyTopic(const MTPDforumTopic &data) {
 	}
 	applyColorId(data.vicon_color().v);
 
-	if (data.is_pinned()) {
-		owner().setChatPinned(this, 0, true);
-	} else {
-		_list->pinned()->setPinned(this, false);
-	}
-
-	owner().notifySettings().apply(this, data.vnotify_settings());
-
-	const auto draft = data.vdraft();
-	if (draft && draft->type() == mtpc_draftMessage) {
-		Data::ApplyPeerCloudDraft(
-			&session(),
-			channel()->id,
-			_rootId,
-			draft->c_draftMessage());
-	}
 	applyIsMy(data.is_my());
 	setClosed(data.is_closed());
 
-	_replies->setInboxReadTill(
-		data.vread_inbox_max_id().v,
-		data.vunread_count().v);
-	_replies->setOutboxReadTill(data.vread_outbox_max_id().v);
-	applyTopicTopMessage(data.vtop_message().v);
-	unreadMentions().setCount(data.vunread_mentions_count().v);
-	unreadReactions().setCount(data.vunread_reactions_count().v);
+	if (!min) {
+		owner().setPinnedFromEntryList(this, data.is_pinned());
+		owner().notifySettings().apply(this, data.vnotify_settings());
+
+		if (const auto draft = data.vdraft()) {
+			draft->match([&](const MTPDdraftMessage &data) {
+				Data::ApplyPeerCloudDraft(
+					&session(),
+					channel()->id,
+					_rootId,
+					data);
+			}, [](const MTPDdraftMessageEmpty&) {});
+		}
+
+		_replies->setInboxReadTill(
+			data.vread_inbox_max_id().v,
+			data.vunread_count().v);
+		_replies->setOutboxReadTill(data.vread_outbox_max_id().v);
+		applyTopicTopMessage(data.vtop_message().v);
+		unreadMentions().setCount(data.vunread_mentions_count().v);
+		unreadReactions().setCount(data.vunread_reactions_count().v);
+	}
 }
 
 void ForumTopic::applyCreator(PeerId creatorId) {
@@ -486,7 +490,9 @@ void ForumTopic::setLastMessage(HistoryItem *item) {
 void ForumTopic::setChatListMessage(HistoryItem *item) {
 	if (_chatListMessage && *_chatListMessage == item) {
 		return;
-	} else if (item) {
+	}
+	const auto was = _chatListMessage.value_or(nullptr);
+	if (item) {
 		if (item->isSponsored()) {
 			return;
 		}
@@ -502,6 +508,7 @@ void ForumTopic::setChatListMessage(HistoryItem *item) {
 		_chatListMessage = nullptr;
 		updateChatListEntry();
 	}
+	_forum->listMessageChanged(was, item);
 }
 
 void ForumTopic::loadUserpic() {
@@ -616,12 +623,17 @@ TextWithEntities ForumTopic::titleWithIcon() const {
 	return ForumTopicIconWithTitle(_iconId, _title);
 }
 
+int ForumTopic::titleVersion() const {
+	return _titleVersion;
+}
+
 void ForumTopic::applyTitle(const QString &title) {
 	if (_title == title) {
 		return;
 	}
 	_title = title;
 	++_titleVersion;
+	_forum->recentTopicsInvalidate(this);
 	_defaultIcon = QImage();
 	indexTitleParts();
 	updateChatListEntry();
@@ -637,6 +649,7 @@ void ForumTopic::applyIconId(DocumentId iconId) {
 		return;
 	}
 	_iconId = iconId;
+	++_titleVersion;
 	_icon = iconId
 		? std::make_unique<Ui::Text::LimitedLoopsEmoji>(
 			owner().customEmojiManager().create(
@@ -728,10 +741,16 @@ Dialogs::UnreadState ForumTopic::chatListUnreadState() const {
 }
 
 Dialogs::BadgesState ForumTopic::chatListBadgesState() const {
-	return Dialogs::BadgesForUnread(
+	auto result = Dialogs::BadgesForUnread(
 		chatListUnreadState(),
 		Dialogs::CountInBadge::Messages,
 		Dialogs::IncludeInBadge::All);
+	if (!result.unread && _replies->inboxReadTillId() < 2) {
+		result.unread = channel()->amIn()
+			&& (_lastKnownServerMessageId > history()->inboxReadTillId());
+		result.unreadMuted = muted();
+	}
+	return result;
 }
 
 Dialogs::UnreadState ForumTopic::unreadStateFor(

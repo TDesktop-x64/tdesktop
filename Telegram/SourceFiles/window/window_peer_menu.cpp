@@ -1844,6 +1844,7 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 			});
 			data->requests.insert(history->sendRequestId);
 		}
+		data->submitCallback();
 	};
 	auto filterCallback = [](auto thread)  {
 		return thread->canWrite();

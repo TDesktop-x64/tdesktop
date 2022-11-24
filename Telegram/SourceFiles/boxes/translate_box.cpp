@@ -144,8 +144,13 @@ void TranslateBox(
 	box->setWidth(st::boxWideWidth);
 	box->addButton(tr::lng_box_ok(), [=] { box->closeBox(); });
 	const auto container = box->verticalLayout();
-	const auto defaultId = QLocale(
-		Core::App().settings().skipTranslationForLanguage()).name().mid(0, 2);
+	const auto settingsLang =
+		Core::App().settings().skipTranslationForLanguage();
+	const auto defaultId = (settingsLang == QLocale::English)
+		? Lang::LanguageIdOrDefault(Lang::Id())
+		: (settingsLang == QLocale::C)
+		? u"en"_q
+		: QLocale(settingsLang).name().mid(0, 2);
 
 	const auto api = box->lifetime().make_state<MTP::Sender>(
 		&peer->session().mtp());
@@ -153,6 +158,10 @@ void TranslateBox(
 		rpl::event_stream<QLocale> locale;
 	};
 	const auto state = box->lifetime().make_state<State>();
+
+	if (!IsServerMsgId(msgId)) {
+		msgId = 0;
+	}
 
 	using Flag = MTPmessages_translateText::Flag;
 	const auto flags = msgId
@@ -308,11 +317,10 @@ bool SkipTranslate(TextWithEntities textWithEntities) {
 	if (!Core::App().settings().translateButtonEnabled()) {
 		return true;
 	}
-	auto hasLetters = false;
-	constexpr auto kFirstChunk = 100;
+	constexpr auto kFirstChunk = size_t(100);
+	auto hasLetters = (text.size() >= kFirstChunk);
 	for (auto i = 0; i < kFirstChunk; i++) {
 		if (i >= text.size()) {
-			hasLetters = true; // Rest characters are unknown.
 			break;
 		}
 		if (text.at(i).isLetter()) {
@@ -327,7 +335,13 @@ bool SkipTranslate(TextWithEntities textWithEntities) {
 	if (result.unknown) {
 		return false;
 	}
-	const auto skip = Core::App().settings().skipTranslationForLanguage();
+	const auto settingsLang =
+		Core::App().settings().skipTranslationForLanguage();
+	const auto skip = (settingsLang == QLocale::English)
+		? QLocale(Lang::LanguageIdOrDefault(Lang::Id())).language()
+		: (settingsLang == QLocale::C)
+		? QLocale::English
+		: settingsLang;
 	return (result.locale.language() == skip);
 }
 

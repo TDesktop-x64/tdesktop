@@ -103,6 +103,7 @@ static void t_desktop_application_class_init(
 					"{sv}",
 					"activation-token",
 					g_variant_new_string(token.constData()));
+				qunsetenv("XDG_ACTIVATION_TOKEN");
 			}
 		}
 	};
@@ -290,6 +291,11 @@ void LaunchGApplication() {
 						nullptr)));
 
 			app->signal_startup().connect([=] {
+				// GNotification
+				InvokeQueued(qApp, [] {
+					Core::App().notifications().createManager();
+				});
+
 				QEventLoop loop;
 				loop.exec(QEventLoop::ApplicationExec);
 				app->quit();
@@ -416,13 +422,15 @@ bool GenerateDesktopFile(
 	const auto sourceFile = kDesktopFile.utf16();
 	const auto targetFile = targetPath + QGuiApplication::desktopFileName();
 
-	QString fileText;
-	QFile source(sourceFile);
-	if (source.open(QIODevice::ReadOnly)) {
-		QTextStream s(&source);
-		fileText = s.readAll();
-		source.close();
-	} else {
+	const auto sourceText = [&] {
+		QFile source(sourceFile);
+		if (source.open(QIODevice::ReadOnly)) {
+			return source.readAll().toStdString();
+		}
+		return std::string();
+	}();
+	
+	if (sourceText.empty()) {
 		if (!silent) {
 			LOG(("App Error: Could not open '%1' for read").arg(sourceFile));
 		}
@@ -432,7 +440,7 @@ bool GenerateDesktopFile(
 	try {
 		const auto target = Glib::KeyFile::create();
 		target->load_from_data(
-			fileText.toStdString(),
+			sourceText,
 			Glib::KeyFile::Flags::KEEP_COMMENTS
 				| Glib::KeyFile::Flags::KEEP_TRANSLATIONS);
 
@@ -513,6 +521,19 @@ bool GenerateDesktopFile(
 			targetPath,
 			md5Hash,
 			AppName.utf16().replace(' ', '_')));
+
+		const auto d = QFile::encodeName(QDir(cWorkingDir()).absolutePath());
+		hashMd5Hex(d.constData(), d.size(), md5Hash);
+
+		if (!Core::Sandbox::Instance().customWorkingDir()) {
+			const auto exePath = QFile::encodeName(
+				cExeDir() + cExeName());
+			hashMd5Hex(exePath.constData(), exePath.size(), md5Hash);
+		}
+
+		QFile::remove(qsl("%1org.telegram.desktop.%2.desktop").arg(
+			targetPath,
+			md5Hash));
 	}
 
 	return true;
@@ -571,11 +592,15 @@ std::optional<bool> IsDarkMode() {
 }
 
 bool AutostartSupported() {
+#ifndef DESKTOP_APP_DISABLE_DBUS_INTEGRATION
 	// snap sandbox doesn't allow creating files
 	// in folders with names started with a dot
 	// and doesn't provide any api to add an app to autostart
 	// thus, autostart isn't supported in snap
 	return !KSandbox::isSnap();
+#else // !DESKTOP_APP_DISABLE_DBUS_INTEGRATION
+	return false;
+#endif // DESKTOP_APP_DISABLE_DBUS_INTEGRATION
 }
 
 void AutostartToggle(bool enabled, Fn<void(bool)> done) {
@@ -702,13 +727,18 @@ void start() {
 					md5Hash.data());
 			}
 
-			return qsl("org.telegram.desktop.%1.desktop").arg(md5Hash);
+			return qsl("org.telegram.desktop._%1.desktop").arg(md5Hash);
 		}
 
 		return qsl("org.telegram.desktop.desktop");
 	}());
 
 	LOG(("Launcher filename: %1").arg(QGuiApplication::desktopFileName()));
+
+	if (!qEnvironmentVariableIsSet("XDG_ACTIVATION_TOKEN")
+		&& qEnvironmentVariableIsSet("DESKTOP_STARTUP_ID")) {
+		qputenv("XDG_ACTIVATION_TOKEN", qgetenv("DESKTOP_STARTUP_ID"));
+	}
 
 	qputenv("PULSE_PROP_application.name", AppName.utf8());
 	qputenv("PULSE_PROP_application.icon_name", base::IconName().toLatin1());
@@ -837,7 +867,6 @@ bool OpenSystemSettings(SystemSettingsType type) {
 }
 
 void NewVersionLaunched(int oldVersion) {
-	InstallLauncher();
 	if (oldVersion > 0
 		&& oldVersion <= 4000002
 		&& qEnvironmentVariableIsSet("WAYLAND_DISPLAY")

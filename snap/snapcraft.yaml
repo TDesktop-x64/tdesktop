@@ -15,7 +15,9 @@ architectures:
 
 apps:
   telegram-desktop:
-    command: bin/desktop-launch telegram-desktop
+    command: usr/bin/telegram-desktop
+    command-chain:
+      - bin/desktop-launch
     common-id: org.telegram.desktop
     desktop: usr/share/applications/org.telegram.desktop.desktop
     environment:
@@ -158,6 +160,7 @@ parts:
       - mozjpeg
       - openal
       - openssl
+      - protobuf
       - rnnoise
       - webrtc
 
@@ -217,8 +220,8 @@ parts:
     source-tag: 2.72.1
     plugin: meson
     build-packages:
-      - curl
       - meson
+      - mm-common
       - ninja-build
       - libglib2.0-dev
       - libxml-parser-perl
@@ -232,7 +235,6 @@ parts:
       - -Dsigc++-3.0:build-documentation=false
       - -Dsigc++-3.0:build-examples=false
       - -Dsigc++-3.0:validation=false
-      - -Dmm-common:use-network=true
     prime:
       - -./usr/include
       - -./usr/lib/$CRAFT_ARCH_TRIPLET/pkgconfig
@@ -337,6 +339,28 @@ parts:
       - -./usr/lib/$CRAFT_ARCH_TRIPLET/*.a
       - -./usr/lib/$CRAFT_ARCH_TRIPLET/*.so
       - -./usr/share
+
+  protobuf:
+    source: https://github.com/protocolbuffers/protobuf.git
+    source-depth: 1
+    source-tag: v21.9
+    plugin: cmake
+    build-packages:
+      - zlib1g-dev
+    stage-packages:
+      - zlib1g
+    cmake-generator: Ninja
+    cmake-parameters:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DCMAKE_INSTALL_PREFIX=/usr
+      - -DBUILD_SHARED_LIBS=ON
+      - -Dprotobuf_BUILD_TESTS=OFF
+    prime:
+      - -./usr/bin
+      - -./usr/include
+      - -./usr/lib/$CRAFT_ARCH_TRIPLET/cmake
+      - -./usr/lib/$CRAFT_ARCH_TRIPLET/pkgconfig
+      - -./usr/lib/$CRAFT_ARCH_TRIPLET/*.so
 
   qt:
     plugin: nil

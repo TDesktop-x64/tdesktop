@@ -397,7 +397,7 @@ if customRunCommand:
 stage('patches', """
     git clone https://github.com/desktop-app/patches.git
     cd patches
-    git checkout b14854c6f6
+    git checkout e1117dfb86
 """)
 
 stage('msys64', """
@@ -444,8 +444,6 @@ win:
     git clone https://chromium.googlesource.com/external/gyp
     cd gyp
     git checkout 9d09418933
-depends:patches/gyp.diff
-    git apply $LIBS_DIR/patches/gyp.diff
 mac:
     python3 -m pip install ^
         --ignore-installed ^
@@ -1152,22 +1150,22 @@ mac:
 """)
 
 if buildQt6:
-    stage('qt_6_3_1', """
+    stage('qt_6_3_2', """
 mac:
-    git clone -b v6.3.1 https://code.qt.io/qt/qt5.git qt_6_3_1
-    cd qt_6_3_1
+    git clone -b v6.3.2 https://code.qt.io/qt/qt5.git qt_6_3_2
+    cd qt_6_3_2
     perl init-repository --module-subset=qtbase,qtimageformats,qtsvg,qt5compat
-depends:patches/qtbase_6_3_1/*.patch
+depends:patches/qtbase_6_3_2/*.patch
     cd qtbase
 
-    find ../../patches/qtbase_6_3_1 -type f -print0 | sort -z | xargs -0 git apply
+    find ../../patches/qtbase_6_3_2 -type f -print0 | sort -z | xargs -0 git apply
     cd ..
 
     CONFIGURATIONS=-debug
 release:
     CONFIGURATIONS=-debug-and-release
 mac:
-    ./configure -prefix "$USED_PREFIX/Qt-6.3.1" \
+    ./configure -prefix "$USED_PREFIX/Qt-6.3.2" \
         $CONFIGURATIONS \
         -force-debug-info \
         -opensource \

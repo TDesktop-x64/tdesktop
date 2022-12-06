@@ -433,8 +433,8 @@ MainMenu::MainMenu(
 	parentResized();
 
 	_telegram->setMarkedText(Ui::Text::Link(
-		qsl("64Gram Desktop"),
-		qsl("https://github.com/TDesktop-x64/tdesktop")));
+		u"64Gram Desktop"_q,
+		u"https://github.com/TDesktop-x64/tdesktop"_q));
 	_telegram->setLinksTrusted();
 	_version->setMarkedText(
 		Ui::Text::Link(
@@ -698,8 +698,7 @@ void MainMenu::setupMenu() {
 			tr::lng_saved_messages(),
 			{ &st::settingsIconSavedMessages, kIconLightBlue }
 		)->setClickedCallback([=] {
-			const auto self = controller->session().user();
-			controller->content()->chooseThread(self, ShowAtUnreadMsgId);
+			controller->showPeerHistory(controller->session().user());
 		});
 	} else {
 		addAction(

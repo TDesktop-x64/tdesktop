@@ -24,7 +24,7 @@ StartWidget::StartWidget(
 	not_null<Data*> data)
 : Step(parent, account, data, true) {
 	setMouseTracking(true);
-	setTitleText(rpl::single(qsl("64Gram Desktop")));
+	setTitleText(rpl::single(u"64Gram Desktop"_q));
 	setDescriptionText(tr::lng_intro_about2());
 	show();
 }

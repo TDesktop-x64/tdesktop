@@ -63,6 +63,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/qt/qt_common_adapters.h"
 #include "base/qt/qt_key_modifiers.h"
 #include "base/unixtime.h"
+#include "base/call_delayed.h"
 #include "mainwindow.h"
 #include "layout/layout_selection.h"
 #include "main/main_session.h"
@@ -97,7 +98,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_sponsored_messages.h"
 #include "dialogs/ui/dialogs_video_userpic.h"
 #include "settings/settings_premium.h"
-#include "facades.h"
 #include "styles/style_chat.h"
 #include "styles/style_window.h" // st::windowMinWidth
 #include "styles/style_menu_icons.h"
@@ -233,7 +233,7 @@ public:
 		return _widget ? _widget->elementAnimationsPaused() : false;
 	}
 	bool elementHideReply(not_null<const Element*> view) override {
-		return false;
+		return view->isTopicRootReply();
 	}
 	bool elementShownUnread(not_null<const Element*> view) override {
 		return view->data()->unread(view->data()->history());
@@ -914,10 +914,8 @@ Ui::ChatPaintContext HistoryInner::preparePaintContext(
 }
 
 void HistoryInner::paintEvent(QPaintEvent *e) {
-	if (Ui::skipPaintEvent(this, e)) {
-		return;
-	}
-	if (hasPendingResizedItems()) {
+	if (_controller->contentOverlapped(this, e)
+		|| hasPendingResizedItems()) {
 		return;
 	} else if (_recountedAfterPendingResizedItems) {
 		_recountedAfterPendingResizedItems = false;
@@ -1145,7 +1143,8 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 
 		// paint the userpic if it intersects the painted rect
 		if (userpicTop + st::msgPhotoSize > clip.top()) {
-			if (const auto from = view->data()->displayFrom()) {
+			const auto item = view->data();
+			if (const auto from = item->displayFrom()) {
 				Dialogs::Ui::PaintUserpic(
 					p,
 					from,
@@ -1156,28 +1155,25 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 					width(),
 					st::msgPhotoSize,
 					context.paused);
-			} else if (const auto info = view->data()->hiddenSenderInfo()) {
+			} else if (const auto info = item->hiddenSenderInfo()) {
 				if (info->customUserpic.empty()) {
-					info->emptyUserpic.paint(
+					info->emptyUserpic.paintCircle(
 						p,
 						st::historyPhotoLeft,
 						userpicTop,
 						width(),
 						st::msgPhotoSize);
 				} else {
-					const auto painted = info->paintCustomUserpic(
+					auto &userpic = _hiddenSenderUserpics[item->id];
+					const auto valid = info->paintCustomUserpic(
 						p,
+						userpic,
 						st::historyPhotoLeft,
 						userpicTop,
 						width(),
 						st::msgPhotoSize);
-					if (!painted) {
-						const auto itemId = view->data()->fullId();
-						auto &v = _sponsoredUserpics[itemId.msg];
-						if (!info->customUserpic.isCurrentView(v)) {
-							v = info->customUserpic.createView();
-							info->customUserpic.load(&session(), itemId);
-						}
+					if (!valid) {
+						info->customUserpic.load(&session(), item->fullId());
 					}
 				}
 			} else {
@@ -1717,7 +1713,7 @@ std::unique_ptr<QMimeData> HistoryInner::prepareDrag() {
 			auto selectedState = getSelectionState();
 			if (selectedState.count > 0 && selectedState.count == selectedState.canForwardCount) {
 				session().data().setMimeForwardIds(getSelectedItems());
-				mimeData->setData(qsl("application/x-td-forward"), "1");
+				mimeData->setData(u"application/x-td-forward"_q, "1");
 			}
 		}
 		return mimeData;
@@ -1742,7 +1738,7 @@ std::unique_ptr<QMimeData> HistoryInner::prepareDrag() {
 		}
 		session().data().setMimeForwardIds(std::move(forwardIds));
 		auto result = std::make_unique<QMimeData>();
-		result->setData(qsl("application/x-td-forward"), "1");
+		result->setData(u"application/x-td-forward"_q, "1");
 		if (const auto media = view->media()) {
 			if (const auto document = media->getDocument()) {
 				const auto filepath = document->filepath(true);
@@ -2115,14 +2111,8 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 		const auto itemId = item->fullId();
 		const auto canReply = [&] {
 			const auto peer = item->history()->peer;
-			if (const auto forum = peer->forum()) {
-				const auto topicRootId = item->topicRootId();
-				const auto topic = item->topic();
-				return topic
-					? topic->canWrite()
-					: peer->canWrite(!topicRootId);
-			}
-			return peer->canWrite();
+			const auto topic = item->topic();
+			return topic ? topic->canWrite() : peer->canWrite();
 		}();
 		if (canReply) {
 			_menu->addAction(tr::lng_context_reply_msg(tr::now), [=] {
@@ -2131,7 +2121,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 		}
 		const auto repliesCount = item->repliesCount();
 		const auto withReplies = (repliesCount > 0);
-		const auto topicRootId = item->history()->peer->isForum()
+		const auto topicRootId = item->history()->isForum()
 			? item->topicRootId()
 			: 0;
 		if (topicRootId
@@ -2198,7 +2188,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 		const auto media = photo->activeMediaView();
 		const auto itemId = item ? item->fullId() : FullMsgId();
 		if (!photo->isNull() && media && media->loaded() && !hasCopyMediaRestriction(item)) {
-			_menu->addAction(tr::lng_context_save_image(tr::now), App::LambdaDelayed(st::defaultDropdownMenu.menu.ripple.hideDuration, this, [=] {
+			_menu->addAction(tr::lng_context_save_image(tr::now), base::fn_delayed(st::defaultDropdownMenu.menu.ripple.hideDuration, this, [=] {
 				savePhotoToFile(photo);
 			}), &st::menuIconSaveImage);
 			_menu->addAction(tr::lng_context_copy_image(tr::now), [=] {
@@ -2254,7 +2244,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				item,
 				document,
 				controller);
-			_menu->addAction(lnkIsVideo ? tr::lng_context_save_video(tr::now) : (lnkIsVoice ? tr::lng_context_save_audio(tr::now) : (lnkIsAudio ? tr::lng_context_save_audio_file(tr::now) : tr::lng_context_save_file(tr::now))), App::LambdaDelayed(st::defaultDropdownMenu.menu.ripple.hideDuration, this, [=] {
+			_menu->addAction(lnkIsVideo ? tr::lng_context_save_video(tr::now) : (lnkIsVoice ? tr::lng_context_save_audio(tr::now) : (lnkIsAudio ? tr::lng_context_save_audio_file(tr::now) : tr::lng_context_save_file(tr::now))), base::fn_delayed(st::defaultDropdownMenu.menu.ripple.hideDuration, this, [=] {
 				saveDocumentToFile(itemId, document);
 			}), &st::menuIconDownload);
 		}
@@ -2316,7 +2306,8 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 						Ui::TranslateBox,
 						item->history()->peer,
 						MsgId(),
-						getSelectedText().rich));
+						getSelectedText().rich,
+						hasCopyRestrictionForSelected()));
 				}, &st::menuIconTranslate);
 			}
 		}
@@ -2523,7 +2514,8 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 						Ui::TranslateBox,
 						item->history()->peer,
 						MsgId(),
-						getSelectedText().rich));
+						getSelectedText().rich,
+						hasCopyRestrictionForSelected()));
 				}, &st::menuIconTranslate);
 			}
 			addItemActions(item, item);
@@ -2544,7 +2536,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 							}, isFaved ? &st::menuIconUnfave : &st::menuIconFave);
 						}
 						if (!hasCopyMediaRestriction(item)) {
-							_menu->addAction(tr::lng_context_save_image(tr::now), App::LambdaDelayed(st::defaultDropdownMenu.menu.ripple.hideDuration, this, [=] {
+							_menu->addAction(tr::lng_context_save_image(tr::now), base::fn_delayed(st::defaultDropdownMenu.menu.ripple.hideDuration, this, [=] {
 								saveDocumentToFile(itemId, document);
 							}), &st::menuIconDownload);
 						}
@@ -2593,7 +2585,8 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 							Ui::TranslateBox,
 							item->history()->peer,
 							item->fullId().msg,
-							item->originalText()));
+							item->originalText(),
+							hasCopyRestriction(item)));
 					}, &st::menuIconTranslate);
 				}
 			}
@@ -2876,14 +2869,12 @@ void HistoryInner::savePhotoToFile(not_null<PhotoData*> photo) {
 		return;
 	}
 
-	auto filter = qsl("JPEG Image (*.jpg);;") + FileDialog::AllFilesFilter();
+	auto filter = u"JPEG Image (*.jpg);;"_q + FileDialog::AllFilesFilter();
 	FileDialog::GetWritePath(
 		this,
 		tr::lng_save_photo(tr::now),
 		filter,
-		filedialogDefaultName(
-			qsl("photo"),
-			qsl(".jpg")),
+		filedialogDefaultName(u"photo"_q, u".jpg"_q),
 		crl::guard(this, [=](const QString &result) {
 			if (!result.isEmpty()) {
 				media->saveToFile(result);
@@ -3041,7 +3032,7 @@ TextForMimeData HistoryInner::getSelectedText() const {
 		return texts.front().second.unwrapped;
 	}
 	auto result = TextForMimeData();
-	const auto sep = qstr("\n\n");
+	const auto sep = u"\n\n"_q;
 	result.reserve(fullSize + (texts.size() - 1) * sep.size());
 	for (auto i = texts.begin(), e = texts.end(); i != e;) {
 		result.append(i->second.name).append(i->second.time);

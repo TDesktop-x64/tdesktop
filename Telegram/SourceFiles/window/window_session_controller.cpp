@@ -79,7 +79,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_blocked_peers.h"
 #include "support/support_helper.h"
 #include "storage/file_upload.h"
-#include "facades.h"
 #include "window/themes/window_theme.h"
 #include "window/window_peer_menu.h"
 #include "settings/settings_main.h"
@@ -372,7 +371,7 @@ void SessionNavigation::showPeerByLinkResolved(
 	} else if (peer->isForum()) {
 		const auto itemId = info.messageId;
 		if (!itemId) {
-			parentController()->openForum(peer->asChannel(), params);
+			parentController()->showForum(peer->forum(), params);
 		} else if (const auto item = peer->owner().message(peer, itemId)) {
 			showMessageByLinkResolved(item, info);
 		} else {
@@ -641,7 +640,7 @@ void SessionNavigation::showThread(
 		showPeerHistory(thread->asHistory(), params, itemId);
 	}
 	if (parentController()->activeChatCurrent().thread() == thread) {
-		parentController()->content()->clearSelectingPeer();
+		parentController()->content()->hideDragForwardInfo();
 	}
 }
 
@@ -1003,13 +1002,22 @@ void SessionController::closeFolder() {
 	_openedFolder = nullptr;
 }
 
-void SessionController::openForum(
-		not_null<ChannelData*> forum,
+void SessionController::showForum(
+		not_null<Data::Forum*> forum,
 		const SectionShow &params) {
-	Expects(forum->isForum());
-
-	_openedForumLifetime.destroy();
-	if (_openedForum.current() != forum) {
+	if (!isPrimary()) {
+		const auto primary = Core::App().primaryWindow();
+		if (&primary->account() != &session().account()) {
+			primary->showAccount(&session().account());
+		}
+		if (&primary->account() == &session().account()) {
+			primary->sessionController()->showForum(forum, params);
+		}
+		primary->activate();
+		return;
+	}
+	_shownForumLifetime.destroy();
+	if (_shownForum.current() != forum) {
 		resetFakeUnreadWhileOpened();
 	}
 	if (forum
@@ -1017,24 +1025,23 @@ void SessionController::openForum(
 		&& adaptive().isOneColumn()) {
 		clearSectionStack(params);
 	}
-	_openedForum = forum.get();
-	if (_openedForum.current() == forum) {
-		forum->forum()->destroyed(
-		) | rpl::start_with_next([=] {
-			closeForum();
-			showPeerHistory(
-				forum,
-				{ anim::type::normal, anim::activation::background });
-		}, _openedForumLifetime);
+	_shownForum = forum.get();
+	if (_shownForum.current() != forum) {
+		return;
 	}
-	if (params.activation != anim::activation::background) {
-		hideLayer();
-	}
+	forum->destroyed(
+	) | rpl::start_with_next([=, history = forum->history()] {
+		closeForum();
+		showPeerHistory(
+			history,
+			{ anim::type::normal, anim::activation::background });
+	}, _shownForumLifetime);
+	content()->showForum(forum, params);
 }
 
 void SessionController::closeForum() {
-	_openedForumLifetime.destroy();
-	_openedForum = nullptr;
+	_shownForumLifetime.destroy();
+	_shownForum = nullptr;
 }
 
 void SessionController::setupPremiumToast() {
@@ -1066,8 +1073,8 @@ const rpl::variable<Data::Folder*> &SessionController::openedFolder() const {
 	return _openedFolder;
 }
 
-const rpl::variable<ChannelData*> &SessionController::openedForum() const {
-	return _openedForum;
+const rpl::variable<Data::Forum*> &SessionController::shownForum() const {
+	return _shownForum;
 }
 
 void SessionController::setActiveChatEntry(Dialogs::RowDescriptor row) {
@@ -1091,9 +1098,9 @@ void SessionController::setActiveChatEntry(Dialogs::RowDescriptor row) {
 			) | rpl::start_with_next([=] {
 				clearSectionStack(
 					{ anim::type::normal, anim::activation::background });
-				openForum(channel,
+				showForum(channel->forum(),
 					{ anim::type::normal, anim::activation::background });
-			}, _openedForumLifetime);
+			}, _shownForumLifetime);
 		}
 	}
 	if (session().supportMode()) {
@@ -1144,8 +1151,11 @@ bool SessionController::chatEntryHistoryMove(int steps) {
 }
 
 bool SessionController::jumpToChatListEntry(Dialogs::RowDescriptor row) {
-	if (const auto history = row.key.history()) {
-		Ui::showPeerHistory(history, row.fullId.msg);
+	if (const auto thread = row.key.thread()) {
+		showThread(
+			thread,
+			row.fullId.msg,
+			SectionShow::Way::ClearStack);
 		return true;
 	}
 	return false;
@@ -1703,7 +1713,7 @@ void SessionController::showPeerHistory(
 		PeerId peerId,
 		const SectionShow &params,
 		MsgId msgId) {
-	content()->ui_showPeerHistory(peerId, params, msgId);
+	content()->showPeerHistory(peerId, params, msgId);
 }
 
 void SessionController::showMessage(
@@ -1786,6 +1796,10 @@ void SessionController::showLayer(
 
 void SessionController::removeLayerBlackout() {
 	widget()->ui_removeLayerBlackout();
+}
+
+bool SessionController::isLayerShown() const {
+	return _window->isLayerShown();
 }
 
 not_null<MainWidget*> SessionController::content() const {
@@ -2178,6 +2192,10 @@ void SessionController::setPremiumRef(const QString &ref) {
 
 QString SessionController::premiumRef() const {
 	return _premiumRef;
+}
+
+bool SessionController::contentOverlapped(QWidget *w, QPaintEvent *e) {
+	return widget()->contentOverlapped(w, e);
 }
 
 SessionController::~SessionController() {

@@ -258,7 +258,7 @@ void Application::run() {
 	if (KSandbox::isInside()) {
 		const auto path = settings().downloadPath();
 		if (!path.isEmpty()
-			&& path != qstr("tmp")
+			&& path != FileDialog::Tmp()
 			&& !base::CanReadDirectory(path)) {
 			settings().setDownloadPath(QString());
 		}
@@ -298,7 +298,7 @@ void Application::run() {
 	DEBUG_LOG(("Application Info: starting app..."));
 
 	// Create mime database, so it won't be slow later.
-	QMimeDatabase().mimeTypeForName(qsl("text/plain"));
+	QMimeDatabase().mimeTypeForName(u"text/plain"_q);
 
 	_primaryWindow = std::make_unique<Window::Controller>();
 	_lastActiveWindow = _primaryWindow.get();
@@ -578,7 +578,7 @@ bool Application::eventFilter(QObject *object, QEvent *e) {
 			const auto event = static_cast<QFileOpenEvent*>(e);
 			const auto url = QString::fromUtf8(
 				event->url().toEncoded().trimmed());
-			if (url.startsWith(qstr("tg://"), Qt::CaseInsensitive)) {
+			if (url.startsWith(u"tg://"_q, Qt::CaseInsensitive)) {
 				cSetStartUrl(url.mid(0, 8192));
 				checkStartUrl();
 			}
@@ -863,16 +863,18 @@ void Application::switchDebugMode() {
 		Logs::SetDebugEnabled(true);
 		_launcher->writeDebugModeSetting();
 		DEBUG_LOG(("Debug logs started."));
-		Ui::hideLayer();
+		if (_primaryWindow) {
+			_primaryWindow->hideLayer();
+		}
 	}
 }
 
 void Application::switchFreeType() {
 	if (cUseFreeType()) {
-		QFile(cWorkingDir() + qsl("tdata/withfreetype")).remove();
+		QFile(cWorkingDir() + u"tdata/withfreetype"_q).remove();
 		cSetUseFreeType(false);
 	} else {
-		QFile f(cWorkingDir() + qsl("tdata/withfreetype"));
+		QFile f(cWorkingDir() + u"tdata/withfreetype"_q);
 		if (f.open(QIODevice::WriteOnly)) {
 			f.write("1");
 			f.close();
@@ -972,6 +974,12 @@ bool Application::canApplyLangPackWithoutRestart() const {
 		}
 	}
 	return true;
+}
+
+void Application::checkSendPaths() {
+	if (!cSendPaths().isEmpty() && _primaryWindow && !_primaryWindow->locked()) {
+		_primaryWindow->widget()->sendPaths();
+	}
 }
 
 void Application::checkStartUrl() {
@@ -1244,13 +1252,12 @@ void Application::closeChatFromWindows(not_null<PeerData*> peer) {
 		const auto primary = _primaryWindow->sessionController();
 		if ((primary->activeChatCurrent().peer() == peer)
 			&& (&primary->session() == &peer->session())) {
-			// showChatsList
-			primary->showPeerHistory(
-				PeerId(0),
-				Window::SectionShow::Way::ClearStack);
+			primary->clearSectionStack();
 		}
-		if (primary->openedForum().current() == peer) {
-			primary->closeForum();
+		if (const auto forum = primary->shownForum().current()) {
+			if (peer->forum() == forum) {
+				primary->closeForum();
+			}
 		}
 	}
 }
@@ -1472,11 +1479,11 @@ void Application::RegisterUrlScheme() {
 	base::Platform::RegisterUrlScheme(base::Platform::UrlSchemeDescriptor{
 		.executable = cExeDir() + cExeName(),
 		.arguments = Sandbox::Instance().customWorkingDir()
-			? qsl("-workdir \"%1\"").arg(cWorkingDir())
+			? u"-workdir \"%1\""_q.arg(cWorkingDir())
 			: QString(),
-		.protocol = qsl("tg"),
-		.protocolName = qsl("Telegram Link"),
-		.shortAppName = qsl("64gram"),
+		.protocol = u"tg"_q,
+		.protocolName = u"Telegram Link"_q,
+		.shortAppName = u"64Gram"_q,
 		.longAppName = QCoreApplication::applicationName(),
 		.displayAppName = AppName.utf16(),
 		.displayAppDescription = AppName.utf16(),

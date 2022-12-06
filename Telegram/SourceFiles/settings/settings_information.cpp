@@ -647,7 +647,7 @@ void SetupAccountsWrap(
 		}
 
 		Ui::RpWidget userpic;
-		std::shared_ptr<Data::CloudImageView> view;
+		Ui::PeerUserpicView view;
 		base::unique_qptr<Ui::PopupMenu> menu;
 	};
 	const auto state = raw->lifetime().make_state<State>(raw);

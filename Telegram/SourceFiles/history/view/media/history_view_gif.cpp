@@ -1038,13 +1038,30 @@ TextState Gif::textState(QPoint point, StateRequest request) const {
 			}
 			if (QRect(QPoint(fastShareLeft, fastShareTop), *size).contains(point)) {
 				result.link = _parent->rightActionLink();
+				_parent->applyRightActionLastPoint(point
+					- QPoint(fastShareLeft, fastShareTop));
 			}
 		}
-		if (_transcribe && _transcribe->lastPaintedRect().contains(point)) {
+		if (_transcribe && _transcribe->contains(point)) {
 			result.link = _transcribe->link();
 		}
 	}
 	return result;
+}
+
+void Gif::clickHandlerPressedChanged(
+		const ClickHandlerPtr &handler,
+		bool pressed) {
+	File::clickHandlerPressedChanged(handler, pressed);
+	if (!handler) {
+		return;
+	} else if (_transcribe && (handler == _transcribe->link())) {
+		if (pressed) {
+			_transcribe->addRipple([=] { repaint(); });
+		} else {
+			_transcribe->stopRipple();
+		}
+	}
 }
 
 TextForMimeData Gif::selectedText(TextSelection selection) const {
@@ -1313,7 +1330,8 @@ bool Gif::needsBubble() const {
 		|| item->viaBot()
 		|| _parent->displayedReply()
 		|| _parent->displayForwardedFrom()
-		|| _parent->displayFromName();
+		|| _parent->displayFromName()
+		|| _parent->displayedTopicButton();
 	return false;
 }
 

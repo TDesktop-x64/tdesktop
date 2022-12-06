@@ -23,6 +23,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "lang/lang_keys.h"
 #include "base/weak_ptr.h"
+#include "window/notifications_utilities.h"
 #include "styles/style_window.h"
 
 #include <QtCore/QBuffer>
@@ -387,7 +388,7 @@ bool NotificationData::init(
 		_notification->set_body(
 			subtitle.isEmpty()
 				? msg.toStdString()
-				: qsl("%1\n%2").arg(subtitle, msg).toStdString());
+				: u"%1\n%2"_q.arg(subtitle, msg).toStdString());
 
 		_notification->set_icon(
 			Gio::ThemedIcon::create(base::IconName().toStdString()));
@@ -500,16 +501,16 @@ bool NotificationData::init(
 	_title = title.toStdString();
 	_imageKey = GetImageKey(CurrentServerInformationValue().specVersion);
 
-	if (capabilities.contains(qsl("body-markup"))) {
+	if (capabilities.contains(u"body-markup"_q)) {
 		_body = subtitle.isEmpty()
 			? msg.toHtmlEscaped().toStdString()
-			: qsl("<b>%1</b>\n%2").arg(
+			: u"<b>%1</b>\n%2"_q.arg(
 				subtitle.toHtmlEscaped(),
 				msg.toHtmlEscaped()).toStdString();
 	} else {
 		_body = subtitle.isEmpty()
 			? msg.toStdString()
-			: qsl("%1\n%2").arg(subtitle, msg).toStdString();
+			: u"%1\n%2"_q.arg(subtitle, msg).toStdString();
 	}
 
 	if (capabilities.contains("actions")) {
@@ -812,16 +813,16 @@ bool ByDefault() {
 	// with custom notifications
 	static const auto NeededCapabilities = {
 		// To show message content
-		qsl("body"),
+		u"body"_q,
 		// To make the sender name bold
-		qsl("body-markup"),
+		u"body-markup"_q,
 		// To have buttons on notifications
-		qsl("actions"),
+		u"actions"_q,
 		// To have quick reply
-		qsl("inline-reply"),
+		u"inline-reply"_q,
 		// To not to play sound with Don't Disturb activated
 		// (no, using sound capability is not a way)
-		qsl("inhibitions"),
+		u"inhibitions"_q,
 	};
 
 	return ranges::all_of(NeededCapabilities, [&](const auto &capability) {
@@ -906,7 +907,7 @@ public:
 	void showNotification(
 		not_null<PeerData*> peer,
 		MsgId topicRootId,
-		std::shared_ptr<Data::CloudImageView> &userpicView,
+		Ui::PeerUserpicView &userpicView,
 		MsgId msgId,
 		const QString &title,
 		const QString &subtitle,
@@ -962,7 +963,7 @@ Manager::Private::Private(not_null<Manager*> manager)
 			.arg(capabilities.join(", ")));
 	}
 
-	if (capabilities.contains(qsl("inhibitions"))) {
+	if (capabilities.contains(u"inhibitions"_q)) {
 		Noexcept([&] {
 			_dbusConnection = Gio::DBus::Connection::get_sync(
 				Gio::DBus::BusType::SESSION);
@@ -1013,7 +1014,7 @@ Manager::Private::Private(not_null<Manager*> manager)
 void Manager::Private::showNotification(
 		not_null<PeerData*> peer,
 		MsgId topicRootId,
-		std::shared_ptr<Data::CloudImageView> &userpicView,
+		Ui::PeerUserpicView &userpicView,
 		MsgId msgId,
 		const QString &title,
 		const QString &subtitle,
@@ -1041,12 +1042,8 @@ void Manager::Private::showNotification(
 	}
 
 	if (!options.hideNameAndPhoto) {
-		const auto userpic = peer->isSelf()
-			? Ui::EmptyUserpic::GenerateSavedMessages(st::notifyMacPhotoSize)
-			: peer->isRepliesChat()
-			? Ui::EmptyUserpic::GenerateRepliesMessages(st::notifyMacPhotoSize)
-			: peer->genUserpic(userpicView, st::notifyMacPhotoSize);
-		notification->setImage(userpic.toImage());
+		notification->setImage(
+			Window::Notifications::GenerateUserpic(peer, userpicView));
 	}
 
 	auto i = _notifications.find(key);
@@ -1183,7 +1180,7 @@ Manager::~Manager() = default;
 void Manager::doShowNativeNotification(
 		not_null<PeerData*> peer,
 		MsgId topicRootId,
-		std::shared_ptr<Data::CloudImageView> &userpicView,
+		Ui::PeerUserpicView &userpicView,
 		MsgId msgId,
 		const QString &title,
 		const QString &subtitle,

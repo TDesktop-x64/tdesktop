@@ -69,7 +69,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_file_click_handler.h"
 #include "data/data_message_reactions.h"
 #include "data/data_peer_values.h"
-#include "facades.h"
 #include "styles/style_chat.h"
 
 #include <QtWidgets/QApplication>
@@ -496,6 +495,7 @@ void ListWidget::refreshRows(const Data::MessagesSlice &old) {
 	) - 1;
 
 	auto destroyingBarElement = _bar.element;
+	auto clearingOverElement = _overElement;
 	_resizePending = true;
 	_items.clear();
 	_items.reserve(_slice.ids.size());
@@ -510,11 +510,10 @@ void ListWidget::refreshRows(const Data::MessagesSlice &old) {
 			if (destroyingBarElement == view) {
 				destroyingBarElement = nullptr;
 			}
+			if (clearingOverElement == view) {
+				clearingOverElement = nullptr;
+			}
 		}
-	}
-	if (destroyingBarElement) {
-		destroyingBarElement->destroyUnreadBar();
-		_bar = {};
 	}
 	for (auto e = end(_items), i = e - addedToEndCount; i != e; ++i) {
 		_itemRevealPending.emplace(*i);
@@ -522,6 +521,15 @@ void ListWidget::refreshRows(const Data::MessagesSlice &old) {
 	updateAroundPositionFromNearest(nearestIndex);
 
 	updateItemsGeometry();
+
+	if (clearingOverElement) {
+		_overElement = nullptr;
+	}
+	if (destroyingBarElement) {
+		destroyingBarElement->destroyUnreadBar();
+		_bar = {};
+	}
+
 	checkUnreadBarCreation();
 	restoreScrollState();
 	if (!_itemsRevealHeight) {
@@ -2016,7 +2024,7 @@ void ListWidget::checkActivation() {
 }
 
 void ListWidget::paintEvent(QPaintEvent *e) {
-	if (Ui::skipPaintEvent(this, e)) {
+	if (_controller->contentOverlapped(this, e)) {
 		return;
 	}
 
@@ -2125,7 +2133,8 @@ void ListWidget::paintEvent(QPaintEvent *e) {
 
 		// paint the userpic if it intersects the painted rect
 		if (userpicTop + st::msgPhotoSize > clip.top()) {
-			if (const auto from = view->data()->displayFrom()) {
+			const auto item = view->data();
+			if (const auto from = item->displayFrom()) {
 				from->paintUserpicLeft(
 					p,
 					_userpics[from],
@@ -2133,28 +2142,25 @@ void ListWidget::paintEvent(QPaintEvent *e) {
 					userpicTop,
 					view->width(),
 					st::msgPhotoSize);
-			} else if (const auto info = view->data()->hiddenSenderInfo()) {
+			} else if (const auto info = item->hiddenSenderInfo()) {
 				if (info->customUserpic.empty()) {
-					info->emptyUserpic.paint(
+					info->emptyUserpic.paintCircle(
 						p,
 						st::historyPhotoLeft,
 						userpicTop,
 						view->width(),
 						st::msgPhotoSize);
 				} else {
-					const auto painted = info->paintCustomUserpic(
+					auto &userpic = _hiddenSenderUserpics[item->id];
+					const auto valid = info->paintCustomUserpic(
 						p,
+						userpic,
 						st::historyPhotoLeft,
 						userpicTop,
 						view->width(),
 						st::msgPhotoSize);
-					if (!painted) {
-						const auto itemId = view->data()->fullId();
-						auto &v = _sponsoredUserpics[itemId.msg];
-						if (!info->customUserpic.isCurrentView(v)) {
-							v = info->customUserpic.createView();
-							info->customUserpic.load(session, itemId);
-						}
+					if (!valid) {
+						info->customUserpic.load(session, item->fullId());
 					}
 				}
 			} else {
@@ -2340,7 +2346,7 @@ TextForMimeData ListWidget::getSelectedText() const {
 	});
 
 	auto result = TextForMimeData();
-	auto sep = qstr("\n\n");
+	auto sep = u"\n\n"_q;
 	result.reserve(fullSize + (texts.size() - 1) * sep.size());
 	for (auto i = begin(texts), e = end(texts); i != e;) {
 		result.append(std::move(i->second));
@@ -3561,7 +3567,7 @@ std::unique_ptr<QMimeData> ListWidget::prepareDrag() {
 				: MessageIdsList();
 			if (!items.empty()) {
 				session().data().setMimeForwardIds(std::move(items));
-				mimeData->setData(qsl("application/x-td-forward"), "1");
+				mimeData->setData(u"application/x-td-forward"_q, "1");
 			}
 		}
 		return mimeData;
@@ -3591,7 +3597,7 @@ std::unique_ptr<QMimeData> ListWidget::prepareDrag() {
 		}
 		session().data().setMimeForwardIds(std::move(forwardIds));
 		auto result = std::make_unique<QMimeData>();
-		result->setData(qsl("application/x-td-forward"), "1");
+		result->setData(u"application/x-td-forward"_q, "1");
 		if (const auto media = pressedView->media()) {
 			if (const auto document = media->getDocument()) {
 				const auto filepath = document->filepath(true);

@@ -984,6 +984,8 @@ PRIVATE
     media/view/media_view_playback_progress.cpp
     media/view/media_view_playback_progress.h
     media/view/media_view_open_common.h
+    menu/menu_antispam_validator.cpp
+    menu/menu_antispam_validator.h
     menu/menu_item_download_files.cpp
     menu/menu_item_download_files.h
     menu/menu_mute.cpp
@@ -1179,6 +1181,8 @@ PRIVATE
     settings/settings_experimental.h
     settings/settings_folders.cpp
     settings/settings_folders.h
+    settings/settings_global_ttl.cpp
+    settings/settings_global_ttl.h
     settings/settings_information.cpp
     settings/settings_information.h
     settings/settings_intro.cpp
@@ -1275,8 +1279,6 @@ PRIVATE
     ui/widgets/level_meter.h
     ui/countryinput.cpp
     ui/countryinput.h
-    ui/empty_userpic.cpp
-    ui/empty_userpic.h
     ui/filter_icons.cpp
     ui/filter_icons.h
     ui/filter_icon_panel.cpp
@@ -1348,8 +1350,6 @@ PRIVATE
     apiwrap.cpp
     apiwrap.h
     config.h
-    facades.cpp
-    facades.h
     logs.cpp
     logs.h
     main.cpp
@@ -1608,6 +1608,17 @@ if (WIN32)
         /DELAYLOAD:wtsapi32.dll
         /DELAYLOAD:propsys.dll
     )
+
+    if (NOT build_win64 AND DESKTOP_APP_SPECIAL_TARGET)
+        target_compile_options(Telegram
+        PRIVATE
+            $<IF:$<CONFIG:Debug>,,/GL>
+        )
+        target_link_options(Telegram
+        PRIVATE
+            $<IF:$<CONFIG:Debug>,,/LTCG>
+        )
+    endif()
 endif()
 
 target_prepare_qrc(Telegram)

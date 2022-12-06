@@ -180,7 +180,7 @@ void Changelogs::addBetaLog(int changeVersion, const char *changes) {
 		return result.replace(simple, separator);
 	}();
 	const auto version = FormatVersionDisplay(changeVersion);
-	const auto log = qsl("New in version %1%2:\n\n").arg(version).arg(AppBetaVersion ? " beta" : "") + text;
+	const auto log = u"New in version %1%2:\n\n"_q.arg(AppBetaVersion ? " beta" : "").arg(version) + text;
 	addLocalLog(log);
 }
 

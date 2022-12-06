@@ -38,6 +38,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/peers/add_bot_to_chat_box.h"
 #include "boxes/peers/edit_contact_box.h"
 #include "boxes/report_messages_box.h"
+#include "boxes/translate_box.h"
 #include "lang/lang_keys.h"
 #include "menu/menu_mute.h"
 #include "history/history.h"
@@ -58,9 +59,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/settings_common.h"
 #include "apiwrap.h"
 #include "api/api_blocked_peers.h"
-#include "facades.h"
 #include "styles/style_info.h"
 #include "styles/style_boxes.h"
+#include "styles/style_menu_icons.h"
 
 #include <QtGui/QGuiApplication>
 #include <QtGui/QClipboard>
@@ -313,6 +314,34 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 		return true;
 	};
 
+	const auto addTranslateToMenu = [&,
+			peer = _peer.get(),
+			controller = _controller->parentController()](
+			not_null<Ui::FlatLabel*> label,
+			rpl::producer<TextWithEntities> &&text) {
+		struct State {
+			rpl::variable<TextWithEntities> labelText;
+		};
+		const auto state = label->lifetime().make_state<State>();
+		state->labelText = std::move(text);
+		label->setContextMenuHook([=](
+				Ui::FlatLabel::ContextMenuRequest request) {
+			label->fillContextMenu(request);
+			if (Ui::SkipTranslate(state->labelText.current())) {
+				return;
+			}
+			auto item = tr::lng_context_translate(tr::now);
+			request.menu->addAction(std::move(item), [=] {
+				controller->window().show(Box(
+					Ui::TranslateBox,
+					peer,
+					MsgId(),
+					state->labelText.current(),
+					false));
+			});
+		});
+	};
+
 	const auto addInfoLineGeneric = [&](
 			v::text::data &&label,
 			rpl::producer<TextWithEntities> &&text,
@@ -369,7 +398,9 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 		auto label = user->isBot()
 			? tr::lng_info_about_label()
 			: tr::lng_info_bio_label();
-		addInfoLine(std::move(label), AboutValue(user));
+		addTranslateToMenu(
+			addInfoLine(std::move(label), AboutValue(user)).text,
+			AboutValue(user));
 
 		const auto usernameLine = addInfoOneLine(
 			UsernamesSubtext(_peer, tr::lng_info_username_label()),
@@ -468,8 +499,8 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 			return link.isEmpty()
 				? TextWithEntities()
 				: Ui::Text::Link(
-					(link.startsWith(qstr("https://"))
-						? link.mid(qstr("https://").size())
+					(link.startsWith(u"https://"_q)
+						? link.mid(u"https://"_q.size())
 						: link) + addToLink,
 					link + addToLink);
 		});
@@ -504,9 +535,12 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 			).text->setLinksTrusted();
 		}
 
-		addInfoLine(
+		const auto about = addInfoLine(
 			tr::lng_info_about_label(),
 			_topic ? rpl::single(TextWithEntities()) : AboutValue(_peer));
+		if (!_topic) {
+			addTranslateToMenu(about.text, AboutValue(_peer));
+		}
 	}
 	if (!_peer->isSelf()) {
 		// No notifications toggle for Self => no separator.
@@ -608,16 +642,16 @@ Ui::MultiSlideTracker DetailsFiller::fillTopicButtons() {
 	Ui::MultiSlideTracker tracker;
 	const auto window = _controller->parentController();
 
-	const auto channel = _topic->channel().get();
+	const auto forum = _topic->forum();
 	auto showTopicsVisible = rpl::combine(
 		window->adaptive().oneColumnValue(),
-		window->openedForum().value(),
-		_1 || (_2 != channel));
+		window->shownForum().value(),
+		_1 || (_2 != forum));
 	AddMainButton(
 		_wrap,
 		tr::lng_forum_show_topics_list(),
 		std::move(showTopicsVisible),
-		[=] { window->openForum(channel); },
+		[=] { window->showForum(forum); },
 		tracker);
 	return tracker;
 }
@@ -829,10 +863,10 @@ void ActionsFiller::addBotCommandActions(not_null<UserData*> user) {
 	};
 	addBotCommand(
 		tr::lng_profile_bot_help(),
-		qsl("help"),
+		u"help"_q,
 		&st::infoIconInformation);
-	addBotCommand(tr::lng_profile_bot_settings(), qsl("settings"));
-	addBotCommand(tr::lng_profile_bot_privacy(), qsl("privacy"));
+	addBotCommand(tr::lng_profile_bot_settings(), u"settings"_q);
+	addBotCommand(tr::lng_profile_bot_privacy(), u"privacy"_q);
 }
 
 void ActionsFiller::addReportAction() {
@@ -851,7 +885,8 @@ void ActionsFiller::addReportAction() {
 }
 
 void ActionsFiller::addBlockAction(not_null<UserData*> user) {
-	const auto window = &_controller->parentController()->window();
+	const auto controller = _controller->parentController();
+	const auto window = &controller->window();
 
 	auto text = user->session().changes().peerFlagsValue(
 		user,
@@ -880,7 +915,7 @@ void ActionsFiller::addBlockAction(not_null<UserData*> user) {
 		if (user->isBlocked()) {
 			Window::PeerMenuUnblockUserWithBotRestart(user);
 			if (user->isBot()) {
-				Ui::showPeerHistory(user, ShowAtUnreadMsgId);
+				controller->showPeerHistory(user);
 			}
 		} else if (user->isBot()) {
 			user->session().api().blockedPeers().block(user);

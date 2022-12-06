@@ -21,7 +21,6 @@ struct ClickHandlerContext;
 
 namespace Data {
 struct Group;
-class CloudImageView;
 } // namespace Data
 
 namespace HistoryView {
@@ -52,6 +51,7 @@ class PopupMenu;
 enum class ReportReason;
 struct ChatPaintContext;
 class PathShiftGradient;
+struct PeerUserpicView;
 } // namespace Ui
 
 namespace Dialogs::Ui {
@@ -466,12 +466,9 @@ private:
 	bool _isChatWide = false;
 
 	base::flat_set<not_null<const HistoryItem*>> _animatedStickersPlayed;
-	base::flat_map<
-		not_null<PeerData*>,
-		std::shared_ptr<Data::CloudImageView>> _userpics, _userpicsCache;
-	base::flat_map<
-		MsgId,
-		std::shared_ptr<Data::CloudImageView>> _sponsoredUserpics;
+	base::flat_map<not_null<PeerData*>, Ui::PeerUserpicView> _userpics;
+	base::flat_map<not_null<PeerData*>, Ui::PeerUserpicView> _userpicsCache;
+	base::flat_map<MsgId, Ui::PeerUserpicView> _hiddenSenderUserpics;
 	base::flat_map<
 		not_null<PeerData*>,
 		std::unique_ptr<VideoUserpic>> _videoUserpics;

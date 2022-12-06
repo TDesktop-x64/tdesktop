@@ -77,15 +77,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/unixtime.h"
 #include "base/call_delayed.h"
 #include "base/random.h"
-#include "facades.h" // Notify::switchInlineBotButtonReceived
 #include "styles/style_boxes.h" // st::backgroundSize
 
 namespace Data {
 namespace {
 
 using ViewElement = HistoryView::Element;
-
-constexpr auto kTopicsPinLimit = 5;
 
 // s: box 100x100
 // m: box 320x320
@@ -140,11 +137,11 @@ std::vector<UnavailableReason> ExtractUnavailableReasons(
 			const auto platform = qs(data.vplatform());
 			return false
 #ifdef OS_MAC_STORE
-				|| (platform == qstr("ios"))
+				|| (platform == u"ios"_q)
 #elif defined OS_WIN_STORE // OS_MAC_STORE
-				|| (platform == qstr("ms"))
+				|| (platform == u"ms"_q)
 #endif // OS_MAC_STORE || OS_WIN_STORE
-				|| (platform == qstr("all"));
+				|| (platform == u"all"_q);
 		});
 	}) | ranges::views::transform([](const MTPRestrictionReason &restriction) {
 		return restriction.match([&](const MTPDrestrictionReason &data) {
@@ -2062,7 +2059,8 @@ int Session::pinnedChatsLimit(FilterId filterId) const {
 }
 
 int Session::pinnedChatsLimit(not_null<Data::Forum*> forum) const {
-	return kTopicsPinLimit;
+	const auto limits = Data::PremiumLimits(_session);
+	return limits.topicsPinnedCurrent();
 }
 
 rpl::producer<int> Session::maxPinnedChatsLimitValue(
@@ -2097,7 +2095,12 @@ rpl::producer<int> Session::maxPinnedChatsLimitValue(
 
 rpl::producer<int> Session::maxPinnedChatsLimitValue(
 		not_null<Data::Forum*> forum) const {
-	return rpl::single(pinnedChatsLimit(forum));
+	return rpl::single(rpl::empty_value()) | rpl::then(
+		_session->account().appConfig().refreshed()
+	) | rpl::map([=] {
+		const auto limits = Data::PremiumLimits(_session);
+		return limits.topicsPinnedCurrent();
+	});
 }
 
 const std::vector<Dialogs::Key> &Session::pinnedChatsOrder(
@@ -3270,7 +3273,7 @@ void Session::webpageApplyFields(
 	};
 	const auto siteName = qs(data.vsite_name().value_or_empty());
 	auto parseFlags = TextParseLinks | TextParseMultiline;
-	if (siteName == qstr("Twitter") || siteName == qstr("Instagram")) {
+	if (siteName == u"Twitter"_q || siteName == u"Instagram"_q) {
 		parseFlags |= TextParseHashtags | TextParseMentions;
 	}
 	TextUtilities::ParseEntities(description, parseFlags);
@@ -4047,6 +4050,9 @@ void Session::refreshChatListEntry(Dialogs::Key key) {
 			if (const auto migrated = historyLoaded(from)) {
 				removeChatListEntry(migrated);
 			}
+		}
+		if (const auto forum = history->peer->forum()) {
+			forum->preloadTopics();
 		}
 	}
 }

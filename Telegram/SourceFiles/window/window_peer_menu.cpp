@@ -1108,7 +1108,7 @@ void Filler::addFirstMessage() {
 		return;
 	}
 	_addAction(tr::lng_go_to_first_message(tr::now), [=] {
-		_controller->showPeerHistory(
+		App::wnd()->sessionController()->showPeerHistory(
 				peer,
 				Window::SectionShow::Way::Forward,
 				1);
@@ -1122,7 +1122,7 @@ void Filler::addViewChannel() {
 	}
 	if (const auto chat = peer->linkedChat()) {
 		_addAction(peer->isMegagroup() ? tr::lng_profile_view_channel(tr::now) : tr::lng_profile_view_discussion(tr::now), [=] {
-			_controller->showPeerHistory(
+			App::wnd()->sessionController()->showPeerHistory(
 					chat,
 					Window::SectionShow::Way::Forward);
 		}, &st::menuIconDiscussion);

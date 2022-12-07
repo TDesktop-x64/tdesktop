@@ -293,7 +293,7 @@ void Launcher::init() {
 	prepareSettings();
 	initQtMessageLogging();
 
-	QApplication::setApplicationName(u"64GramDesktop"_q);
+	QApplication::setApplicationName(u"64Gram"_q);
 	QApplication::setAttribute(Qt::AA_DisableHighDpiScaling, true);
 	QApplication::setHighDpiScaleFactorRoundingPolicy(
 		Qt::HighDpiScaleFactorRoundingPolicy::Floor);

@@ -101,7 +101,7 @@ namespace Settings {
 					blockList.append(int64(UserId(user.c_user().vid().v).bare));
 				}
 				if (blockCount > blockList.length()) {
-					reqBlocked(controller, offset+100);
+					reqBlocked(offset+100);
 				} else {
 					writeBlocklistFile();
 				}

@@ -72,6 +72,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
+#include "facades.h"
 #include "apiwrap.h"
 #include "styles/style_chat.h"
 #include "styles/style_menu_icons.h"
@@ -396,7 +397,7 @@ bool AddForwardSelectedAction(
 	menu->addAction(tr::lng_forward_to_saved_message(tr::now), [=] {
 		const auto weak = Ui::MakeWeak(list);
 		const auto items = ExtractIdsList(request.selectedItems);
-		const auto item = App::wnd()->sessionController()->session().data().message(items[0]);
+		const auto item = request.navigation->session().data().message(items[0]);
 		const auto api = &item->history()->peer->session().api();
 		const auto session = &item->history()->peer->session();
 		const auto self = api->session().user()->asUser();

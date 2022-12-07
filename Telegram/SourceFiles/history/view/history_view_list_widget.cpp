@@ -3988,7 +3988,7 @@ void ConfirmForwardSelectedToSavedMessagesItems(not_null<ListWidget*> widget) {
 	const auto weak = Ui::MakeWeak(widget);
 
 	const auto itemsList = ExtractIdsList(items);
-	const auto item = App::wnd()->sessionController()->session().data().message(itemsList[0]);
+	const auto item = widget->controller()->session().data().message(itemsList[0]);
 	const auto api = &item->history()->peer->session().api();
 	const auto session = &item->history()->peer->session();
 	const auto self = api->session().user()->asUser();

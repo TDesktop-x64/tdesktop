@@ -615,7 +615,7 @@ void ProxiesBox::setupContent() {
 		Local::writeSettings();
 
 		closeBox();
-		Ui::show(ProxiesBoxController::CreateOwningBox(&App::wnd()->account()));
+		//Ui::show(ProxiesBoxController::CreateOwningBox(&App::wnd()->account()));
 	};
 	const auto menu =
 			std::make_shared<base::unique_qptr<Ui::PopupMenu>>();

@@ -7490,7 +7490,7 @@ void HistoryWidget::forwardSelectedToSavedMessages() {
 	const auto weak = Ui::MakeWeak(this);
 
 	const auto items = getSelectedItems();
-	const auto item = App::wnd()->sessionController()->session().data().message(items[0]);
+	const auto item = controller()->session().data().message(items[0]);
 	const auto api = &item->history()->peer->session().api();
 	const auto session = &item->history()->peer->session();
 	const auto self = api->session().user()->asUser();

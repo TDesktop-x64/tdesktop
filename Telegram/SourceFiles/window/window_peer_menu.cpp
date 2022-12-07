@@ -1097,7 +1097,7 @@ void Filler::addPinnedMessages() {
 				tr::lng_pinned_message_view(tr::now),
 				[=] {
 					const auto history = channel->owner().history(channel);
-					App::wnd()->sessionController()->showSection(std::make_shared<HistoryView::PinnedMemento>(history, 0));
+					_controller->showSection(std::make_shared<HistoryView::PinnedMemento>(history, 0));
 				}, & st::menuIconEdit);
 	}
 }
@@ -1108,7 +1108,7 @@ void Filler::addFirstMessage() {
 		return;
 	}
 	_addAction(tr::lng_go_to_first_message(tr::now), [=] {
-		App::wnd()->sessionController()->showPeerHistory(
+		_controller->showPeerHistory(
 				peer,
 				Window::SectionShow::Way::Forward,
 				1);
@@ -1122,7 +1122,7 @@ void Filler::addViewChannel() {
 	}
 	if (const auto chat = peer->linkedChat()) {
 		_addAction(peer->isMegagroup() ? tr::lng_profile_view_channel(tr::now) : tr::lng_profile_view_discussion(tr::now), [=] {
-			App::wnd()->sessionController()->showPeerHistory(
+			_controller->showPeerHistory(
 					chat,
 					Window::SectionShow::Way::Forward);
 		}, &st::menuIconDiscussion);
@@ -1783,7 +1783,7 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 		FnMut<void()> submitCallback;
 	};
 	const auto weak = std::make_shared<QPointer<ShareBox>>();
-	const auto item = App::wnd()->sessionController()->session().data().message(items[0]);
+	const auto item = navigation->session().data().message(items[0]);
 	const auto history = item->history();
 	const auto owner = &history->owner();
 	const auto session = &history->session();

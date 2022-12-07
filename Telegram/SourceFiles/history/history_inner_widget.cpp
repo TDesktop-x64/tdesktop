@@ -71,6 +71,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/session/send_as_peers.h"
 #include "menu/menu_item_download_files.h"
 #include "core/application.h"
+#include "facades.h"
 #include "apiwrap.h"
 #include "api/api_attached_stickers.h"
 #include "api/api_common.h"
@@ -4560,7 +4561,7 @@ void HistoryInner::setupShortcuts() {
 	) | rpl::filter([=] {
 		return Ui::AppInFocus()
 			   && Ui::InFocusChain(this)
-			   && !Ui::isLayerShown();
+			   && !_controller->isLayerShown();
 	}) | rpl::start_with_next([=](not_null<Shortcuts::Request*> request) {
 		using Command = Shortcuts::Command;
 		request->check(Command::FastForward, 1) && request->handle([=] {

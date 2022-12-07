@@ -92,7 +92,7 @@ namespace Ui {
 
 void showChatsList(not_null<Main::Session*> session) {
 	if (const auto m = CheckMainWidget(session)) {
-		m->ui_showPeerHistory(
+		m->showPeerHistory(
 			0,
 			::Window::SectionShow::Way::ClearStack,
 			0);
@@ -105,7 +105,7 @@ void showPeerHistory(not_null<const History*> history, MsgId msgId) {
 
 void showPeerHistory(not_null<const PeerData*> peer, MsgId msgId) {
 	if (const auto m = CheckMainWidget(&peer->session())) {
-		m->ui_showPeerHistory(
+		m->showPeerHistory(
 			peer->id,
 			::Window::SectionShow::Way::ClearStack,
 			msgId);

@@ -420,7 +420,7 @@ LastCrashedWindow::LastCrashedWindow(
 		QDesktopServices::openUrl(u"https://github.com/TDesktop-x64/tdesktop"_q);
 	});
 
-	_send.setText(u"SEND CRASH REPORT"_q);
+	//_send.setText(u"SEND CRASH REPORT"_q);
 	//connect(&_send, &QPushButton::clicked, [=] { sendReport(); });
 
 	_sendSkip.setText(u"SKIP"_q);

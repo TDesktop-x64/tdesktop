@@ -389,3 +389,7 @@ private:
 	const std::unique_ptr<Core::Changelogs> _changelogs;
 
 };
+
+namespace App {
+MainWidget *main();
+} // namespace App

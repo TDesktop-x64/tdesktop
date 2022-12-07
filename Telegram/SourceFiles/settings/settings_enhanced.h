@@ -26,12 +26,12 @@ namespace Settings {
 
 	private:
 		void setupContent(not_null<Window::SessionController *> controller);
-		void SetupEnhancedNetwork(not_null<Ui::VerticalLayout *> container);
-		void SetupEnhancedMessages(not_null<Ui::VerticalLayout *> container);
-		void SetupEnhancedButton(not_null<Ui::VerticalLayout *> container);
-		void SetupEnhancedVoiceChat(not_null<Ui::VerticalLayout *> container);
+		void SetupEnhancedNetwork(not_null<Window::SessionController*> controller, not_null<Ui::VerticalLayout *> container);
+		void SetupEnhancedMessages(not_null<Window::SessionController*> controller, not_null<Ui::VerticalLayout *> container);
+		void SetupEnhancedButton(not_null<Window::SessionController*> controller, not_null<Ui::VerticalLayout *> container);
+		void SetupEnhancedVoiceChat(not_null<Window::SessionController*> controller, not_null<Ui::VerticalLayout *> container);
 		void SetupEnhancedOthers(not_null<Window::SessionController*> controller, not_null<Ui::VerticalLayout *> container);
-		void reqBlocked(int offset);
+		void reqBlocked(not_null<Window::SessionController*> controller, int offset);
 		void writeBlocklistFile();
 
 		rpl::event_stream<QString> _AlwaysDeleteChanged;

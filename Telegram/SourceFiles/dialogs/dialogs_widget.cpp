@@ -67,6 +67,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_info.h"
 #include "styles/style_window.h"
 #include "base/qt/qt_common_adapters.h"
+#include "boxes/abstract_box.h"
 
 #include <QtCore/QMimeData>
 #include <core/shortcuts.h>
@@ -609,14 +610,11 @@ void Widget::setupShortcuts(not_null<Window::SessionController *> controller) {
 	Shortcuts::Requests(
 	) | rpl::filter([=] {
 		return isActiveWindow()
-		       && !Ui::isLayerShown()
+		       && !controller->isLayerShown()
 		       && !controller->window().locked();
 	}) | rpl::start_with_next([=](not_null<Shortcuts::Request*> request) {
 		using Command = Shortcuts::Command;
 
-		if (controller->selectingPeer()) {
-			return;
-		}
 		const auto row = controller->activeChatEntryCurrent();
 
 		request->check(Command::GlobalSearch) && request->handle([=] {

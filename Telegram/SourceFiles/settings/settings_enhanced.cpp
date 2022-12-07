@@ -41,7 +41,7 @@ https://github.com/TDesktop-x64/tdesktop/blob/dev/LEGAL
 
 namespace Settings {
 
-	void Enhanced::SetupEnhancedNetwork(not_null<Ui::VerticalLayout *> container) {
+	void Enhanced::SetupEnhancedNetwork(not_null<Window::SessionController*> controller, not_null<Ui::VerticalLayout *> container) {
 		const auto wrap = container->add(
 				object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
 						container,
@@ -86,11 +86,11 @@ namespace Settings {
 		}
 	}
 
-	void Enhanced::reqBlocked(int offset) {
+	void Enhanced::reqBlocked(not_null<Window::SessionController*> controller, int offset) {
 		if (_requestId) {
 			return;
 		}
-		_requestId = App::wnd()->sessionController()->session().api().request(MTPcontacts_GetBlocked(
+		_requestId = controller->session().api().request(MTPcontacts_GetBlocked(
 				MTP_int(offset),
 				MTP_int(100)
 		)).done([=](const MTPcontacts_Blocked &result) {
@@ -101,7 +101,7 @@ namespace Settings {
 					blockList.append(int64(UserId(user.c_user().vid().v).bare));
 				}
 				if (blockCount > blockList.length()) {
-					reqBlocked(offset+100);
+					reqBlocked(controller, offset+100);
 				} else {
 					writeBlocklistFile();
 				}
@@ -116,7 +116,7 @@ namespace Settings {
 		}).send();
 	}
 
-	void Enhanced::SetupEnhancedMessages(not_null<Ui::VerticalLayout *> container) {
+	void Enhanced::SetupEnhancedMessages(not_null<Window::SessionController*> controller, not_null<Ui::VerticalLayout *> container) {
 		AddDivider(container);
 		AddSkip(container);
 		AddSubsectionTitle(container, tr::lng_settings_messages());
@@ -288,14 +288,14 @@ namespace Settings {
 			if (toggled) {
 				Ui::Toast::Show("Please wait a moment, fetching blocklist...");
 
-				App::wnd()->sessionController()->session().api().blockedPeers().slice() | rpl::take(
+				controller->session().api().blockedPeers().slice() | rpl::take(
 					1
 				) | rpl::start_with_next([&](const Api::BlockedPeers::Slice &result) {
 					if (blockList.length() == result.total) {
 						return;
 					}
 					blockList = QList<int64>();
-					reqBlocked(0);
+					reqBlocked(controller, 0);
 				}, container->lifetime());
 			}
 		}, container->lifetime());
@@ -303,7 +303,7 @@ namespace Settings {
 		AddDividerText(inner, tr::lng_settings_hide_messages_desc());
 	}
 
-	void Enhanced::SetupEnhancedButton(not_null<Ui::VerticalLayout *> container) {
+	void Enhanced::SetupEnhancedButton(not_null<Window::SessionController*> controller, not_null<Ui::VerticalLayout *> container) {
 		AddDivider(container);
 		AddSkip(container);
 		AddSubsectionTitle(container, tr::lng_settings_button());
@@ -350,7 +350,7 @@ namespace Settings {
 		AddSkip(container);
 	}
 
-	void Enhanced::SetupEnhancedVoiceChat(not_null<Ui::VerticalLayout *> container) {
+	void Enhanced::SetupEnhancedVoiceChat(not_null<Window::SessionController*> controller, not_null<Ui::VerticalLayout *> container) {
 		AddDivider(container);
 		AddSkip(container);
 		AddSubsectionTitle(container, tr::lng_settings_voice_chat());
@@ -452,7 +452,7 @@ namespace Settings {
 			SetEnhancedValue("hide_all_chats", enabled);
 			EnhancedSettings::Write();
 			controller->reloadFiltersMenu();
-			App::wnd()->fixOrder();
+			controller->widget()->fixOrder();
 		}, container->lifetime());
 
 		AddButton(
@@ -503,10 +503,10 @@ namespace Settings {
 	void Enhanced::setupContent(not_null<Window::SessionController *> controller) {
 		const auto content = Ui::CreateChild<Ui::VerticalLayout>(this);
 
-		SetupEnhancedNetwork(content);
-		SetupEnhancedMessages(content);
-		SetupEnhancedButton(content);
-		SetupEnhancedVoiceChat(content);
+		SetupEnhancedNetwork(controller, content);
+		SetupEnhancedMessages(controller, content);
+		SetupEnhancedButton(controller, content);
+		SetupEnhancedVoiceChat(controller, content);
 		SetupEnhancedOthers(controller, content);
 
 		Ui::ResizeFitChild(this, content);

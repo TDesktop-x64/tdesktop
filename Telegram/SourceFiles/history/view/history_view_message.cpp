@@ -1595,6 +1595,7 @@ void Message::toggleCommentsButtonRipple(bool pressed) {
 
 void Message::toggleRightActionRipple(bool pressed) {
 	Expects(_rightAction != nullptr);
+
 	const auto size = rightActionSize();
 	Assert(size != std::nullopt);
 
@@ -1968,10 +1969,9 @@ TextState Message::textState(
 				size->width(),
 				size->height()
 			).contains(point)) {
-				result.link = rightActionLink();
+				result.link = rightActionLink(point
+					- QPoint(fastShareLeft, fastShareTop));
 			}
-			applyRightActionLastPoint(point
-				- QPoint(fastShareLeft, fastShareTop));
 		}
 	} else if (media && media->isDisplayed()) {
 		result = media->textState(point - g.topLeft(), request);
@@ -2013,7 +2013,7 @@ bool Message::getStateCommentsButton(
 	if (!_comments->link && data()->repliesAreComments()) {
 		_comments->link = createGoToCommentsLink();
 	} else if (!_comments->link && data()->externalReply()) {
-		_comments->link = rightActionLink();
+		_comments->link = prepareRightActionLink();
 	}
 	outResult->link = _comments->link;
 	_comments->lastPoint = point - QPoint(g.left(), g.top() + g.height());
@@ -2720,7 +2720,7 @@ auto Message::verticalRepaintRange() const -> VerticalRepaintRange {
 
 void Message::refreshDataIdHook() {
 	if (_rightAction && base::take(_rightAction->link)) {
-		_rightAction->link = rightActionLink();
+		_rightAction->link = rightActionLink(_rightAction->lastPoint);
 	}
 	if (base::take(_fastReplyLink)) {
 		_fastReplyLink = fastReplyLink();
@@ -2994,13 +2994,6 @@ std::optional<QSize> Message::rightActionSize() const {
 		: std::optional<QSize>();
 }
 
-void Message::applyRightActionLastPoint(QPoint p) const {
-	if (!_rightAction) {
-		_rightAction = std::make_unique<RightAction>();
-	}
-	_rightAction->lastPoint = std::move(p);
-}
-
 bool Message::displayFastShare() const {
 	const auto item = message();
 	const auto peer = item->history()->peer;
@@ -3044,9 +3037,7 @@ void Message::drawRightAction(
 		int left,
 		int top,
 		int outerWidth) const {
-	if (!_rightAction) {
-		_rightAction = std::make_unique<RightAction>();
-	}
+	ensureRightAction();
 
 	const auto size = rightActionSize();
 	const auto st = context.st;
@@ -3109,19 +3100,31 @@ void Message::drawRightAction(
 	}
 }
 
-ClickHandlerPtr Message::rightActionLink() const {
-	if (!_rightAction) {
-		_rightAction = std::make_unique<RightAction>();
+ClickHandlerPtr Message::rightActionLink(
+		std::optional<QPoint> pressPoint) const {
+	ensureRightAction();
+	if (!_rightAction->link) {
+		_rightAction->link = prepareRightActionLink();
 	}
-	if (_rightAction->link) {
-		return _rightAction->link;
+	if (pressPoint) {
+		_rightAction->lastPoint = *pressPoint;
 	}
+	return _rightAction->link;
+}
+
+void Message::ensureRightAction() const {
+	if (_rightAction) {
+		return;
+	}
+	Assert(rightActionSize().has_value());
+	_rightAction = std::make_unique<RightAction>();
+}
+
+ClickHandlerPtr Message::prepareRightActionLink() const {
 	if (isPinnedContext()) {
-		_rightAction->link = goToMessageClickHandler(data());
-		return _rightAction->link;
+		return goToMessageClickHandler(data());
 	} else if (displayRightActionComments()) {
-		_rightAction->link = createGoToCommentsLink();
-		return _rightAction->link;
+		return createGoToCommentsLink();
 	}
 	const auto sessionId = data()->history()->session().uniqueId();
 	const auto owner = &data()->history()->owner();
@@ -3169,7 +3172,7 @@ ClickHandlerPtr Message::rightActionLink() const {
 			}
 		};
 	};
-	_rightAction->link = std::make_shared<LambdaClickHandler>([=](
+	return std::make_shared<LambdaClickHandler>([=](
 			ClickContext context) {
 		const auto controller = ExtractController(context).value_or(nullptr);
 		if (!controller) {
@@ -3192,7 +3195,6 @@ ClickHandlerPtr Message::rightActionLink() const {
 			}
 		}
 	});
-	return _rightAction->link;
 }
 
 ClickHandlerPtr Message::fastReplyLink() const {

@@ -679,16 +679,12 @@ auto Element::contextDependentServiceText() -> TextWithLinks {
 	if (!info) {
 		return {};
 	}
-	const auto created = !info->closed
-		&& !info->reopened
-		&& !info->renamed
-		&& !info->reiconed;
 	if (_delegate->elementContext() == Context::Replies) {
-		if (created) {
+		if (info->created()) {
 			return { { tr::lng_action_topic_created_inside(tr::now) } };
 		}
 		return {};
-	} else if (created) {
+	} else if (info->created()) {
 		return{};
 	}
 	const auto peerId = item->history()->peer->id;
@@ -748,6 +744,22 @@ auto Element::contextDependentServiceText() -> TextWithLinks {
 	} else if (info->reopened) {
 		return {
 			tr::lng_action_topic_reopened(
+				tr::now,
+				lt_topic,
+				wrapParentTopic(),
+				Ui::Text::WithEntities),
+		};
+	} else if (info->hidden) {
+		return {
+			tr::lng_action_topic_hidden(
+				tr::now,
+				lt_topic,
+				wrapParentTopic(),
+				Ui::Text::WithEntities),
+		};
+	} else if (info->unhidden) {
+		return {
+			tr::lng_action_topic_unhidden(
 				tr::now,
 				lt_topic,
 				wrapParentTopic(),
@@ -1226,11 +1238,9 @@ void Element::drawRightAction(
 	int outerWidth) const {
 }
 
-ClickHandlerPtr Element::rightActionLink() const {
+ClickHandlerPtr Element::rightActionLink(
+		std::optional<QPoint> pressPoint) const {
 	return ClickHandlerPtr();
-}
-
-void Element::applyRightActionLastPoint(QPoint p) const {
 }
 
 TimeId Element::displayedEditDate() const {

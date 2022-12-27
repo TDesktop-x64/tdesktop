@@ -271,7 +271,7 @@ HistoryItem::HistoryItem(
 	if (checked == MediaCheckResult::Unsupported) {
 		_flags &= ~MessageFlag::HasPostAuthor;
 		_flags |= MessageFlag::Legacy;
-		createComponents(data);
+		createComponents(data, false);
 		setText(UnsupportedMessageText());
 	} else if (checked == MediaCheckResult::Empty) {
 		AddComponents(HistoryServiceData::Bit());
@@ -282,16 +282,59 @@ HistoryItem::HistoryItem(
 		createServiceFromMtp(data);
 		applyTTL(data);
 	} else {
-		createComponents(data);
+		auto peerId = data.vfrom_id() ? peerFromMTP(*data.vfrom_id()) : PeerId(0);
+		auto user = history->session().data().peerLoaded(peerId);
+		auto isBlocked = false;
+
+		if (GetEnhancedBool("blocked_user_spoiler_mode") && blockExist(int64(peerId.value)) ||
+			GetEnhancedBool("blocked_user_spoiler_mode") && user && user->isBlocked()) {
+			isBlocked = true;
+		}
+
 		if (const auto media = data.vmedia()) {
 			setMedia(*media);
+			if (_media && _media->webpage()) {
+				if (isBlocked) {
+					_media->webpage()->applyChanges(WebPageType::Article, "", "", "", "", TextWithEntities(), nullptr, nullptr, WebPageCollage(), 0, "", 0);
+				}
+			}
 		}
-		auto textWithEntities = TextWithEntities{
-			qs(data.vmessage()),
-			Api::EntitiesFromMTP(
-				&history->session(),
-				data.ventities().value_or_empty())
-		};
+
+		createComponents(data, isBlocked);
+
+		auto textWithEntities = TextWithEntities();
+
+		auto blkMsg = QString("[Blocked User Message]\n");
+		auto msg = blkMsg + qs(data.vmessage());
+
+		if (GetEnhancedBool("blocked_user_spoiler_mode")) {
+			_blockMsg = TextWithEntities{
+					msg,
+					Api::EntitiesFromMTP(
+							&history->session(),
+							data.ventities().value_or_empty(),
+							blkMsg.length(), qs(data.vmessage()).length())
+			};
+
+			_originalMsg = TextWithEntities{
+					qs(data.vmessage()),
+					Api::EntitiesFromMTP(
+							&history->session(),
+							data.ventities().value_or_empty())
+			};
+		}
+
+		if (GetEnhancedBool("blocked_user_spoiler_mode") && blockExist(int64(peerId.value)) || GetEnhancedBool("blocked_user_spoiler_mode") && user && user->isBlocked()) {
+			textWithEntities = _blockMsg;
+		} else {
+			textWithEntities = TextWithEntities{
+					qs(data.vmessage()),
+					Api::EntitiesFromMTP(
+							&history->session(),
+							data.ventities().value_or_empty())
+			};
+		}
+
 		setText(_media ? textWithEntities : EnsureNonEmpty(textWithEntities));
 		if (const auto groupedId = data.vgrouped_id()) {
 			setGroupId(
@@ -2980,7 +3023,7 @@ void HistoryItem::applyTTL(const MTPDmessageService &data) {
 	}
 }
 
-void HistoryItem::createComponents(const MTPDmessage &data) {
+void HistoryItem::createComponents(const MTPDmessage &data, bool blocked) {
 	auto config = CreateConfig();
 	if (const auto forwarded = data.vfwd_from()) {
 		forwarded->match([&](const MTPDmessageFwdHeader &data) {
@@ -3012,6 +3055,12 @@ void HistoryItem::createComponents(const MTPDmessage &data) {
 	config.markup = HistoryMessageMarkupData(data.vreply_markup());
 	config.editDate = data.vedit_date().value_or_empty();
 	config.author = qs(data.vpost_author().value_or_empty());
+	if (_media && _media->document() && _media->document()->sticker()) {
+		if (blocked) {
+			config.originalDate = 1;
+			config.senderNameOriginal = QString("Blocked User");
+		}
+	}
 	createComponents(std::move(config));
 }
 

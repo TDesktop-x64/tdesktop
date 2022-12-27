@@ -953,11 +953,19 @@ void HistoryItem::setCommentsItemId(FullMsgId id) {
 	}
 }
 
+QString GenerateServiceTime(TimeId date) {
+	if (date > 0) {
+		return QString(" (%1)").arg(base::unixtime::parse(date).toString(cTimeFormat()));
+	}
+	return QString();
+}
+
 void HistoryItem::setServiceText(PreparedServiceText &&prepared) {
 	AddComponents(HistoryServiceData::Bit());
 	_flags &= ~MessageFlag::HasTextLinks;
 	const auto data = Get<HistoryServiceData>();
 	const auto had = !_text.empty();
+	prepared.text.text += GenerateServiceTime(date());
 	_text = std::move(prepared.text);
 	data->textLinks = std::move(prepared.links);
 	if (had) {

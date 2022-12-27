@@ -26,7 +26,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/file_utilities.h"
 #include "ui/toast/toast.h"
 #include "ui/toasts/common_toasts.h"
-#include "ui/special_buttons.h"
 #include "ui/emoji_config.h"
 #include "ui/chat/attach/attach_prepare.h"
 #include "ui/chat/choose_theme_controller.h"
@@ -45,10 +44,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/chat/choose_send_as.h"
 #include "ui/image/image.h"
 #include "ui/painter.h"
-#include "ui/special_buttons.h"
 #include "ui/controls/emoji_button.h"
 #include "ui/controls/send_button.h"
 #include "ui/controls/send_as_button.h"
+#include "ui/controls/silent_toggle.h"
 #include "inline_bots/inline_bot_result.h"
 #include "base/event_filter.h"
 #include "base/qt_signal_producer.h"
@@ -78,7 +77,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/stickers/data_custom_emoji.h"
 #include "history/history.h"
 #include "history/history_item.h"
-#include "history/history_message.h"
+#include "history/history_item_helpers.h" // GetErrorTextForSending.
 #include "history/history_drag_area.h"
 #include "history/history_inner_widget.h"
 #include "history/history_item_components.h"
@@ -966,7 +965,8 @@ HistoryWidget::HistoryWidget(
 		const auto lastKeyboardUsed = lastForceReplyReplied(FullMsgId(
 			action.history->peer->id,
 			action.replyTo));
-		if (action.options.scheduled) {
+		if (action.replaceMediaOf) {
+		} else if (action.options.scheduled) {
 			cancelReply(lastKeyboardUsed);
 			crl::on_main(this, [=, history = action.history] {
 				controller->showSection(
@@ -2876,7 +2876,7 @@ void HistoryWidget::updateControlsVisibility() {
 		if (_kbShown) {
 			_kbScroll->show();
 			_tabbedSelectorToggle->hide();
-			_botKeyboardHide->show();
+			showKeyboardHideButton();
 			_botKeyboardShow->hide();
 			_botCommandStart->hide();
 		} else if (_kbReplyTo) {
@@ -4699,6 +4699,11 @@ bool HistoryWidget::kbWasHidden() const {
 				_history->lastKeyboardHiddenId));
 }
 
+void HistoryWidget::showKeyboardHideButton() {
+	_botKeyboardHide->setVisible(!_peer->isUser()
+		|| !_keyboard->persistent());
+}
+
 void HistoryWidget::toggleKeyboard(bool manual) {
 	auto fieldEnabled = canWriteMessage() && !_showAnimation;
 	if (_kbShown || _kbReplyTo) {
@@ -4750,7 +4755,7 @@ void HistoryWidget::toggleKeyboard(bool manual) {
 			_history->lastKeyboardHiddenId = 0;
 		}
 	} else if (fieldEnabled) {
-		_botKeyboardHide->show();
+		showKeyboardHideButton();
 		_botKeyboardShow->hide();
 		_kbScroll->show();
 		_kbShown = true;
@@ -5917,7 +5922,7 @@ void HistoryWidget::updateBotKeyboard(History *h, bool force) {
 				if (hasMarkup) {
 					_kbScroll->show();
 					_tabbedSelectorToggle->hide();
-					_botKeyboardHide->show();
+					showKeyboardHideButton();
 				} else {
 					_kbScroll->hide();
 					_tabbedSelectorToggle->show();

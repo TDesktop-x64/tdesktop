@@ -1459,6 +1459,12 @@ TextWithEntities Document::getCaption() const {
 	return TextWithEntities();
 }
 
+void Document::hideSpoilers() {
+	if (const auto captioned = Get<HistoryDocumentCaptioned>()) {
+		captioned->caption.setSpoilerRevealed(false, anim::type::instant);
+	}
+}
+
 Ui::Text::String Document::createCaption() {
 	return File::createCaption(_realParent);
 }

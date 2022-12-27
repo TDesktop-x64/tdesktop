@@ -8,8 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_media_types.h"
 
 #include "history/history.h"
-#include "history/history_item.h"
-#include "history/history_message.h" // CreateMedia.
+#include "history/history_item.h" // CreateMedia.
 #include "history/history_location_manager.h"
 #include "history/view/history_view_element.h"
 #include "history/view/history_view_item_preview.h"
@@ -28,7 +27,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/media/history_view_theme_document.h"
 #include "history/view/media/history_view_slot_machine.h"
 #include "history/view/media/history_view_dice.h"
-#include "history/view/media/history_view_service_media_gift.h"
+#include "history/view/media/history_view_service_box.h"
+#include "history/view/media/history_view_premium_gift.h"
+#include "history/view/media/history_view_userpic_suggestion.h"
 #include "dialogs/ui/dialogs_message_view.h"
 #include "ui/image/image.h"
 #include "ui/effects/spoiler_mess.h"
@@ -235,7 +236,7 @@ template <typename MediaType>
 
 bool UpdateExtendedMedia(
 		Invoice &invoice,
-		not_null<HistoryMessage*> item,
+		not_null<HistoryItem*> item,
 		const MTPMessageExtendedMedia &media) {
 	return media.match([&](const MTPDmessageExtendedMediaPreview &data) {
 		if (invoice.extendedMedia) {
@@ -269,7 +270,7 @@ bool UpdateExtendedMedia(
 		}
 		return changed;
 	}, [&](const MTPDmessageExtendedMedia &data) {
-		invoice.extendedMedia = HistoryMessage::CreateMedia(
+		invoice.extendedMedia = HistoryItem::CreateMedia(
 			item,
 			data.vmedia());
 		return true;
@@ -291,7 +292,7 @@ TextForMimeData WithCaptionClipboardText(
 }
 
 Invoice ComputeInvoiceData(
-		not_null<HistoryMessage*> item,
+		not_null<HistoryItem*> item,
 		const MTPDmessageMediaInvoice &data) {
 	auto description = qs(data.vdescription());
 	auto result = Invoice{
@@ -445,6 +446,10 @@ QString Media::errorTextForForward(not_null<PeerData*> peer) const {
 	return QString();
 }
 
+bool Media::hasSpoiler() const {
+	return false;
+}
+
 bool Media::consumeMessageText(const TextWithEntities &text) {
 	return false;
 }
@@ -529,10 +534,16 @@ ItemPreview Media::toGroupPreview(
 
 MediaPhoto::MediaPhoto(
 	not_null<HistoryItem*> parent,
-	not_null<PhotoData*> photo)
+	not_null<PhotoData*> photo,
+	bool spoiler)
 : Media(parent)
-, _photo(photo) {
+, _photo(photo)
+, _spoiler(spoiler) {
 	parent->history()->owner().registerPhotoItem(_photo, parent);
+
+	if (_spoiler) {
+		Ui::PreloadImageSpoiler();
+	}
 }
 
 MediaPhoto::MediaPhoto(
@@ -555,7 +566,7 @@ MediaPhoto::~MediaPhoto() {
 std::unique_ptr<Media> MediaPhoto::clone(not_null<HistoryItem*> parent) {
 	return _chat
 		? std::make_unique<MediaPhoto>(parent, _chat, _photo)
-		: std::make_unique<MediaPhoto>(parent, _photo);
+		: std::make_unique<MediaPhoto>(parent, _photo, _spoiler);
 }
 
 PhotoData *MediaPhoto::photo() const {
@@ -660,6 +671,10 @@ QString MediaPhoto::errorTextForForward(not_null<PeerData*> peer) const {
 	).value_or(QString());
 }
 
+bool MediaPhoto::hasSpoiler() const {
+	return _spoiler;
+}
+
 bool MediaPhoto::updateInlineResultMedia(const MTPMessageMedia &media) {
 	if (media.type() != mtpc_messageMediaPhoto) {
 		return false;
@@ -703,6 +718,15 @@ std::unique_ptr<HistoryView::Media> MediaPhoto::createView(
 		not_null<HistoryItem*> realParent,
 		HistoryView::Element *replacing) {
 	if (_chat) {
+		if (realParent->isUserpicSuggestion()) {
+			return std::make_unique<HistoryView::ServiceBox>(
+				message,
+				std::make_unique<HistoryView::UserpicSuggestion>(
+					message,
+					_chat,
+					_photo,
+					st::msgServicePhotoWidth));
+		}
 		return std::make_unique<HistoryView::Photo>(
 			message,
 			_chat,
@@ -712,23 +736,30 @@ std::unique_ptr<HistoryView::Media> MediaPhoto::createView(
 	return std::make_unique<HistoryView::Photo>(
 		message,
 		realParent,
-		_photo);
+		_photo,
+		_spoiler);
 }
 
 MediaFile::MediaFile(
 	not_null<HistoryItem*> parent,
 	not_null<DocumentData*> document,
-	bool skipPremiumEffect)
+	bool skipPremiumEffect,
+	bool spoiler)
 : Media(parent)
 , _document(document)
 , _emoji(document->sticker() ? document->sticker()->alt : QString())
-, _skipPremiumEffect(skipPremiumEffect) {
+, _skipPremiumEffect(skipPremiumEffect)
+, _spoiler(spoiler) {
 	parent->history()->owner().registerDocumentItem(_document, parent);
 
 	if (!_emoji.isEmpty()) {
 		if (const auto emoji = Ui::Emoji::Find(_emoji)) {
 			_emoji = emoji->text();
 		}
+	}
+
+	if (_spoiler) {
+		Ui::PreloadImageSpoiler();
 	}
 }
 
@@ -745,7 +776,8 @@ std::unique_ptr<Media> MediaFile::clone(not_null<HistoryItem*> parent) {
 	return std::make_unique<MediaFile>(
 		parent,
 		_document,
-		!_document->session().premium());
+		!_document->session().premium(),
+		_spoiler);
 }
 
 DocumentData *MediaFile::document() const {
@@ -1021,6 +1053,10 @@ QString MediaFile::errorTextForForward(not_null<PeerData*> peer) const {
 	return QString();
 }
 
+bool MediaFile::hasSpoiler() const {
+	return _spoiler;
+}
+
 bool MediaFile::updateInlineResultMedia(const MTPMessageMedia &media) {
 	if (media.type() != mtpc_messageMediaDocument) {
 		return false;
@@ -1086,13 +1122,15 @@ std::unique_ptr<HistoryView::Media> MediaFile::createView(
 			return std::make_unique<HistoryView::Gif>(
 				message,
 				realParent,
-				_document);
+				_document,
+				_spoiler);
 		}
 	} else if (_document->isAnimation() || _document->isVideoFile()) {
 		return std::make_unique<HistoryView::Gif>(
 			message,
 			realParent,
-			_document);
+			_document,
+			_spoiler);
 	} else if (_document->isTheme() && _document->hasThumbnail()) {
 		return std::make_unique<HistoryView::ThemeDocument>(
 			message,
@@ -1583,7 +1621,7 @@ MediaInvoice::MediaInvoice(
 	.isTest = data.isTest,
 } {
 	if (_invoice.extendedPreview && !_invoice.extendedMedia) {
-		Ui::PrepareImageSpoiler();
+		Ui::PreloadImageSpoiler();
 	}
 }
 
@@ -1639,7 +1677,7 @@ bool MediaInvoice::updateSentMedia(const MTPMessageMedia &media) {
 }
 
 bool MediaInvoice::updateExtendedMedia(
-		not_null<HistoryMessage*> item,
+		not_null<HistoryItem*> item,
 		const MTPMessageExtendedMedia &media) {
 	Expects(item == parent());
 
@@ -1908,7 +1946,9 @@ std::unique_ptr<HistoryView::Media> MediaGiftBox::createView(
 		not_null<HistoryView::Element*> message,
 		not_null<HistoryItem*> realParent,
 		HistoryView::Element *replacing) {
-	return std::make_unique<HistoryView::MediaGift>(message, this);
+	return std::make_unique<HistoryView::ServiceBox>(
+		message,
+		std::make_unique<HistoryView::PremiumGift>(message, this));
 }
 
 bool MediaGiftBox::activated() const {

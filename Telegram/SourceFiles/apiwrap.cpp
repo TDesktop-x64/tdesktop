@@ -67,8 +67,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/add_contact_box.h"
 #include "mtproto/mtproto_config.h"
 #include "history/history.h"
-#include "history/history_message.h"
+#include "history/history_item.h"
 #include "history/history_item_components.h"
+#include "history/history_item_helpers.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
 #include "main/main_account.h"
@@ -690,7 +691,11 @@ QString ApiWrap::exportDirectMessageLink(
 		auto linkThreadId = MsgId();
 		auto linkThreadIsTopic = false;
 		if (inRepliesContext) {
-			if (const auto rootId = item->replyToTop()) {
+			linkThreadIsTopic = item->history()->isForum();
+			const auto rootId = linkThreadIsTopic
+				? item->topicRootId()
+				: item->replyToTop();
+			if (rootId) {
 				const auto root = item->history()->owner().message(
 					channel->id,
 					rootId);
@@ -710,7 +715,6 @@ QString ApiWrap::exportDirectMessageLink(
 				} else {
 					// Reply in a thread, maybe comment in a private channel.
 					linkThreadId = rootId;
-					linkThreadIsTopic = (item->topicRootId() == rootId);
 				}
 			}
 		}
@@ -2415,6 +2419,12 @@ void ApiWrap::refreshFileReference(
 		} else {
 			fail();
 		}
+	}, [&](Data::FileOriginFullUser data) {
+		if (const auto user = _session->data().user(data.userId)) {
+			request(MTPusers_GetFullUser(user->inputUser));
+		} else {
+			fail();
+		}
 	}, [&](Data::FileOriginPeerPhoto data) {
 		fail();
 	}, [&](Data::FileOriginStickerSet data) {
@@ -3055,7 +3065,7 @@ void ApiWrap::sharedMediaDone(
 }
 
 void ApiWrap::sendAction(const SendAction &action) {
-	if (!action.options.scheduled) {
+	if (!action.options.scheduled && !action.replaceMediaOf) {
 		const auto topic = action.topicRootId
 			? action.history->peer->forumTopicFor(action.topicRootId)
 			: nullptr;
@@ -3147,7 +3157,11 @@ void ApiWrap::forwardMessages(
 	if (sendAs) {
 		sendFlags |= MTPmessages_ForwardMessages::Flag::f_send_as;
 	}
-	if (action.topicRootId) {
+	const auto kGeneralId = Data::ForumTopic::kGeneralId;
+	const auto topMsgId = (action.topicRootId == kGeneralId)
+		? MsgId(0)
+		: action.topicRootId;
+	if (topMsgId) {
 		sendFlags |= MTPmessages_ForwardMessages::Flag::f_top_msg_id;
 	}
 
@@ -3169,7 +3183,7 @@ void ApiWrap::forwardMessages(
 				MTP_vector<MTPint>(ids),
 				MTP_vector<MTPlong>(randomIds),
 				peer->input,
-				MTP_int(action.topicRootId),
+				MTP_int(topMsgId),
 				MTP_int(action.options.scheduled),
 				(sendAs ? sendAs->input : MTP_inputPeerEmpty())
 			)).done([=](const MTPUpdates &result) {
@@ -3222,7 +3236,7 @@ void ApiWrap::forwardMessages(
 				messageFromId,
 				messagePostAuthor,
 				item,
-				action.topicRootId);
+				topMsgId);
 			_session->data().registerMessageRandomId(randomId, newId);
 			if (!localIds) {
 				localIds = std::make_shared<base::flat_map<uint64, FullMsgId>>();
@@ -3364,7 +3378,8 @@ void ApiWrap::editMedia(
 		std::move(file.information),
 		type,
 		to,
-		caption));
+		caption,
+		file.spoiler));
 }
 
 void ApiWrap::sendFiles(
@@ -3405,6 +3420,7 @@ void ApiWrap::sendFiles(
 			uploadWithType,
 			to,
 			caption,
+			file.spoiler,
 			album));
 		caption = TextWithTags();
 	}
@@ -3424,14 +3440,17 @@ void ApiWrap::sendFile(
 		const SendAction &action) {
 	const auto to = fileLoadTaskOptions(action);
 	auto caption = TextWithTags();
+	const auto spoiler = false;
+	const auto information = nullptr;
 	_fileLoader->addTask(std::make_unique<FileLoadTask>(
 		&session(),
 		QString(),
 		fileContent,
-		nullptr,
+		information,
 		type,
 		to,
-		caption));
+		caption,
+		spoiler));
 }
 
 void ApiWrap::sendUploadedPhoto(
@@ -3439,7 +3458,7 @@ void ApiWrap::sendUploadedPhoto(
 		Api::RemoteFileInfo info,
 		Api::SendOptions options) {
 	if (const auto item = _session->data().message(localId)) {
-		const auto media = Api::PrepareUploadedPhoto(std::move(info));
+		const auto media = Api::PrepareUploadedPhoto(item, std::move(info));
 		if (const auto groupId = item->groupId()) {
 			uploadAlbumMedia(item, groupId, media);
 		} else {
@@ -3790,7 +3809,9 @@ void ApiWrap::uploadAlbumMedia(
 			failed();
 			return;
 		}
+		auto spoiler = false;
 		if (const auto media = item->media()) {
+			spoiler = media->hasSpoiler();
 			if (const auto photo = media->photo()) {
 				photo->setWaitingForAlbum();
 			} else if (const auto document = media->document()) {
@@ -3807,10 +3828,10 @@ void ApiWrap::uploadAlbumMedia(
 				return;
 			}
 			const auto &fields = photo->c_photo();
-			const auto flags = MTPDinputMediaPhoto::Flags(0)
-				| (data.vttl_seconds()
-					? MTPDinputMediaPhoto::Flag::f_ttl_seconds
-					: MTPDinputMediaPhoto::Flag(0));
+			using Flag = MTPDinputMediaPhoto::Flag;
+			const auto flags = Flag()
+				| (data.vttl_seconds() ? Flag::f_ttl_seconds : Flag())
+				| (spoiler ? Flag::f_spoiler : Flag());
 			const auto media = MTP_inputMediaPhoto(
 				MTP_flags(flags),
 				MTP_inputPhoto(
@@ -3829,10 +3850,10 @@ void ApiWrap::uploadAlbumMedia(
 				return;
 			}
 			const auto &fields = document->c_document();
-			const auto flags = MTPDinputMediaDocument::Flags(0)
-				| (data.vttl_seconds()
-					? MTPDinputMediaDocument::Flag::f_ttl_seconds
-					: MTPDinputMediaDocument::Flag(0));
+			using Flag = MTPDinputMediaDocument::Flag;
+			const auto flags = Flag()
+				| (data.vttl_seconds() ? Flag::f_ttl_seconds : Flag())
+				| (spoiler ? Flag::f_spoiler : Flag());
 			const auto media = MTP_inputMediaDocument(
 				MTP_flags(flags),
 				MTP_inputDocument(

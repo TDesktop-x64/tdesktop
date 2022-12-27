@@ -46,7 +46,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "media/streaming/media_streaming_player.h"
 #include "media/player/media_player_instance.h"
 #include "history/history.h"
-#include "history/history_message.h"
+#include "history/history_item.h"
+#include "history/history_item_helpers.h"
 #include "history/view/media/history_view_media.h"
 #include "data/data_media_types.h"
 #include "data/data_session.h"
@@ -4942,16 +4943,24 @@ void OverlayWidget::updateHeader() {
 				lt_amount,
 				QString::number(count));
 		} else {
-			_headerText = tr::lng_mediaview_n_of_amount(
-				tr::now,
-				lt_n,
-				QString::number(index + 1),
-				lt_amount,
-				QString::number(count));
+			if (_user
+				&& (index == count - 1)
+				&& SyncUserFallbackPhotoViewer(_user)) {
+				_headerText = tr::lng_mediaview_profile_public_photo(tr::now);
+			} else {
+				_headerText = tr::lng_mediaview_n_of_amount(
+					tr::now,
+					lt_n,
+					QString::number(index + 1),
+					lt_amount,
+					QString::number(count));
+			}
 		}
 	} else {
 		if (_document) {
-			_headerText = _document->filename().isEmpty() ? tr::lng_mediaview_doc_image(tr::now) : _document->filename();
+			_headerText = _document->filename().isEmpty()
+				? tr::lng_mediaview_doc_image(tr::now)
+				: _document->filename();
 		} else if (_message) {
 			_headerText = tr::lng_mediaview_single_photo(tr::now);
 		} else if (_user) {

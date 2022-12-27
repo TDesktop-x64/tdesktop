@@ -939,6 +939,7 @@ void ActionsFiller::addBlockAction(not_null<UserData*> user) {
 
 void ActionsFiller::addLeaveChannelAction(not_null<ChannelData*> channel) {
 	Expects(_controller->parentController());
+
 	AddActionButton(
 		_wrap,
 		tr::lng_profile_leave_channel(),

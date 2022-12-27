@@ -60,8 +60,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_updates.h"
 #include "mtproto/mtproto_config.h"
 #include "history/history.h"
-#include "history/history_item.h"
-#include "history/history_message.h" // GetErrorTextForSending.
+#include "history/history_item_helpers.h" // GetErrorTextForSending.
 #include "history/history_widget.h"
 #include "history/view/history_view_context_menu.h"
 #include "window/window_adaptive.h" // Adaptive::isThreeColumn

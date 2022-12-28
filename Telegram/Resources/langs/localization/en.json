@@ -125,5 +125,7 @@
     
     "lng_copy_profile_id": "ID copied to clipboard.",
 
-    "lng_group_requests_ban": "Ban"
+    "lng_group_requests_ban": "Ban",
+
+    "lng_blocked_user_hint": "[Blocked User Message]\n"
 }

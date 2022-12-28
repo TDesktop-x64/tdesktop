@@ -303,8 +303,8 @@ HistoryItem::HistoryItem(
 		createComponents(data, isBlocked);
 
 		auto textWithEntities = TextWithEntities();
-
-		auto blkMsg = QString("[Blocked User Message]\n");
+		
+		auto blkMsg = Lang::GetOriginalValue(tr::lng_blocked_user_hint.base);
 		auto msg = blkMsg + qs(data.vmessage());
 
 		if (GetEnhancedBool("blocked_user_spoiler_mode")) {

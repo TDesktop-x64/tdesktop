@@ -4441,7 +4441,9 @@ PreparedServiceText HistoryItem::prepareCallScheduledText(
 				Ui::Text::WithEntities);
 		}
 	};
-	const auto time = QLocale().toString(scheduled.time(), cTimeFormat());
+	const auto time = QLocale().toString(
+		scheduled.time(),
+		QLocale::ShortFormat);
 	const auto prepareGeneric = [&] {
 		prepareWithDate(tr::lng_group_call_starts_date(
 			tr::now,

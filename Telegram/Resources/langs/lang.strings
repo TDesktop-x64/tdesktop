@@ -308,11 +308,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_edit_caption_voice" = "Sorry, you can't edit your message while you're having an unsent voice message.";
 
 "lng_intro_about" = "Welcome to the Official 64Gram Desktop app.\nIt's fast and secure.";
-"lng_start_msgs" = "START MESSAGING";
+"lng_start_msgs" = "Start messaging";
 
-"lng_intro_next" = "NEXT";
-"lng_intro_finish" = "SIGN UP";
-"lng_intro_submit" = "SUBMIT";
+"lng_intro_next" = "Next";
+"lng_intro_finish" = "Sign up";
+"lng_intro_submit" = "Submit";
 
 "lng_photo_caption" = "Caption";
 "lng_photos_comment" = "Comment";
@@ -3149,6 +3149,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_admin_log_participant_joined_by_link_channel" = "{from} joined the channel via {link}";
 "lng_admin_log_participant_approved_by_link" = "{from} was approved to join the group via {link} by {user}";
 "lng_admin_log_participant_approved_by_link_channel" = "{from} was approved to join the channel via {link} by {user}";
+"lng_admin_log_participant_approved_by_request" = "{from} joined to the group via public request, approved by {user}";
+"lng_admin_log_participant_approved_by_request_channel" = "{from} joined to the channel via public request, approved by {user}";
 "lng_admin_log_revoke_invite_link" = "{from} revoked invite link {link}";
 "lng_admin_log_delete_invite_link" = "{from} deleted invite link {link}";
 "lng_admin_log_participant_left" = "{from} left the group";

@@ -841,7 +841,7 @@ void OverlayWidget::updateControls() {
 		}
 		return dNow;
 	}();
-	_dateText = Ui::FormatDateTime(d, cDateFormat(), cTimeFormat());
+	_dateText = Ui::FormatDateTime(d);
 	if (_photo) {
 		_dateText += QString(" @ DC%1").arg(_photo->getDC());
 	} else if (_document) {

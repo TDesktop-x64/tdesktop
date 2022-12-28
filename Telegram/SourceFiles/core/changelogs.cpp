@@ -76,7 +76,7 @@ std::map<int, const char*> BetaLogs() {
 		"- Fix crash in folder editing on Linux.\n"
 	},
 	{
-		4004002,
+		1000059,
 		"- Send photos and video files hidden by a spoiler effect.\n"
 
 		"- Set a public photo for those who are restricted to see "

@@ -998,7 +998,7 @@ void HistoryItem::setCommentsItemId(FullMsgId id) {
 
 QString GenerateServiceTime(TimeId date) {
 	if (date > 0) {
-		return QString(" (%1)").arg(base::unixtime::parse(date).toString(cTimeFormat()));
+		return QString(" (%1)").arg(base::unixtime::parse(date).toString("hh:mm:ss AP"));
 	}
 	return QString();
 }
@@ -4443,7 +4443,7 @@ PreparedServiceText HistoryItem::prepareCallScheduledText(
 	};
 	const auto time = QLocale().toString(
 		scheduled.time(),
-		QLocale::ShortFormat);
+		GetEnhancedBool("show_seconds") ? "h:mm:ss AP" : "h:mm AP");
 	const auto prepareGeneric = [&] {
 		prepareWithDate(tr::lng_group_call_starts_date(
 			tr::now,

@@ -92,12 +92,12 @@ void PaintRowDate(
 		const auto wasSameDay = (lastDate == nowDate);
 		const auto wasRecently = qAbs(lastTime.secsTo(now)) < kRecentlyInSeconds;
 		if (wasSameDay || wasRecently) {
-			return QLocale().toString(lastTime.time(), QLocale::ShortFormat);
+			return QLocale().toString(lastTime.time(), GetEnhancedBool("show_seconds") ? "h:mm:ss AP" : "h:mm AP");
 		} else if (lastDate.year() == nowDate.year()
 			&& lastDate.weekNumber() == nowDate.weekNumber()) {
 			return langDayOfWeek(lastDate);
 		} else {
-			return QLocale().toString(lastDate, QLocale::ShortFormat);
+			return QLocale().toString(lastDate, GetEnhancedBool("show_seconds") ? "M/d/yy" : "M/d/yy");
 		}
 	}();
 	PaintRowTopRight(p, dt, rectForName, context);

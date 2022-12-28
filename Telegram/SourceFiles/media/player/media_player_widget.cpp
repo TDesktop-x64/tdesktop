@@ -1021,7 +1021,7 @@ void Widget::handleSongChange() {
 			const auto date = [item] {
 				const auto parsed = ItemDateTime(item);
 				const auto date = parsed.date();
-				const auto time = QLocale().toString(parsed.time(), QLocale::ShortFormat);
+				const auto time = QLocale().toString(parsed.time(), GetEnhancedBool("show_seconds") ? "h:mm:ss AP" : "h:mm AP");
 				const auto today = QDateTime::currentDateTime().date();
 				if (date == today) {
 					return tr::lng_player_message_today(

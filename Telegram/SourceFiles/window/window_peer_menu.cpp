@@ -1096,7 +1096,7 @@ void Filler::addPinnedMessages() {
 				tr::lng_pinned_message_view(tr::now),
 				[=] {
 					const auto history = channel->owner().history(channel);
-					_controller->showSection(std::make_shared<HistoryView::PinnedMemento>(history, 0));
+					App::wnd()->sessionController()->showSection(std::make_shared<HistoryView::PinnedMemento>(history));
 				}, & st::menuIconEdit);
 	}
 }

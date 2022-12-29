@@ -85,7 +85,7 @@ std::map<int, const char*> BetaLogs() {
 		"- Bug fixes and other minor improvements.\n"
 	},
 	{
-		4004003,
+		1000060,
 		"- Support for anonymous numbers from the Fragment.com platform.\n"
 
 		"- Fix a crash in own profile photo updating.\n"
@@ -197,7 +197,7 @@ void Changelogs::addBetaLog(int changeVersion, const char *changes) {
 		return result.replace(simple, separator);
 	}();
 	const auto version = FormatVersionDisplay(changeVersion);
-	const auto log = u"New in version %1%2:\n\n"_q.arg(AppBetaVersion ? " beta" : "").arg(version) + text;
+	const auto log = u"New in version %1%2:\n\n"_q.arg(version).arg(AppBetaVersion ? " beta" : "") + text;
 	addLocalLog(log);
 }
 

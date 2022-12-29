@@ -91,7 +91,6 @@ void CameraBox(
 			},
 			std::move(callback),
 			track->frame(FrameRequest()).mirrored(true, false));
-		box->closeBox();
 	};
 
 	box->setTitle(tr::lng_profile_camera_title());
@@ -208,13 +207,13 @@ void UserpicButton::prepare() {
 		prepareUserpicPixmap();
 	}
 	setClickHandlerByRole();
+}
 
-	if (_role == Role::ChangePhoto) {
-		chosenImages(
-		) | rpl::start_with_next([=](ChosenImage &&chosen) {
-			showCustom(std::move(chosen.image));
-		}, lifetime());
-	}
+void UserpicButton::showCustomOnChosen() {
+	chosenImages(
+	) | rpl::start_with_next([=](ChosenImage &&chosen) {
+		showCustom(std::move(chosen.image));
+	}, lifetime());
 }
 
 void UserpicButton::requestSuggestAvailability() {
@@ -274,10 +273,12 @@ void UserpicButton::choosePhotoLocally() {
 				const auto user = _peer ? _peer->asUser() : nullptr;
 				const auto name = (user && !user->firstName.isEmpty())
 					? user->firstName
-					: _peer->name();
+					: _peer
+					? _peer->name()
+					: QString();
 				const auto phrase = (type == ChosenType::Suggest)
 					? &tr::lng_profile_suggest_sure
-					: (_peer->isUser() && !_peer->isSelf())
+					: (user && !user->isSelf())
 					? &tr::lng_profile_set_personal_sure
 					: nullptr;
 				PrepareProfilePhotoFromFile(

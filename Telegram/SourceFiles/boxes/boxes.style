@@ -293,6 +293,10 @@ membersAbout: FlatLabel(defaultFlatLabel) {
 	style: boxLabelStyle;
 }
 
+fragmentBoxButton: RoundButton(introFragmentButton) {
+	width: 256px;
+}
+
 passcodeHeaderFont: font(19px);
 passcodeHeaderHeight: 80px;
 passcodeInput: InputField(introPhone) {

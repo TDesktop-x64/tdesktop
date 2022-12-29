@@ -2289,7 +2289,7 @@ TextForMimeData ListWidget::getSelectedText() const {
 			not_null<HistoryItem*> item,
 			TextForMimeData &&unwrapped) {
 		auto time = QString(", [%1]\n").arg(
-			QLocale().toString(ItemDateTime(item), GetEnhancedBool("show_seconds") ? "h:mm:ss AP" : "h:mm AP"));
+			QLocale().toString(ItemDateTime(item), GetEnhancedBool("show_seconds") ? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t") : QLocale::system().timeFormat(QLocale::ShortFormat)));
 		auto part = TextForMimeData();
 		auto size = item->author()->name().size()
 			+ time.size()

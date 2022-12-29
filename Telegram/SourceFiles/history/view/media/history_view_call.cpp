@@ -48,7 +48,7 @@ Call::Call(
 	_text = Data::MediaCall::Text(item, _reason, _video);
 	_status = QLocale().toString(
 		parent->dateTime().time(),
-		GetEnhancedBool("show_seconds") ? "h:mm:ss AP" : "h:mm AP");
+		GetEnhancedBool("show_seconds") ? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t") : QLocale::system().timeFormat(QLocale::ShortFormat));
 	if (_duration) {
 		_status = tr::lng_call_duration_info(
 			tr::now,

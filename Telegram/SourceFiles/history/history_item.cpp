@@ -4443,7 +4443,7 @@ PreparedServiceText HistoryItem::prepareCallScheduledText(
 	};
 	const auto time = QLocale().toString(
 		scheduled.time(),
-		GetEnhancedBool("show_seconds") ? "h:mm:ss AP" : "h:mm AP");
+		GetEnhancedBool("show_seconds") ? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t") : QLocale::system().timeFormat(QLocale::ShortFormat));
 	const auto prepareGeneric = [&] {
 		prepareWithDate(tr::lng_group_call_starts_date(
 			tr::now,

@@ -64,7 +64,7 @@ EntitiesInText EntitiesFromMTP(
 		const QVector<MTPMessageEntity> &entities, int32 length, int msglen) {
 	auto result = EntitiesInText();
 	if (length > 0) {
-		result.push_back({ EntityType::Bold, 0, 22 });
+		result.push_back({ EntityType::Bold, 0, length-1 });
 		result.push_back({ EntityType::Spoiler, 23, msglen });
 	}
 	if (!entities.isEmpty()) {

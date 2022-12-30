@@ -19,8 +19,8 @@ namespace {
 
 base::options::toggle UseSmallMsgBubbleRadius({
 	.id = kOptionUseSmallMsgBubbleRadius,
-	.name = "Use large message bubble radius",
-	.description = "Makes most message bubbles rounded.",
+	.name = "Use small message bubble radius",
+	.description = "Makes most message bubbles square-ish.",
 	.restartRequired = true,
 });
 

@@ -709,7 +709,7 @@ historyInfoToast: Toast(defaultToast) {
 	iconPosition: point(13px, 13px);
 }
 
-bubbleRadiusSmall: 16px;
+bubbleRadiusSmall: 6px;
 bubbleRadiusLarge: 6px;
 
 historyPhotoLeft: 14px;

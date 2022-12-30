@@ -254,6 +254,7 @@ struct OverlayWidget::PipWrap {
 
 	PipDelegate delegate;
 	Pip wrapped;
+	rpl::lifetime lifetime;
 };
 
 OverlayWidget::Streamed::Streamed(
@@ -3347,14 +3348,14 @@ void OverlayWidget::switchToPip() {
 	Expects(_document != nullptr);
 
 	const auto document = _document;
-	const auto message = _message;
+	const auto messageId = _message ? _message->fullId() : FullMsgId();
 	const auto topicRootId = _topicRootId;
 	const auto closeAndContinue = [=] {
 		_showAsPip = false;
 		show(OpenRequest(
 			findWindow(false),
 			document,
-			message,
+			document->owner().message(messageId),
 			topicRootId,
 			true));
 	};
@@ -3365,6 +3366,16 @@ void OverlayWidget::switchToPip() {
 		_streamed->instance.shared(),
 		closeAndContinue,
 		[=] { _pip = nullptr; });
+
+	if (const auto raw = _message) {
+		raw->history()->owner().itemRemoved(
+		) | rpl::filter([=](not_null<const HistoryItem*> item) {
+			return (raw == item);
+		}) | rpl::start_with_next([=] {
+			_pip = nullptr;
+		}, _pip->lifetime);
+	}
+
 	if (isHidden()) {
 		clearBeforeHide();
 		clearAfterHide();

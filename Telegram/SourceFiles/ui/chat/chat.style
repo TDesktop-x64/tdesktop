@@ -710,7 +710,7 @@ historyInfoToast: Toast(defaultToast) {
 }
 
 bubbleRadiusSmall: 6px;
-bubbleRadiusLarge: 6px;
+bubbleRadiusLarge: 16px;
 
 historyPhotoLeft: 14px;
 historyPhotoBubbleMinWidth: 200px;

@@ -41,7 +41,7 @@ DisableProgramGroupPage=no
   #define ArchModulesFolder "x64"
   AppVerName={#MyAppName} {#MyAppVersion} 64bit
 #else
-  OutputBaseFilename=tsetup.{#MyAppVersionFull}
+  OutputBaseFilename=64Gram-setup.{#MyAppVersionFull}
   #define ArchModulesFolder "x86"
   AppVerName={#MyAppName} {#MyAppVersion} 32bit
 #endif

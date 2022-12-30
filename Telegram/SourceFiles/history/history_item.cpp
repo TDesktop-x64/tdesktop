@@ -998,7 +998,7 @@ void HistoryItem::setCommentsItemId(FullMsgId id) {
 
 QString GenerateServiceTime(TimeId date) {
 	if (date > 0) {
-		return QString(" (%1)").arg(base::unixtime::parse(date).toString("hh:mm:ss AP"));
+		return QString(" (%1)").arg(base::unixtime::parse(date).toString(GetEnhancedBool("show_seconds") ? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t") : QLocale::system().timeFormat(QLocale::ShortFormat)));
 	}
 	return QString();
 }

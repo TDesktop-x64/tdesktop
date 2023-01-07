@@ -35,6 +35,9 @@ enum class Command {
 	ChatPinned3,
 	ChatPinned4,
 	ChatPinned5,
+	ChatPinned6,
+	ChatPinned7,
+	ChatPinned8,
 
 	ShowAllChats,
 	ShowFolder1,

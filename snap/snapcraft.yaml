@@ -449,9 +449,9 @@ parts:
       - libxkbcommon-x11-0
       - zlib1g
     override-pull: |
-      QT=6_4_1
+      QT=6_4_2
 
-      git clone -b v6.4.1 --depth=1 git://code.qt.io/qt/qt5.git .
+      git clone -b v6.4.2 --depth=1 git://code.qt.io/qt/qt5.git .
       git submodule update --init --recursive --depth=1 qtbase qtdeclarative qtwayland qtimageformats qtsvg qt5compat qtshadertools
 
       cd qtbase
@@ -517,7 +517,7 @@ parts:
   webrtc:
     source: https://github.com/desktop-app/tg_owt.git
     source-depth: 1
-    source-commit: cc8edd5719556e1711f50da9a3f7a4c59bba574d
+    source-commit: 5098730b9eb6173f0b52068fe2555b7c1015123a
     plugin: cmake
     build-packages:
       - yasm

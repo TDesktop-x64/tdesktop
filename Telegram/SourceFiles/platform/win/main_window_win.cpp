@@ -27,6 +27,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/popup_menu.h"
 #include "ui/ui_utility.h"
 #include "window/themes/window_theme.h"
+#include "window/window_controller.h"
 #include "history/history.h"
 
 #include <QtWidgets/QDesktopWidget>
@@ -171,6 +172,8 @@ MainWindow::MainWindow(not_null<Window::Controller*> controller)
 
 	setupNativeWindowFrame();
 
+	SetWindowPriority(this, controller->isPrimary() ? 2 : 1);
+
 	using namespace rpl::mappers;
 	Core::App().appDeactivatedValue(
 	) | rpl::distinct_until_changed(
@@ -225,16 +228,19 @@ int32 MainWindow::screenNameChecksum(const QString &name) const {
 
 void MainWindow::forceIconRefresh() {
 	const auto refresher = std::make_unique<QWidget>(this);
-	refresher->setWindowFlags(static_cast<Qt::WindowFlags>(Qt::Tool) | Qt::FramelessWindowHint);
+	refresher->setWindowFlags(
+		static_cast<Qt::WindowFlags>(Qt::Tool) | Qt::FramelessWindowHint);
 	refresher->setGeometry(x() + 1, y() + 1, 1, 1);
 	auto palette = refresher->palette();
-	palette.setColor(QPalette::Window, (isActiveWindow() ? st::titleBgActive : st::titleBg)->c);
+	palette.setColor(
+		QPalette::Window,
+		(isActiveWindow() ? st::titleBgActive : st::titleBg)->c);
 	refresher->setPalette(palette);
 	refresher->show();
 	refresher->raise();
 	refresher->activateWindow();
 
-	updateIconCounters();
+	updateTaskbarAndIconCounters();
 }
 
 void MainWindow::workmodeUpdated(Core::Settings::WorkMode mode) {
@@ -306,7 +312,7 @@ QRect MainWindow::computeDesktopRect() const {
 }
 
 void MainWindow::updateWindowIcon() {
-	updateIconCounters();
+	updateTaskbarAndIconCounters();
 }
 
 bool MainWindow::isActiveForTrayMenu() {
@@ -315,10 +321,10 @@ bool MainWindow::isActiveForTrayMenu() {
 }
 
 void MainWindow::unreadCounterChangedHook() {
-	updateIconCounters();
+	updateTaskbarAndIconCounters();
 }
 
-void MainWindow::updateIconCounters() {
+void MainWindow::updateTaskbarAndIconCounters() {
 	const auto counter = Core::App().unreadBadge();
 	const auto muted = Core::App().unreadBadgeMuted();
 	const auto controller = sessionController();

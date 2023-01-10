@@ -41,6 +41,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/settings_intro.h"
 #include "platform/platform_notifications_manager.h"
 #include "base/platform/base_platform_info.h"
+#include "base/options.h"
 #include "base/variant.h"
 #include "window/notifications_manager.h"
 #include "window/themes/window_theme.h"
@@ -76,7 +77,17 @@ void FeedLangTestingKey(int key) {
 	}
 }
 
+base::options::toggle AutoScrollInactiveChat({
+	.id = kOptionAutoScrollInactiveChat,
+	.name = "Mark as read of inactive chat",
+	.description = "Mark new messages as read and scroll the chat "
+		"even when the window is not in focus.",
+});
+
 } // namespace
+
+const char kOptionAutoScrollInactiveChat[] =
+	"auto-scroll-inactive-chat";
 
 MainWindow::MainWindow(not_null<Window::Controller*> controller)
 : Platform::MainWindow(controller) {
@@ -538,8 +549,8 @@ bool MainWindow::markingAsRead() const {
 		&& !_main->isHidden()
 		&& !_main->animatingShow()
 		&& !_layer
-		&& isActive()
-		&& !_main->session().updates().isIdle();
+		&& (AutoScrollInactiveChat.value()
+			|| (isActive() && !_main->session().updates().isIdle()));
 }
 
 void MainWindow::checkActivation() {

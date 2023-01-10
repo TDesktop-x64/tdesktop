@@ -845,8 +845,6 @@ PRIVATE
     info/profile/info_profile_cover.h
     info/profile/info_profile_emoji_status_panel.cpp
     info/profile/info_profile_emoji_status_panel.h
-    info/profile/info_profile_icon.cpp
-    info/profile/info_profile_icon.h
     info/profile/info_profile_inner_widget.cpp
     info/profile/info_profile_inner_widget.h
     info/profile/info_profile_members.cpp
@@ -1207,6 +1205,8 @@ PRIVATE
     settings/settings_privacy_controllers.h
     settings/settings_privacy_security.cpp
     settings/settings_privacy_security.h
+    settings/settings_scale_preview.cpp
+    settings/settings_scale_preview.h
     settings/settings_type.h
     storage/details/storage_file_utilities.cpp
     storage/details/storage_file_utilities.h

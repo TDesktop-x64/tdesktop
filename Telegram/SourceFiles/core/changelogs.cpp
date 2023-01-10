@@ -40,7 +40,7 @@ std::map<int, const char*> BetaLogs() {
 		"- Bug fixes and other minor improvements.\n"
 	},
 	{
-		4005004,
+		1000064,
 		"- Allow wide range of interface scale options.\n"
 
 		"- Show opened chat name in the window title.\n"

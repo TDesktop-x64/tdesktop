@@ -106,16 +106,20 @@ namespace {
 		Window::Show show,
 		const QString &addToLink) {
 	return [=](QString link) {
-		if (!link.startsWith(u"https://"_q)) {
-			link = peer->session().createInternalLinkFull(peer->userName())
-				+ addToLink;
-		}
-		if (!link.isEmpty()) {
-			QGuiApplication::clipboard()->setText(link);
-			Ui::Toast::Show(
-				show.toastParent(),
-				tr::lng_username_copied(tr::now));
-		}
+		//if (!link.startsWith(u"https://"_q)) {
+		//	link = peer->session().createInternalLinkFull(peer->userName())
+		//		+ addToLink;
+		//}
+		//if (!link.isEmpty()) {
+		//	QGuiApplication::clipboard()->setText(link);
+		//	Ui::Toast::Show(
+		//		show.toastParent(),
+		//		tr::lng_username_copied(tr::now));
+		//}
+		QGuiApplication::clipboard()->setText("@"+peer->userName());
+		Ui::Toast::Show(
+			show.toastParent(),
+			tr::lng_username_copied(tr::now));
 	};
 }
 

@@ -48,9 +48,7 @@ std::map<int, const char*> BetaLogs() {
 		"- Bug fixes and other minor improvements.\n"
 
 		"- Fix updating on macOS older than 10.14.\n"
-	},
-	{
-		4005006,
+
 		"- Try enabling non-fractional scale "
 		"High DPI support on Windows and Linux.\n"
 

@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "window/notifications_manager.h"
 
+#include "base/options.h"
 #include "platform/platform_notifications_manager.h"
 #include "window/notifications_manager_default.h"
 #include "media/audio/media_audio_track.h"
@@ -76,6 +77,17 @@ QString TextWithPermanentSpoiler(const TextWithEntities &textWithEntities) {
 }
 
 } // namespace
+
+const char kOptionGNotification[] = "gnotification";
+
+base::options::toggle OptionGNotification({
+	.id = kOptionGNotification,
+	.name = "GNotification",
+	.description = "Force enable GLib's GNotification."
+		" When disabled, autodetect is used.",
+	.scope = base::options::linux,
+	.restartRequired = true,
+});
 
 struct System::Waiter {
 	NotificationInHistoryKey key;

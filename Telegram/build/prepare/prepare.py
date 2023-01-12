@@ -1266,8 +1266,8 @@ win:
         -nomake tests ^
         -platform win32-msvc
 
-    jom -j16
-    jom -j16 install
+    jom -j %NUMBER_OF_PROCESSORS%
+    jom -j %NUMBER_OF_PROCESSORS% install
 mac:
     find ../../patches/qtbase_5_15_8 -type f -print0 | sort -z | xargs -0 git apply
     cd ..

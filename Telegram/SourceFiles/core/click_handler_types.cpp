@@ -52,7 +52,7 @@ void SearchByHashtag(ClickContext context, const QString &tag) {
 		? data.message(my.itemId)->history()->peer.get()
 		: nullptr;
 	controller->content()->searchMessages(
-		tag + ' ',
+		tag,
 		(inPeer && !inPeer->isUser())
 			? data.history(inPeer).get()
 			: Dialogs::Key(), nullptr);

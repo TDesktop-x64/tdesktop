@@ -757,7 +757,7 @@ void MainWidget::searchMessages(const QString &query, Dialogs::Key inChat, PeerD
 	} else {
 		const auto searchIn = [&](not_null<Window::Controller*> window) {
 			if (const auto controller = window->sessionController()) {
-				controller->content()->searchMessages(query, inChat);
+				controller->content()->searchMessages(query, inChat, from);
 				controller->widget()->activate();
 			}
 		};
@@ -2676,7 +2676,7 @@ int MainWidget::backgroundFromY() const {
 }
 
 void MainWidget::searchInChat(Dialogs::Key chat) {
-	searchMessages(QString(), chat);
+	searchMessages(QString(), chat, nullptr);
 }
 
 bool MainWidget::contentOverlapped(const QRect &globalRect) {

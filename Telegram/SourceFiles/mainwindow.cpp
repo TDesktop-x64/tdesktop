@@ -725,8 +725,8 @@ MainWindow::~MainWindow() = default;
 namespace App {
 
 MainWindow *wnd() {
-	return (Core::IsAppLaunched() && Core::App().primaryWindow())
-		? Core::App().primaryWindow()->widget().get()
+	return (Core::IsAppLaunched() && Core::App().activePrimaryWindow())
+		? Core::App().activePrimaryWindow()->widget().get()
 		: nullptr;
 }
 

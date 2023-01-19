@@ -31,7 +31,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_account.h" // Account::sessionValue.
 #include "main/main_domain.h"
 #include "mainwidget.h"
-#include "media/system_media_controls_manager.h"
 #include "ui/boxes/confirm_box.h"
 #include "boxes/connection_box.h"
 #include "storage/storage_account.h"
@@ -126,11 +125,6 @@ void MainWindow::initHook() {
 		this,
 		[=] { checkActivation(); },
 		Qt::QueuedConnection);
-
-	if (Media::SystemMediaControlsManager::Supported()) {
-		using MediaManager = Media::SystemMediaControlsManager;
-		_mediaControlsManager = std::make_unique<MediaManager>(&controller());
-	}
 }
 
 void MainWindow::applyInitialWorkMode() {
@@ -666,11 +660,8 @@ void MainWindow::closeEvent(QCloseEvent *e) {
 		e->accept();
 		Core::Quit();
 		return;
-	} else if (!isPrimary()) {
+	} else if (Core::App().closeNonLastAsync(&controller())) {
 		e->accept();
-		crl::on_main(this, [=] {
-			Core::App().closeWindow(&controller());
-		});
 		return;
 	}
 	e->ignore();

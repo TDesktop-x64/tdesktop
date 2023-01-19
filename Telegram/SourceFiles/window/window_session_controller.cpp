@@ -71,6 +71,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/boxes/confirm_box.h"
 #include "mainwidget.h"
 #include "mainwindow.h"
+#include "main/main_account.h"
+#include "main/main_domain.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
 #include "apiwrap.h"
@@ -743,10 +745,6 @@ SessionController::SessionController(
 		}
 	}, _lifetime);
 
-	if (Media::Player::instance()->pauseGifByRoundVideo()) {
-		enableGifPauseReason(GifPauseReason::RoundPlaying);
-	}
-
 	session->changes().peerUpdates(
 		Data::PeerUpdate::Flag::FullInfo
 	) | rpl::filter([=](const Data::PeerUpdate &update) {
@@ -1006,9 +1004,10 @@ void SessionController::showForum(
 		not_null<Data::Forum*> forum,
 		const SectionShow &params) {
 	if (!isPrimary()) {
-		const auto primary = Core::App().primaryWindow();
+		auto primary = Core::App().windowFor(&session().account());
 		if (&primary->account() != &session().account()) {
-			primary->showAccount(&session().account());
+			Core::App().domain().activate(&session().account());
+			primary = Core::App().windowFor(&session().account());
 		}
 		if (&primary->account() == &session().account()) {
 			primary->sessionController()->showForum(forum, params);
@@ -1714,6 +1713,9 @@ void SessionController::showPeerHistory(
 		const SectionShow &params,
 		MsgId msgId) {
 	content()->showPeerHistory(peerId, params, msgId);
+	if (peerId && params.activation != anim::activation::background) {
+		_window->activate();
+	}
 }
 
 void SessionController::showMessage(
@@ -1730,6 +1732,9 @@ void SessionController::showMessage(
 					params);
 			} else {
 				controller->content()->showMessage(item, params);
+			}
+			if (params.activation != anim::activation::background) {
+				controller->window().activate();
 			}
 		});
 }

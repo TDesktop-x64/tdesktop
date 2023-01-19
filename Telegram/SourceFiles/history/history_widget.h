@@ -237,6 +237,7 @@ public:
 	[[nodiscard]] rpl::producer<> cancelRequests() const {
 		return _cancelRequests.events();
 	}
+	void searchInChatEmbedded(std::optional<QString> query = {});
 
 	void updateNotifyControls();
 

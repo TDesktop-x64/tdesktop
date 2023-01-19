@@ -2622,12 +2622,8 @@ void RepliesWidget::setupShortcuts() {
 }
 
 void RepliesWidget::searchInTopic() {
-	if (!_topic) {
-		return;
-	} else if (controller()->isPrimary()) {
+	if (_topic) {
 		controller()->content()->searchInChat(_topic);
-	} else {
-		// #TODO forum window
 	}
 }
 

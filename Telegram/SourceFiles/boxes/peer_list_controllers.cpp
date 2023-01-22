@@ -590,11 +590,10 @@ void ChooseTopicSearchController::searchOnServer() {
 			}
 			delegate()->peerListSearchAddRow(topic->rootId().bare);
 		});
-		if (_offsetTopicId != savedTopicId) {
-			delegate()->peerListSearchRefreshRows();
-		} else {
+		if (_offsetTopicId == savedTopicId) {
 			_allLoaded = true;
 		}
+		delegate()->peerListSearchRefreshRows();
 	}).fail([=] {
 		_allLoaded = true;
 	}).send();
@@ -633,10 +632,13 @@ auto ChooseTopicBoxController::Row::generatePaintUserpicCallback(
 			int y,
 			int outerWidth,
 			int size) {
+		const auto &st = st::forumTopicRow;
+		x -= st.padding.left();
+		y -= st.padding.top();
 		auto view = Ui::PeerUserpicView();
 		p.translate(x, y);
 		_topic->paintUserpic(p, view, {
-			.st = &st::forumTopicRow,
+			.st = &st,
 			.currentBg = st::windowBg,
 			.now = crl::now(),
 			.width = outerWidth,
@@ -696,7 +698,7 @@ void ChooseTopicBoxController::rowClicked(not_null<PeerListRow*> row) {
 
 void ChooseTopicBoxController::prepare() {
 	delegate()->peerListSetTitle(tr::lng_forward_choose());
-	setSearchNoResultsText(tr::lng_blocked_list_not_found(tr::now));
+	setSearchNoResultsText(tr::lng_topics_not_found(tr::now));
 	delegate()->peerListSetSearchMode(PeerListSearchMode::Enabled);
 	refreshRows(true);
 

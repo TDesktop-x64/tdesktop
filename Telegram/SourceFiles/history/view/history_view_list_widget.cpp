@@ -536,6 +536,13 @@ void ListWidget::refreshRows(const Data::MessagesSlice &old) {
 
 std::optional<int> ListWidget::scrollTopForPosition(
 		Data::MessagePosition position) const {
+	auto messageUnknown = !position.date && position.fullId;
+	if (messageUnknown) {
+		if (const auto item = session().data().message(position.fullId)) {
+			position = item->position();
+			messageUnknown = false;
+		}
+	}
 	if (position == Data::UnreadMessagePosition) {
 		if (_bar.element && !_bar.hidden && _bar.focus) {
 			const auto shift = st::lineWidth + st::historyUnreadBarMargin;
@@ -550,6 +557,15 @@ std::optional<int> ListWidget::scrollTopForPosition(
 			return height() - (_visibleBottom - _visibleTop);
 		}
 		return std::nullopt;
+	} else if (!_items.empty()
+		&& (_aroundPosition == position
+			|| _initialAroundPosition == position)
+		&& messageUnknown) {
+		if (_refreshingViewer) {
+			return std::nullopt;
+		}
+		const auto available = _visibleBottom - _visibleTop;
+		return std::max((height() / 2) - available / 2, 0);
 	} else if (_items.empty()
 		|| isBelowPosition(position)
 		|| isAbovePosition(position)) {
@@ -872,6 +888,7 @@ void ListWidget::updateAroundPositionFromNearest(int nearestIndex) {
 	}
 	const auto newPosition = _items[_aroundIndex]->data()->position();
 	if (_aroundPosition != newPosition) {
+		_initialAroundPosition = _aroundPosition;
 		_aroundPosition = newPosition;
 		crl::on_main(this, [=] { refreshViewer(); });
 	}

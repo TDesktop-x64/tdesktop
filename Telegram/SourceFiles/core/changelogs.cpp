@@ -64,6 +64,13 @@ std::map<int, const char*> BetaLogs() {
 		"- Fix CJK fonts on Windows.\n"
 
 		"- Fix glitches after moving window to another screen.\n",
+	},
+	{
+		4005008,
+		"- Allow opening another account in a new window "
+		"(see Settings > Advanced > Experimental Settings).\n"
+
+		"- A lot of bugfixes for working with more than one window.\n"
 	}
 	};
 };

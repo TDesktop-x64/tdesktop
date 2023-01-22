@@ -390,6 +390,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_no_chats_filter" = "No chats currently belong to this folder.";
 "lng_contacts_loading" = "Loading...";
 "lng_contacts_not_found" = "No contacts found";
+"lng_topics_not_found" = "No topics found.";
 "lng_dlg_search_for_messages" = "Search for messages";
 "lng_update_telegram" = "Update Telegram";
 "lng_dlg_search_in" = "Search messages in";
@@ -2703,6 +2704,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_call_box_clear_all" = "Clear All";
 "lng_call_box_clear_sure" = "Are you sure you want to completely clear your calls log?";
 "lng_call_box_clear_button" = "Clear";
+"lng_call_box_groupcalls_subtitle" = "Active video chats";
 
 "lng_call_outgoing" = "Outgoing call";
 "lng_call_video_outgoing" = "Outgoing video call";

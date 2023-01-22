@@ -368,11 +368,7 @@ public:
 	RepliesMemento(
 		not_null<History*> history,
 		MsgId rootId,
-		MsgId highlightId = 0)
-	: _history(history)
-	, _rootId(rootId)
-	, _highlightId(highlightId) {
-	}
+		MsgId highlightId = 0);
 	explicit RepliesMemento(
 		not_null<HistoryItem*> commentsItem,
 		MsgId commentId = 0);
@@ -410,6 +406,8 @@ public:
 	const QVector<FullMsgId> &replyReturns() const {
 		return _replyReturns;
 	}
+
+	Data::ForumTopic *topicForRemoveRequests() const override;
 
 	[[nodiscard]] not_null<ListMemento*> list() {
 		return &_list;

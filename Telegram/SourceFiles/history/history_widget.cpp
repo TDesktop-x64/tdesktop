@@ -2303,7 +2303,8 @@ void HistoryWidget::showHistory(
 			_chooseForReport = nullptr;
 		}
 		if (_showAtMsgId == ShowAtUnreadMsgId
-			&& !_history->trackUnreadMessages()) {
+			&& !_history->trackUnreadMessages()
+			&& !hasSavedScroll()) {
 			_showAtMsgId = ShowAtTheEndMsgId;
 		}
 		refreshTopBarActiveChat();
@@ -5571,8 +5572,15 @@ MsgId HistoryWidget::replyToId() const {
 	return _replyToId ? _replyToId : (_kbReplyTo ? _kbReplyTo->id : 0);
 }
 
+bool HistoryWidget::hasSavedScroll() const {
+	Expects(_history != nullptr);
+
+	return _history->scrollTopItem
+		|| (_migrated && _migrated->scrollTopItem);
+}
+
 int HistoryWidget::countInitialScrollTop() {
-	if (_history->scrollTopItem || (_migrated && _migrated->scrollTopItem)) {
+	if (hasSavedScroll()) {
 		return _list->historyScrollTop();
 	} else if (_showAtMsgId
 		&& (IsServerMsgId(_showAtMsgId)

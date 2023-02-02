@@ -87,39 +87,3 @@ void searchByHashtag(const QString &tag, PeerData *inPeer, PeerData *from) {
 }
 
 } // namespace App
-
-namespace Ui {
-
-void showChatsList(not_null<Main::Session*> session) {
-	if (const auto m = CheckMainWidget(session)) {
-		m->showPeerHistory(
-			0,
-			::Window::SectionShow::Way::ClearStack,
-			0);
-	}
-}
-
-void showPeerHistory(not_null<const History*> history, MsgId msgId) {
-	showPeerHistory(history->peer, msgId);
-}
-
-void showPeerHistory(not_null<const PeerData*> peer, MsgId msgId) {
-	if (const auto m = CheckMainWidget(&peer->session())) {
-		m->showPeerHistory(
-			peer->id,
-			::Window::SectionShow::Way::ClearStack,
-			msgId);
-	}
-}
-
-bool skipPaintEvent(QWidget *widget, QPaintEvent *event) {
-	if (auto w = App::wnd()) {
-		if (w->contentOverlapped(widget, event)) {
-			return true;
-		}
-	}
-	return false;
-}
-
-} // namespace Ui
-

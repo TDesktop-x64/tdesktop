@@ -92,6 +92,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/connection_box.h"
 #include "boxes/premium_limits_box.h"
 #include "ui/boxes/confirm_box.h"
+#include "styles/style_window.h"
 
 #include <QtCore/QStandardPaths>
 #include <QtCore/QMimeDatabase>
@@ -186,7 +187,7 @@ Application::~Application() {
 	}
 
 	setLastActiveWindow(nullptr);
-	_lastActivePrimaryWindow = nullptr;
+	_windowInSettings = _lastActivePrimaryWindow = nullptr;
 	_closingAsyncWindows.clear();
 	_secondaryWindows.clear();
 	_primaryWindows.clear();
@@ -243,7 +244,6 @@ void Application::run() {
 	refreshGlobalProxy(); // Depends on app settings being read.
 
 	if (const auto old = Local::oldSettingsVersion(); old < AppVersion) {
-		Platform::InstallLauncher();
 		InvokeQueued(this, [] { RegisterUrlScheme(); });
 		Platform::NewVersionLaunched(old);
 	}
@@ -293,7 +293,7 @@ void Application::run() {
 
 	_primaryWindows.emplace(nullptr, std::make_unique<Window::Controller>());
 	setLastActiveWindow(_primaryWindows.front().second.get());
-	_lastActivePrimaryWindow = _lastActiveWindow;
+	_windowInSettings = _lastActivePrimaryWindow = _lastActiveWindow;
 
 	_domain->activeChanges(
 	) | rpl::start_with_next([=](not_null<Main::Account*> account) {
@@ -1166,6 +1166,11 @@ void Application::localPasscodeChanged() {
 	checkAutoLock(crl::now());
 }
 
+bool Application::savingPositionFor(
+		not_null<Window::Controller*> window) const {
+	return !_windowInSettings || (_windowInSettings == window);
+}
+
 bool Application::hasActiveWindow(not_null<Main::Session*> session) const {
 	if (Quitting() || !_lastActiveWindow) {
 		return false;
@@ -1323,6 +1328,9 @@ void Application::closeWindow(not_null<Window::Controller*> window) {
 	if (_lastActivePrimaryWindow == window) {
 		_lastActivePrimaryWindow = next;
 	}
+	if (_windowInSettings == window) {
+		_windowInSettings = next;
+	}
 	if (_lastActiveWindow == window) {
 		setLastActiveWindow(next);
 		if (_lastActiveWindow) {
@@ -1335,6 +1343,7 @@ void Application::closeWindow(not_null<Window::Controller*> window) {
 		if (i->second.get() == window) {
 			Assert(_lastActiveWindow != window);
 			Assert(_lastActivePrimaryWindow != window);
+			Assert(_windowInSettings != window);
 			i = _primaryWindows.erase(i);
 		} else {
 			++i;
@@ -1347,6 +1356,12 @@ void Application::closeWindow(not_null<Window::Controller*> window) {
 		} else {
 			++i;
 		}
+	}
+	const auto account = domain().started()
+		? &domain().active()
+		: nullptr;
+	if (account && !_primaryWindows.contains(account) && _lastActiveWindow) {
+		domain().activate(&_lastActiveWindow->account());
 	}
 }
 

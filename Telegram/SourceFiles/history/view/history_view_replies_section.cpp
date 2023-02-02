@@ -2271,14 +2271,16 @@ void RepliesWidget::updatePinnedVisibility() {
 void RepliesWidget::setPinnedVisibility(bool shown) {
 	if (animatingShow()) {
 		return;
-	} else if (!_topic && !_rootViewInited) {
-		const auto height = shown ? st::historyReplyHeight : 0;
-		if (const auto delta = height - _rootViewHeight) {
-			_rootViewHeight = height;
-			if (_scroll->scrollTop() == _scroll->scrollTopMax()) {
-				setGeometryWithTopMoved(geometry(), delta);
-			} else {
-				updateControlsGeometry();
+	} else if (!_topic) {
+		if (!_rootViewInitScheduled) {
+			const auto height = shown ? st::historyReplyHeight : 0;
+			if (const auto delta = height - _rootViewHeight) {
+				_rootViewHeight = height;
+				if (_scroll->scrollTop() == _scroll->scrollTopMax()) {
+					setGeometryWithTopMoved(geometry(), delta);
+				} else {
+					updateControlsGeometry();
+				}
 			}
 		}
 		if (shown) {
@@ -2287,8 +2289,15 @@ void RepliesWidget::setPinnedVisibility(bool shown) {
 			_rootView->hide();
 		}
 		_rootVisible = shown;
-		_rootView->finishAnimating();
-		_rootViewInited = true;
+		if (!_rootViewInited) {
+			_rootView->finishAnimating();
+			if (!_rootViewInitScheduled) {
+				_rootViewInitScheduled = true;
+				InvokeQueued(this, [=] {
+					_rootViewInited = true;
+				});
+			}
+		}
 	} else {
 		_rootVisible = shown;
 	}

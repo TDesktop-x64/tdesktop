@@ -23,6 +23,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/localstorage.h"
 #include "export/export_settings.h"
 #include "window/notifications_manager.h"
+#include "window/window_controller.h"
 #include "data/data_peer_values.h" // Data::AmPremiumValue.
 
 namespace Main {
@@ -304,14 +305,24 @@ not_null<Main::Account*> Domain::add(MTP::Environment environment) {
 	return account;
 }
 
-void Domain::addActivated(MTP::Environment environment) {
+void Domain::addActivated(MTP::Environment environment, bool newWindow) {
+	const auto added = [&](not_null<Main::Account*> account) {
+		if (newWindow) {
+			Core::App().ensureSeparateWindowForAccount(account);
+		} else if (const auto window = Core::App().separateWindowForAccount(
+				account)) {
+			window->activate();
+		} else {
+			activate(account);
+		}
+	};
 	if (accounts().size() < maxAccounts()) {
-		activate(add(environment));
+		added(add(environment));
 	} else {
 		for (auto &[index, account] : accounts()) {
 			if (!account->sessionExists()
 				&& account->mtp().environment() == environment) {
-				activate(account.get());
+				added(account.get());
 				break;
 			}
 		}
@@ -340,26 +351,31 @@ void Domain::watchSession(not_null<Account*> account) {
 		return !session;
 	}) | rpl::start_with_next([=] {
 		scheduleUpdateUnreadBadge();
-		if (account == _active.current()) {
-			activateAuthedAccount();
-		}
+		closeAccountWindows(account);
 		crl::on_main(&Core::App(), [=] {
 			removeRedundantAccounts();
 		});
 	}, account->lifetime());
 }
 
-void Domain::activateAuthedAccount() {
-	Expects(started());
-
-	if (_active.current()->sessionExists()) {
-		return;
-	}
+void Domain::closeAccountWindows(not_null<Main::Account*> account) {
+	auto another = (Main::Account*)nullptr;
 	for (auto i = _accounts.begin(); i != _accounts.end(); ++i) {
-		if (i->account->sessionExists()) {
-			activate(i->account.get());
-			return;
+		const auto other = i->account.get();
+		if (other == account) {
+			continue;
+		} else if (Core::App().separateWindowForAccount(other)) {
+			const auto that = Core::App().separateWindowForAccount(account);
+			if (that) {
+				that->close();
+			}
+		} else if (!another
+			|| (other->sessionExists() && !another->sessionExists())) {
+			another = other;
 		}
+	}
+	if (another) {
+		activate(another);
 	}
 }
 
@@ -384,9 +400,8 @@ void Domain::removeRedundantAccounts() {
 	Expects(started());
 
 	const auto was = _accounts.size();
-	activateAuthedAccount();
 	for (auto i = _accounts.begin(); i != _accounts.end();) {
-		if (i->account.get() == _active.current()
+		if (Core::App().separateWindowForAccount(i->account.get())
 			|| i->account->sessionExists()) {
 			++i;
 			continue;

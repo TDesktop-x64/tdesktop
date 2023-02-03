@@ -194,12 +194,6 @@ void FiltersMenu::refresh() {
 	if (!filters->has() || _ignoreRefresh) {
 		return;
 	}
-	if (GetEnhancedBool("hide_all_chats")) {
-		filters->backupFilters();
-		filters->remove(0);
-	} else if (filters->hasBackup()) {
-		filters->restoreFilters();
-	}
 	const auto oldTop = _scroll.scrollTop();
 	const auto reorderAll = premium();
 	if (!_list) {
@@ -241,11 +235,10 @@ void FiltersMenu::refresh() {
 	// After the filters are refreshed, the scroll is reset,
 	// so we have to restore it.
 	_scroll.scrollToY(oldTop);
-	const auto i = _filters.find(GetEnhancedBool("hide_all_chats") ? filters->lookupId(0) : _activeFilterId);
+	const auto i = _filters.find(_activeFilterId);
 	const auto button = ((i != end(_filters)) ? i->second.get() : nullptr);
 	if (button) {
 		scrollToButton(button);
-		_session->setActiveChatsFilter(GetEnhancedBool("hide_all_chats") ? filters->lookupId(0) : _activeFilterId);
 	}
 }
 

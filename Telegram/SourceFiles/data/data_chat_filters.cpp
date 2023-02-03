@@ -280,6 +280,9 @@ void ChatFilters::received(const QVector<MTPDialogFilter> &list) {
 	auto changed = false;
 	for (const auto &filter : list) {
 		auto parsed = ChatFilter::FromTL(filter, _owner);
+		if (GetEnhancedBool("hide_all_chats") && parsed.id() == 0) {
+			continue;
+		}
 		const auto b = begin(_list) + position, e = end(_list);
 		const auto i = ranges::find(b, e, parsed.id(), &ChatFilter::id);
 		if (i == e) {
@@ -300,9 +303,9 @@ void ChatFilters::received(const QVector<MTPDialogFilter> &list) {
 		applyRemove(position);
 		changed = true;
 	}
-	if (!ranges::contains(begin(_list), end(_list), 0, &ChatFilter::id)) {
-		_list.insert(begin(_list), ChatFilter());
-	}
+	//if (!ranges::contains(begin(_list), end(_list), 0, &ChatFilter::id)) {
+	//	_list.insert(begin(_list), ChatFilter());
+	//}
 	if (changed || !_loaded) {
 		_loaded = true;
 		_listChanged.fire({});
@@ -312,7 +315,11 @@ void ChatFilters::received(const QVector<MTPDialogFilter> &list) {
 void ChatFilters::apply(const MTPUpdate &update) {
 	update.match([&](const MTPDupdateDialogFilter &data) {
 		if (const auto filter = data.vfilter()) {
-			set(ChatFilter::FromTL(*filter, _owner));
+			auto parsed = ChatFilter::FromTL(*filter, _owner);
+			if (GetEnhancedBool("hide_all_chats") && parsed.id() == 0) {
+				return;
+			}
+			set(parsed);
 		} else {
 			remove(data.vid().v);
 		}
@@ -534,20 +541,6 @@ bool ChatFilters::archiveNeeded() const {
 
 const std::vector<ChatFilter> &ChatFilters::list() const {
 	return _list;
-}
-
-void ChatFilters::backupFilters() {
-	if (_list_backup.empty()) {
-		_list_backup = _list;
-	}
-}
-
-void ChatFilters::restoreFilters() {
-	_list = _list_backup;
-}
-
-bool ChatFilters::hasBackup() const {
-	return _list_backup.size() > 1;
 }
 
 FilterId ChatFilters::defaultId() const {

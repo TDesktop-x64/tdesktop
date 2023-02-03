@@ -167,6 +167,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_profile.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_info.h"
+#include "ui/toast/toast.h"
 
 #include <QtGui/QWindow>
 #include <QtCore/QMimeData>
@@ -190,101 +191,6 @@ constexpr auto kCommonModifiers = 0
 	| Qt::MetaModifier
 	| Qt::ControlModifier;
 const auto kPsaAboutPrefix = "cloud_lng_about_psa_";
-
-object_ptr<Ui::FlatButton> SetupDiscussButton(
-		not_null<QWidget*> parent,
-		not_null<Window::SessionController*> controller) {
-	auto result = object_ptr<Ui::FlatButton>(
-		parent,
-		QString(),
-		st::historyComposeButton);
-	const auto button = result.data();
-	const auto label = Ui::CreateChild<Ui::FlatLabel>(
-		button,
-		tr::lng_channel_discuss() | Ui::Text::ToUpper(),
-		st::historyComposeButtonLabel);
-	const auto badge = Ui::CreateChild<Ui::UnreadBadge>(button);
-	label->show();
-
-	controller->activeChatValue(
-	) | rpl::map([=](Dialogs::Key chat) {
-		return chat.history();
-	}) | rpl::map([=](History *history) {
-		return history ? history->peer->asChannel() : nullptr;
-	}) | rpl::map([=](ChannelData *channel) -> rpl::producer<ChannelData*> {
-		if (channel && channel->isBroadcast()) {
-			return channel->session().changes().peerFlagsValue(
-				channel,
-				Data::PeerUpdate::Flag::ChannelLinkedChat
-			) | rpl::map([=] {
-				return channel->linkedChat();
-			});
-		}
-		return rpl::single<ChannelData*>(nullptr);
-	}) | rpl::flatten_latest(
-	) | rpl::distinct_until_changed(
-	) | rpl::map([=](ChannelData *chat)
-	-> rpl::producer<std::tuple<int, bool>> {
-		if (chat) {
-			using UpdateFlag = Data::PeerUpdate::Flag;
-			return rpl::merge(
-				chat->session().changes().historyUpdates(
-					Data::HistoryUpdate::Flag::UnreadView
-				) | rpl::filter([=](const Data::HistoryUpdate &update) {
-					return (update.history->peer == chat);
-				}) | rpl::to_empty,
-
-				chat->session().changes().peerFlagsValue(
-					chat,
-					UpdateFlag::Notifications | UpdateFlag::ChannelAmIn
-				) | rpl::to_empty
-			) | rpl::map([=] {
-				const auto history = chat->amIn()
-					? chat->owner().historyLoaded(chat)
-					: nullptr;
-				return history
-					? std::make_tuple(
-						history->unreadCount(),
-						!history->muted())
-					: std::make_tuple(0, false);
-			});
-		} else {
-			return rpl::single(std::make_tuple(0, false));
-		}
-	}) | rpl::flatten_latest(
-	) | rpl::distinct_until_changed(
-	) | rpl::start_with_next([=](int count, bool active) {
-		badge->setText(QString::number(count), active);
-		badge->setVisible(count > 0);
-	}, badge->lifetime());
-
-	rpl::combine(
-		badge->shownValue(),
-		badge->widthValue(),
-		label->widthValue(),
-		button->widthValue()
-	) | rpl::start_with_next([=](
-			bool badgeShown,
-			int badgeWidth,
-			int labelWidth,
-			int width) {
-		const auto textTop = st::historyComposeButton.textTop;
-		const auto badgeTop = textTop
-			+ st::historyComposeButton.font->height
-			- badge->textBaseline();
-		const auto add = badgeShown
-			? (textTop + badgeWidth)
-			: 0;
-		const auto total = labelWidth + add;
-		label->moveToLeft((width - total) / 2, textTop, width);
-		badge->moveToRight((width - total) / 2, textTop, width);
-	}, button->lifetime());
-
-	label->setAttribute(Qt::WA_TransparentForMouseEvents);
-	badge->setAttribute(Qt::WA_TransparentForMouseEvents);
-
-	return result;
-}
 
 [[nodiscard]] rpl::producer<PeerData*> ActivePeerValue(
 		not_null<Window::SessionController*> controller) {
@@ -334,7 +240,10 @@ HistoryWidget::HistoryWidget(
 	this,
 	tr::lng_channel_mute(tr::now).toUpper(),
 	st::historyComposeButton)
-, _discuss(SetupDiscussButton(this, controller))
+, _discuss(
+	this,
+	tr::lng_channel_discuss(tr::now).toUpper(),
+	st::historyComposeButton)
 , _reportMessages(this, QString(), st::historyComposeButton)
 , _attachToggle(this, st::historyAttach)
 , _tabbedSelectorToggle(this, st::historyAttachEmoji)

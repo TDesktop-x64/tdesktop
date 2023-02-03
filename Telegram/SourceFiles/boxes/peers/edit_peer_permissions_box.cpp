@@ -62,10 +62,10 @@ struct NestedRestrictionLabels {
 		{ Flag::SendMusic, tr::lng_rights_chat_music(tr::now) },
 		{ Flag::SendVoiceMessages, tr::lng_rights_chat_voice_messages(tr::now) },
 		{ Flag::SendFiles, tr::lng_rights_chat_files(tr::now) },
-		{ Flag::SendStickers
-			| Flag::SendGifs
-			| Flag::SendGames
-			| Flag::SendInline, tr::lng_rights_chat_stickers(tr::now) },
+		{ Flag::SendStickers, tr::lng_admin_log_banned_send_stickers2(tr::now) },
+		{ Flag::SendGifs, tr::lng_admin_log_banned_send_gifs(tr::now) },
+		{ Flag::SendInline, tr::lng_admin_log_banned_use_inline(tr::now) },
+		{ Flag::SendGames, tr::lng_admin_log_banned_send_games(tr::now) },
 		{ Flag::EmbedLinks, tr::lng_rights_chat_send_links(tr::now) },
 		{ Flag::SendPolls, tr::lng_rights_chat_send_polls(tr::now) },
 	};
@@ -163,14 +163,17 @@ auto Dependencies(ChatRestrictions)
 	using Flag = ChatRestriction;
 
 	return {
-		// gifs <-> send_messages
-		{ Flag::SendGifs, Flag::SendMessages },
+		// stickers <-> gifs
+		{ Flag::SendGifs, Flag::SendStickers },
+		{ Flag::SendStickers, Flag::SendGifs },
 
-		// games <-> games
-		{ Flag::SendGames, Flag::SendMessages },
+		// stickers <-> games
+		{ Flag::SendGames, Flag::SendStickers },
+		{ Flag::SendStickers, Flag::SendGames },
 
-		// inline <-> inline
-		{ Flag::SendInline, Flag::SendMessages },
+		// stickers <-> inline
+		{ Flag::SendInline, Flag::SendStickers },
+		{ Flag::SendStickers, Flag::SendInline },
 
 		// embed_links -> send_plain
 		{ Flag::EmbedLinks, Flag::SendOther },

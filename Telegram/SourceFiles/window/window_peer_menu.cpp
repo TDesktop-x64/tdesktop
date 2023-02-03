@@ -1935,8 +1935,9 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 			data->submitCallback();
 		}
 	};
-	auto filterCallback = [](auto thread)  {
-		return thread->canWrite();
+	const auto requiredRight = item->requiredSendRight();
+	auto filterCallback = [=](not_null<Data::Thread*> thread) {
+		return Data::CanSend(thread, requiredRight);
 	};
 	*weak = Ui::show(Box<ShareBox>(ShareBox::Descriptor{
 		.session = session,

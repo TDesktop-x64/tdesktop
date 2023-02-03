@@ -1500,6 +1500,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_ttl_video_sent" = "You sent a self-destructing video.";
 "lng_ttl_video_expired" = "Video has expired";
 
+"lng_profile_migrate_button" = "Upgrade to supergroup";
 "lng_profile_convert_title" = "Convert to supergroup";
 "lng_profile_convert_feature1" = "— New members see the full message history";
 "lng_profile_convert_feature2" = "— Messages are deleted for all members";

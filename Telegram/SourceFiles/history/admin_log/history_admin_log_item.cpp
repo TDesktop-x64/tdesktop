@@ -266,10 +266,10 @@ QString GeneratePermissionsChangeText(
 		{
 			Flag::SendVideoMessages,
 			tr::lng_admin_log_banned_send_video_messages },
-		{ Flag::SendStickers
-			| Flag::SendGifs
-			| Flag::SendInline
-			| Flag::SendGames, tr::lng_admin_log_banned_send_stickers },
+		{ Flag::SendStickers, tr::lng_admin_log_banned_send_stickers2 },
+		{ Flag::SendGifs, tr::lng_admin_log_banned_send_gifs },
+		{ Flag::SendInline, tr::lng_admin_log_banned_use_inline },
+		{ Flag::SendGames, tr::lng_admin_log_banned_send_games },
 		{ Flag::EmbedLinks, tr::lng_admin_log_banned_embed_links },
 		{ Flag::SendPolls, tr::lng_admin_log_banned_send_polls },
 		{ Flag::ChangeInfo, tr::lng_admin_log_admin_change_info },

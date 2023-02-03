@@ -486,6 +486,20 @@ namespace Settings {
 
 		AddDividerText(container, tr::lng_settings_skip_message_desc());
 
+		AddButton(
+				container,
+				tr::lng_settings_hide_counter(),
+				st::settingsButtonNoIcon
+		)->toggleOn(
+				rpl::single(GetEnhancedBool("hide_counter"))
+		)->toggledValue(
+		) | rpl::filter([](bool enabled) {
+			return (enabled != GetEnhancedBool("hide_counter"));
+		}) | rpl::start_with_next([=](bool enabled) {
+			SetEnhancedValue("hide_counter", enabled);
+			EnhancedSettings::Write();
+		}, container->lifetime());
+
 		AddSkip(container);
 	}
 

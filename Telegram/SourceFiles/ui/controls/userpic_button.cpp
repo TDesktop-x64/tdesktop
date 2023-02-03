@@ -27,6 +27,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/painter.h"
 #include "editor/photo_editor_common.h"
 #include "editor/photo_editor_layer_widget.h"
+#include "info/userpic/info_userpic_emoji_builder_common.h"
+#include "info/userpic/info_userpic_emoji_builder_menu_item.h"
 #include "media/streaming/media_streaming_instance.h"
 #include "media/streaming/media_streaming_player.h"
 #include "media/streaming/media_streaming_document.h"
@@ -41,6 +43,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "apiwrap.h"
 #include "api/api_peer_photo.h"
 #include "styles/style_boxes.h"
+#include "styles/style_chat.h"
 #include "styles/style_menu_icons.h"
 
 namespace Ui {
@@ -193,13 +196,8 @@ UserpicButton::UserpicButton(
 , _source(Source::PeerPhoto) {
 	Expects(_role != Role::OpenPhoto);
 
-	if (_source == Source::Custom) {
-		showCustom({});
-	} else {
-		processPeerPhoto();
-		setupPeerViewers();
-	}
-	_waiting = false;
+	processPeerPhoto();
+	setupPeerViewers();
 	prepare();
 }
 
@@ -308,10 +306,29 @@ void UserpicButton::choosePhotoLocally() {
 					callback(type));
 			}));
 	};
+	const auto user = _peer ? _peer->asUser() : nullptr;
+	const auto addUserpicBuilder = [&](ChosenType type) {
+		if (!_controller) {
+			return;
+		}
+		const auto done = [=](UserpicBuilder::Result data) {
+			auto result = ChosenImage{ base::take(data.image), type };
+			result.markup.documentId = data.id;
+			result.markup.colors = base::take(data.colors);
+			_chosenImages.fire(std::move(result));
+		};
+		UserpicBuilder::AddEmojiBuilderAction(
+			_controller,
+			_menu,
+			_controller->session().api().peerPhoto().emojiListValue(user
+				? Api::PeerPhoto::EmojiListType::Profile
+				: Api::PeerPhoto::EmojiListType::Group),
+			done,
+			_peer ? _peer->isForum() : false);
+	};
 	_menu = base::make_unique_q<Ui::PopupMenu>(
 		this,
 		st::popupMenuWithIcons);
-	const auto user = _peer ? _peer->asUser() : nullptr;
 	if (user && !user->isSelf()) {
 		_menu->addAction(
 			tr::lng_profile_set_photo_for(tr::now),
@@ -323,24 +340,30 @@ void UserpicButton::choosePhotoLocally() {
 				[=] { chooseFile(ChosenType::Suggest); },
 				&st::menuIconPhotoSuggest);
 		}
+		addUserpicBuilder(ChosenType::Set);
 		if (hasPersonalPhotoLocally()) {
+			_menu->addSeparator(&st::expandedMenuSeparator);
 			_menu->addAction(makeResetToOriginalAction());
 		}
 	} else {
-		if (!IsCameraAvailable()) {
-			chooseFile();
-		} else {
+		const auto hasCamera = IsCameraAvailable();
+		if (hasCamera || _controller) {
 			_menu->addAction(tr::lng_attach_file(tr::now), [=] {
 				chooseFile();
 			}, &st::menuIconPhoto);
-			_menu->addAction(tr::lng_attach_camera(tr::now), [=] {
-				_window->show(Box(
-					CameraBox,
-					_window,
-					_peer,
-					_forceForumShape,
-					callback(ChosenType::Set)));
-			}, &st::menuIconPhotoSet);
+			if (hasCamera) {
+				_menu->addAction(tr::lng_attach_camera(tr::now), [=] {
+					_window->show(Box(
+						CameraBox,
+						_window,
+						_peer,
+						_forceForumShape,
+						callback(ChosenType::Set)));
+				}, &st::menuIconPhotoSet);
+			}
+			addUserpicBuilder(ChosenType::Set);
+		} else {
+			chooseFile();
 		}
 	}
 	_menu->popup(QCursor::pos());

@@ -145,7 +145,13 @@ Cover::Cover(
 			Ui::UserpicButton::ChosenImage chosen) {
 		auto &image = chosen.image;
 		_userpic->showCustom(base::duplicate(image));
-		_user->session().api().peerPhoto().upload(_user, std::move(image));
+		_user->session().api().peerPhoto().upload(
+			_user,
+			{
+				std::move(image),
+				chosen.markup.documentId,
+				chosen.markup.colors,
+			});
 	});
 
 	_badge.setPremiumClickCallback([=] {
@@ -256,6 +262,7 @@ void Cover::refreshUsernameGeometry(int newWidth) {
 } // namespace
 
 void SetupLanguageButton(
+		not_null<Window::Controller*> window,
 		not_null<Ui::VerticalLayout*> container,
 		bool icon) {
 	const auto button = AddButtonWithLabel(
@@ -274,7 +281,7 @@ void SetupLanguageButton(
 		if ((m & Qt::ShiftModifier) && (m & Qt::AltModifier)) {
 			Lang::CurrentCloudManager().switchToLanguage({ u"#custom"_q });
 		} else {
-			*guard = LanguageBox::Show();
+			*guard = LanguageBox::Show(window->sessionController());
 		}
 	});
 }
@@ -382,7 +389,7 @@ void SetupSections(
 		Enhanced::Id(),
 		{ &st::settingsIconGeneral, kIconRed });
 
-	SetupLanguageButton(container);
+	SetupLanguageButton(&controller->window(), container);
 
 	if (controller->session().premiumPossible()) {
 		AddSkip(container);

@@ -44,6 +44,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "ui/layers/generic_box.h"
 #include "ui/toasts/common_toasts.h"
+#include "ui/delayed_activation.h"
 #include "core/application.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
@@ -90,6 +91,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "export/export_manager.h"
 #include "boxes/peers/edit_peer_info_box.h"
+#include "styles/style_chat.h"
 #include "styles/style_layers.h"
 #include "styles/style_boxes.h"
 #include "styles/style_window.h" // st::windowMinWidth
@@ -266,6 +268,7 @@ private:
 	void addToggleMuteSubmenu(bool addSeparator);
 	void addSupportInfo();
 	void addInfo();
+	void addNewWindow();
 	void addToggleFolder();
 	void addToggleUnreadMark();
 	void addToggleArchive();
@@ -282,6 +285,7 @@ private:
 	void addViewDiscussion();
 	void addToggleTopicClosed();
 	void addExportChat();
+	void addTranslate();
 	void addReport();
 	void addNewContact();
 	void addShareContact();
@@ -611,6 +615,25 @@ void Filler::addToggleUnreadMark() {
 	}, (unread ? &st::menuIconMarkRead : &st::menuIconMarkUnread));
 }
 
+void Filler::addNewWindow() {
+	const auto history = _request.key.history();
+	if (!_peer
+		|| _topic
+		|| _peer->isForum()
+		|| (history
+			&& history->useTopPromotion()
+			&& !history->topPromotionType().isEmpty())) {
+		return;
+	}
+	const auto peer = _peer;
+	const auto controller = _controller;
+	_addAction(tr::lng_context_new_window(tr::now), [=] {
+		Ui::PreventDelayedActivation();
+		controller->showInNewWindow(peer);
+	}, &st::menuIconNewWindow);
+	AddSeparatorAndShiftUp(_addAction);
+}
+
 void Filler::addToggleArchive() {
 	if (!_peer || _topic) {
 		return;
@@ -791,6 +814,23 @@ void Filler::addExportChat() {
 		&st::menuIconExport);
 }
 
+void Filler::addTranslate() {
+	if (_peer->translationFlag() != PeerData::TranslationFlag::Disabled
+		|| !_peer->session().premium()
+		|| !Core::App().settings().translateChatEnabled()) {
+		return;
+	}
+	const auto history = _peer->owner().historyLoaded(_peer);
+	if (!history
+		|| !history->translateOfferedFrom()
+		|| history->translatedTo()) {
+		return;
+	}
+	_addAction(tr::lng_context_translate(tr::now), [=] {
+		history->peer->saveTranslationDisabled(false);
+	}, &st::menuIconTranslate);
+}
+
 void Filler::addReport() {
 	const auto chat = _peer->asChat();
 	const auto channel = _peer->asChannel();
@@ -966,7 +1006,11 @@ void Filler::addManageChat() {
 }
 
 void Filler::addCreatePoll() {
-	if (!(_topic ? _topic->canSendPolls() : _peer->canSendPolls())) {
+	constexpr auto kRight = ChatRestriction::SendPolls;
+	const auto can = _topic
+		? Data::CanSend(_topic, kRight)
+		: Data::CanSend(_peer, kRight);
+	if (!can) {
 		return;
 	}
 	const auto peer = _peer;
@@ -1207,6 +1251,7 @@ void Filler::addVideoChat() {
 }
 
 void Filler::fillContextMenuActions() {
+	addNewWindow();
 	addHidePromotion();
 	addInfo();
 	addToggleArchive();
@@ -1241,6 +1286,7 @@ void Filler::fillHistoryActions() {
 	addThemeEdit();
 	// addViewDiscussion();
 	addExportChat();
+	addTranslate();
 	addReport();
 	addClearHistory();
 	addDeleteChat();
@@ -1414,7 +1460,7 @@ void PeerMenuShareContactBox(
 	const auto weak = std::make_shared<QPointer<Ui::BoxContent>>();
 	auto callback = [=](not_null<Data::Thread*> thread) {
 		const auto peer = thread->peer();
-		if (!thread->canWrite()) {
+		if (!Data::CanSend(thread, ChatRestriction::SendOther)) {
 			navigation->parentController()->show(
 				Ui::MakeInformBox(tr::lng_forward_share_cant()),
 				Ui::LayerOption::KeepOther);
@@ -2245,10 +2291,9 @@ QPointer<Ui::BoxContent> ShowShareGameBox(
 			Ui::LayerOption::KeepOther);
 	};
 	auto filter = [](not_null<Data::Thread*> thread) {
-		const auto peer = thread->peer();
-		return (thread->canWrite() || thread->asForum())
-			&& !peer->amRestricted(ChatRestriction::SendGames)
-			&& !peer->isSelf();
+		return !thread->peer()->isSelf()
+			&& (Data::CanSend(thread, ChatRestriction::SendGames)
+				|| thread->asForum());
 	};
 	auto initBox = [](not_null<PeerListBox*> box) {
 		box->addButton(tr::lng_cancel(), [box] {
@@ -2688,6 +2733,19 @@ void MarkAsReadThread(not_null<Data::Thread*> thread) {
 	} else if (const auto topic = thread->asTopic()) {
 		topic->readTillEnd();
 	}
+}
+
+void AddSeparatorAndShiftUp(const PeerMenuCallback &addAction) {
+	addAction({ .isSeparator = true });
+
+	const auto &st = st::popupMenuExpandedSeparator.menu;
+	const auto shift = st::popupMenuExpandedSeparator.scrollPadding.top()
+		+ st.itemPadding.top()
+		+ st.itemStyle.font->height
+		+ st.itemPadding.bottom()
+		+ st.separator.padding.top()
+		+ st.separator.width / 2;
+	addAction({ .addTopShift = -shift });
 }
 
 } // namespace Window

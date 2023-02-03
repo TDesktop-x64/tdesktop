@@ -63,6 +63,7 @@ private:
 	case SizeTag::Normal: return LottieSize::EmojiInteraction;
 	case SizeTag::Large: return LottieSize::EmojiInteractionReserved1;
 	case SizeTag::Isolated: return LottieSize::EmojiInteractionReserved2;
+	case SizeTag::SetIcon: return LottieSize::EmojiInteractionReserved3;
 	}
 	Unexpected("SizeTag value in CustomEmojiManager-LottieSizeFromTag.");
 }
@@ -73,6 +74,9 @@ private:
 	case SizeTag::Large: return Ui::Emoji::GetSizeLarge();
 	case SizeTag::Isolated:
 		return (st::largeEmojiSize + 2 * st::largeEmojiOutline)
+			* style::DevicePixelRatio();
+	case SizeTag::SetIcon:
+		return int(style::ConvertScale(18 * 7 / 6., style::Scale()))
 			* style::DevicePixelRatio();
 	}
 	Unexpected("SizeTag value in CustomEmojiManager-SizeFromTag.");
@@ -472,6 +476,14 @@ std::unique_ptr<Ui::Text::CustomEmoji> CustomEmojiManager::create(
 	return std::make_unique<Ui::CustomEmoji::Object>(
 		i->second.get(),
 		std::move(update));
+}
+
+Ui::Text::CustomEmojiFactory CustomEmojiManager::factory(
+		SizeTag tag,
+		int sizeOverride) {
+	return [=](QStringView data, Fn<void()> update) {
+		return create(data, std::move(update), tag, sizeOverride);
+	};
 }
 
 Ui::CustomEmoji::Preview CustomEmojiManager::prepareNonExactPreview(

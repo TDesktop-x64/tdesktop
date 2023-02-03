@@ -326,7 +326,6 @@ callBarMuteToggle: IconButton {
 	rippleAreaPosition: point(5px, 3px);
 	rippleAreaSize: 32px;
 }
-callBarUnmuteIcon: icon {{ "calls/call_record_muted", callBarFg }};
 callBarRightSkip: 12px;
 callBarSkip: 10px;
 callBarHangup: IconButton(callBarMuteToggle) {
@@ -530,7 +529,7 @@ groupCallMenu: Menu(defaultMenu) {
 		padding: margins(0px, 4px, 0px, 4px);
 		fg: groupCallMenuBgOver;
 	}
-	arrow: icon {{ "dropdown_submenu_arrow", groupCallMemberNotJoinedStatus }};
+	arrow: icon {{ "menu/submenu_arrow", groupCallMemberNotJoinedStatus }};
 
 	ripple: RippleAnimation(defaultRippleAnimation) {
 		color: groupCallMenuBgRipple;
@@ -650,9 +649,6 @@ groupCallMembersList: PeerList(defaultPeerList) {
 		textFg: groupCallMemberNotJoinedStatus;
 	}
 	item: groupCallMembersListItem;
-}
-groupCallInviteDividerLabel: FlatLabel(defaultFlatLabel) {
-	textFg: groupCallMemberNotJoinedStatus;
 }
 groupCallInviteDividerPadding: margins(17px, 7px, 17px, 7px);
 groupCallInviteMembersListItem: PeerListItem(groupCallMembersListItem) {
@@ -796,7 +792,6 @@ groupCallVideoLimitLabel: FlatLabel(defaultFlatLabel) {
 	style: semiboldTextStyle;
 	minWidth: 96px;
 }
-groupCallAddButtonPosition: point(10px, 7px);
 groupCallMembersWidthMax: 480px;
 groupCallRecordingMark: 6px;
 groupCallRecordingMarkSkip: 4px;
@@ -944,7 +939,6 @@ groupCallMenuToggleSmall: CallButton(groupCallSettingsSmall) {
 groupCallButtonSkip: 40px;
 groupCallButtonSkipSmall: 5px;
 groupCallButtonBottomSkip: 113px;
-groupCallButtonBottomSkipSmall: 95px;
 groupCallButtonBottomSkipWide: 108px;
 groupCallControlsBackMargin: margins(10px, 0px, 10px, 0px);
 groupCallControlsBackRadius: 12px;
@@ -969,9 +963,7 @@ groupCallTopBarJoin: RoundButton(defaultActiveButton) {
 	textTop: 4px;
 }
 groupCallTopBarOpen: RoundButton(groupCallTopBarJoin) {
-	ripple: RippleAnimation(defaultRippleAnimation) {
-		color: shadowFg;
-	}
+	ripple: universalRippleAnimation;
 }
 groupCallBoxButton: RoundButton(defaultBoxButton) {
 	textFg: groupCallActiveFg;
@@ -1156,7 +1148,6 @@ groupCallPinOnTop: IconButton(groupCallTitleButton) {
 }
 groupCallPinnedOnTop: icon{{ "calls/navbar_pin_filled", groupCallMembersFg }};
 
-groupCallMajorBlobIdleRadius: 2px;
 groupCallMajorBlobMaxRadius: 4px;
 
 groupCallMinorBlobIdleRadius: 3px;
@@ -1171,7 +1162,6 @@ groupCallMuteCrossLine: CrossLineAnimation {
 }
 
 groupCallMenuSpeakerArcsSkip: 1px;
-groupCallMenuVolumeSkip: 5px;
 groupCallMenuVolumePadding: margins(17px, 6px, 17px, 5px);
 groupCallMenuVolumeMargin: margins(55px, 0px, 15px, 0px);
 groupCallMenuVolumeSlider: MediaSlider(defaultContinuousSlider) {
@@ -1270,9 +1260,7 @@ desktopCaptureSubmit: RoundButton(desktopCaptureCancel) {
 	textBg: groupCallMuted1;
 	textBgOver: groupCallMuted1;
 
-	ripple: RippleAnimation(groupCallRipple) {
-		color: shadowFg;
-	}
+	ripple: universalRippleAnimation;
 }
 desktopCaptureWithAudio: Checkbox(defaultCheckbox) {
 	textFg: groupCallMembersFg;
@@ -1280,9 +1268,6 @@ desktopCaptureWithAudio: Checkbox(defaultCheckbox) {
 	rippleBg: groupCallMembersBgRipple;
 	rippleBgActive: groupCallMembersBgRipple;
 	style: semiboldTextStyle;
-}
-desktopCaptureWithAudioCheck: Check(defaultCheck) {
-	untoggledFg: groupCallActiveFg;
 }
 
 groupCallNarrowSkip: 9px;
@@ -1430,9 +1415,6 @@ groupCallRtmpUrlSkip: 1px;
 groupCallRtmpKeySubsectionTitleSkip: 8px;
 groupCallRtmpSubsectionTitleAddPadding: margins(0px, -1px, 0px, -4px);
 groupCallRtmpShowButtonPosition: point(21px, -5px);
-groupCallRtmpKeyLabel: FlatLabel(boxLabel) {
-	minWidth: 230px;
-}
 groupCallDividerBg: groupCallMembersBgRipple;
 
 groupCallScheduleDateField: InputField(groupCallField) {

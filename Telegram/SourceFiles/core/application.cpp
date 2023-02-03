@@ -171,6 +171,12 @@ Application::Application(not_null<Launcher*> launcher)
 	passcodeLockChanges(
 	) | rpl::start_with_next([=] {
 		_notifications->updateAll();
+		updateWindowTitles();
+	}, _lifetime);
+
+	settings().windowTitleContentChanges(
+	) | rpl::start_with_next([=] {
+		updateWindowTitles();
 	}, _lifetime);
 
 	_domain->activeSessionChanges(
@@ -186,6 +192,7 @@ Application::~Application() {
 		Local::writeSettings();
 	}
 
+	_windowStack.clear();
 	setLastActiveWindow(nullptr);
 	_windowInSettings = _lastActivePrimaryWindow = nullptr;
 	_closingAsyncWindows.clear();
@@ -387,15 +394,19 @@ void Application::showAccount(not_null<Main::Account*> account) {
 		_lastActivePrimaryWindow = separate;
 		separate->activate();
 	} else if (const auto last = activePrimaryWindow()) {
-		for (auto &[key, window] : _primaryWindows) {
-			if (window.get() == last && key != account.get()) {
-				auto found = std::move(window);
-				_primaryWindows.remove(key);
-				_primaryWindows.emplace(account, std::move(found));
-				break;
-			}
-		}
 		last->showAccount(account);
+	}
+}
+
+void Application::checkWindowAccount(not_null<Window::Controller*> window) {
+	const auto account = window->maybeAccount();
+	for (auto &[key, existing] : _primaryWindows) {
+		if (existing.get() == window && key != account) {
+			auto found = std::move(existing);
+			_primaryWindows.remove(key);
+			_primaryWindows.emplace(account, std::move(found));
+			break;
+		}
 	}
 }
 
@@ -507,18 +518,26 @@ void Application::startTray() {
 }
 
 void Application::activate() {
-	const auto last = _lastActiveWindow;
-	const auto primary = _lastActivePrimaryWindow;
-	enumerateWindows([&](not_null<Window::Controller*> w) {
-		if (w != last && w != primary) {
-			w->widget()->showFromTray();
+	for (const auto &window : _windowStack) {
+		if (window == _lastActiveWindow) {
+			break;
 		}
-	});
-	if (primary) {
-		primary->widget()->showFromTray();
+		const auto widget = window->widget();
+		const auto wasHidden = !widget->isVisible();
+		const auto state = widget->windowState();
+		if (state & Qt::WindowMinimized) {
+			widget->setWindowState(state & ~Qt::WindowMinimized);
+		}
+		widget->setVisible(true);
+		widget->activateWindow();
+		if (wasHidden) {
+			if (const auto session = window->sessionController()) {
+				session->content()->windowShown();
+			}
+		}
 	}
-	if (last && last != primary) {
-		last->widget()->showFromTray();
+	if (_lastActiveWindow) {
+		_lastActiveWindow->widget()->showFromTray();
 	}
 }
 
@@ -1066,6 +1085,12 @@ void Application::preventOrInvoke(Fn<void()> &&callback) {
 	_lastActivePrimaryWindow->preventOrInvoke(std::move(callback));
 }
 
+void Application::updateWindowTitles() {
+	enumerateWindows([](not_null<Window::Controller*> window) {
+		window->widget()->updateTitle();
+	});
+}
+
 void Application::lockByPasscode() {
 	enumerateWindows([&](not_null<Window::Controller*> w) {
 		_passcodeLock = true;
@@ -1299,6 +1324,14 @@ void Application::setLastActiveWindow(Window::Controller *window) {
 		}
 	}
 	_lastActiveWindow = window;
+	if (window) {
+		const auto i = ranges::find(_windowStack, not_null(window));
+		if (i == end(_windowStack)) {
+			_windowStack.push_back(window);
+		} else if (i + 1 != end(_windowStack)) {
+			std::rotate(i, i + 1, end(_windowStack));
+		}
+	}
 	if (!window) {
 		_floatPlayers = nullptr;
 		return;
@@ -1320,16 +1353,31 @@ void Application::setLastActiveWindow(Window::Controller *window) {
 }
 
 void Application::closeWindow(not_null<Window::Controller*> window) {
-	const auto next = (_primaryWindows.front().second.get() != window)
+	const auto stackIt = ranges::find(_windowStack, window);
+	const auto nextFromStack = _windowStack.empty()
+		? nullptr
+		: (stackIt == end(_windowStack) || stackIt + 1 != end(_windowStack))
+		? _windowStack.back().get()
+		: (_windowStack.size() > 1)
+		? (stackIt - 1)->get()
+		: nullptr;
+	const auto next = nextFromStack
+		? nextFromStack
+		: (_primaryWindows.front().second.get() != window)
 		? _primaryWindows.front().second.get()
 		: (_primaryWindows.back().second.get() != window)
 		? _primaryWindows.back().second.get()
 		: nullptr;
+	Assert(next != window);
+
 	if (_lastActivePrimaryWindow == window) {
 		_lastActivePrimaryWindow = next;
 	}
 	if (_windowInSettings == window) {
 		_windowInSettings = next;
+	}
+	if (stackIt != end(_windowStack)) {
+		_windowStack.erase(stackIt);
 	}
 	if (_lastActiveWindow == window) {
 		setLastActiveWindow(next);

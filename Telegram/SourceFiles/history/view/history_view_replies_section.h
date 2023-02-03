@@ -67,6 +67,7 @@ class StickerToast;
 class TopicReopenBar;
 class EmptyPainter;
 class PinnedTracker;
+class TranslateBar;
 
 class RepliesWidget final
 	: public Window::SectionWidget
@@ -170,6 +171,9 @@ public:
 		Painter &p,
 		const Ui::ChatPaintContext &context) override;
 	QString listElementAuthorRank(not_null<const Element*> view) override;
+	History *listTranslateHistory() override;
+	void listAddTranslatedItems(
+		not_null<TranslateTracker*> tracker) override;
 
 	// CornerButtonsDelegate delegate.
 	void cornerButtonsShowAtPosition(
@@ -217,9 +221,9 @@ private:
 	void setTopic(Data::ForumTopic *topic);
 	void setupDragArea();
 	void setupShortcuts();
+	void setupTranslateBar();
 
 	void searchInTopic();
-	void scrollDownAnimationFinish();
 	void updatePinnedVisibility();
 
 	void confirmDeleteSelected();
@@ -281,6 +285,9 @@ private:
 		std::optional<bool> overrideSendImagesAsPhotos,
 		const QString &insertTextOnCancel = QString());
 	bool showSendingFilesError(const Ui::PreparedList &list) const;
+	bool showSendingFilesError(
+		const Ui::PreparedList &list,
+		std::optional<bool> compress) const;
 	void sendingFilesConfirmed(
 		Ui::PreparedList &&list,
 		Ui::SendFilesWay way,
@@ -310,7 +317,6 @@ private:
 	void refreshJoinGroupButton();
 	[[nodiscard]] bool emptyShown() const;
 	[[nodiscard]] bool showSlowmodeError();
-	[[nodiscard]] std::optional<QString> writeRestriction() const;
 
 	const not_null<History*> _history;
 	MsgId _rootId = 0;
@@ -333,12 +339,16 @@ private:
 	bool _skipScrollEvent = false;
 	bool _synteticScrollEvent = false;
 
+	std::unique_ptr<TranslateBar> _translateBar;
+	int _translateBarHeight = 0;
+
 	std::unique_ptr<PinnedTracker> _pinnedTracker;
 	std::unique_ptr<Ui::PinnedBar> _pinnedBar;
 	std::unique_ptr<Ui::PinnedBar> _hidingPinnedBar;
 	int _pinnedBarHeight = 0;
 	FullMsgId _pinnedClickedId;
 	std::optional<FullMsgId> _minPinnedId;
+	HistoryItem *_shownPinnedItem = nullptr;
 
 	std::unique_ptr<Ui::PinnedBar> _rootView;
 	int _rootViewHeight = 0;

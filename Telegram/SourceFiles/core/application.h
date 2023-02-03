@@ -181,6 +181,7 @@ public:
 	void checkSystemDarkMode();
 	[[nodiscard]] bool isActiveForTrayMenu() const;
 	void closeChatFromWindows(not_null<PeerData*> peer);
+	void checkWindowAccount(not_null<Window::Controller*> window);
 	void activate();
 
 	// Media view interface.
@@ -334,6 +335,7 @@ private:
 	void startSystemDarkModeViewer();
 	void startTray();
 
+	void updateWindowTitles();
 	void setLastActiveWindow(Window::Controller *window);
 	void showAccount(not_null<Main::Account*> account);
 	void enumerateWindows(
@@ -395,6 +397,7 @@ private:
 	base::flat_map<
 		not_null<History*>,
 		std::unique_ptr<Window::Controller>> _secondaryWindows;
+	std::vector<not_null<Window::Controller*>> _windowStack;
 	Window::Controller *_lastActiveWindow = nullptr;
 	Window::Controller *_lastActivePrimaryWindow = nullptr;
 	Window::Controller *_windowInSettings = nullptr;

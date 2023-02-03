@@ -181,6 +181,16 @@ Account *Domain::maybeLastOrSomeAuthedAccount() {
 	return result;
 }
 
+int Domain::accountsAuthedCount() const {
+	auto result = 0;
+	for (const auto &[index, account] : _accounts) {
+		if (account->sessionExists()) {
+			++result;
+		}
+	}
+	return result;
+}
+
 rpl::producer<Account*> Domain::activeValue() const {
 	return _active.value();
 }
@@ -442,6 +452,9 @@ void Domain::maybeActivate(not_null<Main::Account*> account) {
 }
 
 void Domain::activate(not_null<Main::Account*> account) {
+	if (const auto window = Core::App().separateWindowForAccount(account)) {
+		window->activate();
+	}
 	if (_active.current() == account.get()) {
 		return;
 	}

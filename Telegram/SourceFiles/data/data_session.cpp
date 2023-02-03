@@ -201,6 +201,10 @@ std::vector<UnavailableReason> ExtractUnavailableReasons(
 	const auto area = [](const MTPVideoSize &size) {
 		return size.match([](const MTPDvideoSize &data) {
 			return (data.vw().v * data.vh().v);
+		}, [](const MTPDvideoSizeEmojiMarkup &) {
+			return 0;
+		}, [](const MTPDvideoSizeStickerMarkup &) {
+			return 0;
 		});
 	};
 	const auto thumbs = data.vvideo_thumbs();
@@ -2826,6 +2830,10 @@ void Session::photoApplyFields(
 		const auto area = [](const MTPVideoSize &size) {
 			return size.match([](const MTPDvideoSize &data) {
 				return data.vsize().v ? (data.vw().v * data.vh().v) : 0;
+			}, [](const MTPDvideoSizeEmojiMarkup &) {
+				return 0;
+			}, [](const MTPDvideoSizeStickerMarkup &) {
+				return 0;
 			});
 		};
 		const auto type = [](const MTPVideoSize &size) {
@@ -2833,6 +2841,8 @@ void Session::photoApplyFields(
 				return data.vtype().v.isEmpty()
 					? char(0)
 					: data.vtype().v.front();
+			}, [](const auto &) {
+				return char(0);
 			});
 		};
 		const auto result = (size == PhotoSize::Small)
@@ -2872,8 +2882,10 @@ void Session::photoApplyFields(
 				? Images::FromVideoSize(_session, data, *videoLarge)
 				: ImageWithLocation()),
 			(videoLarge
-				? VideoStartTime(*videoLarge->match(
-					[](const auto &data) { return &data; }))
+				? videoLarge->match([](const MTPDvideoSize &data) {
+					return VideoStartTime(data);
+				}, [](const MTPDvideoSizeEmojiMarkup &) { return 0;
+				}, [](const MTPDvideoSizeStickerMarkup &) { return 0; })
 				: 0));
 	}
 }

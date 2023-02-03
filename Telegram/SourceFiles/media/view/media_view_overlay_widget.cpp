@@ -2305,7 +2305,7 @@ void OverlayWidget::refreshCaption() {
 			return;
 		}
 	}
-	const auto caption = _message->originalText();
+	const auto caption = _message->translatedText();
 	if (caption.text.isEmpty()) {
 		return;
 	}

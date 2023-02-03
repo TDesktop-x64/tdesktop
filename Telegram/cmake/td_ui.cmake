@@ -23,6 +23,7 @@ set(style_files
     calls/calls.style
     export/view/export.style
     info/info.style
+    info/userpic/info_userpic_builder.style
     intro/intro.style
     media/player/media_player.style
     passport/passport.style
@@ -94,6 +95,12 @@ PRIVATE
 
     info/profile/info_profile_icon.cpp
     info/profile/info_profile_icon.h
+    info/userpic/info_userpic_bubble_wrap.cpp
+    info/userpic/info_userpic_bubble_wrap.h
+    info/userpic/info_userpic_color_circle_button.cpp
+    info/userpic/info_userpic_color_circle_button.h
+    info/userpic/info_userpic_emoji_builder_layer.cpp
+    info/userpic/info_userpic_emoji_builder_layer.h
 
     layout/abstract_layout_item.cpp
     layout/abstract_layout_item.h
@@ -149,6 +156,8 @@ PRIVATE
     ui/boxes/calendar_box.h
     ui/boxes/choose_date_time.cpp
     ui/boxes/choose_date_time.h
+    ui/boxes/choose_language_box.cpp
+    ui/boxes/choose_language_box.h
     ui/boxes/choose_time.cpp
     ui/boxes/choose_time.h
     ui/boxes/confirm_box.cpp
@@ -235,6 +244,8 @@ PRIVATE
     ui/controls/send_as_button.h
     ui/controls/send_button.cpp
     ui/controls/send_button.h
+    ui/controls/tabbed_search.cpp
+    ui/controls/tabbed_search.h
     ui/controls/who_reacted_context_action.cpp
     ui/controls/who_reacted_context_action.h
     ui/controls/window_outdated_bar.cpp
@@ -257,6 +268,8 @@ PRIVATE
     ui/effects/scroll_content_shadow.h
     ui/effects/snowflakes.cpp
     ui/effects/snowflakes.h
+    ui/effects/toggle_arrow.cpp
+    ui/effects/toggle_arrow.h
     ui/text/format_song_name.cpp
     ui/text/format_song_name.h
     ui/text/format_values.cpp
@@ -317,6 +330,7 @@ PRIVATE
     desktop-app::lib_ffmpeg
     desktop-app::lib_webview
     desktop-app::lib_webrtc
+    desktop-app::lib_spellcheck
     desktop-app::lib_stripe
     desktop-app::external_kcoreaddons
 )

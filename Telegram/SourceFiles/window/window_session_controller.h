@@ -337,8 +337,9 @@ public:
 		object_ptr<Ui::BoxContent> content,
 		Ui::LayerOptions options = Ui::LayerOption::KeepOther,
 		anim::type animated = anim::type::normal);
-
 	void hideLayer(anim::type animated = anim::type::normal);
+
+	void showToast(TextWithEntities &&text);
 
 	[[nodiscard]] auto sendingAnimation() const
 	-> Ui::MessageSendingAnimationController &;
@@ -477,6 +478,10 @@ public:
 		Fn<void(MessageIdsList)> done);
 	void clearChooseReportMessages();
 
+	void showInNewWindow(
+		not_null<PeerData*> peer,
+		MsgId msgId = ShowAtUnreadMsgId);
+
 	void toggleChooseChatTheme(not_null<PeerData*> peer);
 
 	[[nodiscard]] bool dialogsListFocused() const {
@@ -554,6 +559,10 @@ public:
 		return *_cachedReactionIconFactory;
 	}
 
+	[[nodiscard]] QString authedName() const {
+		return _authedName;
+	}
+
 	void setPremiumRef(const QString &ref);
 	[[nodiscard]] QString premiumRef() const;
 
@@ -605,6 +614,8 @@ private:
 	const not_null<Controller*> _window;
 	const std::unique_ptr<ChatHelpers::EmojiInteractions> _emojiInteractions;
 	const bool _isPrimary = false;
+
+	QString _authedName;
 
 	using SendingAnimation = Ui::MessageSendingAnimationController;
 	const std::unique_ptr<SendingAnimation> _sendingAnimation;

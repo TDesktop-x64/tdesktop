@@ -280,7 +280,7 @@ void ChatFilters::received(const QVector<MTPDialogFilter> &list) {
 	auto changed = false;
 	for (const auto &filter : list) {
 		auto parsed = ChatFilter::FromTL(filter, _owner);
-		if (GetEnhancedBool("hide_all_chats") && parsed.id() == 0) {
+		if (GetEnhancedBool("hide_all_chats") && parsed.id() == 0 && list.size() > 1) {
 			continue;
 		}
 		const auto b = begin(_list) + position, e = end(_list);

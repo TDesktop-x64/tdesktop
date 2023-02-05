@@ -254,6 +254,20 @@ namespace Settings {
 			EnhancedSettings::Write();
 		}, container->lifetime());
 
+		AddButton(
+				inner,
+				tr::lng_settings_translate_to_tc(),
+				st::settingsButtonNoIcon
+		)->toggleOn(
+				rpl::single(GetEnhancedBool("translate_to_tc"))
+		)->toggledChanges(
+		) | rpl::filter([=](bool toggled) {
+			return (toggled != GetEnhancedBool("translate_to_tc"));
+		}) | rpl::start_with_next([=](bool toggled) {
+			SetEnhancedValue("translate_to_tc", toggled);
+			EnhancedSettings::Write();
+		}, container->lifetime());
+
 		auto secondsBtn = AddButton(
 			inner,
 			tr::lng_settings_show_seconds(),

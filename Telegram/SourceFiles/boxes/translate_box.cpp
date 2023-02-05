@@ -210,6 +210,7 @@ void TranslateBox(
 	const auto send = [=](LanguageId to) {
 		loading->show(anim::type::instant);
 		translated->hide(anim::type::instant);
+		auto toTC = GetEnhancedBool("translate_to_tc"); // Override translate setting :)
 		api->request(MTPmessages_TranslateText(
 			MTP_flags(flags),
 			msgId ? peer->input : MTP_inputPeerEmpty(),
@@ -221,7 +222,7 @@ void TranslateBox(
 				: MTP_vector<MTPTextWithEntities>(1, MTP_textWithEntities(
 					MTP_string(text.text),
 					MTP_vector<MTPMessageEntity>()))),
-			MTP_string(to.locale().name().mid(0, 2))
+			MTP_string(toTC ? "zh-Hant" : to.locale().name().mid(0, 2))
 		)).done([=](const MTPmessages_TranslatedText &result) {
 			const auto &data = result.data();
 			const auto &list = data.vresult().v;

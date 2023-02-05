@@ -311,6 +311,7 @@ namespace EnhancedSettings {
 		settings.insert(qsl("disable_premium_animation"), false);
 		settings.insert(qsl("show_seconds"), false);
 		settings.insert(qsl("hide_counter"), false);
+		settings.insert(qsl("translate_to_tc"), false);
 
 		auto document = QJsonDocument();
 		document.setObject(settings);
@@ -358,6 +359,7 @@ namespace EnhancedSettings {
 		settings.insert(qsl("disable_premium_animation"), GetEnhancedBool("disable_premium_animation"));
 		settings.insert(qsl("show_seconds"), GetEnhancedBool("show_seconds"));
 		settings.insert(qsl("hide_counter"), GetEnhancedBool("hide_counter"));
+		settings.insert(qsl("translate_to_tc"), GetEnhancedBool("translate_to_tc"));
 
 		auto document = QJsonDocument();
 		document.setObject(settings);

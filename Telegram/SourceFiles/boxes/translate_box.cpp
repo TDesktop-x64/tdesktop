@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "boxes/translate_box.h"
 
+#include "api/api_text_entities.h" // Api::EntitiesToMTP / EntitiesFromMTP.
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "core/ui_integration.h"
@@ -22,6 +23,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/boxes/choose_language_box.h"
 #include "ui/effects/loading_element.h"
 #include "ui/layers/generic_box.h"
+#include "ui/text/text_utilities.h"
+#include "ui/toasts/common_toasts.h"
 #include "ui/painter.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/labels.h"
@@ -38,6 +41,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace Ui {
 namespace {
+
+constexpr auto kSkipAtLeastOneDuration = 3 * crl::time(1000);
 
 class ShowButton final : public RpWidget {
 public:
@@ -107,12 +112,6 @@ void TranslateBox(
 	};
 	const auto state = box->lifetime().make_state<State>(&peer->session());
 	state->to = ChooseTranslateTo(peer->owner().history(peer));
-
-	text.entities = ranges::views::all(
-		text.entities
-	) | ranges::views::filter([](const EntityInText &e) {
-		return e.type() != EntityType::Spoiler;
-	}) | ranges::to<EntitiesInText>();
 
 	if (!IsServerMsgId(msgId)) {
 		msgId = 0;
@@ -209,8 +208,14 @@ void TranslateBox(
 				return id.locale().textDirection() == Qt::RightToLeft;
 			}))));
 
-	const auto showText = [=](const QString &text) {
-		translated->entity()->setText(text);
+	const auto showText = [=](TextWithEntities text) {
+		const auto label = translated->entity();
+		label->setMarkedText(
+			text,
+			Core::MarkedTextContext{
+				.session = &peer->session(),
+				.customEmojiRepaint = [=] { label->update(); },
+			});
 		translated->show(anim::type::instant);
 		loading->hide(anim::type::instant);
 	};
@@ -229,16 +234,28 @@ void TranslateBox(
 				? MTPVector<MTPTextWithEntities>()
 				: MTP_vector<MTPTextWithEntities>(1, MTP_textWithEntities(
 					MTP_string(text.text),
-					MTP_vector<MTPMessageEntity>()))),
+					Api::EntitiesToMTP(
+						&peer->session(),
+						text.entities,
+						Api::ConvertOption::SkipLocal)))),
 			MTP_string(toTC ? "zh-Hant" : to.twoLetterCode())
 		)).done([=](const MTPmessages_TranslatedText &result) {
 			const auto &data = result.data();
 			const auto &list = data.vresult().v;
-			showText(list.isEmpty()
-				? tr::lng_translate_box_error(tr::now)
-				: qs(list.front().data().vtext()));
+			if (list.isEmpty()) {
+				showText(
+					Ui::Text::Italic(tr::lng_translate_box_error(tr::now)));
+			} else {
+				showText(TextWithEntities{
+					.text = qs(list.front().data().vtext()),
+					.entities = Api::EntitiesFromMTP(
+						&peer->session(),
+						list.front().data().ventities().v),
+				});
+			}
 		}).fail([=](const MTP::Error &error) {
-			showText(tr::lng_translate_box_error(tr::now));
+			showText(
+				Ui::Text::Italic(tr::lng_translate_box_error(tr::now)));
 		}).send();
 	};
 	state->to.value() | rpl::start_with_next(send, box->lifetime());
@@ -286,21 +303,51 @@ bool SkipTranslate(TextWithEntities textWithEntities) {
 
 object_ptr<BoxContent> EditSkipTranslationLanguages() {
 	auto title = tr::lng_translate_settings_choose();
-	return Box(ChooseLanguageBox, std::move(title), [=](
+	const auto selected = std::make_shared<std::vector<LanguageId>>(
+		Core::App().settings().skipTranslationLanguages());
+	const auto weak = std::make_shared<QPointer<BoxContent>>();
+	const auto check = [=](LanguageId id) {
+		const auto already = ranges::contains(*selected, id);
+		if (already) {
+			selected->erase(ranges::remove(*selected, id), selected->end());
+		} else {
+			selected->push_back(id);
+		}
+		if (already && selected->empty()) {
+			if (const auto strong = weak->data()) {
+				Ui::ShowMultilineToast({
+					.parentOverride = BoxShow(strong).toastParent(),
+					.text = { tr::lng_translate_settings_one(tr::now) },
+					.duration = kSkipAtLeastOneDuration,
+				});
+			}
+			return false;
+		}
+		return true;
+	};
+	auto result = Box(ChooseLanguageBox, std::move(title), [=](
 			std::vector<LanguageId> &&list) {
 		Core::App().settings().setSkipTranslationLanguages(
 			std::move(list));
 		Core::App().saveSettingsDelayed();
-	}, Core::App().settings().skipTranslationLanguages(), true);
+	}, *selected, true, check);
+	*weak = result.data();
+	return result;
 }
 
 object_ptr<BoxContent> ChooseTranslateToBox(
 		LanguageId bringUp,
 		Fn<void(LanguageId)> callback) {
+	auto &settings = Core::App().settings();
 	auto selected = std::vector<LanguageId>{
-		Core::App().settings().translateTo(),
+		settings.translateTo(),
 	};
-	if (bringUp && bringUp != selected.front()) {
+	for (const auto &id : settings.skipTranslationLanguages()) {
+		if (id != selected.front()) {
+			selected.push_back(id);
+		}
+	}
+	if (bringUp && ranges::contains(selected, bringUp)) {
 		selected.push_back(bringUp);
 	}
 	return Box(ChooseLanguageBox, tr::lng_languages(), [=](
@@ -311,7 +358,7 @@ object_ptr<BoxContent> ChooseTranslateToBox(
 		Core::App().settings().setTranslateTo(id);
 		Core::App().saveSettingsDelayed();
 		callback(id);
-	}, selected, false);
+	}, selected, false, nullptr);
 }
 
 LanguageId ChooseTranslateTo(not_null<History*> history) {

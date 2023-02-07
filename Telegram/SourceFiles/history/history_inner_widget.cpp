@@ -1766,6 +1766,9 @@ void HistoryInner::itemRemoved(not_null<const HistoryItem*> item) {
 		return;
 	}
 
+	if (_pinnedItem == item) {
+		_pinnedItem = nullptr;
+	}
 	if (_reactionsItem.current() == item) {
 		_reactionsItem = nullptr;
 	}

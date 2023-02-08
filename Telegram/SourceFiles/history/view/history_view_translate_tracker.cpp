@@ -267,13 +267,14 @@ void TranslateTracker::requestSome() {
 			break;
 		}
 	}
+	auto toTC = GetEnhancedBool("translate_to_tc"); // Override translate setting :)
 	using Flag = MTPmessages_TranslateText::Flag;
 	_requestId = session->api().request(MTPmessages_TranslateText(
 		MTP_flags(Flag::f_peer | Flag::f_id),
 		peer->input,
 		MTP_vector<MTPint>(list),
 		MTPVector<MTPTextWithEntities>(),
-		MTP_string(to.twoLetterCode())
+		MTP_string(toTC ? "zh-Hant" : to.twoLetterCode())
 	)).done([=](const MTPmessages_TranslatedText &result) {
 		requestDone(to, result.data().vresult().v);
 	}).fail([=] {

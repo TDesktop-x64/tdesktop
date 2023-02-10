@@ -71,6 +71,13 @@ namespace {
 constexpr auto kHashtagResultsLimit = 5;
 constexpr auto kStartReorderThreshold = 30;
 
+base::options::toggle CtrlClickChatNewWindow({
+	.id = kOptionCtrlClickChatNewWindow,
+	.name = "New chat window by Ctrl+Click",
+	.description = "Open chat in a new window by Ctrl+Click "
+	"(Cmd+Click on macOS).",
+});
+
 int FixedOnTopDialogsCount(not_null<Dialogs::IndexedList*> list) {
 	auto result = 0;
 	for (const auto &row : *list) {
@@ -98,6 +105,8 @@ int PinnedDialogsCount(
 }
 
 } // namespace
+
+const char kOptionCtrlClickChatNewWindow[] = "ctrl-click-chat-new-window";
 
 struct InnerWidget::CollapsedRow {
 	CollapsedRow(Data::Folder *folder) : folder(folder) {
@@ -3304,7 +3313,9 @@ bool InnerWidget::chooseRow(
 	const auto modifyChosenRow = [](
 			ChosenRow row,
 			Qt::KeyboardModifiers modifiers) {
-		row.newWindow = (modifiers & Qt::ControlModifier);
+		if (CtrlClickChatNewWindow.value()) {
+			row.newWindow = (modifiers & Qt::ControlModifier);
+		}
 		return row;
 	};
 	auto chosen = modifyChosenRow(computeChosenRow(), modifiers);

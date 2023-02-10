@@ -54,6 +54,8 @@ struct TopicJumpCache;
 
 namespace Dialogs {
 
+extern const char kOptionCtrlClickChatNewWindow[];
+
 class Row;
 class FakeRow;
 class IndexedList;

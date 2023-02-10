@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "settings/settings_information.h"
 
+#include "dialogs/dialogs_inner_widget.h" // kOptionCtrlClickChatNewWindow.
 #include "editor/photo_editor_layer_widget.h"
 #include "settings/settings_common.h"
 #include "ui/wrap/vertical_layout.h"
@@ -823,7 +824,9 @@ not_null<Ui::SlideWrap<Ui::SettingsButton>*> AccountsList::setupAdd() {
 	) | rpl::start_with_next([=](Qt::MouseButton which) {
 		if (which == Qt::LeftButton) {
 			const auto modifiers = button->clickModifiers();
-			const auto newWindow = (modifiers & Qt::ControlModifier);
+			const auto newWindow = (modifiers & Qt::ControlModifier)
+				&& base::options::lookup<bool>(
+					Dialogs::kOptionCtrlClickChatNewWindow).value();
 			add(Environment::Production, newWindow);
 			return;
 		} else if (which != Qt::RightButton
@@ -893,7 +896,9 @@ void AccountsList::rebuild() {
 					_currentAccountActivations.fire({});
 					return;
 				}
-				const auto newWindow = (modifiers & Qt::ControlModifier);
+				const auto newWindow = (modifiers & Qt::ControlModifier)
+					&& base::options::lookup<bool>(
+						Dialogs::kOptionCtrlClickChatNewWindow).value();
 				auto activate = [=, guard = _accountSwitchGuard.make_guard()]{
 					if (guard) {
 						_reorder->finishReordering();

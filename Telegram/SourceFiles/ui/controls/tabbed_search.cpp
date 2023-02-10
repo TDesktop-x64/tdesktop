@@ -512,7 +512,7 @@ void SearchWithGroups::ensureRounding(int size, float64 ratio) {
 		p.setCompositionMode(QPainter::CompositionMode_Source);
 		p.setBrush(Qt::transparent);
 		p.setPen(Qt::NoPen);
-		p.drawRoundedRect(QRect(QPoint(), full), rounded / 2., rounded / 2.);
+		p.drawRoundedRect(QRect(QPoint(), full), 6, 6);
 	}
 	_rounding.setDevicePixelRatio(ratio);
 }

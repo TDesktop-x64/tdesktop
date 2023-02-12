@@ -27,6 +27,7 @@ https://github.com/TDesktop-x64/tdesktop/blob/dev/LEGAL
 #include "platform/platform_specific.h"
 #include "window/window_session_controller.h"
 #include "lang/lang_keys.h"
+#include "lang/lang_instance.h"
 #include "core/update_checker.h"
 #include "core/enhanced_settings.h"
 #include "core/application.h"
@@ -254,19 +255,22 @@ namespace Settings {
 			EnhancedSettings::Write();
 		}, container->lifetime());
 
-		AddButton(
-				inner,
-				tr::lng_settings_translate_to_tc(),
-				st::settingsButtonNoIcon
-		)->toggleOn(
-				rpl::single(GetEnhancedBool("translate_to_tc"))
-		)->toggledChanges(
-		) | rpl::filter([=](bool toggled) {
-			return (toggled != GetEnhancedBool("translate_to_tc"));
-		}) | rpl::start_with_next([=](bool toggled) {
-			SetEnhancedValue("translate_to_tc", toggled);
-			EnhancedSettings::Write();
-		}, container->lifetime());
+		QString langPackBaseId = Lang::GetInstance().baseId();
+		if (langPackBaseId == "zh-hant-raw" || langPackBaseId == "zh-hans-raw") {
+			AddButton(
+					inner,
+					tr::lng_settings_translate_to_tc(),
+					st::settingsButtonNoIcon
+			)->toggleOn(
+					rpl::single(GetEnhancedBool("translate_to_tc"))
+			)->toggledChanges(
+			) | rpl::filter([=](bool toggled) {
+				return (toggled != GetEnhancedBool("translate_to_tc"));
+			}) | rpl::start_with_next([=](bool toggled) {
+				SetEnhancedValue("translate_to_tc", toggled);
+				EnhancedSettings::Write();
+			}, container->lifetime());
+		}
 
 		auto secondsBtn = AddButton(
 			inner,

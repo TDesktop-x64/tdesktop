@@ -147,7 +147,9 @@ TopBarWidget::TopBarWidget(
 					ParticipantsBoxController::Role::Admins);
 	});
 	_infoToggle->setClickedCallback([=] { toggleInfoSection(); });
-	_back->addClickHandler([=] { backClicked(); });
+	_back->setClickedCallback([=] {
+		InvokeQueued(_back.data(), [=] { backClicked(); });
+	});
 	_cancelChoose->setClickedCallback(
 		[=] { _cancelChooseForReport.fire({}); });
 

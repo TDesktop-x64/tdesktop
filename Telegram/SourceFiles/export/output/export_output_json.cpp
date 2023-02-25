@@ -220,6 +220,20 @@ QByteArray SerializeText(
 	return SerializeArray(context, text);
 }
 
+QByteArray SerializeFullText(const std::vector<Data::TextPart>& data) {
+	if (data.empty()) {
+		return SerializeString("");
+	}
+
+	QByteArray text = QByteArray();
+
+	for (auto part : data) {
+		text += part.text;
+	}
+
+	return SerializeString(text);
+}
+
 Data::Utf8String FormatUsername(const Data::Utf8String &username) {
 	return username.isEmpty() ? username : ('@' + username);
 }
@@ -729,6 +743,7 @@ QByteArray SerializeMessage(
 		Unexpected("Unsupported message.");
 	}, [](v::null_t) {});
 
+	pushBare("full_text", SerializeFullText(message.text));
 	pushBare("text", SerializeText(context, message.text));
 	pushBare("text_entities", SerializeText(context, message.text, true));
 

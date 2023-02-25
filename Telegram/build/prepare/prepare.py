@@ -404,7 +404,7 @@ if customRunCommand:
 stage('patches', """
     git clone https://github.com/desktop-app/patches.git
     cd patches
-    git checkout d0fc458228
+    git checkout e8574ccccc
 """)
 
 stage('msys64', """
@@ -877,8 +877,8 @@ win:
 stage('ffmpeg', """
     git clone https://github.com/FFmpeg/FFmpeg.git ffmpeg
     cd ffmpeg
-    git checkout cc33e73618
 win:
+    git checkout cc33e73618
     SET PATH_BACKUP_=%PATH%
     SET PATH=%ROOT_DIR%\\ThirdParty\\msys64\\usr\\bin;%PATH%
 
@@ -891,6 +891,7 @@ depends:patches/build_ffmpeg_win.sh
 
     SET PATH=%PATH_BACKUP_%
 mac:
+    git checkout 7268323193
     export PKG_CONFIG_PATH=$USED_PREFIX/lib/pkgconfig
 depends:yasm/yasm
 

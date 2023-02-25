@@ -149,6 +149,7 @@ void SetupExperimental(
 	addToggle(Webview::kOptionWebviewDebugEnabled);
 	addToggle(kOptionAutoScrollInactiveChat);
 	addToggle(Window::Notifications::kOptionGNotification);
+	addToggle(Core::kOptionFreeType);
 }
 
 } // namespace

@@ -27,7 +27,7 @@ struct Key;
 
 // 10 MB max file could be hold in memory
 // This value is used in local cache database settings!
-constexpr auto kMaxFileInMemory = 10 * 1024 * 1024;
+constexpr auto kMaxFileInMemory = 100 * 1024 * 1024;
 
 // 2 MB stickers hold in memory, auto loaded and displayed inline
 constexpr auto kMaxStickerBytesSize = 2 * 1024 * 1024;

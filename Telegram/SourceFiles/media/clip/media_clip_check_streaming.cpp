@@ -20,7 +20,7 @@ namespace Clip {
 namespace {
 
 constexpr auto kHeaderSize = 8;
-constexpr auto kFindMoovBefore = 128 * 1024;
+constexpr auto kFindMoovBefore = 1024 * 1024;
 
 template <typename Type>
 Type ReadBigEndian(bytes::const_span data) {

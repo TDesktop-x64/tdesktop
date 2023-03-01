@@ -32,6 +32,7 @@ private:
 		const QImage &image,
 		QRect rect,
 		int rotation);
+	void paintControlsFade(QRect geometry, float64 opacity);
 	void paintRadialLoading(
 		QRect inner,
 		bool radial,
@@ -42,8 +43,8 @@ private:
 	void paintControlsStart() override;
 	void paintControl(
 		OverState control,
-		QRect outer,
-		float64 outerOpacity,
+		QRect over,
+		float64 overOpacity,
 		QRect inner,
 		float64 innerOpacity,
 		const style::icon &icon) override;
@@ -51,6 +52,8 @@ private:
 	void paintCaption(QRect outer, float64 opacity) override;
 	void paintGroupThumbs(QRect outer, float64 opacity) override;
 	void paintRoundedCorners(int radius) override;
+
+	void validateOverControlImage();
 
 	[[nodiscard]] static QRect TransformRect(QRectF geometry, int rotation);
 
@@ -60,6 +63,8 @@ private:
 	Painter *_p = nullptr;
 	const QRegion *_clip = nullptr;
 	QRect _clipOuter;
+
+	QImage _overControlImage;
 
 };
 

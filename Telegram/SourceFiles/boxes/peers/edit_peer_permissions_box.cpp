@@ -26,6 +26,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/profile/info_profile_values.h"
 #include "boxes/peers/edit_participants_box.h"
 #include "boxes/peers/edit_peer_info_box.h"
+#include "settings/settings_power_saving.h"
 #include "window/window_session_controller.h"
 #include "window/window_controller.h"
 #include "main/main_session.h"
@@ -41,11 +42,12 @@ namespace {
 
 constexpr auto kSlowmodeValues = 7;
 constexpr auto kSuggestGigagroupThreshold = 199000;
+constexpr auto kForceDisableTooltipDuration = 3 * crl::time(1000);
 
-struct NestedRestrictionLabels {
-	std::optional<rpl::producer<QString>> nestedLabel;
-	std::vector<RestrictionLabel> restrictionLabels;
-};
+[[nodiscard]] auto Dependencies(PowerSaving::Flags)
+-> std::vector<std::pair<PowerSaving::Flag, PowerSaving::Flag>> {
+	return {};
+}
 
 [[nodiscard]] auto NestedRestrictionLabelsList(
 		Data::RestrictionsSetOptions options) {
@@ -53,7 +55,6 @@ struct NestedRestrictionLabels {
 
 	auto first = std::vector<RestrictionLabel>{
 		{ Flag::SendOther, tr::lng_rights_chat_send_text(tr::now) },
-		// { Flag::SendMedia, tr::lng_rights_chat_send_media(tr::now) },
 	};
 	auto inner = std::vector<RestrictionLabel>{
 		{ Flag::SendPhotos, tr::lng_rights_chat_photos(tr::now) },
@@ -83,7 +84,7 @@ struct NestedRestrictionLabels {
 				&RestrictionLabel::flags),
 			end(second));
 	}
-	return std::vector<NestedRestrictionLabels>{
+	return std::vector<NestedEditFlagsLabels<ChatRestrictions>>{
 		{ std::nullopt, std::move(first) },
 		{ tr::lng_rights_chat_send_media(), std::move(inner) },
 		{ std::nullopt, std::move(second) },
@@ -179,7 +180,6 @@ auto Dependencies(ChatRestrictions)
 	};
 }
 
-
 ChatRestrictions NegateRestrictions(ChatRestrictions value) {
 	using Flag = ChatRestriction;
 
@@ -247,19 +247,24 @@ ChatRestrictions DisabledByAdminRights(not_null<PeerData*> peer) {
 
 not_null<Ui::RpWidget*> AddInnerToggle(
 		not_null<Ui::VerticalLayout*> container,
+		const style::SettingsButton &st,
 		std::vector<not_null<Ui::AbstractCheckView*>> innerCheckViews,
 		not_null<Ui::SlideWrap<>*> wrap,
 		rpl::producer<QString> buttonLabel,
-		std::optional<QString> locked) {
-	const auto &stButton = st::rightsButton;
+		std::optional<QString> locked,
+		Settings::IconDescriptor &&icon) {
 	const auto button = container->add(object_ptr<Ui::SettingsButton>(
 		container,
 		nullptr,
-		stButton));
+		st));
+	if (icon) {
+		Settings::AddButtonIcon(button, st, std::move(icon));
+	}
+
 	const auto toggleButton = Ui::CreateChild<Ui::SettingsButton>(
 		container.get(),
 		nullptr,
-		stButton);
+		st);
 
 	struct State final {
 		State(const style::Toggle &st, Fn<void()> c)
@@ -271,7 +276,7 @@ not_null<Ui::RpWidget*> AddInnerToggle(
 		std::vector<not_null<Ui::AbstractCheckView*>> innerChecks;
 	};
 	const auto state = button->lifetime().make_state<State>(
-		stButton.toggle,
+		st.toggle,
 		[=] { toggleButton->update(); });
 	state->innerChecks = std::move(innerCheckViews);
 	const auto countChecked = [=] {
@@ -289,12 +294,12 @@ not_null<Ui::RpWidget*> AddInnerToggle(
 	{
 		const auto separator = Ui::CreateChild<Ui::RpWidget>(container.get());
 		separator->paintRequest(
-		) | rpl::start_with_next([=, bg = stButton.textBgOver] {
+		) | rpl::start_with_next([=, bg = st.textBgOver] {
 			auto p = QPainter(separator);
 			p.fillRect(separator->rect(), bg);
 		}, separator->lifetime());
-		const auto separatorHeight = 2 * stButton.toggle.border
-			+ stButton.toggle.diameter;
+		const auto separatorHeight = 2 * st.toggle.border
+			+ st.toggle.diameter;
 		button->geometryValue(
 		) | rpl::start_with_next([=](const QRect &r) {
 			const auto w = st::rightsButtonToggleWidth;
@@ -321,7 +326,7 @@ not_null<Ui::RpWidget*> AddInnerToggle(
 		toggleButton->sizeValue(
 		) | rpl::start_with_next([=](const QSize &s) {
 			checkWidget->moveToRight(
-				stButton.toggleSkip,
+				st.toggleSkip,
 				(s.height() - checkWidget->height()) / 2);
 		}, toggleButton->lifetime());
 	}
@@ -372,8 +377,8 @@ not_null<Ui::RpWidget*> AddInnerToggle(
 		}, arrow->lifetime());
 	}
 	button->sizeValue(
-	) | rpl::start_with_next([=](const QSize &s) {
-		const auto labelLeft = stButton.padding.left();
+	) | rpl::start_with_next([=, &st](const QSize &s) {
+		const auto labelLeft = st.padding.left();
 		const auto labelRight = s.width() - toggleButton->width();
 
 		label->resizeToWidth(labelRight - labelLeft - arrow->width());
@@ -426,22 +431,48 @@ not_null<Ui::RpWidget*> AddInnerToggle(
 	return button;
 }
 
-template <
-	typename Flags,
-	typename DisabledMessagePairs,
-	typename FlagLabelPairs>
-[[nodiscard]] EditFlagsControl<Flags, Ui::RpWidget> CreateEditFlags(
+template <typename Flags>
+[[nodiscard]] EditFlagsControl<Flags> CreateEditFlags(
 		not_null<Ui::VerticalLayout*> container,
-		rpl::producer<QString> header,
 		Flags checked,
-		const DisabledMessagePairs &disabledMessagePairs,
-		const FlagLabelPairs &flagLabelPairsNested) {
+		EditFlagsDescriptor<Flags> &&descriptor) {
 	struct State final {
 		std::map<Flags, not_null<Ui::AbstractCheckView*>> checkViews;
 		rpl::event_stream<> anyChanges;
+		rpl::variable<QString> forceDisabledMessage;
+		rpl::variable<bool> forceDisabled;
+		base::flat_map<Flags, bool> realCheckedValues;
+		base::weak_ptr<Ui::Toast::Instance> toast;
 	};
 	const auto state = container->lifetime().make_state<State>();
+	if (descriptor.forceDisabledMessage) {
+		state->forceDisabledMessage = std::move(
+			descriptor.forceDisabledMessage);
+		state->forceDisabled = state->forceDisabledMessage.value(
+		) | rpl::map([=](const QString &message) {
+			return !message.isEmpty();
+		});
 
+		state->forceDisabled.value(
+		) | rpl::start_with_next([=](bool disabled) {
+			if (disabled) {
+				for (const auto &[flags, checkView] : state->checkViews) {
+					checkView->setChecked(false, anim::type::normal);
+				}
+			} else {
+				for (const auto &[flags, checkView] : state->checkViews) {
+					if (const auto i = state->realCheckedValues.find(flags)
+						; i != state->realCheckedValues.end()) {
+						checkView->setChecked(
+							i->second,
+							anim::type::normal);
+					}
+				}
+			}
+		}, container->lifetime());
+	}
+
+	const auto &st = descriptor.st ? *descriptor.st : st::rightsButton;
 	const auto value = [=] {
 		auto result = Flags(0);
 		for (const auto &[flags, checkView] : state->checkViews) {
@@ -458,35 +489,38 @@ template <
 		ApplyDependencies(state->checkViews, dependencies, view);
 	};
 
-	container->add(
-		object_ptr<Ui::FlatLabel>(
-			container,
-			std::move(header),
-			st::rightsHeaderLabel),
-		st::rightsHeaderMargin);
-
+	if (descriptor.header) {
+		container->add(
+			object_ptr<Ui::FlatLabel>(
+				container,
+				std::move(descriptor.header),
+				st::rightsHeaderLabel),
+			st::rightsHeaderMargin);
+	}
 	const auto addCheckbox = [&](
 			not_null<Ui::VerticalLayout*> verticalLayout,
 			bool isInner,
-			Flags flags,
-			const QString &text) {
+			const EditFlagsLabel<Flags> &entry) {
+		const auto flags = entry.flags;
 		const auto lockedIt = ranges::find_if(
-			disabledMessagePairs,
+			descriptor.disabledMessages,
 			[&](const auto &pair) { return (pair.first & flags) != 0; });
-		const auto locked = (lockedIt != end(disabledMessagePairs))
+		const auto locked = (lockedIt != end(descriptor.disabledMessages))
 			? std::make_optional(lockedIt->second)
 			: std::nullopt;
-		const auto toggled = ((checked & flags) != 0);
+		const auto realChecked = (checked & flags) != 0;
+		state->realCheckedValues.emplace(flags, realChecked);
+		const auto toggled = realChecked && !state->forceDisabled.current();
 
 		const auto checkView = [&]() -> not_null<Ui::AbstractCheckView*> {
 			if (isInner) {
 				const auto checkbox = verticalLayout->add(
 					object_ptr<Ui::Checkbox>(
 						verticalLayout,
-						text,
+						entry.label,
 						toggled,
 						st::settingsCheckbox),
-					st::rightsButton.padding);
+					st.padding);
 				const auto button = Ui::CreateChild<Ui::RippleButton>(
 					verticalLayout.get(),
 					st::defaultRippleAnimation);
@@ -509,13 +543,17 @@ template <
 			} else {
 				const auto button = Settings::AddButton(
 					verticalLayout,
-					rpl::single(text),
-					st::rightsButton);
+					rpl::single(entry.label),
+					st,
+					{ entry.icon });
 				const auto toggle = Ui::CreateChild<Ui::RpWidget>(
 					button.get());
-				auto &lifetime = toggle->lifetime();
+
+				// Looks like a bug in Clang, fails to compile with 'auto&' below.
+				rpl::lifetime &lifetime = toggle->lifetime();
+
 				const auto checkView = lifetime.make_state<Ui::ToggleView>(
-					st::rightsButton.toggle,
+					st.toggle,
 					toggled,
 					[=] { toggle->update(); });
 				toggle->resize(checkView->getSize());
@@ -527,7 +565,7 @@ template <
 				button->sizeValue(
 				) | rpl::start_with_next([=](const QSize &s) {
 					toggle->moveToRight(
-						st::rightsButton.toggleSkip,
+						st.toggleSkip,
 						(s.height() - toggle->height()) / 2);
 				}, toggle->lifetime());
 				button->setClickedCallback([=] {
@@ -542,15 +580,30 @@ template <
 		state->checkViews.emplace(flags, checkView);
 		checkView->checkedChanges(
 		) | rpl::start_with_next([=](bool checked) {
-			if (locked.has_value()) {
-				if (checked != toggled) {
-					Ui::ShowMultilineToast({
+			if (checked && state->forceDisabled.current()) {
+				if (!state->toast) {
+					state->toast = Ui::ShowMultilineToast({
 						.parentOverride = container,
-						.text = { *locked },
+						.text = { state->forceDisabledMessage.current() },
+						.duration = kForceDisableTooltipDuration,
 					});
+				}
+				checkView->setChecked(false, anim::type::instant);
+			} else if (locked.has_value()) {
+				if (checked != toggled) {
+					if (!state->toast) {
+						state->toast = Ui::ShowMultilineToast({
+							.parentOverride = container,
+							.text = { *locked },
+							.duration = kForceDisableTooltipDuration,
+						});
+					}
 					checkView->setChecked(toggled, anim::type::instant);
 				}
 			} else {
+				if (!state->forceDisabled.current()) {
+					state->realCheckedValues[flags] = checked;
+				}
 				InvokeQueued(container, [=] {
 					applyDependencies(checkView);
 					state->anyChanges.fire({});
@@ -560,8 +613,10 @@ template <
 
 		return checkView;
 	};
-	for (const auto &[nestedLabel, flagLabelPairs] : flagLabelPairsNested) {
-		const auto isInner = nestedLabel.has_value();
+	for (const auto &nestedWithLabel : descriptor.labels) {
+		Assert(!nestedWithLabel.nested.empty());
+
+		const auto isInner = nestedWithLabel.nestingLabel.has_value();
 		auto wrap = isInner
 			? object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
 				container,
@@ -569,8 +624,8 @@ template <
 			: object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>{ nullptr };
 		const auto verticalLayout = wrap ? wrap->entity() : container.get();
 		auto innerChecks = std::vector<not_null<Ui::AbstractCheckView*>>();
-		for (const auto &[flags, label] : flagLabelPairs) {
-			const auto c = addCheckbox(verticalLayout, isInner, flags, label);
+		for (const auto &entry : nestedWithLabel.nested) {
+			const auto c = addCheckbox(verticalLayout, isInner, entry);
 			if (isInner) {
 				innerChecks.push_back(c);
 			}
@@ -580,10 +635,12 @@ template <
 			raw->hide(anim::type::instant);
 			AddInnerToggle(
 				container,
+				st,
 				innerChecks,
 				raw,
-				*nestedLabel,
-				std::nullopt);
+				*nestedWithLabel.nestingLabel,
+				std::nullopt,
+				{ nestedWithLabel.nested.front().icon });
 			container->add(std::move(wrap));
 			container->widthValue(
 			) | rpl::start_with_next([=](int w) {
@@ -836,10 +893,10 @@ void ShowEditPeerPermissionsBox(
 		Unexpected("User in EditPeerPermissionsBox.");
 	}());
 	const auto disabledMessages = [&] {
-		auto result = std::map<Flags, QString>();
-			result.emplace(
-				disabledByAdminRights,
-				tr::lng_rights_permission_cant_edit(tr::now));
+		auto result = base::flat_map<Flags, QString>();
+		result.emplace(
+			disabledByAdminRights,
+			tr::lng_rights_permission_cant_edit(tr::now));
 		if (const auto channel = peer->asChannel()) {
 			if (channel->isPublic()
 				|| (channel->isMegagroup() && channel->linkedChat())) {
@@ -1005,19 +1062,21 @@ std::vector<AdminRightLabel> AdminRightLabels(
 	}
 }
 
-EditFlagsControl<ChatRestrictions, Ui::RpWidget> CreateEditRestrictions(
+EditFlagsControl<ChatRestrictions> CreateEditRestrictions(
 		QWidget *parent,
 		rpl::producer<QString> header,
 		ChatRestrictions restrictions,
-		std::map<ChatRestrictions, QString> disabledMessages,
+		base::flat_map<ChatRestrictions, QString> disabledMessages,
 		Data::RestrictionsSetOptions options) {
 	auto widget = object_ptr<Ui::VerticalLayout>(parent);
 	auto result = CreateEditFlags(
 		widget.data(),
-		header,
 		NegateRestrictions(restrictions),
-		disabledMessages,
-		NestedRestrictionLabelsList(options));
+		{
+			.header = std::move(header),
+			.labels = NestedRestrictionLabelsList(options),
+			.disabledMessages = std::move(disabledMessages),
+		});
 	result.widget = std::move(widget);
 	result.value = [original = std::move(result.value)]{
 		return NegateRestrictions(original());
@@ -1029,22 +1088,21 @@ EditFlagsControl<ChatRestrictions, Ui::RpWidget> CreateEditRestrictions(
 	return result;
 }
 
-EditFlagsControl<ChatAdminRights, Ui::RpWidget> CreateEditAdminRights(
+EditFlagsControl<ChatAdminRights> CreateEditAdminRights(
 		QWidget *parent,
 		rpl::producer<QString> header,
 		ChatAdminRights rights,
-		std::map<ChatAdminRights, QString> disabledMessages,
+		base::flat_map<ChatAdminRights, QString> disabledMessages,
 		Data::AdminRightsSetOptions options) {
-	using String = std::optional<rpl::producer<QString>>;
-	using Labels = std::pair<String, std::vector<AdminRightLabel>>;
-
 	auto widget = object_ptr<Ui::VerticalLayout>(parent);
 	auto result = CreateEditFlags(
 		widget.data(),
-		header,
 		rights,
-		disabledMessages,
-		std::vector<Labels>{ { std::nullopt, AdminRightLabels(options) } });
+		{
+			.header = std::move(header),
+			.labels = { { std::nullopt, AdminRightLabels(options) } },
+			.disabledMessages = std::move(disabledMessages),
+		});
 	result.widget = std::move(widget);
 
 	return result;
@@ -1109,10 +1167,26 @@ ChatRestrictions FixDependentRestrictions(ChatRestrictions restrictions) {
 ChatAdminRights AdminRightsForOwnershipTransfer(
 		Data::AdminRightsSetOptions options) {
 	auto result = ChatAdminRights();
-	for (const auto &[flag, label] : AdminRightLabels(options)) {
-		if (!(flag & ChatAdminRight::Anonymous)) {
-			result |= flag;
+	for (const auto &entry : AdminRightLabels(options)) {
+		if (!(entry.flags & ChatAdminRight::Anonymous)) {
+			result |= entry.flags;
 		}
 	}
+	return result;
+}
+
+EditFlagsControl<PowerSaving::Flags> CreateEditPowerSaving(
+		QWidget *parent,
+		PowerSaving::Flags flags,
+		rpl::producer<QString> forceDisabledMessage) {
+	auto widget = object_ptr<Ui::VerticalLayout>(parent);
+	auto descriptor = Settings::PowerSavingLabels();
+	descriptor.forceDisabledMessage = std::move(forceDisabledMessage);
+	auto result = CreateEditFlags(
+		widget.data(),
+		flags,
+		std::move(descriptor));
+	result.widget = std::move(widget);
+
 	return result;
 }

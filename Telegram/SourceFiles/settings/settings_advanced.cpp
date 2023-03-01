@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/settings_common.h"
 #include "settings/settings_chat.h"
 #include "settings/settings_experimental.h"
+#include "settings/settings_power_saving.h"
 #include "ui/wrap/vertical_layout.h"
 #include "ui/wrap/slide_wrap.h"
 #include "ui/widgets/labels.h"
@@ -19,11 +20,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/text_utilities.h" // Ui::Text::ToUpper
 #include "ui/text/format_values.h"
 #include "ui/boxes/single_choice_box.h"
+#include "ui/painter.h"
 #include "boxes/connection_box.h"
 #include "boxes/about_box.h"
 #include "ui/boxes/confirm_box.h"
 #include "platform/platform_specific.h"
 #include "ui/platform/ui_platform_window.h"
+#include "base/platform/base_platform_custom_app_icon.h"
 #include "base/platform/base_platform_info.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
@@ -51,6 +54,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #endif // !TDESKTOP_DISABLE_SPELLCHECK
 
 namespace Settings {
+namespace {
+
+#if defined Q_OS_MAC && !defined OS_MAC_STORE
+[[nodiscard]] const QImage &IconMacRound() {
+	static const auto result = QImage(u":/gui/art/icon_round512@2x.png"_q);
+	return result;
+}
+#endif // Q_OS_MAC && !OS_MAC_STORE
+
+} // namespace
 
 void SetupConnectionType(
 		not_null<Window::Controller*> controller,
@@ -527,6 +540,32 @@ void SetupSystemIntegrationContent(
 		Core::App().settings().setMacWarnBeforeQuit(checked);
 		Core::App().saveSettingsDelayed();
 	}, warnBeforeQuit->lifetime());
+
+#ifndef OS_MAC_STORE
+	const auto enabled = [] {
+		const auto digest = base::Platform::CurrentCustomAppIconDigest();
+		return digest && (Core::App().settings().macRoundIconDigest() == digest);
+	};
+	const auto roundIcon = addCheckbox(
+		tr::lng_settings_mac_round_icon(),
+		enabled());
+	roundIcon->checkedChanges(
+	) | rpl::filter([=](bool checked) {
+		return (checked != enabled());
+	}) | rpl::start_with_next([=](bool checked) {
+		const auto digest = checked
+			? base::Platform::SetCustomAppIcon(IconMacRound())
+			: std::optional<uint64>();
+		if (!checked) {
+			base::Platform::ClearCustomAppIcon();
+		}
+		Window::OverrideApplicationIcon(checked ? IconMacRound() : QImage());
+		Core::App().refreshApplicationIcon();
+		Core::App().settings().setMacRoundIconDigest(digest);
+		Core::App().saveSettings();
+	}, roundIcon->lifetime());
+#endif // OS_MAC_STORE
+
 #else // Q_OS_MAC
 	const auto closeToTaskbar = addSlidingCheckbox(
 		tr::lng_settings_close_to_taskbar(),
@@ -658,20 +697,16 @@ void SetupWindowTitleOptions(
 		SetupWindowTitleContent);
 }
 
-void SetupAnimations(not_null<Ui::VerticalLayout*> container) {
+void SetupAnimations(
+		not_null<Window::Controller*> window,
+		not_null<Ui::VerticalLayout*> container) {
 	AddButton(
 		container,
-		tr::lng_settings_enable_animations(),
+		tr::lng_settings_power_menu(),
 		st::settingsButtonNoIcon
-	)->toggleOn(
-		rpl::single(!anim::Disabled())
-	)->toggledValue(
-	) | rpl::filter([](bool enabled) {
-		return (enabled == anim::Disabled());
-	}) | rpl::start_with_next([](bool enabled) {
-		anim::SetDisabled(!enabled);
-		Local::writeSettings();
-	}, container->lifetime());
+	)->setClickedCallback([=] {
+		window->show(Box(PowerSavingBox));
+	});
 }
 
 void SetupHardwareAcceleration(not_null<Ui::VerticalLayout*> container) {
@@ -804,7 +839,7 @@ void SetupOpenGL(
 void SetupPerformance(
 		not_null<Window::SessionController*> controller,
 		not_null<Ui::VerticalLayout*> container) {
-	SetupAnimations(container);
+	SetupAnimations(&controller->window(), container);
 	SetupHardwareAcceleration(container);
 #ifdef Q_OS_WIN
 	SetupANGLE(controller, container);

@@ -1221,6 +1221,8 @@ PRIVATE
     settings/settings_main.h
     settings/settings_notifications.cpp
     settings/settings_notifications.h
+    settings/settings_power_saving.cpp
+    settings/settings_power_saving.h
     settings/settings_premium.cpp
     settings/settings_premium.h
     settings/settings_privacy_controllers.cpp
@@ -1454,6 +1456,13 @@ PRIVATE
     langs/localization/en.json
     numbers.txt
 )
+
+if (APPLE AND NOT build_macstore)
+    nice_target_sources(Telegram ${res_loc}
+    PRIVATE
+        qrc/telegram/mac_icons.qrc
+    )
+endif()
 
 if (WIN32)
     # message(${CMAKE_GENERATOR})

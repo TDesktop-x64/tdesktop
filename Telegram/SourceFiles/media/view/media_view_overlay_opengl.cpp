@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/gl/gl_shader.h"
 #include "ui/painter.h"
 #include "media/streaming/media_streaming_common.h"
+#include "platform/platform_overlay_widget.h"
 #include "base/platform/base_platform_info.h"
 #include "core/crash_reports.h"
 #include "styles/style_media_view.h"
@@ -27,7 +28,32 @@ constexpr auto kFooterOffset = kSaveMsgOffset + 4;
 constexpr auto kCaptionOffset = kFooterOffset + 4;
 constexpr auto kGroupThumbsOffset = kCaptionOffset + 4;
 constexpr auto kControlsOffset = kGroupThumbsOffset + 4;
-constexpr auto kControlValues = 2 * 4 + 4 * 4;
+constexpr auto kControlValues = 4 * 4 + 4 * 4; // over + icon
+
+[[nodiscard]] ShaderPart FragmentApplyControlsFade() {
+	return {
+		.header = R"(
+uniform sampler2D f_texture;
+uniform vec4 shadowTopRect;
+uniform vec2 shadowBottomAndOpacity;
+)",
+		.body = R"(
+	float topHeight = shadowTopRect.w;
+	float bottomHeight = shadowBottomAndOpacity.x;
+	float opacity = shadowBottomAndOpacity.y;
+	float viewportHeight = shadowTopRect.y + topHeight;
+	float fullHeight = topHeight + bottomHeight;
+	float topY = min(
+		(viewportHeight - gl_FragCoord.y) / fullHeight,
+		topHeight / fullHeight);
+	float topX = (gl_FragCoord.x - shadowTopRect.x) / shadowTopRect.z;
+	vec4 fadeTop = texture2D(f_texture, vec2(topX, topY)) * opacity;
+	float bottomY = max(fullHeight - gl_FragCoord.y, topHeight) / fullHeight;
+	vec4 fadeBottom = texture2D(f_texture, vec2(0.5, bottomY)) * opacity;
+	result.rgb = result.rgb * (1. - fadeTop.a) * (1. - fadeBottom.a);
+)",
+	};
+}
 
 [[nodiscard]] ShaderPart FragmentPlaceOnTransparentBackground() {
 	return {
@@ -77,6 +103,7 @@ OverlayWidget::RendererGL::RendererGL(not_null<OverlayWidget*> owner)
 : _owner(owner) {
 	style::PaletteChanged(
 	) | rpl::start_with_next([=] {
+		_controlsFadeImage.invalidate();
 		_radialImage.invalidate();
 		_documentBubbleImage.invalidate();
 		_themePreviewImage.invalidate();
@@ -118,6 +145,15 @@ void OverlayWidget::RendererGL::init(
 			FragmentSampleARGB32Texture(),
 		})).vertex;
 
+	_staticContentProgram.emplace();
+	LinkProgram(
+		&*_staticContentProgram,
+		_texturedVertexShader,
+		FragmentShader({
+			FragmentSampleARGB32Texture(),
+			FragmentApplyControlsFade()
+		}));
+
 	_withTransparencyProgram.emplace();
 	LinkProgram(
 		&*_withTransparencyProgram,
@@ -125,6 +161,7 @@ void OverlayWidget::RendererGL::init(
 		FragmentShader({
 			FragmentSampleARGB32Texture(),
 			FragmentPlaceOnTransparentBackground(),
+			FragmentApplyControlsFade()
 		}));
 
 	_yuv420Program.emplace();
@@ -133,6 +170,7 @@ void OverlayWidget::RendererGL::init(
 		_texturedVertexShader,
 		FragmentShader({
 			FragmentSampleYUV420Texture(),
+			FragmentApplyControlsFade()
 		}));
 
 	_nv12Program.emplace();
@@ -141,6 +179,7 @@ void OverlayWidget::RendererGL::init(
 		_texturedVertexShader,
 		FragmentShader({
 			FragmentSampleNV12Texture(),
+			FragmentApplyControlsFade()
 		}));
 
 	_fillProgram.emplace();
@@ -195,6 +234,7 @@ void OverlayWidget::RendererGL::paint(
 	if (_factor != factor) {
 		_factor = factor;
 		_controlsImage.invalidate();
+		_controlsFadeImage.invalidate();
 	}
 	_blendingEnabled = false;
 	_viewport = widget->size();
@@ -283,7 +323,12 @@ void OverlayWidget::RendererGL::paintTransformedVideoFrame(
 		}
 		_chromaNV12 = nv12;
 	}
-	if (!nv12) {
+
+	validateControlsFade();
+	if (nv12) {
+		_f->glActiveTexture(GL_TEXTURE2);
+		_controlsFadeImage.bind(*_f);
+	} else {
 		_f->glActiveTexture(GL_TEXTURE2);
 		_textures.bind(*_f, 3);
 		if (upload) {
@@ -297,6 +342,9 @@ void OverlayWidget::RendererGL::paintTransformedVideoFrame(
 			_chromaSize = yuv->chromaSize;
 			_f->glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 		}
+
+		_f->glActiveTexture(GL_TEXTURE3);
+		_controlsFadeImage.bind(*_f);
 	}
 	program->setUniformValue("y_texture", GLint(0));
 	if (nv12) {
@@ -305,6 +353,7 @@ void OverlayWidget::RendererGL::paintTransformedVideoFrame(
 		program->setUniformValue("u_texture", GLint(1));
 		program->setUniformValue("v_texture", GLint(2));
 	}
+	program->setUniformValue("f_texture", GLint(nv12 ? 2 : 3));
 
 	toggleBlending(false);
 	paintTransformedContent(program, geometry);
@@ -325,7 +374,7 @@ void OverlayWidget::RendererGL::paintTransformedStaticContent(
 
 	auto &program = fillTransparentBackground
 		? _withTransparencyProgram
-		: _imageProgram;
+		: _staticContentProgram;
 	program->bind();
 	if (fillTransparentBackground) {
 		program->setUniformValue(
@@ -369,7 +418,13 @@ void OverlayWidget::RendererGL::paintTransformedStaticContent(
 			_rgbaSize = image.size();
 		}
 	}
+
+	validateControlsFade();
+	_f->glActiveTexture(GL_TEXTURE1);
+	_controlsFadeImage.bind(*_f);
+
 	program->setUniformValue("s_texture", GLint(0));
+	program->setUniformValue("f_texture", GLint(1));
 
 	toggleBlending(semiTransparent && !fillTransparentBackground);
 	paintTransformedContent(&*program, geometry);
@@ -412,6 +467,15 @@ void OverlayWidget::RendererGL::paintTransformedContent(
 	_contentBuffer->write(0, coords, sizeof(coords));
 
 	program->setUniformValue("viewport", _uniformViewport);
+	const auto &top = st::mediaviewShadowTop.size();
+	program->setUniformValue(
+		"shadowTopRect",
+		Uniform(transformRect(
+			QRect(QPoint(_viewport.width() - top.width(), 0), top))));
+	const auto &bottom = st::mediaviewShadowBottom;
+	program->setUniformValue(
+		"shadowBottomAndOpacity",
+		QVector2D(bottom.height() * _factor, geometry.controlsOpacity));
 
 	FillTexturedRectangle(*_f, &*program);
 }
@@ -494,28 +558,37 @@ void OverlayWidget::RendererGL::paintControlsStart() {
 
 void OverlayWidget::RendererGL::paintControl(
 		OverState control,
-		QRect outer,
-		float64 outerOpacity,
+		QRect over,
+		float64 overOpacity,
 		QRect inner,
 		float64 innerOpacity,
 		const style::icon &icon) {
 	const auto meta = ControlMeta(control);
 	Assert(meta.icon == &icon);
 
-	const auto &bg = st::mediaviewControlBg->c;
-	const auto bgAlpha = int(base::SafeRound(bg.alpha() * outerOpacity));
+	const auto overAlpha = overOpacity * kOverBackgroundOpacity;
 	const auto offset = kControlsOffset + (meta.index * kControlValues) / 4;
-	const auto fgOffset = offset + 2;
-	const auto bgRect = transformRect(outer);
+	const auto fgOffset = offset + 4;
+	const auto overRect = _controlsImage.texturedRect(
+		over,
+		_controlsTextures[kControlsCount]);
+	const auto overGeometry = transformRect(over);
 	const auto iconRect = _controlsImage.texturedRect(
 		inner,
 		_controlsTextures[meta.index]);
 	const auto iconGeometry = transformRect(iconRect.geometry);
 	const GLfloat coords[] = {
-		bgRect.left(), bgRect.top(),
-		bgRect.right(), bgRect.top(),
-		bgRect.right(), bgRect.bottom(),
-		bgRect.left(), bgRect.bottom(),
+		overGeometry.left(), overGeometry.top(),
+		overRect.texture.left(), overRect.texture.bottom(),
+
+		overGeometry.right(), overGeometry.top(),
+		overRect.texture.right(), overRect.texture.bottom(),
+
+		overGeometry.right(), overGeometry.bottom(),
+		overRect.texture.right(), overRect.texture.top(),
+
+		overGeometry.left(), overGeometry.bottom(),
+		overRect.texture.left(), overRect.texture.top(),
 
 		iconGeometry.left(), iconGeometry.top(),
 		iconRect.texture.left(), iconRect.texture.bottom(),
@@ -529,27 +602,22 @@ void OverlayWidget::RendererGL::paintControl(
 		iconGeometry.left(), iconGeometry.bottom(),
 		iconRect.texture.left(), iconRect.texture.top(),
 	};
-	if (!outer.isEmpty() && bgAlpha > 0) {
+	_controlsProgram->bind();
+	_controlsProgram->setUniformValue("viewport", _uniformViewport);
+	if (!over.isEmpty() && overOpacity > 0) {
 		_contentBuffer->write(
 			offset * 4 * sizeof(GLfloat),
 			coords,
 			sizeof(coords));
-		_fillProgram->bind();
-		_fillProgram->setUniformValue("viewport", _uniformViewport);
-		FillRectangle(
-			*_f,
-			&*_fillProgram,
-			offset,
-			QColor(bg.red(), bg.green(), bg.blue(), bgAlpha));
+		_controlsProgram->setUniformValue("g_opacity", GLfloat(overAlpha));
+		FillTexturedRectangle(*_f, &*_controlsProgram, offset);
 	} else {
 		_contentBuffer->write(
 			fgOffset * 4 * sizeof(GLfloat),
 			coords + (fgOffset - offset) * 4,
 			sizeof(coords) - (fgOffset - offset) * 4 * sizeof(GLfloat));
 	}
-	_controlsProgram->bind();
 	_controlsProgram->setUniformValue("g_opacity", GLfloat(innerOpacity));
-	_controlsProgram->setUniformValue("viewport", _uniformViewport);
 	FillTexturedRectangle(*_f, &*_controlsProgram, fgOffset);
 }
 
@@ -558,10 +626,9 @@ auto OverlayWidget::RendererGL::ControlMeta(OverState control)
 	switch (control) {
 	case OverLeftNav: return { 0, &st::mediaviewLeft };
 	case OverRightNav: return { 1, &st::mediaviewRight };
-	case OverClose: return { 2, &st::mediaviewClose };
-	case OverSave: return { 3, &st::mediaviewSave };
-	case OverRotate: return { 4, &st::mediaviewRotate };
-	case OverMore: return { 5, &st::mediaviewMore };
+	case OverSave: return { 2, &st::mediaviewSave };
+	case OverRotate: return { 3, &st::mediaviewRotate };
+	case OverMore: return { 4, &st::mediaviewMore };
 	}
 	Unexpected("Control value in OverlayWidget::RendererGL::ControlIndex.");
 }
@@ -573,7 +640,6 @@ void OverlayWidget::RendererGL::validateControls() {
 	const auto metas = {
 		ControlMeta(OverLeftNav),
 		ControlMeta(OverRightNav),
-		ControlMeta(OverClose),
 		ControlMeta(OverSave),
 		ControlMeta(OverRotate),
 		ControlMeta(OverMore),
@@ -584,6 +650,8 @@ void OverlayWidget::RendererGL::validateControls() {
 		maxWidth = std::max(meta.icon->width(), maxWidth);
 		fullHeight += meta.icon->height();
 	}
+	maxWidth = std::max(st::mediaviewIconOver, maxWidth);
+	fullHeight += st::mediaviewIconOver;
 	auto image = QImage(
 		QSize(maxWidth, fullHeight) * _factor,
 		QImage::Format_ARGB32_Premultiplied);
@@ -600,6 +668,15 @@ void OverlayWidget::RendererGL::validateControls() {
 				meta.icon->size() * _factor);
 			height += meta.icon->height();
 		}
+		auto hq = PainterHighQualityEnabler(p);
+		p.setPen(Qt::NoPen);
+		p.setBrush(OverBackgroundColor());
+		p.drawEllipse(
+			QRect(0, height, st::mediaviewIconOver, st::mediaviewIconOver));
+		_controlsTextures[index++] = QRect(
+			QPoint(0, height) * _factor,
+			QSize(st::mediaviewIconOver, st::mediaviewIconOver) * _factor);
+		height += st::mediaviewIconOver;
 	}
 	_controlsImage.setImage(std::move(image));
 }
@@ -607,6 +684,36 @@ void OverlayWidget::RendererGL::validateControls() {
 void OverlayWidget::RendererGL::invalidateControls() {
 	_controlsImage.invalidate();
 	ranges::fill(_controlsTextures, QRect());
+}
+
+void OverlayWidget::RendererGL::validateControlsFade() {
+	if (!_controlsFadeImage.image().isNull()) {
+		return;
+	}
+	const auto width = st::mediaviewShadowTop.width();
+	const auto bottomTop = st::mediaviewShadowTop.height();
+	const auto height = bottomTop + st::mediaviewShadowBottom.height();
+
+	auto image = QImage(
+		QSize(width, height) * _factor,
+		QImage::Format_ARGB32_Premultiplied);
+	image.fill(Qt::transparent);
+	image.setDevicePixelRatio(_factor);
+
+	auto p = QPainter(&image);
+	st::mediaviewShadowTop.paint(p, 0, 0, width);
+	st::mediaviewShadowBottom.fill(
+		p,
+		QRect(0, bottomTop, width, st::mediaviewShadowBottom.height()));
+	p.end();
+
+	_controlsFadeImage.setImage(std::move(image));
+	_shadowTopTexture = QRect(
+		QPoint(),
+		QSize(width, st::mediaviewShadowTop.height()) * _factor);
+	_shadowBottomTexture = QRect(
+		QPoint(0, bottomTop) * _factor,
+		QSize(width, st::mediaviewShadowBottom.height()) * _factor);
 }
 
 void OverlayWidget::RendererGL::paintFooter(QRect outer, float64 opacity) {
@@ -701,25 +808,25 @@ void OverlayWidget::RendererGL::paintRoundedCorners(int radius) {
 
 	_f->glDisableVertexAttribArray(position);
 }
-
-void OverlayWidget::RendererGL::invalidate() {
-	_trackFrameIndex = -1;
-	_streamedIndex = -1;
-	const auto images = {
-		&_radialImage,
-		&_documentBubbleImage,
-		&_themePreviewImage,
-		&_saveMsgImage,
-		&_footerImage,
-		&_captionImage,
-		&_groupThumbsImage,
-		&_controlsImage,
-	};
-	for (const auto image : images) {
-		image->setImage(QImage());
-	}
-	invalidateControls();
-}
+//
+//void OverlayWidget::RendererGL::invalidate() {
+//	_trackFrameIndex = -1;
+//	_streamedIndex = -1;
+//	const auto images = {
+//		&_radialImage,
+//		&_documentBubbleImage,
+//		&_themePreviewImage,
+//		&_saveMsgImage,
+//		&_footerImage,
+//		&_captionImage,
+//		&_groupThumbsImage,
+//		&_controlsImage,
+//	};
+//	for (const auto image : images) {
+//		image->setImage(QImage());
+//	}
+//	invalidateControls();
+//}
 
 void OverlayWidget::RendererGL::paintUsingRaster(
 		Ui::GL::Image &image,

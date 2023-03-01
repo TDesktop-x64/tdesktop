@@ -404,7 +404,7 @@ if customRunCommand:
 stage('patches', """
     git clone https://github.com/desktop-app/patches.git
     cd patches
-    git checkout e8574ccccc
+    git checkout 73f5d4762f
 """)
 
 stage('msys64', """
@@ -1221,10 +1221,10 @@ if buildQt5:
     perl init-repository --module-subset=qtbase,qtimageformats,qtsvg
     git checkout v5.15.8-lts-lgpl
     git submodule update qtbase qtimageformats qtsvg
-depends:patches/qtbase_5_15_8/*.patch
+depends:patches/qtbase_5.15.8/*.patch
     cd qtbase
 win:
-    for /r %%i in (..\\..\\patches\\qtbase_5_15_8\\*) do git apply %%i
+    for /r %%i in (..\\..\\patches\\qtbase_5.15.8\\*) do git apply %%i
     cd ..
 
     SET CONFIGURATIONS=-debug
@@ -1262,6 +1262,7 @@ win:
         LIBJPEG_LIBS_DEBUG="%MOZJPEG_DIR%\Debug\jpeg-static.lib" ^
         LIBJPEG_LIBS_RELEASE="%MOZJPEG_DIR%\Release\jpeg-static.lib" ^
         -mp ^
+        -no-feature-netlistmgr ^
         -nomake examples ^
         -nomake tests ^
         -platform win32-msvc
@@ -1269,7 +1270,7 @@ win:
     jom -j %NUMBER_OF_PROCESSORS%
     jom -j %NUMBER_OF_PROCESSORS% install
 mac:
-    find ../../patches/qtbase_5_15_8 -type f -print0 | sort -z | xargs -0 git apply
+    find ../../patches/qtbase_5.15.8 -type f -print0 | sort -z | xargs -0 git apply
     cd ..
 
     CONFIGURATIONS=-debug
@@ -1302,10 +1303,10 @@ mac:
     git clone -b v6.3.2 https://code.qt.io/qt/qt5.git qt_6_3_2
     cd qt_6_3_2
     perl init-repository --module-subset=qtbase,qtimageformats,qtsvg,qt5compat
-depends:patches/qtbase_6_3_2/*.patch
+depends:patches/qtbase_6.3.2/*.patch
     cd qtbase
 
-    find ../../patches/qtbase_6_3_2 -type f -print0 | sort -z | xargs -0 git apply
+    find ../../patches/qtbase_6.3.2 -type f -print0 | sort -z | xargs -0 git apply
     cd ..
 
     CONFIGURATIONS=-debug

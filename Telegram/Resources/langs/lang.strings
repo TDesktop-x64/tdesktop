@@ -497,6 +497,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_open_system_settings" = "Open Settings";
 "lng_settings_add_sendto" = "Place Telegram in \"Send to\" menu";
 "lng_settings_mac_warn_before_quit" = "Show warning before quitting with {text}";
+"lng_settings_mac_round_icon" = "Round application icon";
 
 "lng_settings_experimental" = "Experimental settings";
 "lng_settings_experimental_about" = "Warning! Those are experimental settings. Some may not work. Others may break the app. Any of them may disappear in the next version without a trace. Use at your own risk.";
@@ -593,7 +594,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_version_info" = "Version and updates";
 "lng_settings_system_integration" = "System integration";
 "lng_settings_performance" = "Performance";
-"lng_settings_enable_animations" = "Enable animations";
 "lng_settings_enable_hwaccel" = "Hardware accelerated video decoding";
 "lng_settings_enable_opengl" = "Enable OpenGL rendering for media";
 "lng_settings_angle_backend" = "ANGLE graphics backend";
@@ -608,6 +608,25 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_sensitive_about" = "Display sensitive media in public channels on all your Telegram devices.";
 "lng_settings_security_bots" = "Bots and websites";
 "lng_settings_clear_payment_info" = "Clear Payment and Shipping Info";
+
+"lng_settings_power_menu" = "Battery and Animations";
+"lng_settings_power_title" = "Power Usage";
+"lng_settings_power_subtitle" = "Power saving options";
+"lng_settings_power_stickers" = "Animated Stickers";
+"lng_settings_power_stickers_panel" = "Autoplay in panel";
+"lng_settings_power_stickers_chat" = "Autoplay in chat";
+"lng_settings_power_emoji" = "Animated Emoji";
+"lng_settings_power_emoji_panel" = "Autoplay in panel";
+"lng_settings_power_emoji_reactions" = "Autoplay in reactions menu";
+"lng_settings_power_emoji_chat" = "Autoplay in messages";
+"lng_settings_power_chat" = "Animations in Chats";
+"lng_settings_power_chat_background" = "Background rotation";
+"lng_settings_power_chat_spoiler" = "Animated spoiler effect";
+"lng_settings_power_calls" = "Animations in Calls";
+"lng_settings_power_ui" = "Interface animations";
+"lng_settings_power_auto" = "Save Power on Low Battery";
+"lng_settings_power_auto_about" = "Automatically disable all animations when your laptop is in a battery saving mode.";
+"lng_settings_power_turn_off" = "Please turn off Save Power on Low Battery to change these settings.";
 
 "lng_settings_cloud_password_on" = "On";
 "lng_settings_cloud_password_off" = "Off";
@@ -2564,6 +2583,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_call_status_failed" = "failed to connect";
 "lng_call_status_ringing" = "ringing...";
 "lng_call_status_busy" = "line busy";
+"lng_call_status_sure" = "Click on the Camera icon if you want to start a video call.";
 "lng_call_fingerprint_tooltip" = "If emoji on {user}'s screen are the same, this call is 100% secure";
 
 "lng_call_error_not_available" = "Sorry, {user} doesn't accept calls.";
@@ -2604,6 +2624,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_call_rate_label" = "Please rate the quality of your call";
 "lng_call_rate_comment" = "Comment (optional)";
 
+"lng_call_start" = "Start Call";
 "lng_call_start_video" = "Start Video";
 "lng_call_stop_video" = "Stop Video";
 "lng_call_screencast" = "Screencast";

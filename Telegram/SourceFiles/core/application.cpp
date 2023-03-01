@@ -14,10 +14,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_user.h"
 #include "data/data_channel.h"
 #include "data/data_download_manager.h"
-#include "base/timer.h"
+#include "base/battery_saving.h"
 #include "base/event_filter.h"
 #include "base/concurrent_timer.h"
 #include "base/qt_signal_producer.h"
+#include "base/timer.h"
 #include "base/unixtime.h"
 #include "core/core_settings.h"
 #include "core/update_checker.h"
@@ -79,6 +80,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/effects/animations.h"
 #include "ui/effects/spoiler_mess.h"
 #include "ui/cached_round_corners.h"
+#include "ui/power_saving.h"
 #include "storage/serialize_common.h"
 #include "storage/storage_domain.h"
 #include "storage/storage_databases.h"
@@ -144,6 +146,7 @@ Application::Application(not_null<Launcher*> launcher)
 , _launcher(launcher)
 , _private(std::make_unique<Private>())
 , _platformIntegration(Platform::Integration::Create())
+, _batterySaving(std::make_unique<base::BatterySaving>())
 , _databases(std::make_unique<Storage::Databases>())
 , _animationsManager(std::make_unique<Ui::Animations::Manager>())
 , _clearEmojiImageLoaderTimer([=] { clearEmojiSourceImages(); })
@@ -282,6 +285,13 @@ void Application::run() {
 		_mediaControlsManager = std::make_unique<MediaControlsManager>();
 	}
 
+	rpl::combine(
+		_batterySaving->value(),
+		settings().ignoreBatterySavingValue()
+	) | rpl::start_with_next([=](bool saving, bool ignore) {
+		PowerSaving::SetForceAll(saving && !ignore);
+	}, _lifetime);
+
 	style::ShortAnimationPlaying(
 	) | rpl::start_with_next([=](bool playing) {
 		if (playing) {
@@ -412,14 +422,14 @@ void Application::showOpenGLCrashNotification() {
 	const auto enable = [=] {
 		Ui::GL::ForceDisable(false);
 		Ui::GL::CrashCheckFinish();
-		Core::App().settings().setDisableOpenGL(false);
+		settings().setDisableOpenGL(false);
 		Local::writeSettings();
 		Restart();
 	};
 	const auto keepDisabled = [=] {
 		Ui::GL::ForceDisable(true);
 		Ui::GL::CrashCheckFinish();
-		Core::App().settings().setDisableOpenGL(true);
+		settings().setDisableOpenGL(true);
 		Local::writeSettings();
 	};
 	_lastActivePrimaryWindow->show(Ui::MakeConfirmBox({
@@ -661,6 +671,10 @@ Settings &Application::settings() {
 	return _private->settings;
 }
 
+const Settings &Application::settings() const {
+	return _private->settings;
+}
+
 void Application::saveSettingsDelayed(crl::time delay) {
 	if (_saveSettingsTimer) {
 		_saveSettingsTimer->callOnce(delay);
@@ -673,7 +687,7 @@ void Application::saveSettings() {
 
 bool Application::canReadDefaultDownloadPath(bool always) const {
 	if (KSandbox::isInside()
-		&& (always || Core::App().settings().downloadPath().isEmpty())) {
+		&& (always || settings().downloadPath().isEmpty())) {
 		const auto path = QStandardPaths::writableLocation(
 			QStandardPaths::DownloadLocation);
 		return base::CanReadDirectory(path);
@@ -682,7 +696,7 @@ bool Application::canReadDefaultDownloadPath(bool always) const {
 }
 
 bool Application::canSaveFileWithoutAskingForPath() const {
-	return !Core::App().settings().askDownloadPath();
+	return !settings().askDownloadPath();
 }
 
 MTP::Config &Application::fallbackProductionConfig() const {
@@ -1642,16 +1656,27 @@ void Application::quitDelayed() {
 	}
 }
 
+void Application::refreshApplicationIcon() {
+	const auto session = (domain().started() && domain().active().sessionExists())
+		? &domain().active().session()
+		: nullptr;
+	refreshApplicationIcon(session);
+}
+
+void Application::refreshApplicationIcon(Main::Session *session) {
+	const auto support = session && session->supportMode();
+	Shortcuts::ToggleSupportShortcuts(support);
+	Platform::SetApplicationIcon(Window::CreateIcon(
+		session,
+		Platform::IsMac()));
+}
+
 void Application::startShortcuts() {
 	Shortcuts::Start();
 
 	_domain->activeSessionChanges(
 	) | rpl::start_with_next([=](Main::Session *session) {
-		const auto support = session && session->supportMode();
-		Shortcuts::ToggleSupportShortcuts(support);
-		Platform::SetApplicationIcon(Window::CreateIcon(
-			session,
-			Platform::IsMac()));
+		refreshApplicationIcon(session);
 	}, _lifetime);
 
 	Shortcuts::Requests(

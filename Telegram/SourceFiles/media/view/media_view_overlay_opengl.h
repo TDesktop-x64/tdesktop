@@ -60,8 +60,8 @@ private:
 	void paintControlsStart() override;
 	void paintControl(
 		OverState control,
-		QRect outer,
-		float64 outerOpacity,
+		QRect over,
+		float64 overOpacity,
 		QRect inner,
 		float64 innerOpacity,
 		const style::icon &icon) override;
@@ -70,7 +70,7 @@ private:
 	void paintGroupThumbs(QRect outer, float64 opacity) override;
 	void paintRoundedCorners(int radius) override;
 
-	void invalidate();
+	//void invalidate();
 
 	void paintUsingRaster(
 		Ui::GL::Image &image,
@@ -79,6 +79,7 @@ private:
 		int bufferOffset,
 		bool transparent = false);
 
+	void validateControlsFade();
 	void validateControls();
 	void invalidateControls();
 	void toggleBlending(bool enabled);
@@ -105,6 +106,7 @@ private:
 
 	std::optional<QOpenGLBuffer> _contentBuffer;
 	std::optional<QOpenGLShaderProgram> _imageProgram;
+	std::optional<QOpenGLShaderProgram> _staticContentProgram;
 	QOpenGLShader *_texturedVertexShader = nullptr;
 	std::optional<QOpenGLShaderProgram> _withTransparencyProgram;
 	std::optional<QOpenGLShaderProgram> _yuv420Program;
@@ -121,6 +123,7 @@ private:
 	int _streamedIndex = 0;
 	bool _chromaNV12 = false;
 
+	Ui::GL::Image _controlsFadeImage;
 	Ui::GL::Image _radialImage;
 	Ui::GL::Image _documentBubbleImage;
 	Ui::GL::Image _themePreviewImage;
@@ -130,9 +133,14 @@ private:
 	Ui::GL::Image _groupThumbsImage;
 	Ui::GL::Image _controlsImage;
 
-	static constexpr auto kControlsCount = 6;
+	static constexpr auto kControlsCount = 5;
 	[[nodiscard]] static Control ControlMeta(OverState control);
-	std::array<QRect, kControlsCount> _controlsTextures;
+
+	// Last one is for the over circle image.
+	std::array<QRect, kControlsCount + 1> _controlsTextures;
+
+	QRect _shadowTopTexture;
+	QRect _shadowBottomTexture;
 
 	bool _blendingEnabled = false;
 

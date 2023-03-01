@@ -58,6 +58,20 @@ std::map<int, const char*> BetaLogs() {
 	{
 		1000071,
 		"- Allow media viewer to exit fullscreen and become a normal window."
+	},
+	{
+		4006006,
+		"- Confirmation window before starting a call.\n"
+
+		"- New \"Battery and Animations\" settings section.\n"
+
+		"- \n""Save Power on Low Battery\n"" option for laptops.\n"
+
+		"- Improved windowed mode support for media viewer.\n"
+
+		"- Hardware accelerated video playback fix on macOS.\n"
+		
+		"- New application icon on macOS following the system guidelines.\n"
 	}
 	};
 };

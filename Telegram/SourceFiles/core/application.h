@@ -13,6 +13,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 class History;
 
+namespace base {
+class BatterySaving;
+} // namespace base
+
 namespace Platform {
 class Integration;
 } // namespace Platform
@@ -127,15 +131,14 @@ public:
 	Application &operator=(const Application &other) = delete;
 	~Application();
 
+	void run();
+
 	[[nodiscard]] Launcher &launcher() const {
 		return *_launcher;
 	}
 	[[nodiscard]] Platform::Integration &platformIntegration() const {
 		return *_platformIntegration;
 	}
-
-	void run();
-
 	[[nodiscard]] Ui::Animations::Manager &animationManager() const {
 		return *_animationsManager;
 	}
@@ -149,6 +152,9 @@ public:
 	}
 	[[nodiscard]] Tray &tray() const {
 		return *_tray;
+	}
+	[[nodiscard]] base::BatterySaving &batterySaving() const {
+		return *_batterySaving;
 	}
 
 	// Windows interface.
@@ -191,6 +197,7 @@ public:
 
 	void startSettingsAndBackground();
 	[[nodiscard]] Settings &settings();
+	[[nodiscard]] const Settings &settings() const;
 	void saveSettingsDelayed(crl::time delay = kDefaultSaveDelay);
 	void saveSettings();
 
@@ -297,6 +304,7 @@ public:
 	// Sandbox interface.
 	void postponeCall(FnMut<void()> &&callable);
 	void refreshGlobalProxy();
+	void refreshApplicationIcon();
 
 	void quitPreventFinished();
 
@@ -342,6 +350,7 @@ private:
 	void enumerateWindows(
 		Fn<void(not_null<Window::Controller*>)> callback) const;
 	void processCreatedWindow(not_null<Window::Controller*> window);
+	void refreshApplicationIcon(Main::Session *session);
 
 	friend void QuitAttempt();
 	void quitDelayed();
@@ -373,6 +382,7 @@ private:
 	struct Private;
 	const std::unique_ptr<Private> _private;
 	const std::unique_ptr<Platform::Integration> _platformIntegration;
+	const std::unique_ptr<base::BatterySaving> _batterySaving;
 
 	const std::unique_ptr<Storage::Databases> _databases;
 	const std::unique_ptr<Ui::Animations::Manager> _animationsManager;

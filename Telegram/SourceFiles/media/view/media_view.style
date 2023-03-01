@@ -321,6 +321,12 @@ mediaviewTitle: WindowTitle(defaultWindowTitle) {
 	}
 	closeIconActive: mediaviewTitleClose;
 	closeIconActiveOver: mediaviewTitleClose;
+	topIconActive: mediaviewTitleMinimize;
+	topIconActiveOver: mediaviewTitleMinimize;
+	top2Icon: mediaviewTitleMinimize;
+	top2IconOver: mediaviewTitleMinimize;
+	top2IconActive: mediaviewTitleMinimize;
+	top2IconActiveOver: mediaviewTitleMinimize;
 }
 
 mediaviewTitleButtonMac: icon{

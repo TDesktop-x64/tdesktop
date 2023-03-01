@@ -50,6 +50,7 @@ public:
 	void updateState(
 		bool active,
 		bool maximized,
+		bool topState,
 		const style::WindowTitle &st) override;
 	void notifySynteticOver(Control control, bool over) override;
 
@@ -99,6 +100,7 @@ object_ptr<Ui::AbstractButton> DefaultOverlayWidgetHelper::Buttons::create(
 
 	const auto icon = [&] {
 		switch (control) {
+		case Control::OnTop: return &st::mediaviewTitleMinimize;
 		case Control::Minimize: return &st::mediaviewTitleMinimize;
 		case Control::Maximize: return &st::mediaviewTitleMaximize;
 		case Control::Close: return &st::mediaviewTitleClose;
@@ -167,6 +169,7 @@ object_ptr<Ui::AbstractButton> DefaultOverlayWidgetHelper::Buttons::create(
 void DefaultOverlayWidgetHelper::Buttons::updateState(
 		bool active,
 		bool maximized,
+		bool topState,
 		const style::WindowTitle &st) {
 	_maximized = maximized;
 }

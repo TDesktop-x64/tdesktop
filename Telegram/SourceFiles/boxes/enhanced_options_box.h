@@ -21,7 +21,7 @@ namespace Ui {
 
 class NetBoostBox : public Ui::BoxContent {
 public:
-	NetBoostBox(QWidget *parent);
+	NetBoostBox(QWidget *parent, bool isDownload);
 
 	static QString BoostLabel(int boost);
 
@@ -33,6 +33,8 @@ private:
 
 	object_ptr<Ui::FlatLabel> _description = {nullptr};
 	std::shared_ptr<Ui::RadiobuttonGroup> _boostGroup;
+
+	bool _isDownload = false;
 
 };
 

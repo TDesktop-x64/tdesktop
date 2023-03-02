@@ -73,4 +73,5 @@ EnhancedSetting gEnhancedOptions;
 int gNetRequestsCount = 2;
 int gNetUploadSessionsCount = 2;
 int gNetUploadRequestInterval = 500;
+int gNetDownloadChunkSize = 128;
 int gAlwaysDeleteFor = 0;

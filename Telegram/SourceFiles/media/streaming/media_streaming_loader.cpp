@@ -12,7 +12,7 @@ namespace Streaming {
 
 bool LoadedPart::valid(int64 size) const {
 	return (offset != kFailedOffset)
-		&& ((bytes.size() == Loader::kPartSize)
+		&& ((bytes.size() == cNetDownloadChunkSize())
 			|| (offset + bytes.size() == size));
 }
 

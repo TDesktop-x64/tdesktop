@@ -196,16 +196,11 @@ inline void SetNetworkBoost(int boost) {
 	cSetNetUploadRequestInterval(500 - (100 * GetEnhancedInt("net_speed_boost")));
 }
 
-inline void SetNetworkDLBoost(int boost) {
-	if (boost <= 0) {
-		gEnhancedOptions.insert("net_dl_speed_boost", 0);
-		cSetNetDownloadChunkSize(128 * 1024);
-	} else if (boost >= 3) {
-		gEnhancedOptions.insert("net_dl_speed_boost", 3);
+inline void SetNetworkDLBoost(bool boost) {
+	if (boost) {
 		cSetNetDownloadChunkSize(1024 * 1024);
 	} else {
-		gEnhancedOptions.insert("net_dl_speed_boost", boost);
-		cSetNetDownloadChunkSize(256 * GetEnhancedInt("net_dl_speed_boost") * 1024);
+		cSetNetDownloadChunkSize(128 * 1024);
 	}
 }
 

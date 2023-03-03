@@ -19,16 +19,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/enhanced_settings.h"
 #include "settings/settings_enhanced.h"
 
-NetBoostBox::NetBoostBox(QWidget *parent, bool isDownload) {
-	_isDownload = isDownload;
+NetBoostBox::NetBoostBox(QWidget *parent) {
 }
 
 void NetBoostBox::prepare() {
-	if (_isDownload) {
-		setTitle(tr::lng_settings_net_download_speed_boost());
-	} else {
-		setTitle(tr::lng_settings_net_upload_speed_boost());
-	}
+	setTitle(tr::lng_settings_net_upload_speed_boost());
 
 	addButton(tr::lng_settings_save(), [=] { save(); });
 	addButton(tr::lng_cancel(), [=] { closeBox(); });
@@ -42,11 +37,7 @@ void NetBoostBox::prepare() {
 
 	y += _description->height() + st::boxMediumSkip;
 
-	if (_isDownload) {
-		_boostGroup = std::make_shared<Ui::RadiobuttonGroup>(GetEnhancedInt("net_dl_speed_boost"));
-	} else {
-		_boostGroup = std::make_shared<Ui::RadiobuttonGroup>(GetEnhancedInt("net_speed_boost"));
-	}
+	_boostGroup = std::make_shared<Ui::RadiobuttonGroup>(GetEnhancedInt("net_speed_boost"));
 	
 
 	for (int i = 0; i <= 3; i++) {
@@ -80,11 +71,7 @@ QString NetBoostBox::BoostLabel(int boost) {
 
 void NetBoostBox::save() {
 	const auto changeBoost = [=](Fn<void()> &&close) {
-		if (_isDownload) {
-			SetEnhancedValue("net_dl_speed_boost", _boostGroup->value());
-		} else {
-			SetNetworkBoost(_boostGroup->value());
-		}
+		SetNetworkBoost(_boostGroup->value());
 		EnhancedSettings::Write();
 		Core::Restart();
 	};

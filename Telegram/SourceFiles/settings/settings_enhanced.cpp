@@ -50,30 +50,36 @@ namespace Settings {
 		const auto inner = wrap->entity();
 
 		AddDividerText(inner, tr::lng_settings_restart_hint());
-		AddSkip(container);
-		AddSubsectionTitle(container, tr::lng_settings_network());
+		AddSkip(inner);
+		AddSubsectionTitle(inner, tr::lng_settings_network());
 
 		auto uploadBoostBtn = AddButtonWithLabel(
-				container,
+				inner,
 				tr::lng_settings_net_upload_speed_boost(),
 				rpl::single(NetBoostBox::BoostLabel(GetEnhancedInt("net_speed_boost"))),
 				st::settingsButtonNoIcon
 		);
 		uploadBoostBtn->setColorOverride(QColor(255, 0, 0));
 		uploadBoostBtn->addClickHandler([=] {
-			Ui::show(Box<NetBoostBox>(false));
+			Ui::show(Box<NetBoostBox>());
 		});
 
-		auto donwloadBoostBtn = AddButtonWithLabel(
-				container,
+		auto donwloadBoostBtn = AddButton(
+				inner,
 				tr::lng_settings_net_download_speed_boost(),
-				rpl::single(NetBoostBox::BoostLabel(GetEnhancedInt("net_dl_speed_boost"))),
 				st::settingsButtonNoIcon
 		);
 		donwloadBoostBtn->setColorOverride(QColor(255, 0, 0));
-		donwloadBoostBtn->addClickHandler([=] {
-			Ui::show(Box<NetBoostBox>(true));
-		});
+		donwloadBoostBtn->toggleOn(
+				rpl::single(GetEnhancedBool("net_dl_speed_boost"))
+		)->toggledChanges(
+		) | rpl::filter([=](bool toggled) {
+			return (toggled != GetEnhancedBool("net_dl_speed_boost"));
+		}) | rpl::start_with_next([=](bool toggled) {
+			SetEnhancedValue("net_dl_speed_boost", toggled);
+			EnhancedSettings::Write();
+			Core::Restart();
+		}, container->lifetime());
 
 		AddSkip(container);
 	}

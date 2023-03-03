@@ -153,7 +153,7 @@ private:
 	Ui::Animations::Simple _hangupShownProgress;
 	object_ptr<Ui::FadeWrap<Ui::CallButton>> _screencast;
 	object_ptr<Ui::CallButton> _camera;
-	object_ptr<Ui::FadeWrap<Ui::CallButton>> _startVideo;
+	base::unique_qptr<Ui::CallButton> _startVideo;
 	object_ptr<Ui::FadeWrap<Ui::CallButton>> _mute;
 	object_ptr<Ui::FlatLabel> _name;
 	object_ptr<Ui::FlatLabel> _status;
@@ -167,6 +167,8 @@ private:
 
 	base::Timer _updateDurationTimer;
 	base::Timer _updateOuterRippleTimer;
+
+	rpl::event_stream<bool> _startOutgoingRequests;
 
 };
 

@@ -60,7 +60,7 @@ std::map<int, const char*> BetaLogs() {
 		"- Allow media viewer to exit fullscreen and become a normal window."
 	},
 	{
-		4006006,
+		1000072,
 		"- Confirmation window before starting a call.\n"
 
 		"- New \"Battery and Animations\" settings section.\n"
@@ -74,7 +74,7 @@ std::map<int, const char*> BetaLogs() {
 		"- New application icon on macOS following the system guidelines.\n"
 	},
 	{
-		4006007,
+		1000073,
 		"- Fix crash when accepting incoming calls.\n"
 
 		"- Remove sound when cancelling an unconfirmed call.\n"

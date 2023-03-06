@@ -1633,6 +1633,7 @@ void TopBarWidget::updateOnlineDisplay() {
 	QString text;
 	const auto now = base::unixtime::now();
 	bool titlePeerTextOnline = false;
+	bool delayUpdate = false;
 	if (const auto user = peer->asUser()) {
 		if (session().supportMode()
 			&& !session().supportHelper().infoCurrent(user).text.empty()) {
@@ -1654,38 +1655,23 @@ void TopBarWidget::updateOnlineDisplay() {
 				text = tr::lng_chat_status_members(tr::now, lt_count_decimal, chat->count);
 			}
 		} else {
-			if (GetEnhancedBool("hide_counter")) {
+			const auto self = session().user();
+			auto online = 0;
+			auto onlyMe = true;
+			for (const auto &user : chat->participants) {
+				if (user->onlineTill > now) {
+					++online;
+					if (onlyMe && user != self) onlyMe = false;
+				}
+			}
+			if (online > 0 && !onlyMe) {
+				auto membersCount = tr::lng_chat_status_members(tr::now, lt_count_decimal, chat->participants.size());
+				auto onlineCount = tr::lng_chat_status_online(tr::now, lt_count, online);
+				text = tr::lng_chat_status_members_online(tr::now, lt_members_count, membersCount, lt_online_count, onlineCount);
+			} else if (chat->participants.size() > 0) {
 				text = tr::lng_chat_status_members(tr::now, lt_count_decimal, chat->participants.size());
 			} else {
-				if (lastChatRequest[QString::number(chat->id.value)].requestTime + 10 < now) { // Update every 10 seconds
-					session().api().request(MTPmessages_GetOnlines(
-							chat->input
-					)).done([=](const MTPChatOnlines &result) {
-						const auto count = result.c_chatOnlines().vonlines().v;
-						if (count > 0) {
-							auto membersCount = tr::lng_chat_status_members(tr::now, lt_count_decimal, chat->participants.size());
-							auto onlineCount = tr::lng_chat_status_online(tr::now, lt_count, count);
-							QString text = tr::lng_chat_status_members_online(tr::now, lt_members_count, membersCount, lt_online_count, onlineCount);
-							_titlePeerText.setText(st::dialogsTextStyle, text);
-							_titlePeerTextOnline = titlePeerTextOnline;
-							updateMembersShowArea();
-						}
-						lastChatRequest[QString::number(chat->id.value)].memberCount = count;
-					}).fail([=](const MTP::Error &error) {
-						// if failed, then no any changes :)
-					}).send();
-					lastChatRequest[QString::number(chat->id.value)].requestTime = now;
-				}
-
-				if (chat->participants.size() > 0 && lastChatRequest[QString::number(chat->id.value)].memberCount > 0) {
-					auto membersCount = tr::lng_chat_status_members(tr::now, lt_count_decimal, chat->participants.size());
-					auto onlineCount = tr::lng_chat_status_online(tr::now, lt_count, lastChatRequest[QString::number(chat->id.value)].memberCount);
-					text = tr::lng_chat_status_members_online(tr::now, lt_members_count, membersCount, lt_online_count, onlineCount);
-				} else if (chat->participants.size() > 0) {
-					text = tr::lng_chat_status_members(tr::now, lt_count_decimal, chat->participants.size());
-				} else {
-					text = tr::lng_group_status(tr::now);
-				}
+				text = tr::lng_group_status(tr::now);
 			}
 		}
 	} else if (const auto channel = peer->asChannel()) {
@@ -1695,6 +1681,7 @@ void TopBarWidget::updateOnlineDisplay() {
 				text = tr::lng_chat_status_members(tr::now, lt_count_decimal, channel->membersCount());
 			} else {
 				if (lastChatRequest[QString::number(channel->id.value)].requestTime + 10 < now) { // Update every 10 seconds
+					delayUpdate = true;
 					session().api().request(MTPmessages_GetOnlines(
 							channel->input
 					)).done([=](const MTPChatOnlines &result) {
@@ -1703,9 +1690,12 @@ void TopBarWidget::updateOnlineDisplay() {
 							auto membersCount = tr::lng_chat_status_members(tr::now, lt_count_decimal, channel->membersCount());
 							auto onlineCount = tr::lng_chat_status_online(tr::now, lt_count, count);
 							QString text = tr::lng_chat_status_members_online(tr::now, lt_members_count, membersCount, lt_online_count, onlineCount);
-							_titlePeerText.setText(st::dialogsTextStyle, text);
-							_titlePeerTextOnline = titlePeerTextOnline;
-							updateMembersShowArea();
+							if (_titlePeerText.toString() != text) {
+								_titlePeerText.setText(st::dialogsTextStyle, text);
+								_titlePeerTextOnline = titlePeerTextOnline;
+								updateMembersShowArea();
+								update();
+							}
 						}
 						lastChatRequest[QString::number(channel->id.value)].memberCount = count;
 					}).fail([=](const MTP::Error &error) {
@@ -1733,7 +1723,7 @@ void TopBarWidget::updateOnlineDisplay() {
 			text = channel->isMegagroup() ? tr::lng_group_status(tr::now) : tr::lng_channel_status(tr::now);
 		}
 	}
-	if (_titlePeerText.toString() != text) {
+	if (_titlePeerText.toString() != text && !delayUpdate) {
 		_titlePeerText.setText(st::dialogsTextStyle, text);
 		_titlePeerTextOnline = titlePeerTextOnline;
 		updateMembersShowArea();

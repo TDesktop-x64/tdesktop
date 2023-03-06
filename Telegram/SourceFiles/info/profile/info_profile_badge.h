@@ -55,9 +55,9 @@ public:
 
 	[[nodiscard]] Data::CustomEmojiSizeTag sizeTag() const;
 
-private:
 	void setBadge(BadgeType badge, DocumentId emojiStatusId);
 
+private:
 	const not_null<QWidget*> _parent;
 	const style::InfoPeerBadge &_st;
 	const not_null<PeerData*> _peer;

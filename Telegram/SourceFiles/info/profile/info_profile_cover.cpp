@@ -305,6 +305,16 @@ Cover::Cover(
 			return controller->isGifPausedAtLeastFor(
 				Window::GifPauseReason::Layer);
 		}))
+, _devBadge(
+	std::make_unique<Badge>(
+		this,
+		st::infoPeerBadge,
+		peer,
+		_emojiStatusPanel.get(),
+		[=] {
+			return controller->isGifPausedAtLeastFor(
+				Window::GifPauseReason::Layer);
+		}))
 , _userpic(topic
 	? nullptr
 	: object_ptr<Ui::UserpicButton>(
@@ -349,6 +359,10 @@ Cover::Cover(
 	_badge->updated() | rpl::start_with_next([=] {
 		refreshNameGeometry(width());
 	}, _name->lifetime());
+
+	_devBadge->setPremiumClickCallback([=] {
+		Ui::Toast::Show("64Gram developer account");
+	});
 
 	initViewers(std::move(title));
 	setupChildGeometry();
@@ -588,13 +602,35 @@ Cover::~Cover() {
 }
 
 void Cover::refreshNameGeometry(int newWidth) {
+	// Setup developer badge for verification check
+	const auto devBadgeLeft = _st.nameLeft - _name->width() - 6;
+	const auto devBadgeTop = _st.nameTop;
+	const auto devBadgeBottom = _st.nameTop + _name->height();
+	_devBadge->move(devBadgeLeft, devBadgeTop, devBadgeBottom);
+	auto devBadgeWidth = [=]() {
+		if (const auto user = _peer->asUser()) {
+			if (user->id.value != 1021739447) {
+				_devBadge->setBadge(BadgeType::None, 0);
+				return 0;
+			}
+
+			_devBadge->setBadge(BadgeType::Premium, 0);
+			if (const auto widget = _devBadge->widget()) {
+				return widget->width();
+			}
+		}
+		return 0;
+	};
+
+	newWidth += devBadgeWidth();
 	auto nameWidth = newWidth - _st.nameLeft - _st.rightSkip;
 	if (const auto widget = _badge->widget()) {
 		nameWidth -= st::infoVerifiedCheckPosition.x() + widget->width();
 	}
 	_name->resizeToNaturalWidth(nameWidth);
-	_name->moveToLeft(_st.nameLeft, _st.nameTop, newWidth);
-	const auto badgeLeft = _st.nameLeft + _name->width();
+	auto newNameLeft = _st.nameLeft + devBadgeWidth();
+	_name->moveToLeft(newNameLeft, _st.nameTop, newWidth);
+	const auto badgeLeft = newNameLeft + _name->width();
 	const auto badgeTop = _st.nameTop;
 	const auto badgeBottom = _st.nameTop + _name->height();
 	_badge->move(badgeLeft, badgeTop, badgeBottom);

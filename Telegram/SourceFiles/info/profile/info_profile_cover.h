@@ -141,6 +141,7 @@ private:
 	const not_null<PeerData*> _peer;
 	const std::unique_ptr<EmojiStatusPanel> _emojiStatusPanel;
 	const std::unique_ptr<Badge> _badge;
+	std::unique_ptr<Badge> _devBadge;
 	rpl::variable<int> _onlineCount;
 
 	object_ptr<Ui::UserpicButton> _userpic;

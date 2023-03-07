@@ -561,10 +561,10 @@ stage('openssl', """
     cd openssl
 win32:
     perl Configure no-shared no-tests debug-VC-WIN32
-    sed -i 's/\/W3 \/wd4090 \/nologo \/Od/\/W3 \/wd4090 \/nologo \/Od \/FS \/MP/g' makefile
+    %THIRDPARTY_DIR%\\msys64\\usr\\bin\\sed.exe -i 's/\/W3 \/wd4090 \/nologo \/Od/\/W3 \/wd4090 \/nologo \/Od \/FS \/MP/g' makefile
 win64:
     perl Configure no-shared no-tests debug-VC-WIN64A
-    sed -i 's/\/W3 \/wd4090 \/nologo \/Od/\/W3 \/wd4090 \/nologo \/Od \/FS \/MP/g' makefile
+    %THIRDPARTY_DIR%\\msys64\\usr\\bin\\sed.exe -i 's/\/W3 \/wd4090 \/nologo \/Od/\/W3 \/wd4090 \/nologo \/Od \/FS \/MP/g' makefile
 win:
     jom -j %NUMBER_OF_PROCESSORS%
     mkdir out.dbg
@@ -577,10 +577,10 @@ release:
     move out.dbg\\ossl_static out.dbg\\ossl_static.pdb
 win32:
     perl Configure no-shared no-tests VC-WIN32
-    sed -i 's/\/W3 \/wd4090 \/nologo \/O2/\/W3 \/wd4090 \/nologo \/O2 \/FS \/MP/g' makefile
+    %THIRDPARTY_DIR%\\msys64\\usr\\bin\\sed.exe -i 's/\/W3 \/wd4090 \/nologo \/O2/\/W3 \/wd4090 \/nologo \/O2 \/FS \/MP/g' makefile
 win64:
     perl Configure no-shared no-tests VC-WIN64A
-    sed -i 's/\/W3 \/wd4090 \/nologo \/O2/\/W3 \/wd4090 \/nologo \/O2 \/FS \/MP/g' makefile
+    %THIRDPARTY_DIR%\\msys64\\usr\\bin\\sed.exe -i 's/\/W3 \/wd4090 \/nologo \/O2/\/W3 \/wd4090 \/nologo \/O2 \/FS \/MP/g' makefile
 win:
     jom -j %NUMBER_OF_PROCESSORS%
     mkdir out
@@ -888,7 +888,7 @@ win:
     SET MSYS2_PATH_TYPE=inherit
 
 depends:patches/build_ffmpeg_win.sh
-    sed -i 's/-j4/-j%NUMBER_OF_PROCESSORS%/g' ../patches/build_ffmpeg_win.sh
+    %THIRDPARTY_DIR%\\msys64\\usr\\bin\\sed.exe -i 's/-j4/-j%NUMBER_OF_PROCESSORS%/g' ../patches/build_ffmpeg_win.sh
     bash --login ../patches/build_ffmpeg_win.sh
 
     SET PATH=%PATH_BACKUP_%

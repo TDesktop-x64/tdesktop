@@ -466,7 +466,10 @@ HistoryWidget::HistoryWidget(
 		if (action == Ui::InputField::MimeAction::Check) {
 			return canSendFiles(data);
 		} else if (action == Ui::InputField::MimeAction::Insert) {
-			return confirmSendingFiles(data, std::nullopt, data->text());
+			return confirmSendingFiles(
+				data,
+				std::nullopt,
+				Core::ReadMimeText(data));
 		}
 		Unexpected("action in MimeData hook.");
 	});
@@ -947,8 +950,8 @@ void HistoryWidget::refreshJoinChannelText() {
 void HistoryWidget::refreshTopBarActiveChat() {
 	const auto state = computeDialogsEntryState();
 	_topBar->setActiveChat(state, _history->sendActionPainter());
-	if (_inlineResults) {
-		_inlineResults->setCurrentDialogsEntryState(state);
+	if (state.key) {
+		controller()->setCurrentDialogsEntryState(state);
 	}
 }
 
@@ -1500,8 +1503,6 @@ void HistoryWidget::applyInlineBotQuery(UserData *bot, const QString &query) {
 					sendInlineResult(result);
 				}
 			});
-			_inlineResults->setCurrentDialogsEntryState(
-				computeDialogsEntryState());
 			_inlineResults->setSendMenuType([=] { return sendMenuType(); });
 			_inlineResults->requesting(
 			) | rpl::start_with_next([=](bool requesting) {
@@ -1784,14 +1785,21 @@ void HistoryWidget::setInnerFocus() {
 	}
 }
 
-bool HistoryWidget::notify_switchInlineBotButtonReceived(const QString &query, UserData *samePeerBot, MsgId samePeerReplyTo) {
+bool HistoryWidget::notify_switchInlineBotButtonReceived(
+		const QString &query,
+		UserData *samePeerBot,
+		MsgId samePeerReplyTo) {
 	if (samePeerBot) {
 		if (_history) {
 			const auto textWithTags = TextWithTags{
 				'@' + samePeerBot->username() + ' ' + query,
 				TextWithTags::Tags(),
 			};
-			MessageCursor cursor = { int(textWithTags.text.size()), int(textWithTags.text.size()), QFIXED_MAX };
+			MessageCursor cursor = {
+				int(textWithTags.text.size()),
+				int(textWithTags.text.size()),
+				QFIXED_MAX,
+			};
 			_history->setLocalDraft(std::make_unique<Data::Draft>(
 				textWithTags,
 				0, // replyTo
@@ -1805,39 +1813,11 @@ bool HistoryWidget::notify_switchInlineBotButtonReceived(const QString &query, U
 		const auto to = bot->isBot()
 			? bot->botInfo->inlineReturnTo
 			: Dialogs::EntryState();
-		const auto history = to.key.owningHistory();
-		if (!history) {
+		if (!to.key.owningHistory()) {
 			return false;
 		}
 		bot->botInfo->inlineReturnTo = Dialogs::EntryState();
-		using Section = Dialogs::EntryState::Section;
-
-		const auto textWithTags = TextWithTags{
-			'@' + bot->username() + ' ' + query,
-			TextWithTags::Tags(),
-		};
-		MessageCursor cursor = { int(textWithTags.text.size()), int(textWithTags.text.size()), QFIXED_MAX };
-		auto draft = std::make_unique<Data::Draft>(
-			textWithTags,
-			to.currentReplyToId,
-			to.rootId,
-			cursor,
-			Data::PreviewState::Allowed);
-
-		if (to.section == Section::Scheduled) {
-			history->setDraft(Data::DraftKey::Scheduled(), std::move(draft));
-			controller()->showSection(
-				std::make_shared<HistoryView::ScheduledMemento>(history));
-		} else {
-			history->setLocalDraft(std::move(draft));
-			if (to.section == Section::Replies) {
-				controller()->showRepliesForMessage(history, to.rootId);
-			} else if (history == _history) {
-				applyDraft();
-			} else {
-				controller()->showPeerHistory(history->peer);
-			}
-		}
+		controller()->switchInlineQuery(to, bot, query);
 		return true;
 	}
 	return false;
@@ -2111,6 +2091,7 @@ void HistoryWidget::showHistory(
 			}
 			return;
 		} else {
+			_sponsoredMessagesStateKnown = false;
 			session().data().sponsoredMessages().clearItems(_history);
 			session().data().hideShownSpoilers();
 			_composeSearch = nullptr;
@@ -2345,6 +2326,7 @@ void HistoryWidget::showHistory(
 				auto &sponsored = session().data().sponsoredMessages();
 				using State = Data::SponsoredMessages::State;
 				const auto state = sponsored.state(_history);
+				_sponsoredMessagesStateKnown = (state != State::None);
 				if (state == State::AppendToEnd) {
 					_scroll->setTrackingContent(
 						sponsored.canHaveFor(_history));
@@ -2440,6 +2422,7 @@ void HistoryWidget::refreshAttachBotsMenu() {
 	}
 	_attachBotsMenu = InlineBots::MakeAttachBotsMenu(
 		this,
+		controller(),
 		_history->peer,
 		[=] { return prepareSendAction({}); },
 		[=](bool compress) { chooseAttach(compress); });
@@ -3146,7 +3129,7 @@ void HistoryWidget::messagesReceived(
 		int requestId) {
 	Expects(_history != nullptr);
 
-	bool toMigrated = (peer == _peer->migrateFrom());
+	const auto toMigrated = (peer == _peer->migrateFrom());
 	if (peer != _peer && !toMigrated) {
 		if (_preloadRequest == requestId) {
 			_preloadRequest = 0;
@@ -3220,6 +3203,7 @@ void HistoryWidget::messagesReceived(
 		}
 
 		historyLoaded();
+		injectSponsoredMessages();
 	} else if (_delayedShowAtRequest == requestId) {
 		if (toMigrated) {
 			_history->clear(History::ClearType::Unload);
@@ -3424,7 +3408,7 @@ void HistoryWidget::loadMessagesDown() {
 
 	auto loadMigrated = _migrated && !(_migrated->isEmpty() || _migrated->loadedAtBottom() || (!_history->isEmpty() && !_history->loadedAtTop()));
 	auto from = loadMigrated ? _migrated : _history;
-	if (from->loadedAtBottom()) {
+	if (from->loadedAtBottom() && _sponsoredMessagesStateKnown) {
 		session().data().sponsoredMessages().request(_history, nullptr);
 		return;
 	}
@@ -5333,7 +5317,7 @@ bool HistoryWidget::canSendFiles(not_null<const QMimeData*> data) const {
 		return false;
 	} else if (data->hasImage()) {
 		return true;
-	} else if (const auto urls = base::GetMimeUrls(data); !urls.empty()) {
+	} else if (const auto urls = Core::ReadMimeUrls(data); !urls.empty()) {
 		if (ranges::all_of(urls, &QUrl::isLocalFile)) {
 			return true;
 		}
@@ -5352,7 +5336,7 @@ bool HistoryWidget::confirmSendingFiles(
 	const auto hasImage = data->hasImage();
 	const auto premium = controller()->session().user()->isPremium();
 
-	if (const auto urls = base::GetMimeUrls(data); !urls.empty()) {
+	if (const auto urls = Core::ReadMimeUrls(data); !urls.empty()) {
 		auto list = Storage::PrepareMediaList(
 			urls,
 			st::sendMediaPreviewSize,

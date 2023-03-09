@@ -357,6 +357,15 @@ void SessionNavigation::showPeerByLinkResolved(
 	using Scope = AddBotToGroupBoxController::Scope;
 	const auto user = peer->asUser();
 	const auto bot = (user && user->isBot()) ? user : nullptr;
+
+	// t.me/username/012345 - we thought it was a channel post link, but
+	// after resolving the username we found out it is a bot.
+	const auto resolveType = (bot
+		&& !info.botAppName.isEmpty()
+		&& info.resolveType == ResolveType::Default)
+		? ResolveType::BotApp
+		: info.resolveType;
+
 	const auto &replies = info.repliesInfo;
 	if (const auto threadId = std::get_if<ThreadId>(&replies)) {
 		showRepliesForMessage(
@@ -389,14 +398,29 @@ void SessionNavigation::showPeerByLinkResolved(
 				info.messageId,
 				callback);
 		}
-	} else if (bot && info.resolveType == ResolveType::ShareGame) {
+	} else if (bot && resolveType == ResolveType::BotApp) {
+		const auto itemId = info.clickFromMessageId;
+		const auto item = _session->data().message(itemId);
+		const auto contextPeer = item
+			? item->history()->peer
+			: bot;
+		crl::on_main(this, [=] {
+			bot->session().attachWebView().requestApp(
+				parentController(),
+				Api::SendAction(bot->owner().history(contextPeer)),
+				bot,
+				info.botAppName,
+				info.startToken,
+				info.botAppForceConfirmation);
+		});
+	} else if (bot && resolveType == ResolveType::ShareGame) {
 		Window::ShowShareGameBox(parentController(), bot, info.startToken);
 	} else if (bot
-		&& (info.resolveType == ResolveType::AddToGroup
-			|| info.resolveType == ResolveType::AddToChannel)) {
-		const auto scope = (info.resolveType == ResolveType::AddToGroup)
+		&& (resolveType == ResolveType::AddToGroup
+			|| resolveType == ResolveType::AddToChannel)) {
+		const auto scope = (resolveType == ResolveType::AddToGroup)
 			? (info.startAdminRights ? Scope::GroupAdmin : Scope::All)
-			: (info.resolveType == ResolveType::AddToChannel)
+			: (resolveType == ResolveType::AddToChannel)
 			? Scope::ChannelAdmin
 			: Scope::None;
 		Assert(scope != Scope::None);
@@ -407,7 +431,7 @@ void SessionNavigation::showPeerByLinkResolved(
 			scope,
 			info.startToken,
 			info.startAdminRights);
-	} else if (info.resolveType == ResolveType::Mention) {
+	} else if (resolveType == ResolveType::Mention) {
 		if (bot || peer->isChannel()) {
 			crl::on_main(this, [=] {
 				showPeerHistory(peer, params);
@@ -434,6 +458,7 @@ void SessionNavigation::showPeerByLinkResolved(
 				const auto history = peer->owner().history(peer);
 				showPeerHistory(history, params, msgId);
 				peer->session().attachWebView().request(
+					parentController(),
 					Api::SendAction(history),
 					attachBotUsername,
 					info.attachBotToggleCommand.value_or(QString()));
@@ -448,13 +473,13 @@ void SessionNavigation::showPeerByLinkResolved(
 				? contextPeer->asUser()
 				: nullptr;
 			bot->session().attachWebView().requestAddToMenu(
+				bot,
+				*info.attachBotToggleCommand,
+				parentController(),
 				(contextUser
 					? Api::SendAction(
 						contextUser->owner().history(contextUser))
 					: std::optional<Api::SendAction>()),
-				bot,
-				*info.attachBotToggleCommand,
-				parentController(),
 				info.attachBotChooseTypes);
 		} else {
 			crl::on_main(this, [=] {
@@ -1177,6 +1202,76 @@ bool SessionController::jumpToChatListEntry(Dialogs::RowDescriptor row) {
 		return true;
 	}
 	return false;
+}
+
+void SessionController::setCurrentDialogsEntryState(
+		Dialogs::EntryState state) {
+	_currentDialogsEntryState = state;
+}
+
+Dialogs::EntryState SessionController::currentDialogsEntryState() const {
+	return _currentDialogsEntryState;
+}
+
+bool SessionController::switchInlineQuery(
+		Dialogs::EntryState to,
+		not_null<UserData*> bot,
+		const QString &query) {
+	Expects(to.key.owningHistory() != nullptr);
+
+	using Section = Dialogs::EntryState::Section;
+
+	const auto thread = to.key.thread();
+	if (!thread || !Data::CanSend(thread, ChatRestriction::SendInline)) {
+		show(Ui::MakeInformBox(tr::lng_inline_switch_cant()));
+		return false;
+	}
+
+	const auto history = to.key.owningHistory();
+	const auto textWithTags = TextWithTags{
+		'@' + bot->username() + ' ' + query,
+		TextWithTags::Tags(),
+	};
+	MessageCursor cursor = { int(textWithTags.text.size()), int(textWithTags.text.size()), QFIXED_MAX };
+	auto draft = std::make_unique<Data::Draft>(
+		textWithTags,
+		to.currentReplyToId,
+		to.rootId,
+		cursor,
+		Data::PreviewState::Allowed);
+
+	auto params = Window::SectionShow();
+	params.reapplyLocalDraft = true;
+	if (to.section == Section::Scheduled) {
+		history->setDraft(Data::DraftKey::Scheduled(), std::move(draft));
+		showSection(
+			std::make_shared<HistoryView::ScheduledMemento>(history),
+			params);
+	} else {
+		history->setLocalDraft(std::move(draft));
+		history->clearLocalEditDraft(to.rootId);
+		if (to.section == Section::Replies) {
+			const auto commentId = MsgId();
+			showRepliesForMessage(history, to.rootId, commentId, params);
+		} else {
+			showPeerHistory(history->peer, params);
+		}
+	}
+	return true;
+}
+
+bool SessionController::switchInlineQuery(
+		not_null<Data::Thread*> thread,
+		not_null<UserData*> bot,
+		const QString &query) {
+	const auto entryState = Dialogs::EntryState{
+		.key = thread,
+		.section = (thread->asTopic()
+			? Dialogs::EntryState::Section::Replies
+			: Dialogs::EntryState::Section::History),
+		.rootId = thread->topicRootId(),
+	};
+	return switchInlineQuery(entryState, bot, query);
 }
 
 Dialogs::RowDescriptor SessionController::resolveChatNext(

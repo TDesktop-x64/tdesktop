@@ -1095,6 +1095,17 @@ whoReadMenu: PopupMenu(popupMenuExpandedSeparator) {
 	scrollPadding: margins(0px, 6px, 0px, 4px);
 	maxHeight: 400px;
 }
+whoReadNameWithDateTop: 3px;
+whoReadDateTop: 20px;
+whoReadDateSkip: 15px;
+whoReadDateChecks: icon{{ "menu/read_ticks_s", windowSubTextFg }};
+whoReadDateChecksOver: icon{{ "menu/read_ticks_s", windowSubTextFgOver }};
+whoReadDateChecksPosition: point(-7px, -4px);
+whoReadDateStyle: TextStyle(defaultTextStyle) {
+	font: font(12px);
+	linkFont: font(12px);
+	linkFontOver: font(12px underline);
+}
 whoReadChecks: icon{{ "menu/read_ticks", windowBoldFg }};
 whoReadChecksOver: icon{{ "menu/read_ticks", windowBoldFg }};
 whoReadChecksDisabled: icon{{ "menu/read_ticks", menuFgDisabled }};
@@ -1221,6 +1232,13 @@ msgServiceGiftBoxTitlePadding: margins(0px, 5px, 0px, 2px);
 msgServiceGiftBoxStickerTop: -19px;
 msgServiceGiftBoxStickerSize: size(140px, 140px);
 
+historySponsorInfoItem: FlatLabel(defaultFlatLabel) {
+	style: TextStyle(defaultTextStyle) {
+		font: font(12px);
+	}
+	minWidth: 136px;
+	maxHeight: 40px;
+}
 historyHasCustomEmoji: FlatLabel(defaultFlatLabel) {
 	style: TextStyle(defaultTextStyle) {
 		font: font(11px);
@@ -1250,6 +1268,8 @@ historyTranslateSettings: IconButton(defaultIconButton) {
 	}
 }
 historyTranslateMenuPosition: point(-6px, 30px);
+
+historySponsoredAboutMenuLabelPosition: point(54px, 4px);
 
 historySendDisabled: FlatLabel(defaultFlatLabel) {
 	minWidth: 10px;

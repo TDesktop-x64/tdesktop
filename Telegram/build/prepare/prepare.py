@@ -879,8 +879,8 @@ win:
 stage('ffmpeg', """
     git clone https://github.com/FFmpeg/FFmpeg.git ffmpeg
     cd ffmpeg
+    git checkout 7268323193
 win:
-    git checkout cc33e73618
     SET PATH_BACKUP_=%PATH%
     SET PATH=%ROOT_DIR%\\ThirdParty\\msys64\\usr\\bin;%PATH%
 
@@ -893,7 +893,6 @@ depends:patches/build_ffmpeg_win.sh
 
     SET PATH=%PATH_BACKUP_%
 mac:
-    git checkout 7268323193
     export PKG_CONFIG_PATH=$USED_PREFIX/lib/pkgconfig
 depends:yasm/yasm
 
@@ -1017,6 +1016,7 @@ depends:yasm/yasm
     make $MAKE_THREADS_CNT
 
     mkdir out.arm64
+    mv libavfilter/libavfilter.a out.arm64
     mv libavformat/libavformat.a out.arm64
     mv libavcodec/libavcodec.a out.arm64
     mv libswresample/libswresample.a out.arm64
@@ -1029,12 +1029,14 @@ depends:yasm/yasm
     make $MAKE_THREADS_CNT
 
     mkdir out.x86_64
+    mv libavfilter/libavfilter.a out.x86_64
     mv libavformat/libavformat.a out.x86_64
     mv libavcodec/libavcodec.a out.x86_64
     mv libswresample/libswresample.a out.x86_64
     mv libswscale/libswscale.a out.x86_64
     mv libavutil/libavutil.a out.x86_64
 
+    lipo -create out.arm64/libavfilter.a out.x86_64/libavfilter.a -output libavfilter/libavfilter.a
     lipo -create out.arm64/libavformat.a out.x86_64/libavformat.a -output libavformat/libavformat.a
     lipo -create out.arm64/libavcodec.a out.x86_64/libavcodec.a -output libavcodec/libavcodec.a
     lipo -create out.arm64/libswresample.a out.x86_64/libswresample.a -output libswresample/libswresample.a

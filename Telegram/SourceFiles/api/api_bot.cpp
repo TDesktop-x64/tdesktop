@@ -289,10 +289,11 @@ bool SwitchInlineBotButtonReceived(
 }
 
 void ActivateBotCommand(ClickHandlerContext context, int row, int column) {
-	const auto controller = context.sessionWindow.get();
-	if (!controller) {
+	const auto strong = context.sessionWindow.get();
+	if (!strong) {
 		return;
 	}
+	const auto controller = not_null{ strong };
 	const auto item = controller->session().data().message(context.itemId);
 	if (!item) {
 		return;
@@ -455,14 +456,12 @@ void ActivateBotCommand(ClickHandlerContext context, int row, int column) {
 				return false;
 			}();
 			if (!fastSwitchDone) {
-				const auto botAndQuery = '@'
-					+ bot->username()
-					+ ' '
-					+ QString::fromUtf8(button->data);
+				const auto query = QString::fromUtf8(button->data);
 				const auto chosen = [=](not_null<Data::Thread*> thread) {
-					return controller->content()->inlineSwitchChosen(
+					return controller->switchInlineQuery(
 						thread,
-						botAndQuery);
+						bot,
+						query);
 				};
 				Window::ShowChooseRecipientBox(
 					controller,

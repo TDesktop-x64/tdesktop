@@ -354,7 +354,12 @@ MainWidget::MainWidget(
 	session().changes().entryUpdates(
 		Data::EntryUpdate::Flag::LocalDraftSet
 	) | rpl::start_with_next([=](const Data::EntryUpdate &update) {
-		controller->showThread(update.entry->asThread(), ShowAtUnreadMsgId);
+		auto params = Window::SectionShow();
+		params.reapplyLocalDraft = true;
+		controller->showThread(
+			update.entry->asThread(),
+			ShowAtUnreadMsgId,
+			params);
 		controller->hideLayer();
 	}, lifetime());
 
@@ -604,37 +609,6 @@ bool MainWidget::shareUrl(
 		Data::PreviewState::Allowed));
 	history->clearLocalEditDraft(topicRootId);
 	history->session().changes().entryUpdated(
-		thread,
-		Data::EntryUpdate::Flag::LocalDraftSet);
-	return true;
-}
-
-bool MainWidget::inlineSwitchChosen(
-		not_null<Data::Thread*> thread,
-		const QString &botAndQuery) const {
-	if (!Data::CanSend(thread, ChatRestriction::SendInline)) {
-		_controller->show(Ui::MakeInformBox(tr::lng_inline_switch_cant()));
-		return false;
-	}
-	const auto textWithTags = TextWithTags{
-		botAndQuery,
-		TextWithTags::Tags(),
-	};
-	const auto cursor = MessageCursor{
-		int(botAndQuery.size()),
-		int(botAndQuery.size()),
-		QFIXED_MAX
-	};
-	const auto history = thread->owningHistory();
-	const auto topicRootId = thread->topicRootId();
-	history->setLocalDraft(std::make_unique<Data::Draft>(
-		textWithTags,
-		0, // replyTo
-		topicRootId,
-		cursor,
-		Data::PreviewState::Allowed));
-	history->clearLocalEditDraft(topicRootId);
-	thread->session().changes().entryUpdated(
 		thread,
 		Data::EntryUpdate::Flag::LocalDraftSet);
 	return true;
@@ -1341,7 +1315,9 @@ void MainWidget::showHistory(
 		_controller->window().activate();
 	}
 
-	if (!(_history->peer() && _history->peer()->id == peerId)
+	const auto alreadyThatPeer = _history->peer()
+		&& (_history->peer()->id == peerId);
+	if (!alreadyThatPeer
 		&& preventsCloseSection(
 			[=] { showHistory(peerId, params, showAtMsgId); },
 			params)) {
@@ -1424,17 +1400,24 @@ void MainWidget::showHistory(
 		return false;
 	};
 
-	auto animationParams = animatedShow() ? prepareHistoryAnimation(peerId) : Window::SectionSlideParams();
+	auto animationParams = animatedShow()
+		? prepareHistoryAnimation(peerId)
+		: Window::SectionSlideParams();
 
 	if (!back && (way != Way::ClearStack)) {
 		// This may modify the current section, for example remove its contents.
 		saveSectionInStack();
 	}
 
-	if (_history->peer() && _history->peer()->id != peerId && way != Way::Forward) {
+	if (_history->peer()
+		&& _history->peer()->id != peerId
+		&& way != Way::Forward) {
 		clearBotStartToken(_history->peer());
 	}
 	_history->showHistory(peerId, showAtMsgId);
+	if (alreadyThatPeer && params.reapplyLocalDraft) {
+		_history->applyDraft(HistoryWidget::FieldHistoryAction::NewEntry);
+	}
 
 	auto noPeer = !_history->peer();
 	auto onlyDialogs = noPeer && isOneColumn();

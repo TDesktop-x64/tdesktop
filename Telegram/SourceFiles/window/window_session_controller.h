@@ -97,6 +97,7 @@ inline constexpr bool is_flag_type(GifPauseReason) { return true; };
 
 enum class ResolveType {
 	Default,
+	BotApp,
 	BotStart,
 	AddToGroup,
 	AddToChannel,
@@ -171,6 +172,7 @@ struct SectionShow {
 	anim::activation activation = anim::activation::normal;
 	bool thirdColumn = false;
 	bool childColumn = false;
+	bool reapplyLocalDraft = false;
 	Origin origin;
 
 };
@@ -207,6 +209,8 @@ public:
 		QString startToken;
 		ChatAdminRights startAdminRights;
 		bool startAutoSubmit = false;
+		QString botAppName;
+		bool botAppForceConfirmation = false;
 		QString attachBotUsername;
 		std::optional<QString> attachBotToggleCommand;
 		InlineBots::PeerTypes attachBotChooseTypes;
@@ -372,6 +376,17 @@ public:
 	rpl::producer<Dialogs::RowDescriptor> activeChatEntryValue() const;
 	rpl::producer<Dialogs::Key> activeChatValue() const;
 	bool jumpToChatListEntry(Dialogs::RowDescriptor row);
+
+	void setCurrentDialogsEntryState(Dialogs::EntryState state);
+	[[nodiscard]] Dialogs::EntryState currentDialogsEntryState() const;
+	bool switchInlineQuery(
+		Dialogs::EntryState to,
+		not_null<UserData*> bot,
+		const QString &query);
+	bool switchInlineQuery(
+		not_null<Data::Thread*> thread,
+		not_null<UserData*> bot,
+		const QString &query);
 
 	[[nodiscard]] Dialogs::RowDescriptor resolveChatNext(
 		Dialogs::RowDescriptor from = {}) const;
@@ -636,6 +651,8 @@ private:
 	std::deque<Dialogs::RowDescriptor> _chatEntryHistory;
 	int _chatEntryHistoryPosition = -1;
 	bool _filtersActivated = false;
+
+	Dialogs::EntryState _currentDialogsEntryState;
 
 	base::Timer _invitePeekTimer;
 

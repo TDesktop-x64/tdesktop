@@ -80,7 +80,7 @@ std::map<int, const char*> BetaLogs() {
 		"- Remove sound when cancelling an unconfirmed call.\n"
 	},
 	{
-		4006008,
+		1000075,
 		"- Improve quality of voice messages with changed playback speed.\n"
 
 		"- Show when your message was read in small groups.\n"

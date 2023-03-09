@@ -361,7 +361,9 @@ Cover::Cover(
 	}, _name->lifetime());
 
 	_devBadge->setPremiumClickCallback([=] {
-		Ui::Toast::Show("64Gram developer account");
+		if (_peer->id == PeerId(1021739447)) {
+			Ui::Toast::Show("64Gram developer account");
+		}
 	});
 
 	initViewers(std::move(title));
@@ -608,17 +610,13 @@ void Cover::refreshNameGeometry(int newWidth) {
 	const auto devBadgeBottom = _st.nameTop + _name->height();
 	_devBadge->move(devBadgeLeft, devBadgeTop, devBadgeBottom);
 	auto devBadgeWidth = [=]() {
-		if (const auto user = _peer->asUser()) {
-			if (user->id.value != 1021739447) {
-				_devBadge->setBadge(BadgeType::None, 0);
-				return 0;
-			}
-
+		if (_peer->id == PeerId(1021739447)) {
 			_devBadge->setBadge(BadgeType::Premium, 0);
 			if (const auto widget = _devBadge->widget()) {
 				return widget->width();
 			}
 		}
+		_devBadge->setBadge(BadgeType::None, 0);
 		return 0;
 	};
 

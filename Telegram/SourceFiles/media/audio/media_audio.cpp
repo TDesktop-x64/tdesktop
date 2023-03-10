@@ -11,7 +11,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "media/audio/media_child_ffmpeg_loader.h"
 #include "media/audio/media_audio_loaders.h"
 #include "media/audio/media_audio_track.h"
-#include "media/audio/media_openal_functions.h"
 #include "media/streaming/media_streaming_utility.h"
 #include "webrtc/webrtc_media_devices.h"
 #include "data/data_document.h"
@@ -272,7 +271,12 @@ void StopDetachIfNotUsedSafe() {
 }
 
 bool SupportsSpeedControl() {
-	return true;
+	static const auto result = [] {
+		return avfilter_get_by_name("abuffer")
+			&& avfilter_get_by_name("abuffersink")
+			&& avfilter_get_by_name("atempo");
+	}();
+	return result;
 }
 
 } // namespace Audio
@@ -819,10 +823,6 @@ Streaming::TimePoint Mixer::getExternalSyncTimePoint(
 	if (track && track->state.id == audio && track->lastUpdateWhen > 0) {
 		result.trackTime = track->lastUpdatePosition;
 		result.worldTime = track->lastUpdateWhen;
-		LOG(("Sync: Track Time %1, World Time: %2, Speed: %3"
-			).arg(result.trackTime / 1000.
-			).arg(result.worldTime / 1000.
-			).arg(track->speed));
 	}
 	return result;
 }

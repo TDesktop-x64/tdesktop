@@ -208,7 +208,7 @@ parts:
       - shared-mime-info
       - xdg-user-dirs
     override-prime: |
-      snapcraftctl prime
+      craftctl default
       update-mime-database usr/share/mime
       glib-compile-schemas usr/share/glib-2.0/schemas
       for theme in usr/share/icons/*; do
@@ -238,6 +238,12 @@ parts:
       - libavutil56
       - libswresample3
       - libswscale5
+    override-build: |
+      craftctl default
+      mv "$CRAFT_PART_INSTALL/usr/lib/$CRAFT_ARCH_TRIPLET/blas/"* "$CRAFT_PART_INSTALL/usr/lib/$CRAFT_ARCH_TRIPLET"
+      rmdir "$CRAFT_PART_INSTALL/usr/lib/$CRAFT_ARCH_TRIPLET/blas"
+      mv "$CRAFT_PART_INSTALL/usr/lib/$CRAFT_ARCH_TRIPLET/lapack/"* "$CRAFT_PART_INSTALL/usr/lib/$CRAFT_ARCH_TRIPLET"
+      rmdir "$CRAFT_PART_INSTALL/usr/lib/$CRAFT_ARCH_TRIPLET/lapack"
     stage:
       - -./usr/lib/$CRAFT_ARCH_TRIPLET/libjpeg.so.8.2.2
     after:

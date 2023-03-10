@@ -70,7 +70,7 @@ std::map<int, const char*> BetaLogs() {
 		"- Improved windowed mode support for media viewer.\n"
 
 		"- Hardware accelerated video playback fix on macOS.\n"
-		
+
 		"- New application icon on macOS following the system guidelines.\n"
 	},
 	{
@@ -86,7 +86,7 @@ std::map<int, const char*> BetaLogs() {
 		"- Show when your message was read in small groups.\n"
 
 		"- Fix pasting images from Firefox on Windows.\n"
-		
+
 		"- Improve memory usage for custom emoji.\n"
 	}
 	};

@@ -365,12 +365,12 @@ struct State {
 		return tr::lng_mediaview_today(
 			tr::now,
 			lt_time,
-			QLocale().toString(parsed.time(), QLocale::ShortFormat));
+			QLocale().toString(parsed.time(), GetEnhancedBool("show_seconds") ? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t") : QLocale::system().timeFormat(QLocale::ShortFormat)));
 	} else if (readDate.addDays(1) == nowDate) {
 		return tr::lng_mediaview_yesterday(
 			tr::now,
 			lt_time,
-			QLocale().toString(parsed.time(), QLocale::ShortFormat));
+			QLocale().toString(parsed.time(), GetEnhancedBool("show_seconds") ? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t") : QLocale::system().timeFormat(QLocale::ShortFormat)));
 	}
 	return tr::lng_mediaview_date_time(
 		tr::now,
@@ -382,7 +382,7 @@ struct State {
 			lt_day,
 			QString::number(readDate.day())),
 		lt_time,
-		QLocale().toString(parsed.time(), QLocale::ShortFormat));
+		QLocale().toString(parsed.time(), GetEnhancedBool("show_seconds") ? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t") : QLocale::system().timeFormat(QLocale::ShortFormat)));
 }
 
 bool UpdateUserpics(

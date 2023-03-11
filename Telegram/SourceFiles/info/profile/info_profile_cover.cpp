@@ -366,6 +366,10 @@ Cover::Cover(
 		}
 	});
 
+	_devBadge->updated() | rpl::start_with_next([=] {
+		refreshNameGeometry(width());
+	}, _name->lifetime());
+
 	initViewers(std::move(title));
 	setupChildGeometry();
 

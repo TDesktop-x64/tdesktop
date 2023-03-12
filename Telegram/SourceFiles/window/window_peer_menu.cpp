@@ -815,15 +815,11 @@ void Filler::addExportChat() {
 }
 
 void Filler::addTranslate() {
-	if (_peer->translationFlag() != PeerData::TranslationFlag::Disabled
-		|| !_peer->session().premium()
-		|| !Core::App().settings().translateChatEnabled()) {
+	if (!_peer->session().premium()) {
 		return;
 	}
 	const auto history = _peer->owner().historyLoaded(_peer);
-	if (!history
-		|| !history->translateOfferedFrom()
-		|| history->translatedTo()) {
+	if (!history) {
 		return;
 	}
 	_addAction(tr::lng_context_translate(tr::now), [=] {

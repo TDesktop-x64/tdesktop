@@ -90,7 +90,7 @@ std::map<int, const char*> BetaLogs() {
 		"- Improve memory usage for custom emoji.\n"
 	},
 	{
-		4006010,
+		1000077,
 		"- Suggest sending an invite link if user forbids "
 		"inviting him to groups.\n"
 

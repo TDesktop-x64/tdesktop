@@ -705,10 +705,10 @@ win:
         -DBUILD_SHARED_LIBS=OFF ^
         -DAVIF_ENABLE_WERROR=OFF ^
         -DAVIF_CODEC_DAV1D=ON
-    cmake --build . --config Debug
+    cmake --build . --config Debug $MAKE_THREADS_CNT
     cmake --install . --config Debug
 release:
-    cmake --build . --config Release
+    cmake --build . --config Release $MAKE_THREADS_CNT
     cmake --install . --config Release
 """)
 
@@ -729,10 +729,10 @@ win:
         -DBUILD_SHARED_LIBS=OFF ^
         -DENABLE_DECODER=OFF ^
         -DENABLE_ENCODER=OFF
-    cmake --build . --config Debug
+    cmake --build . --config Debug $MAKE_THREADS_CNT
     cmake --install . --config Debug
 release:
-    cmake --build . --config Release
+    cmake --build . --config Release $MAKE_THREADS_CNT
     cmake --install . --config Release
 """)
 
@@ -757,10 +757,10 @@ win:
         -DWITH_RAV1E=OFF ^
         -DWITH_RAV1E_PLUGIN=OFF ^
         -DWITH_EXAMPLES=OFF
-    cmake --build . --config Debug
+    cmake --build . --config Debug $MAKE_THREADS_CNT
     cmake --install . --config Debug
 release:
-    cmake --build . --config Release
+    cmake --build . --config Release $MAKE_THREADS_CNT
     cmake --install . --config Release
 """)
 
@@ -797,10 +797,10 @@ win:
         -DJPEGXL_ENABLE_COVERAGE=OFF ^
         -DJPEGXL_ENABLE_PROFILER=OFF ^
         -DJPEGXL_WARNINGS_AS_ERRORS=OFF
-    cmake --build . --config Debug
+    cmake --build . --config Debug $MAKE_THREADS_CNT
     cmake --install . --config Debug
 release:
-    cmake --build . --config Release
+    cmake --build . --config Release $MAKE_THREADS_CNT
     cmake --install . --config Release
 """)
 

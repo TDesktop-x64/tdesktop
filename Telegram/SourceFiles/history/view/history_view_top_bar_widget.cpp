@@ -1690,7 +1690,7 @@ void TopBarWidget::updateOnlineDisplay() {
 							auto membersCount = tr::lng_chat_status_members(tr::now, lt_count_decimal, channel->membersCount());
 							auto onlineCount = tr::lng_chat_status_online(tr::now, lt_count, count);
 							QString text = tr::lng_chat_status_members_online(tr::now, lt_members_count, membersCount, lt_online_count, onlineCount);
-							if (_titlePeerText.toString() != text) {
+							if (_titlePeerText.isEmpty()) {
 								_titlePeerText.setText(st::dialogsTextStyle, text);
 								_titlePeerTextOnline = titlePeerTextOnline;
 								updateMembersShowArea();

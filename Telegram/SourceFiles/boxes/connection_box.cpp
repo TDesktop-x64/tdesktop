@@ -1290,7 +1290,7 @@ object_ptr<Ui::BoxContent> ProxiesBoxController::CreateOwningBox(
 
 object_ptr<Ui::BoxContent> ProxiesBoxController::create() {
 	auto result = Box<ProxiesBox>(this, _settings);
-	_toastParent = Ui::BoxShow(result.data()).toastParent();
+	_show = std::make_shared<Ui::BoxShow>(result.data());
 	for (const auto &item : _list) {
 		updateView(item);
 	}
@@ -1573,9 +1573,9 @@ void ProxiesBoxController::share(const ProxyData &proxy) {
 		+ ((proxy.type == Type::Mtproto && !proxy.password.isEmpty())
 			? "&secret=" + proxy.password : "");
 	QGuiApplication::clipboard()->setText(link);
-	if (_toastParent) {
-		Ui::Toast::Show(_toastParent, tr::lng_username_copied(tr::now));
-	}
+	Ui::Toast::Show(
+		_show->toastParent(),
+		tr::lng_username_copied(tr::now));
 }
 
 ProxiesBoxController::~ProxiesBoxController() {

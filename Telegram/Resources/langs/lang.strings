@@ -2444,6 +2444,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_mediaview_set_userpic" = "Set as Main";
 "lng_mediaview_report_profile_photo" = "Report";
 
+"lng_mediaview_title" = "Media viewer";
 "lng_mediaview_saved_to" = "Image was saved to your {downloads} folder";
 "lng_mediaview_saved_images_to" = "Images were saved to your {downloads} folder";
 "lng_mediaview_downloads" = "Downloads";
@@ -3564,8 +3565,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 "lng_voice_speed_slow" = "Slow";
 "lng_voice_speed_normal" = "Normal";
+"lng_voice_speed_medium" = "Medium";
 "lng_voice_speed_fast" = "Fast";
 "lng_voice_speed_very_fast" = "Very fast";
+"lng_voice_speed_super_fast" = "Super fast";
 
 "lng_view_button_user" = "View user";
 "lng_view_button_bot" = "View bot";

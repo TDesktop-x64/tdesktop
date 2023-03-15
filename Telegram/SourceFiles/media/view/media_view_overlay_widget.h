@@ -105,6 +105,7 @@ public:
 	void activateControls();
 	void close();
 	void minimize();
+	void toggleFullScreen();
 	void toggleFullScreen(bool fullscreen);
 
 	void notifyFileDialogShown(bool shown);
@@ -204,7 +205,7 @@ private:
 	void playbackControlsVolumeToggled() override;
 	void playbackControlsVolumeChangeFinished() override;
 	void playbackControlsSpeedChanged(float64 speed) override;
-	float64 playbackControlsCurrentSpeed() override;
+	float64 playbackControlsCurrentSpeed(bool lastNonDefault) override;
 	void playbackControlsToFullScreen() override;
 	void playbackControlsFromFullScreen() override;
 	void playbackControlsToPictureInPicture() override;

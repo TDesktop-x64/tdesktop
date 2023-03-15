@@ -95,6 +95,7 @@ public:
 
 	void minimize();
 	void pinToTop(bool isPinned);
+	void toggleFullScreen();
 	void close();
 	void showAndActivate();
 	void closeBeforeDestroy();
@@ -134,7 +135,6 @@ private:
 
 	bool handleClose();
 	void startScheduledNow();
-	void toggleFullScreen();
 	void trackControls(bool track, bool force = false);
 	void raiseControls();
 	void enlargeVideo();

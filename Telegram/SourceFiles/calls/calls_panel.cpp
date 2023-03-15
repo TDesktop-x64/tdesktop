@@ -138,6 +138,10 @@ void Panel::pinToTop(bool isPinned) {
 	}
 }
 
+void Panel::toggleFullScreen() {
+	toggleFullScreen(!window()->isFullScreen());
+}
+
 void Panel::replaceCall(not_null<Call*> call) {
 	reinitWithCall(call);
 	updateControlsGeometry();

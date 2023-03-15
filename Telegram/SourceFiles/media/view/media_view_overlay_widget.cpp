@@ -500,7 +500,7 @@ OverlayWidget::OverlayWidget()
 		update();
 	}, lifetime());
 
-	_window->setTitle(u"Media viewer"_q);
+	_window->setTitle(tr::lng_mediaview_title(tr::now));
 	_window->setTitleStyle(st::mediaviewTitle);
 
 	if constexpr (Platform::IsMac()) {
@@ -1829,6 +1829,10 @@ void OverlayWidget::minimize() {
 		return;
 	}
 	_helper->minimize(_window);
+}
+
+void OverlayWidget::toggleFullScreen() {
+	toggleFullScreen(!_fullscreen);
 }
 
 void OverlayWidget::toggleFullScreen(bool fullscreen) {
@@ -3756,10 +3760,8 @@ void OverlayWidget::playbackControlsSpeedChanged(float64 speed) {
 	}
 }
 
-float64 OverlayWidget::playbackControlsCurrentSpeed() {
-	const auto result = Core::App().settings().videoPlaybackSpeed();
-	DEBUG_LOG(("Media playback speed: now %1.").arg(result));
-	return result;
+float64 OverlayWidget::playbackControlsCurrentSpeed(bool lastNonDefault) {
+	return Core::App().settings().videoPlaybackSpeed(lastNonDefault);
 }
 
 void OverlayWidget::switchToPip() {
@@ -5185,10 +5187,12 @@ bool OverlayWidget::filterApplicationEvent(
 		const auto ctrl = event->modifiers().testFlag(Qt::ControlModifier);
 		if (key == Qt::Key_F && ctrl && _streamed) {
 			playbackToggleFullScreen();
+			return true;
 		} else if (key == Qt::Key_0 && ctrl) {
 			zoomReset();
+			return true;
 		}
-		return true;
+		return false;
 	} else if (type == QEvent::MouseMove
 		|| type == QEvent::MouseButtonPress
 		|| type == QEvent::MouseButtonRelease) {

@@ -101,7 +101,7 @@ std::map<int, const char*> BetaLogs() {
 		"- Fix a crash in audio speed change.\n"
 	},
 	{
-		4006011,
+		1000078,
 		"- Allow larger interface scale values on high-dpi screens.\n"
 
 		"- Implement new voice and video speed change interface (up to 2.5x).\n"

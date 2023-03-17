@@ -1686,18 +1686,8 @@ void TopBarWidget::updateOnlineDisplay() {
 							channel->input
 					)).done([=](const MTPChatOnlines &result) {
 						const auto count = result.c_chatOnlines().vonlines().v;
-						if (count > 0) {
-							auto membersCount = tr::lng_chat_status_members(tr::now, lt_count_decimal, channel->membersCount());
-							auto onlineCount = tr::lng_chat_status_online(tr::now, lt_count, count);
-							QString text = tr::lng_chat_status_members_online(tr::now, lt_members_count, membersCount, lt_online_count, onlineCount);
-							if (_titlePeerText.isEmpty()) {
-								_titlePeerText.setText(st::dialogsTextStyle, text);
-								_titlePeerTextOnline = titlePeerTextOnline;
-								updateMembersShowArea();
-								update();
-							}
-						}
 						lastChatRequest[QString::number(channel->id.value)].memberCount = count;
+						updateOnlineDisplayIn(crl::time(1)); // To slow down chat status update
 					}).fail([=](const MTP::Error &error) {
 						// if failed, then no any changes :)
 					}).send();

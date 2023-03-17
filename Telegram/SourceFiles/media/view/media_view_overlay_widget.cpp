@@ -101,6 +101,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QWindow>
 #include <QtGui/QScreen>
 
+#include <kurlmimedata.h>
+
 namespace Media {
 namespace View {
 namespace {
@@ -831,6 +833,10 @@ void OverlayWidget::updateControlsGeometry() {
 	_topShadowRect = QRect(
 		QPoint(topShadowOnTheRight() ? (width() - top.width()) : 0, 0),
 		top);
+
+	if (_dropdown && !_dropdown->isHidden()) {
+		_dropdown->moveToRight(0, height() - _dropdown->height());
+	}
 
 	updateControls();
 	resizeContentByScreenSize();
@@ -2073,14 +2079,16 @@ void OverlayWidget::handleDocumentClick() {
 	if (_document->loading()) {
 		saveCancel();
 	} else {
+		_reShow = true;
 		Data::ResolveDocument(
 			findWindow(),
 			_document,
 			_message,
 			_topicRootId);
-		if (_document->loading() && !_radial.animating()) {
+		if (_document && _document->loading() && !_radial.animating()) {
 			_radial.start(_documentMedia->progress());
 		}
+		_reShow = false;
 	}
 }
 
@@ -2853,7 +2861,7 @@ void OverlayWidget::show(OpenRequest request) {
 	const auto contextItem = request.item();
 	const auto contextPeer = request.peer();
 	const auto contextTopicRootId = request.topicRootId();
-	if (!request.continueStreaming() && !request.startTime()) {
+	if (!request.continueStreaming() && !request.startTime() && !_reShow) {
 		if (_message && (_message == contextItem)) {
 			return close();
 		} else if (_user && (_user == contextPeer)) {

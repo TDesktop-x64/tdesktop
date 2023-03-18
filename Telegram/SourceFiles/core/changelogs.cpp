@@ -117,7 +117,7 @@ std::map<int, const char*> BetaLogs() {
 		"- Fix possible crash on quit.\n"
 	},
 	{
-		4006011,
+		1000079,
 		"- Fix several possible crashes.\n"
 
 		"- Deprecate macOS 10.12, Ubuntu 18.04 and CentOS 7 in July.\n"

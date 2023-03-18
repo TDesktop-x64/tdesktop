@@ -1206,6 +1206,10 @@ base::unique_qptr<Ui::PopupMenu> FillContextMenu(
 		list,
 		st::popupMenuWithIcons);
 
+	if (hasWhoReactedItem) {
+		AddWhoReactedAction(result, list, item, list->controller());
+	}
+
 	if (request.overSelection && !list->hasCopyRestrictionForSelected()) {
 		const auto text = request.selectedItems.empty()
 			? tr::lng_context_copy_selected(tr::now)
@@ -1299,9 +1303,6 @@ base::unique_qptr<Ui::PopupMenu> FillContextMenu(
 			item,
 			HistoryView::EmojiPacksSource::Message,
 			list->controller());
-	}
-	if (hasWhoReactedItem) {
-		AddWhoReactedAction(result, list, item, list->controller());
 	}
 
 	return result;

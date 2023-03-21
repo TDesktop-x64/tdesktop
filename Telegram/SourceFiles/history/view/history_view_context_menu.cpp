@@ -1292,9 +1292,7 @@ base::unique_qptr<Ui::PopupMenu> FillContextMenu(
 		}
 	}
 
-	if (!view) {
-		AddCopyLinkAction(result, link);
-	}
+	AddCopyLinkAction(result, link);
 	AddMessageActions(result, request, list);
 
 	if (item) {

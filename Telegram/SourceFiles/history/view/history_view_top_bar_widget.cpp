@@ -1680,14 +1680,14 @@ void TopBarWidget::updateOnlineDisplay() {
 			if (GetEnhancedBool("hide_counter")) {
 				text = tr::lng_chat_status_members(tr::now, lt_count_decimal, channel->membersCount());
 			} else {
-				if (lastChatRequest[QString::number(channel->id.value)].requestTime + 10 < now) { // Update every 10 seconds
+				if (lastChatRequest[QString::number(channel->id.value)].requestTime + 60 < now) { // Update every 60 seconds
 					delayUpdate = true;
 					session().api().request(MTPmessages_GetOnlines(
 							channel->input
 					)).done([=](const MTPChatOnlines &result) {
 						const auto count = result.c_chatOnlines().vonlines().v;
 						lastChatRequest[QString::number(channel->id.value)].memberCount = count;
-						updateOnlineDisplayIn(crl::time(1)); // To slow down chat status update
+						updateOnlineDisplayIn(crl::time(100)); // To slow down chat status update
 					}).fail([=](const MTP::Error &error) {
 						// if failed, then no any changes :)
 					}).send();

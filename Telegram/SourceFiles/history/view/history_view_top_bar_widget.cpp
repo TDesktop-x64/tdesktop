@@ -1629,6 +1629,7 @@ void TopBarWidget::updateOnlineDisplay() {
 	if (!peer || _activeChat.key.topic()) {
 		return;
 	}
+	const auto isTopic = peer->forum();
 
 	QString text;
 	const auto now = base::unixtime::now();
@@ -1680,7 +1681,7 @@ void TopBarWidget::updateOnlineDisplay() {
 			if (GetEnhancedBool("hide_counter")) {
 				text = tr::lng_chat_status_members(tr::now, lt_count_decimal, channel->membersCount());
 			} else {
-				if (lastChatRequest[QString::number(channel->id.value)].requestTime + 60 < now) { // Update every 60 seconds
+				if (!isTopic && lastChatRequest[QString::number(channel->id.value)].requestTime + 60 < now) { // Update every 60 seconds
 					delayUpdate = true;
 					session().api().request(MTPmessages_GetOnlines(
 							channel->input
@@ -1695,8 +1696,8 @@ void TopBarWidget::updateOnlineDisplay() {
 				}
 
 				if (channel->membersCount() > 0 && lastChatRequest[QString::number(channel->id.value)].memberCount > 0) {
-					auto membersCount = tr::lng_chat_status_members(tr::now, lt_count_decimal, channel->membersCount());
-					auto onlineCount = tr::lng_chat_status_online(tr::now, lt_count, lastChatRequest[QString::number(channel->id.value)].memberCount);
+					const auto membersCount = tr::lng_chat_status_members(tr::now, lt_count_decimal, channel->membersCount());
+					const auto onlineCount = tr::lng_chat_status_online(tr::now, lt_count, lastChatRequest[QString::number(channel->id.value)].memberCount);
 					text = tr::lng_chat_status_members_online(tr::now, lt_members_count, membersCount, lt_online_count, onlineCount);
 				} else if (channel->membersCount() > 0) {
 					text = tr::lng_chat_status_members(tr::now, lt_count_decimal, channel->membersCount());

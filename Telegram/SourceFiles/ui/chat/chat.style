@@ -482,6 +482,15 @@ historyMessagesTTL: IconButtonWithText {
 
 	font: font(10px semibold);
 }
+historyReplaceMedia: IconButton(historyAttach) {
+	icon: icon {{ "chat/input_replace", windowBgActive }};
+	iconOver: icon {{ "chat/input_replace", windowBgActive }};
+	ripple: RippleAnimation(defaultRippleAnimation) {
+		color: lightButtonBgOver;
+	}
+}
+historyEditMediaBg: videoPlayIconBg;
+historyEditMedia: icon{{ "chat/input_draw", videoPlayIconFg }};
 historyMessagesTTLPickerHeight: 200px;
 historyMessagesTTLPickerItemHeight: 40px;
 historyMessagesTTLLabel: FlatLabel(defaultFlatLabel) {
@@ -1281,3 +1290,39 @@ historySendDisabled: FlatLabel(defaultFlatLabel) {
 historySendDisabledIcon: icon {{ "emoji/premium_lock", placeholderFgActive }};
 historySendDisabledIconSkip: 20px;
 historySendDisabledPosition: point(0px, 0px);
+
+moreChatsBarHeight: 48px;
+moreChatsBarTextPosition: point(12px, 4px);
+moreChatsBarStatusPosition: point(12px, 24px);
+moreChatsBarClose: IconButton(defaultIconButton) {
+	width: 48px;
+	height: 48px;
+
+	icon: boxTitleCloseIcon;
+	iconOver: boxTitleCloseIconOver;
+	iconPosition: point(12px, -1px);
+
+	rippleAreaPosition: point(0px, 4px);
+	rippleAreaSize: 40px;
+	ripple: RippleAnimation(defaultRippleAnimation) {
+		color: windowBgOver;
+	}
+}
+
+backgroundSwitchToDark: IconButton(defaultIconButton) {
+	width: 48px;
+	height: 48px;
+
+	icon: icon {{ "menu/header_mode_night", boxTitleCloseFg }};
+	iconOver: icon {{ "menu/header_mode_night", boxTitleCloseFgOver }};
+
+	rippleAreaPosition: point(4px, 4px);
+	rippleAreaSize: 40px;
+	ripple: RippleAnimation(defaultRippleAnimation) {
+		color: windowBgOver;
+	}
+}
+backgroundSwitchToLight: IconButton(backgroundSwitchToDark) {
+	icon: icon {{ "menu/header_mode_day", boxTitleCloseFg }};
+	iconOver: icon {{ "menu/header_mode_day", boxTitleCloseFgOver }};
+}

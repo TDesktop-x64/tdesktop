@@ -22,7 +22,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/core_settings.h"
 #include "core/update_checker.h"
 #include "window/window_controller.h"
-#include "webview/platform/linux/webview_linux_webkit2gtk.h"
+#include "webview/platform/linux/webview_linux_webkitgtk.h"
 
 #ifndef DESKTOP_APP_DISABLE_DBUS_INTEGRATION
 #include "base/platform/linux/base_linux_glibmm_helper.h"
@@ -54,11 +54,19 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <unistd.h>
 #include <dirent.h>
 #include <pwd.h>
+#include <dlfcn.h>
 
 #include <iostream>
 
 using namespace Platform;
 using Platform::internal::WaylandIntegration;
+
+#ifndef DESKTOP_APP_DISABLE_X11_INTEGRATION
+typedef struct _XDisplay Display;
+struct XErrorEvent;
+typedef int (*XErrorHandler)(Display*, XErrorEvent*);
+typedef XErrorHandler (*LPXSETERRORHANDLER)(XErrorHandler);
+#endif // !DESKTOP_APP_DISABLE_X11_INTEGRATION
 
 #ifndef DESKTOP_APP_DISABLE_DBUS_INTEGRATION
 typedef GApplication TDesktopApplication;
@@ -422,7 +430,11 @@ bool GenerateDesktopFile(
 				target->set_string(
 					group,
 					"TryExec",
-					KShell::joinArgs({ cExeDir() + cExeName() }).replace(
+					KShell::joinArgs({
+						!Core::UpdaterDisabled()
+							? (cExeDir() + cExeName())
+							: cExeName()
+					}).replace(
 						'\\',
 						qstr("\\\\")).toStdString());
 			}
@@ -430,7 +442,9 @@ bool GenerateDesktopFile(
 			if (target->has_key(group, "Exec")) {
 				if (group == "Desktop Entry" && !args.isEmpty()) {
 					QStringList exec;
-					exec.append(cExeDir() + cExeName());
+					exec.append(!Core::UpdaterDisabled()
+						? (cExeDir() + cExeName())
+						: cExeName());
 					if (Core::Sandbox::Instance().customWorkingDir()) {
 						exec.append(u"-workdir"_q);
 						exec.append(cWorkingDir());
@@ -451,7 +465,9 @@ bool GenerateDesktopFile(
 							qstr("\\")));
 
 					if (!exec.isEmpty()) {
-						exec[0] = cExeDir() + cExeName();
+						exec[0] = !Core::UpdaterDisabled()
+							? (cExeDir() + cExeName())
+							: cExeName();
 						if (Core::Sandbox::Instance().customWorkingDir()) {
 							exec.insert(1, u"-workdir"_q);
 							exec.insert(2, cWorkingDir());
@@ -557,7 +573,14 @@ void SetApplicationIcon(const QIcon &icon) {
 }
 
 QString SingleInstanceLocalServerName(const QString &hash) {
+#if defined Q_OS_LINUX && QT_VERSION >= QT_VERSION_CHECK(6, 2, 0)
+	if (KSandbox::isSnap()) {
+		return u"snap.telegram-desktop."_q + hash;
+	}
+	return hash + '-' + cGUIDStr();
+#else // Q_OS_LINUX && Qt >= 6.2.0
 	return QDir::tempPath() + '/' + hash + '-' + cGUIDStr();
+#endif // !Q_OS_LINUX || Qt < 6.2.0
 }
 
 std::optional<bool> IsDarkMode() {
@@ -772,7 +795,7 @@ void start() {
 #endif // DESKTOP_APP_USE_PACKAGED_FONTS
 #endif // !DESKTOP_APP_DISABLE_DBUS_INTEGRATION
 
-	Webview::WebKit2Gtk::SetSocketPath(u"%1/%2-%3-webview-%4"_q.arg(
+	Webview::WebKitGTK::SetSocketPath(u"%1/%2-%3-webview-%4"_q.arg(
 		QDir::tempPath(),
 		h,
 		cGUIDStr(),
@@ -835,18 +858,6 @@ bool OpenSystemSettings(SystemSettingsType type) {
 }
 
 void NewVersionLaunched(int oldVersion) {
-	if (oldVersion > 0
-		&& oldVersion <= 4000002
-		&& qEnvironmentVariableIsSet("WAYLAND_DISPLAY")
-		&& DesktopEnvironment::IsGnome()
-		&& !QFile::exists(cWorkingDir() + u"tdata/nowayland"_q)) {
-		QFile f(cWorkingDir() + u"tdata/nowayland"_q);
-		if (f.open(QIODevice::WriteOnly)) {
-			f.write("1");
-			f.close();
-			Core::Restart(); // restart with X backend
-		}
-	}
 	if (oldVersion <= 4001001 && cAutoStart()) {
 		AutostartToggle(true);
 	}
@@ -861,6 +872,20 @@ namespace ThirdParty {
 void start() {
 	LOG(("Icon theme: %1").arg(QIcon::themeName()));
 	LOG(("Fallback icon theme: %1").arg(QIcon::fallbackThemeName()));
+
+#ifndef DESKTOP_APP_DISABLE_X11_INTEGRATION
+	// tdesktop doesn't use xlib by itself,
+	// but some libraries it depends on may do
+	const auto XSetErrorHandler = reinterpret_cast<LPXSETERRORHANDLER>(
+		dlsym(RTLD_DEFAULT, "XSetErrorHandler"));
+
+	// Reset errors if any
+	(void) dlerror();
+
+	if (XSetErrorHandler) {
+		XSetErrorHandler([](Display *dpy, XErrorEvent *err) { return 0; });
+	}
+#endif // !DESKTOP_APP_DISABLE_X11_INTEGRATION
 
 #ifndef DESKTOP_APP_DISABLE_DBUS_INTEGRATION
 	InstallLauncher();

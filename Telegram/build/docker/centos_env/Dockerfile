@@ -1,7 +1,7 @@
 {%- set GIT = "https://github.com" -%}
 {%- set GIT_FREEDESKTOP = GIT ~ "/gitlab-freedesktop-mirrors" -%}
 {%- set QT = "6.5.0" -%}
-{%- set QT_TAG = "v" ~ QT ~ "-beta3" -%}
+{%- set QT_TAG = "v" ~ QT -%}
 {%- set QT_PREFIX = "/usr/local/desktop-app/Qt-" ~ QT -%}
 {%- set OPENSSL_VER = "1_1_1" -%}
 {%- set OPENSSL_PREFIX = "/usr/local/desktop-app/openssl-1.1.1" -%}
@@ -57,7 +57,7 @@ ENV CXXFLAGS $CFLAGS
 FROM builder AS patches
 RUN git clone {{ GIT }}/desktop-app/patches.git \
 	&& cd patches \
-	&& git checkout 4b35c02c5e \
+	&& git checkout bf05b2a1cc \
 	&& rm -rf .git
 
 FROM builder AS nasm
@@ -629,7 +629,7 @@ RUN git clone -b 0.3.25 --depth=1 {{ GIT }}/PipeWire/pipewire.git \
 FROM builder AS openal
 COPY --link --from=pipewire {{ LibrariesPath }}/pipewire-cache /
 
-RUN git clone -b 1.22.2 --depth=1 {{ GIT }}/kcat/openal-soft.git \
+RUN git clone -b 1.23.0 --depth=1 {{ GIT }}/kcat/openal-soft.git \
 	&& cd openal-soft \
 	&& cmake -GNinja -B build . \
 		-DCMAKE_BUILD_TYPE=None \
@@ -715,7 +715,7 @@ COPY --link --from=xkbcommon {{ LibrariesPath }}/xkbcommon-cache /
 
 ENV OPENSSL_ROOT_DIR {{ OPENSSL_PREFIX }}
 
-RUN git clone -b {{ QT_TAG }} --depth=1 git://code.qt.io/qt/qt5.git qt_{{ QT }} \
+RUN git clone -b {{ QT_TAG }} --depth=1 https://code.qt.io/qt/qt5.git qt_{{ QT }} \
 	&& cd qt_{{ QT }} \
 	&& git submodule update --init --recursive --depth=1 qtbase qtdeclarative qtwayland qtimageformats qtsvg qt5compat qtshadertools \
 	&& cd qtbase \
@@ -724,8 +724,6 @@ RUN git clone -b {{ QT_TAG }} --depth=1 git://code.qt.io/qt/qt5.git qt_{{ QT }} 
 	&& sed -i '/add_subdirectory(quickcontrols)/d' src/CMakeLists.txt \
 	&& sed -i '/add_subdirectory(quickdialogs)/d' src/CMakeLists.txt \
 	&& sed -i '/add_subdirectory(quicknativestyle)/d' src/CMakeLists.txt \
-	&& cd ../qtwayland \
-	&& sed -i '/| MFD_ALLOW_SEALING/{n;N;d}' src/client/qwaylandshmbackingstore.cpp \
 	&& cd .. \
 	&& ./configure -prefix "{{ QT_PREFIX }}" \
 		CMAKE_BUILD_TYPE=None \
@@ -736,6 +734,7 @@ RUN git clone -b {{ QT_TAG }} --depth=1 git://code.qt.io/qt/qt5.git qt_{{ QT }} 
 		-qt-harfbuzz \
 		-qt-pcre \
 		-no-icu \
+		-no-feature-xcb-xlib \
 		-no-feature-xcb-sm \
 		-no-feature-egl-extension-platform-wayland \
 		-static \

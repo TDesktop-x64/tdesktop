@@ -71,6 +71,7 @@ enum class CloudThemeType;
 class Thread;
 class Forum;
 class ForumTopic;
+class WallPaper;
 } // namespace Data
 
 namespace HistoryView::Reactions {
@@ -108,6 +109,7 @@ enum class ResolveType {
 struct PeerThemeOverride {
 	PeerData *peer = nullptr;
 	std::shared_ptr<Ui::ChatTheme> theme;
+	EmojiPtr emoji = nullptr;
 };
 bool operator==(const PeerThemeOverride &a, const PeerThemeOverride &b);
 bool operator!=(const PeerThemeOverride &a, const PeerThemeOverride &b);
@@ -497,7 +499,10 @@ public:
 		not_null<PeerData*> peer,
 		MsgId msgId = ShowAtUnreadMsgId);
 
-	void toggleChooseChatTheme(not_null<PeerData*> peer);
+	void toggleChooseChatTheme(
+		not_null<PeerData*> peer,
+		std::optional<bool> show = std::nullopt);
+	void finishChatThemeEdit(not_null<PeerData*> peer);
 
 	[[nodiscard]] bool dialogsListFocused() const {
 		return _dialogsListFocused.current();
@@ -540,8 +545,13 @@ public:
 	}
 	[[nodiscard]] auto cachedChatThemeValue(
 		const Data::CloudTheme &data,
+		const Data::WallPaper &paper,
 		Data::CloudThemeType type)
 	-> rpl::producer<std::shared_ptr<Ui::ChatTheme>>;
+	[[nodiscard]] bool chatThemeAlreadyCached(
+		const Data::CloudTheme &data,
+		const Data::WallPaper &paper,
+		Data::CloudThemeType type);
 	void setChatStyleTheme(const std::shared_ptr<Ui::ChatTheme> &theme);
 	void clearCachedChatThemes();
 	void pushLastUsedChatTheme(const std::shared_ptr<Ui::ChatTheme> &theme);
@@ -549,7 +559,8 @@ public:
 
 	void overridePeerTheme(
 		not_null<PeerData*> peer,
-		std::shared_ptr<Ui::ChatTheme> theme);
+		std::shared_ptr<Ui::ChatTheme> theme,
+		EmojiPtr emoji);
 	void clearPeerThemeOverride(not_null<PeerData*> peer);
 	[[nodiscard]] auto peerThemeOverrideValue() const
 		-> rpl::producer<PeerThemeOverride> {
@@ -588,6 +599,7 @@ public:
 	}
 
 private:
+	struct CachedThemeKey;
 	struct CachedTheme;
 
 	void init();
@@ -618,7 +630,9 @@ private:
 
 	void pushDefaultChatBackground();
 	void cacheChatTheme(
+		CachedThemeKey key,
 		const Data::CloudTheme &data,
+		const Data::WallPaper &paper,
 		Data::CloudThemeType type);
 	void cacheChatThemeDone(std::shared_ptr<Ui::ChatTheme> result);
 	void updateCustomThemeBackground(CachedTheme &theme);
@@ -670,7 +684,7 @@ private:
 	rpl::event_stream<> _filtersMenuChanged;
 
 	std::shared_ptr<Ui::ChatTheme> _defaultChatTheme;
-	base::flat_map<Ui::ChatThemeKey, CachedTheme> _customChatThemes;
+	base::flat_map<CachedThemeKey, CachedTheme> _customChatThemes;
 	rpl::event_stream<std::shared_ptr<Ui::ChatTheme>> _cachedThemesStream;
 	const std::unique_ptr<Ui::ChatStyle> _chatStyle;
 	std::weak_ptr<Ui::ChatTheme> _chatStyleTheme;

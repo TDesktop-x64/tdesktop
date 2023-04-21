@@ -222,6 +222,8 @@ PRIVATE
     ui/chat/message_bar.h
     ui/chat/message_bubble.cpp
     ui/chat/message_bubble.h
+    ui/chat/more_chats_bar.cpp
+    ui/chat/more_chats_bar.h
     ui/chat/pinned_bar.cpp
     ui/chat/pinned_bar.h
     ui/chat/requests_bar.cpp
@@ -236,6 +238,8 @@ PRIVATE
     ui/controls/download_bar.h
     ui/controls/emoji_button.cpp
     ui/controls/emoji_button.h
+    ui/controls/filter_link_header.cpp
+    ui/controls/filter_link_header.h
     ui/controls/jump_down_button.cpp
     ui/controls/jump_down_button.h
     ui/controls/invite_link_buttons.cpp

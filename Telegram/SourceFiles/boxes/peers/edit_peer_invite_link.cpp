@@ -274,6 +274,7 @@ QImage QrForShare(const QString &text) {
 void QrBox(
 		not_null<Ui::GenericBox*> box,
 		const QString &link,
+		rpl::producer<QString> about,
 		Fn<void(QImage, std::shared_ptr<Ui::BoxShow>)> share) {
 	box->setTitle(tr::lng_group_invite_qr_title());
 
@@ -307,7 +308,7 @@ void QrBox(
 	box->addRow(
 		object_ptr<Ui::FlatLabel>(
 			box,
-			tr::lng_group_invite_qr_about(),
+			std::move(about),
 			st::boxLabel),
 		st::inviteLinkQrValuePadding);
 
@@ -354,7 +355,7 @@ void Controller::addHeaderBlock(not_null<Ui::VerticalLayout*> container) {
 	});
 	const auto getLinkQr = crl::guard(weak, [=] {
 		delegate()->peerListShowBox(
-			InviteLinkQrBox(link),
+			InviteLinkQrBox(link, tr::lng_group_invite_qr_about()),
 			Ui::LayerOption::KeepOther);
 	});
 	const auto revokeLink = crl::guard(weak, [=] {
@@ -731,9 +732,14 @@ void Controller::loadMoreRows() {
 void Controller::appendSlice(const Api::JoinedByLinkSlice &slice) {
 	for (const auto &user : slice.users) {
 		_lastUser = user;
-		delegate()->peerListAppendRow((_role == Role::Requested)
+		auto row = (_role == Role::Requested)
 			? std::make_unique<RequestedRow>(user.user, user.date)
-			: std::make_unique<PeerListRow>(user.user));
+			: std::make_unique<PeerListRow>(user.user);
+		if (_role != Role::Requested && user.viaFilterLink) {
+			row->setCustomStatus(
+				tr::lng_group_invite_joined_via_filter(tr::now));
+		}
+		delegate()->peerListAppendRow(std::move(row));
 	}
 	delegate()->peerListRefreshRows();
 	if (delegate()->peerListFullRowsCount() > 0) {
@@ -968,7 +974,9 @@ void AddPermanentLinkBlock(
 	const auto getLinkQr = crl::guard(weak, [=] {
 		if (const auto current = value->current(); !current.link.isEmpty()) {
 			show->showBox(
-				InviteLinkQrBox(current.link),
+				InviteLinkQrBox(
+					current.link,
+					tr::lng_group_invite_qr_about()),
 				Ui::LayerOption::KeepOther);
 		}
 	});
@@ -1128,6 +1136,12 @@ void CopyInviteLink(not_null<QWidget*> toastParent, const QString &link) {
 object_ptr<Ui::BoxContent> ShareInviteLinkBox(
 		not_null<PeerData*> peer,
 		const QString &link) {
+	return ShareInviteLinkBox(&peer->session(), link);
+}
+
+object_ptr<Ui::BoxContent> ShareInviteLinkBox(
+		not_null<Main::Session*> session,
+		const QString &link) {
 	const auto sending = std::make_shared<bool>();
 	const auto box = std::make_shared<QPointer<ShareBox>>();
 
@@ -1187,7 +1201,7 @@ object_ptr<Ui::BoxContent> ShareInviteLinkBox(
 		} else {
 			comment.text = link;
 		}
-		auto &api = peer->session().api();
+		auto &api = session->api();
 		for (const auto thread : result) {
 			auto message = Api::MessageToSend(
 				Api::SendAction(thread, options));
@@ -1204,7 +1218,7 @@ object_ptr<Ui::BoxContent> ShareInviteLinkBox(
 		return Data::CanSendTexts(thread);
 	};
 	auto object = Box<ShareBox>(ShareBox::Descriptor{
-		.session = &peer->session(),
+		.session = session,
 		.copyCallback = std::move(copyCallback),
 		.submitCallback = std::move(submitCallback),
 		.filterCallback = std::move(filterCallback),
@@ -1213,8 +1227,10 @@ object_ptr<Ui::BoxContent> ShareInviteLinkBox(
 	return object;
 }
 
-object_ptr<Ui::BoxContent> InviteLinkQrBox(const QString &link) {
-	return Box(QrBox, link, [=](
+object_ptr<Ui::BoxContent> InviteLinkQrBox(
+		const QString &link,
+		rpl::producer<QString> about) {
+	return Box(QrBox, link, std::move(about), [=](
 			const QImage &image,
 			std::shared_ptr<Ui::BoxShow> show) {
 		auto mime = std::make_unique<QMimeData>();

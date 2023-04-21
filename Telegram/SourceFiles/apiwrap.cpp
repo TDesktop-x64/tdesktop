@@ -380,6 +380,16 @@ void ApiWrap::checkChatInvite(
 	)).done(std::move(done)).fail(std::move(fail)).send();
 }
 
+void ApiWrap::checkFilterInvite(
+		const QString &slug,
+		FnMut<void(const MTPchatlists_ChatlistInvite &)> done,
+		Fn<void(const MTP::Error &)> fail) {
+	request(base::take(_checkFilterInviteRequestId)).cancel();
+	_checkFilterInviteRequestId = request(
+		MTPchatlists_CheckChatlistInvite(MTP_string(slug))
+	).done(std::move(done)).fail(std::move(fail)).send();
+}
+
 void ApiWrap::savePinnedOrder(Data::Folder *folder) {
 	const auto &order = _session->data().pinnedChatsOrder(folder);
 	const auto input = [](Dialogs::Key key) {

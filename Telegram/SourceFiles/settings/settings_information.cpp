@@ -423,7 +423,8 @@ void SetupRows(
 		std::move(value),
 		tr::lng_context_copy_mention(tr::now),
 		[=] {
-			const auto box = controller->show(Box(UsernamesBox, session));
+			const auto box = controller->show(
+				Box(UsernamesBox, session->user()));
 			box->boxClosing(
 			) | rpl::start_with_next([=] {
 				session->api().usernames().requestToCache(session->user());
@@ -680,8 +681,7 @@ void SetupAccountsWrap(
 			state->menu);
 		addAction(tr::lng_context_new_window(tr::now), [=] {
 			Ui::PreventDelayedActivation();
-			Core::App().ensureSeparateWindowForAccount(account);
-			Core::App().domain().maybeActivate(account);
+			callback(Qt::ControlModifier);
 		}, &st::menuIconNewWindow);
 		Window::AddSeparatorAndShiftUp(addAction);
 
@@ -902,16 +902,18 @@ void AccountsList::rebuild() {
 				auto activate = [=, guard = _accountSwitchGuard.make_guard()]{
 					if (guard) {
 						_reorder->finishReordering();
-						if (newWindow) {
-							Core::App().ensureSeparateWindowForAccount(
-								account);
-						}
-						Core::App().domain().maybeActivate(account);
 					}
+					if (newWindow) {
+						Core::App().ensureSeparateWindowForAccount(
+							account);
+					}
+					Core::App().domain().maybeActivate(account);
 				};
 				if (Core::App().separateWindowForAccount(account)) {
+					_currentAccountActivations.fire({});
 					activate();
 				} else {
+					_currentAccountActivations.fire({});
 					base::call_delayed(
 						st::defaultRippleAnimation.hideDuration,
 						account,

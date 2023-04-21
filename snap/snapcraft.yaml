@@ -21,11 +21,6 @@ apps:
     common-id: org.telegram.desktop
     desktop: usr/share/applications/org.telegram.desktop.desktop
     autostart: telegram-desktop_telegram-desktop.desktop
-    environment:
-      # Tell glib to use portals on file associations handling.
-      GTK_USE_PORTAL: 1
-      # Use sandboxed ibus api
-      IBUS_USE_PORTAL: 1
     plugs:
       - alsa
       - audio-playback
@@ -110,7 +105,6 @@ parts:
       - python3
       - libasound2-dev
       - libavif-dev
-      - libglib2.0-dev
       - libheif-dev
       - libopus-dev
       - libpulse-dev
@@ -123,7 +117,6 @@ parts:
     stage-packages:
       - libasound2
       - libavif13
-      - libglib2.0-0
       - libheif1
       - libopus0
       - libpulse0
@@ -185,7 +178,7 @@ parts:
     override-pull: |
       craftctl default
       cp -r . "$CRAFT_STAGE/patches"
-    override-stage: |
+    override-prime: |
       rm -rf patches
     stage: [-./*]
 
@@ -194,6 +187,8 @@ parts:
     source-subdir: qt
     plugin: make
     make-parameters: ["FLAVOR=qt5"]
+    build-environment:
+      - LD_LIBRARY_PATH: $CRAFT_STAGE/usr/lib/$CRAFT_ARCH_TRIPLET${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
     build-packages:
       - build-essential
       - dpkg-dev
@@ -252,16 +247,13 @@ parts:
   glibmm:
     source: https://github.com/GNOME/glibmm.git
     source-depth: 1
-    source-tag: 2.72.1
+    source-tag: 2.76.0
     plugin: meson
     build-packages:
       - meson
       - mm-common
       - ninja-build
-      - libglib2.0-dev
       - libxml-parser-perl
-    stage-packages:
-      - libglib2.0-0
     meson-parameters:
       - --buildtype=release
       - --prefix=/usr
@@ -299,9 +291,6 @@ parts:
       - -DJPEGXL_ENABLE_SJPEG=OFF
       - -DJPEGXL_ENABLE_OPENEXR=OFF
       - -DJPEGXL_ENABLE_SKCMS=OFF
-    override-pull: |
-      craftctl default
-      sed -i 's/NOT JPEGXL_ENABLE_SKCMS/0/' lib/jxl.cmake
     stage:
       - -./usr/lib/$CRAFT_ARCH_TRIPLET/libbrotli*
     prime:
@@ -336,7 +325,7 @@ parts:
   openal:
     source: https://github.com/kcat/openal-soft.git
     source-depth: 1
-    source-tag: 1.22.2
+    source-tag: 1.23.0
     plugin: cmake
     build-environment:
       - LDFLAGS: -s
@@ -419,7 +408,6 @@ parts:
       - libegl-dev
       - libfontconfig1-dev
       - libfreetype-dev
-      - libglib2.0-dev
       - libglx-dev
       - libgtk-3-dev
       - libharfbuzz-dev
@@ -457,7 +445,6 @@ parts:
       - libegl1
       - libfontconfig1
       - libfreetype6
-      - libglib2.0-0
       - libglx0
       - libgtk-3-0
       - libharfbuzz0b
@@ -496,7 +483,7 @@ parts:
     override-pull: |
       QT=6.5.0
 
-      git clone -b v${QT}-beta3 --depth=1 git://code.qt.io/qt/qt5.git .
+      git clone -b v${QT} --depth=1 https://code.qt.io/qt/qt5.git .
       git submodule update --init --recursive --depth=1 qtbase qtdeclarative qtwayland qtimageformats qtsvg qt5compat qtshadertools
 
       cd qtbase
@@ -536,6 +523,7 @@ parts:
       - -./usr/mkspecs
       - -./usr/modules
     after:
+      - glibmm
       - mozjpeg
       - openssl
       - patches
@@ -573,7 +561,6 @@ parts:
       - libegl-dev
       - libgbm-dev
       - libgl-dev
-      - libglib2.0-dev
       - libopenh264-dev
       - libopus-dev
       - libpipewire-0.3-dev
@@ -591,7 +578,6 @@ parts:
       - libegl1
       - libgbm1
       - libgl1
-      - libglib2.0-0
       - libopenh264-6
       - libopus0
       - libvpx7
@@ -614,5 +600,6 @@ parts:
       - -./usr/lib/$CRAFT_ARCH_TRIPLET/*.a
     after:
       - ffmpeg
+      - glibmm
       - mozjpeg
       - openssl

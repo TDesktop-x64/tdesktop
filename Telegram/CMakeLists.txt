@@ -173,6 +173,8 @@ PRIVATE
     boxes/filters/edit_filter_box.h
     boxes/filters/edit_filter_chats_list.cpp
     boxes/filters/edit_filter_chats_list.h
+    boxes/filters/edit_filter_links.cpp
+    boxes/filters/edit_filter_links.h
     boxes/peers/add_bot_to_chat_box.cpp
     boxes/peers/add_bot_to_chat_box.h
     boxes/peers/add_participants_box.cpp
@@ -926,6 +928,8 @@ PRIVATE
     main/main_account.h
     main/main_app_config.cpp
     main/main_app_config.h
+    main/main_app_config_values.cpp
+    main/main_app_config_values.h
     main/main_domain.cpp
     main/main_domain.h
     main/main_session.cpp
@@ -1733,7 +1737,6 @@ endif()
 
 if (LINUX AND DESKTOP_APP_USE_PACKAGED)
     include(GNUInstallDirs)
-    configure_file("../lib/xdg/org.telegram.desktop.desktop" "${CMAKE_CURRENT_BINARY_DIR}/org.telegram.desktop.desktop" @ONLY)
     configure_file("../lib/xdg/org.telegram.desktop.metainfo.xml" "${CMAKE_CURRENT_BINARY_DIR}/org.telegram.desktop.metainfo.xml" @ONLY)
     generate_appdata_changelog(Telegram "${CMAKE_SOURCE_DIR}/changelog.txt" "${CMAKE_CURRENT_BINARY_DIR}/org.telegram.desktop.metainfo.xml")
     install(TARGETS Telegram RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" BUNDLE DESTINATION "${CMAKE_INSTALL_BINDIR}")
@@ -1744,6 +1747,6 @@ if (LINUX AND DESKTOP_APP_USE_PACKAGED)
     install(FILES "Resources/art/icon128.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/128x128/apps" RENAME "telegram.png")
     install(FILES "Resources/art/icon256.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps" RENAME "telegram.png")
     install(FILES "Resources/art/icon512.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/512x512/apps" RENAME "telegram.png")
-    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/org.telegram.desktop.desktop" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications")
+    install(FILES "../lib/xdg/org.telegram.desktop.desktop" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications")
     install(FILES "${CMAKE_CURRENT_BINARY_DIR}/org.telegram.desktop.metainfo.xml" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/metainfo")
 endif()

@@ -1733,7 +1733,9 @@ void Application::startShortcuts() {
 
 void Application::RegisterUrlScheme() {
 	base::Platform::RegisterUrlScheme(base::Platform::UrlSchemeDescriptor{
-		.executable = cExeDir() + cExeName(),
+		.executable = (!Platform::IsLinux() || !Core::UpdaterDisabled())
+			? (cExeDir() + cExeName())
+			: cExeName(),
 		.arguments = Sandbox::Instance().customWorkingDir()
 			? u"-workdir \"%1\""_q.arg(cWorkingDir())
 			: QString(),

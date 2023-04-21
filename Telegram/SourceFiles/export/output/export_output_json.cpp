@@ -605,6 +605,13 @@ QByteArray SerializeMessage(
 		pushAction("requested_peer");
 		push("button_id", data.buttonId);
 		push("peer_id", data.peerId.value);
+	}, [&](const ActionSetChatWallPaper &data) {
+		pushActor();
+		pushAction("set_chat_wallpaper");
+	}, [&](const ActionSetSameChatWallPaper &data) {
+		pushActor();
+		pushAction("set_same_chat_wallpaper");
+		pushReplyToMsgId("message_id");
 	}, [](v::null_t) {});
 
 	if (v::is_null(message.action.content)) {

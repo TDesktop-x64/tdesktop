@@ -207,8 +207,9 @@ namespace Settings {
 				st::settingsButtonNoIcon
 		);
 		btn->events(
-		) | rpl::start_with_next([=]() {
-			_AlwaysDeleteChanged.fire({});
+		) | rpl::start_with_next([=](not_null<QEvent*> e) {
+			const auto event = e->type();
+			if (event == QEvent::UpdateLater) _AlwaysDeleteChanged.fire({});
 		}, container->lifetime());
 		btn->addClickHandler([=] {
 			Ui::show(Box<AlwaysDeleteBox>());
@@ -437,8 +438,9 @@ namespace Settings {
 				st::settingsButtonNoIcon
 		);
 		btn->events(
-		) | rpl::start_with_next([=]() {
-			_BitrateChanged.fire({});
+		) | rpl::start_with_next([=](not_null<QEvent*> e) {
+			const auto event = e->type();
+			if (event == QEvent::UpdateLater) _BitrateChanged.fire({});
 		}, container->lifetime());
 		btn->addClickHandler([=] {
 			Ui::show(Box<BitrateController>());

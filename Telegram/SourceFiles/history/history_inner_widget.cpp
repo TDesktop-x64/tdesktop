@@ -2051,7 +2051,8 @@ void HistoryInner::mouseDoubleClickEvent(QMouseEvent *e) {
 		&& (_mouseCursorState == CursorState::None
 			|| _mouseCursorState == CursorState::Date)
 		&& !inSelectionMode()
-		&& !_emptyPainter) {
+		&& !_emptyPainter
+		&& e->button() == Qt::LeftButton) {
 		if (const auto view = Element::Moused()) {
 			mouseActionCancel();
 			switch (HistoryView::CurrentQuickAction()) {
@@ -2147,21 +2148,30 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 		isUponSelected = hasSelected;
 	}
 
-	const auto hasWhoReactedItem = _dragStateItem
-		&& Api::WhoReactedExists(_dragStateItem, Api::WhoReactedList::All);
+	const auto groupLeaderOrSelf = [](HistoryItem *item) -> HistoryItem* {
+		if (!item) {
+			return nullptr;
+		} else if (const auto group = item->history()->owner().groups().find(item)) {
+			return group->items.front();
+		}
+		return item;
+	};
+	const auto whoReactedItem = groupLeaderOrSelf(_dragStateItem);
+	const auto hasWhoReactedItem = whoReactedItem
+		&& Api::WhoReactedExists(whoReactedItem, Api::WhoReactedList::All);
 	const auto clickedReaction = link
 		? link->property(
 			kReactionsCountEmojiProperty).value<Data::ReactionId>()
 		: Data::ReactionId();
 	_whoReactedMenuLifetime.destroy();
 	if (!clickedReaction.empty()
-		&& _dragStateItem
-		&& Api::WhoReactedExists(_dragStateItem, Api::WhoReactedList::One)) {
+		&& whoReactedItem
+		&& Api::WhoReactedExists(whoReactedItem, Api::WhoReactedList::One)) {
 		HistoryView::ShowWhoReactedMenu(
 			&_menu,
 			e->globalPos(),
 			this,
-			_dragStateItem,
+			whoReactedItem,
 			clickedReaction,
 			_controller,
 			_whoReactedMenuLifetime);
@@ -2171,20 +2181,12 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 	_menu = base::make_unique_q<Ui::PopupMenu>(this, st::popupMenuWithIcons);
 	const auto session = &this->session();
 	const auto controller = _controller;
-	const auto groupLeaderOrSelf = [](HistoryItem *item) -> HistoryItem* {
-		if (!item) {
-			return nullptr;
-		} else if (const auto group = item->history()->owner().groups().find(item)) {
-			return group->items.front();
-		}
-		return item;
-	};
 
 	if (hasWhoReactedItem) {
 		HistoryView::AddWhoReactedAction(
 			_menu,
 			this,
-			_dragStateItem,
+			whoReactedItem,
 			_controller);
 	}
 
@@ -2878,6 +2880,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			HistoryView::EmojiPacksSource::Message,
 			_controller);
 	}
+
 	if (_menu->empty()) {
 		_menu = nullptr;
 		return;

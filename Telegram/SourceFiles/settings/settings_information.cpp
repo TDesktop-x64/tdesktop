@@ -189,7 +189,7 @@ public:
 		not_null<Ui::VerticalLayout*> container,
 		not_null<Window::SessionController*> controller);
 
-	[[nodiscard]] rpl::producer<> currentAccountActivations() const;
+	[[nodiscard]] rpl::producer<> closeRequests() const;
 
 private:
 	void setup();
@@ -210,7 +210,7 @@ private:
 	std::unique_ptr<Ui::VerticalLayoutReorder> _reorder;
 	int _reordering = 0;
 
-	rpl::event_stream<> _currentAccountActivations;
+	rpl::event_stream<> _closeRequests;
 
 	base::binary_guard _accountSwitchGuard;
 
@@ -732,8 +732,8 @@ AccountsList::AccountsList(
 	setup();
 }
 
-rpl::producer<> AccountsList::currentAccountActivations() const {
-	return _currentAccountActivations.events();
+rpl::producer<> AccountsList::closeRequests() const {
+	return _closeRequests.events();
 }
 
 void AccountsList::setup() {
@@ -893,7 +893,7 @@ void AccountsList::rebuild() {
 					return;
 				}
 				if (account == &_controller->session().account()) {
-					_currentAccountActivations.fire({});
+					_closeRequests.fire({});
 					return;
 				}
 				const auto newWindow = (modifiers & Qt::ControlModifier)
@@ -902,18 +902,18 @@ void AccountsList::rebuild() {
 				auto activate = [=, guard = _accountSwitchGuard.make_guard()]{
 					if (guard) {
 						_reorder->finishReordering();
+						if (newWindow) {
+							_closeRequests.fire({});
+							Core::App().ensureSeparateWindowForAccount(
+								account);
+						}
+						Core::App().domain().maybeActivate(account);
 					}
-					if (newWindow) {
-						Core::App().ensureSeparateWindowForAccount(
-							account);
-					}
-					Core::App().domain().maybeActivate(account);
 				};
-				if (Core::App().separateWindowForAccount(account)) {
-					_currentAccountActivations.fire({});
-					activate();
+				if (const auto window = Core::App().separateWindowForAccount(account)) {
+					_closeRequests.fire({});
+					window->activate();
 				} else {
-					_currentAccountActivations.fire({});
 					base::call_delayed(
 						st::defaultRippleAnimation.hideDuration,
 						account,
@@ -976,7 +976,7 @@ AccountsEvents SetupAccounts(
 		container,
 		controller);
 	return {
-		.currentAccountActivations = list->currentAccountActivations(),
+		.closeRequests = list->closeRequests(),
 	};
 }
 

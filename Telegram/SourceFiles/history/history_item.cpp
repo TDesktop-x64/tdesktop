@@ -50,7 +50,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "dialogs/ui/dialogs_message_view.h"
 #include "data/notify/data_notify_settings.h"
 #include "data/data_bot_app.h"
-#include "data/data_scheduled_messages.h" // kScheduledUntilOnlineTimestamp
+#include "data/data_scheduled_messages.h"
 #include "data/data_changes.h"
 #include "data/data_session.h"
 #include "data/data_message_reactions.h"
@@ -360,7 +360,10 @@ HistoryItem::HistoryItem(
 		setText(_media ? textWithEntities : EnsureNonEmpty(textWithEntities));
 		if (const auto groupedId = data.vgrouped_id()) {
 			setGroupId(
-				MessageGroupId::FromRaw(history->peer->id, groupedId->v));
+				MessageGroupId::FromRaw(
+					history->peer->id,
+					groupedId->v,
+					_flags & MessageFlag::IsOrWasScheduled));
 		}
 		setReactions(data.vreactions());
 		applyTTL(data);
@@ -550,7 +553,10 @@ HistoryItem::HistoryItem(
 	setMedia(media);
 	setText(textWithEntities);
 	if (groupedId) {
-		setGroupId(MessageGroupId::FromRaw(history->peer->id, groupedId));
+		setGroupId(MessageGroupId::FromRaw(
+			history->peer->id,
+			groupedId,
+			flags & MessageFlag::IsOrWasScheduled));
 	}
 }
 

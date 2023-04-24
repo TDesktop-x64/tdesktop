@@ -352,7 +352,9 @@ private:
 	void continueSave();
 	void cancelSave();
 
+#if 0 // Enable after design improvements.
 	void toggleBotManager(const QString &command);
+#endif
 
 	void togglePreHistoryHidden(
 		not_null<ChannelData*> channel,
@@ -1407,7 +1409,7 @@ void Controller::fillBotUsernamesButton() {
 			: tr::lng_manage_peer_bot_public_links();
 	}) | rpl::flatten_latest();
 
-	const auto wrap = _controls.buttonsLayout->add(
+	_controls.buttonsLayout->add(
 		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
 			_controls.buttonsLayout,
 			object_ptr<Ui::VerticalLayout>(
@@ -1935,6 +1937,7 @@ void Controller::saveHistoryVisibility() {
 		[=] { cancelSave(); });
 }
 
+#if 0 // Enable after design improvements.
 void Controller::toggleBotManager(const QString &command) {
 	const auto controller = _navigation->parentController();
 	_api.request(MTPcontacts_ResolveUsername(
@@ -1950,6 +1953,7 @@ void Controller::toggleBotManager(const QString &command) {
 		}
 	}).send();
 }
+#endif
 
 void Controller::togglePreHistoryHidden(
 		not_null<ChannelData*> channel,

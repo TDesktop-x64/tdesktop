@@ -402,7 +402,9 @@ bool ScheduledWidget::confirmSendingFiles(
 bool ScheduledWidget::confirmSendingFiles(
 		Ui::PreparedList &&list,
 		const QString &insertTextOnCancel) {
-	if (showSendingFilesError(list)) {
+	if (_composeControls->confirmMediaEdit(list)) {
+		return true;
+	} else if (showSendingFilesError(list)) {
 		return false;
 	}
 
@@ -1172,6 +1174,9 @@ void ScheduledWidget::listSelectionChanged(SelectedItems &&items) {
 		}
 	}
 	_topBar->showSelected(state);
+	if (items.empty()) {
+		doSetInnerFocus();
+	}
 }
 
 void ScheduledWidget::listMarkReadTill(not_null<HistoryItem*> item) {

@@ -541,6 +541,7 @@ void Gif::draw(Painter &p, const PaintContext &context) const {
 	if (radial
 		|| (!streamingMode
 			&& ((!loaded && !_data->loading()) || !autoplay))) {
+		const auto radialRevealed = 1.;
 		const auto opacity = (item->isSending() || _data->uploading())
 			? 1.
 			: streamedForWaiting
@@ -548,7 +549,7 @@ void Gif::draw(Painter &p, const PaintContext &context) const {
 			: (radial && loaded)
 			? _animation->radial.opacity()
 			: 1.;
-		const auto radialOpacity = opacity * revealed;
+		const auto radialOpacity = opacity * radialRevealed;
 		const auto innerSize = st::msgFileLayout.thumbSize;
 		auto inner = QRect(rthumb.x() + (rthumb.width() - innerSize) / 2, rthumb.y() + (rthumb.height() - innerSize) / 2, innerSize, innerSize);
 		p.setPen(Qt::NoPen);
@@ -586,7 +587,7 @@ void Gif::draw(Painter &p, const PaintContext &context) const {
 		if (icon) {
 			icon->paintInCenter(p, inner);
 		}
-		p.setOpacity(revealed);
+		p.setOpacity(radialRevealed);
 		if (radial) {
 			QRect rinner(inner.marginsRemoved(QMargins(st::msgFileRadialLine, st::msgFileRadialLine, st::msgFileRadialLine, st::msgFileRadialLine)));
 			if (streamedForWaiting && !_data->uploading()) {
@@ -1300,6 +1301,7 @@ void Gif::drawGrouped(
 	if (radial
 		|| (!streamingMode
 			&& ((!loaded && !_data->loading()) || !autoplay))) {
+		const auto radialRevealed = 1.;
 		const auto opacity = (item->isSending() || _data->uploading())
 			? 1.
 			: streamedForWaiting
@@ -1307,7 +1309,7 @@ void Gif::drawGrouped(
 			: (radial && loaded)
 			? _animation->radial.opacity()
 			: 1.;
-		const auto radialOpacity = opacity * revealed;
+		const auto radialOpacity = opacity * radialRevealed;
 		const auto radialSize = st::historyGroupRadialSize;
 		const auto inner = QRect(
 			geometry.x() + (geometry.width() - radialSize) / 2,
@@ -1358,7 +1360,7 @@ void Gif::drawGrouped(
 				icon->paintInCenter(p, inner);
 			}
 		}
-		p.setOpacity(revealed);
+		p.setOpacity(radialRevealed);
 		if (radial) {
 			const auto line = st::historyGroupRadialLine;
 			const auto rinner = inner.marginsRemoved({ line, line, line, line });

@@ -311,7 +311,8 @@ HistoryWidget::HistoryWidget(
 		_send.get(),
 		[=] { return sendButtonMenuType(); },
 		[=] { sendSilent(); },
-		[=] { sendScheduled(); });
+		[=] { sendScheduled(); },
+		[=] { sendWhenOnline(); });
 
 	_unblock->addClickHandler([=] { unblockUser(); });
 	_botStart->addClickHandler([=] { sendBotStartCommand(); });
@@ -2153,6 +2154,7 @@ void HistoryWidget::showHistory(
 	_saveEditMsgRequestId = 0;
 	_processingReplyItem = _replyEditMsg = nullptr;
 	_processingReplyId = _editMsgId = _replyToId = 0;
+	_canReplaceMedia = false;
 	_photoEditMedia = nullptr;
 	updateReplaceMediaButton();
 	_previewData = nullptr;
@@ -2488,6 +2490,9 @@ void HistoryWidget::registerDraftSource() {
 void HistoryWidget::setEditMsgId(MsgId msgId) {
 	unregisterDraftSources();
 	_editMsgId = msgId;
+	if (!msgId) {
+		_canReplaceMedia = false;
+	}
 	if (_history) {
 		refreshSendAsToggle();
 		orderWidgets();
@@ -3982,6 +3987,10 @@ void HistoryWidget::sendScheduled() {
 	controller()->show(
 		HistoryView::PrepareScheduleBox(_list, sendMenuType(), callback),
 		Ui::LayerOption::KeepOther);
+}
+
+void HistoryWidget::sendWhenOnline() {
+	send(Api::DefaultSendWhenOnlineOptions());
 }
 
 SendMenu::Type HistoryWidget::sendMenuType() const {

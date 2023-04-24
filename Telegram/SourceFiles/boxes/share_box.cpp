@@ -503,7 +503,8 @@ void ShareBox::showMenu(not_null<Ui::RpWidget*> parent) {
 		_menu.get(),
 		sendMenuType(),
 		[=] { submitSilent(); },
-		[=] { submitScheduled(); });
+		[=] { submitScheduled(); },
+		[=] { submitWhenOnline(); });
 	const auto success = (result == SendMenu::FillMenuResult::Success);
 	if (_descriptor.forwardOptions.show || success) {
 		_menu->setForcedVerticalOrigin(Ui::PopupMenu::VerticalOrigin::Bottom);
@@ -598,6 +599,10 @@ void ShareBox::submitScheduled() {
 			HistoryView::DefaultScheduleTime(),
 			_descriptor.scheduleBoxStyle),
 		Ui::LayerOption::KeepOther);
+}
+
+void ShareBox::submitWhenOnline() {
+	submit(Api::DefaultSendWhenOnlineOptions());
 }
 
 void ShareBox::copyLink() {

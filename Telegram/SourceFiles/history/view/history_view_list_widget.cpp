@@ -3764,7 +3764,7 @@ void ListWidget::refreshItem(not_null<const Element*> view) {
 		}();
 		const auto [i, ok] = _views.emplace(
 			item,
-			item->createView(this));
+			item->createView(this, was.get()));
 		const auto now = i->second.get();
 		_items[index] = now;
 

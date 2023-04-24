@@ -343,7 +343,7 @@ void BackgroundPreviewBox::createDimmingSlider(bool dark) {
 			_dimmingWrap->move(0, top);
 		}, _dimmingWrap->lifetime());
 
-		_dimmingWrap->toggle(!dark, anim::type::instant);
+		_dimmingWrap->toggle(dark, anim::type::instant);
 		_dimmingHeight = _dimmingWrap->heightValue();
 		_dimmingHeight.changes() | rpl::start_with_next([=] {
 			update();
@@ -590,6 +590,12 @@ void BackgroundPreviewBox::uploadForPeer() {
 void BackgroundPreviewBox::setExistingForPeer(const Data::WallPaper &paper) {
 	Expects(_forPeer != nullptr);
 
+	if (const auto already = _forPeer->wallPaper()) {
+		if (already->equals(paper)) {
+			_controller->finishChatThemeEdit(_forPeer);
+			return;
+		}
+	}
 	const auto api = &_controller->session().api();
 	using Flag = MTPmessages_SetChatWallPaper::Flag;
 	api->request(MTPmessages_SetChatWallPaper(

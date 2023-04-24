@@ -399,7 +399,8 @@ QImage Reactions::resolveImageFor(
 		const auto frameSize = set.fromSelectAnimation
 			? (size / 2)
 			: size;
-		image = set.icon->frame().scaled(
+		// Must not be colored to text.
+		image = set.icon->frame(QColor()).scaled(
 			frameSize * factor,
 			frameSize * factor,
 			Qt::IgnoreAspectRatio,
@@ -480,6 +481,7 @@ void Reactions::setAnimatedIcon(ImageSet &set) {
 	set.icon = Ui::MakeAnimatedIcon({
 		.generator = DocumentIconFrameGenerator(set.media),
 		.sizeOverride = QSize(size, size),
+		.colorized = set.media->owner()->emojiUsesTextColor(),
 	});
 	set.media = nullptr;
 }
@@ -966,13 +968,16 @@ void MessageReactions::add(const ReactionId &id, bool addToRecent) {
 		const auto removed = !--one.count;
 		const auto j = _recent.find(one.id);
 		if (j != end(_recent)) {
-			j->second.erase(
-				ranges::remove(j->second, self, &RecentReaction::peer),
-				end(j->second));
-			if (j->second.empty()) {
+			if (removed) {
+				j->second.clear();
 				_recent.erase(j);
 			} else {
-				Assert(!removed);
+				j->second.erase(
+					ranges::remove(j->second, self, &RecentReaction::peer),
+					end(j->second));
+				if (j->second.empty()) {
+					_recent.erase(j);
+				}
 			}
 		}
 		return removed;

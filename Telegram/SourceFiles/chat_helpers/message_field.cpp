@@ -178,10 +178,10 @@ void EditLinkBox(
 		if (QRegularExpression("\\d+").match(url->getLastText()).hasMatch() && url->getLastText().length() <= 10) {
 			const auto uid = url->getLastText().toLongLong();
 			if (uid > 0) {
-				const auto user = session->data().userLoaded(uid);
+				const auto user =  show->session().data().userLoaded(uid);
 				if (user != nullptr) {
 					const auto userId = UserId(uid);
-					linkUrl = "mention://" + TextUtilities::MentionNameDataFromFields({.selfId = session->userId().bare, .userId = userId.bare, .accessHash = user->accessHash()});
+					linkUrl = "mention://" + TextUtilities::MentionNameDataFromFields({.selfId = show->session().userId().bare, .userId = userId.bare, .accessHash = user->accessHash()});
 				} else {
 					url->showError();
 					return;
@@ -199,10 +199,10 @@ void EditLinkBox(
 		if (linkUrl.contains("tg://user?id=")) {
 			const auto uid = linkUrl.split("tg://user?id=")[1].toInt();
 			if (uid > 0) {
-				const auto user = session->data().userLoaded(uid);
+				const auto user =  show->session().data().userLoaded(uid);
 				if (user != nullptr) {
 					const auto userId = UserId(uid);
-					linkUrl = "mention://" + TextUtilities::MentionNameDataFromFields({.selfId = session->userId().bare, .userId = userId.bare, .accessHash = user->accessHash()});
+					linkUrl = "mention://" + TextUtilities::MentionNameDataFromFields({.selfId =  show->session().userId().bare, .userId = userId.bare, .accessHash = user->accessHash()});
 				} else {
 					url->showError();
 					return;

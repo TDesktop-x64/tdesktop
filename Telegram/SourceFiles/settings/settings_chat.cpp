@@ -807,8 +807,9 @@ void SetupStickersEmoji(
 		st::settingsButton,
 		{ &st::settingsIconStickers, kIconLightOrange }
 	)->addClickHandler([=] {
-		controller->show(
-			Box<StickersBox>(controller, StickersBox::Section::Installed));
+		controller->show(Box<StickersBox>(
+			controller->uiShow(),
+			StickersBox::Section::Installed));
 	});
 
 	AddButton(
@@ -991,8 +992,8 @@ void SetupMessages(
 		Core::App().saveSettingsDelayed();
 	});
 
-	buttonRight->setClickedCallback([=, show = Window::Show(controller)] {
-		show.showBox(Box(ReactionsSettingsBox, controller));
+	buttonRight->setClickedCallback([=, show = controller->uiShow()] {
+		show->showBox(Box(ReactionsSettingsBox, controller));
 	});
 
 	AddSkip(inner, st::settingsSendTypeSkip);
@@ -1533,7 +1534,7 @@ void SetupCloudThemes(
 void SetupAutoNightMode(
 		not_null<Window::SessionController*> controller,
 		not_null<Ui::VerticalLayout*> container) {
-	if (!Platform::IsDarkModeSupported()) {
+	if (!Core::App().settings().systemDarkMode().has_value()) {
 		return;
 	}
 

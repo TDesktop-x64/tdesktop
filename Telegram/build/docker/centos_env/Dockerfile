@@ -5,7 +5,7 @@
 {%- set QT_PREFIX = "/usr/local/desktop-app/Qt-" ~ QT -%}
 {%- set OPENSSL_VER = "1_1_1" -%}
 {%- set OPENSSL_PREFIX = "/usr/local/desktop-app/openssl-1.1.1" -%}
-{%- set CMAKE_VER = "3.24.3" -%}
+{%- set CMAKE_VER = "3.26.3" -%}
 {%- set CMAKE_FILE = "cmake-" ~ CMAKE_VER ~ "-Linux-x86_64.sh" -%}
 {%- set CFLAGS_DEBUG = "-g -pipe -fPIC -fstack-protector-all -fstack-clash-protection -D_GLIBCXX_ASSERTIONS" -%}
 {%- set CFLAGS_LTO = "-flto=auto -ffat-lto-objects" -%}
@@ -22,11 +22,12 @@ ENV PKG_CONFIG_PATH /usr/local/lib64/pkgconfig:/usr/local/lib/pkgconfig:/usr/loc
 RUN yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm \
 	&& yum -y install https://packages.endpointdev.com/rhel/7/os/x86_64/endpoint-repo.x86_64.rpm \
 	&& yum -y install centos-release-scl \
-	&& yum -y install git rh-python38-python-pip autoconf automake libtool patch gperf \
+	&& yum -y install git rh-python38-python-pip rh-python38-python-devel \
+		autoconf automake libtool patch gperf flex \
 		fontconfig-devel freetype-devel libX11-devel at-spi2-core-devel alsa-lib-devel \
 		pulseaudio-libs-devel mesa-libGL-devel mesa-libEGL-devel mesa-libgbm-devel \
-		libdrm-devel vulkan-devel gtk3-devel \
-		perl-XML-Parser pkgconfig bison yasm file which xorg-x11-util-macros \
+		libdrm-devel vulkan-devel boost169-devel fmt-devel \
+		gtk3-devel perl-XML-Parser pkgconfig bison yasm file which xorg-x11-util-macros \
 		devtoolset-10-make devtoolset-10-gcc devtoolset-10-gcc-c++ \
 		devtoolset-10-binutils llvm-toolset-7.0 llvm-toolset-7.0-clang-devel \
 		llvm-toolset-7.0-llvm-devel \
@@ -51,7 +52,7 @@ FROM builder-base AS builder
 ENV AR gcc-ar
 ENV RANLIB gcc-ranlib
 ENV NM gcc-nm
-ENV CFLAGS {% if DEBUG %}-g{% endif %} -Ofast {% if LTO %}{{ CFLAGS_LTO }}{% endif %} -pipe -fPIC -fstack-protector-all -fstack-clash-protection -DNDEBUG -D_FORTIFY_SOURCE=2 -D_GLIBCXX_ASSERTIONS
+ENV CFLAGS {% if DEBUG %}-g{% endif %} -O3 {% if LTO %}{{ CFLAGS_LTO }}{% endif %} -pipe -fPIC -fstack-protector-all -fstack-clash-protection -DNDEBUG -D_FORTIFY_SOURCE=2 -D_GLIBCXX_ASSERTIONS
 ENV CXXFLAGS $CFLAGS
 
 FROM builder AS patches
@@ -187,7 +188,7 @@ FROM builder AS opus
 RUN git clone -b v1.3.1 --depth=1 {{ GIT }}/xiph/opus.git \
 	&& cd opus \
 	&& ./autogen.sh \
-	&& ./configure --enable-float-approx \
+	&& ./configure \
 	&& make -j$(nproc) \
 	&& make DESTDIR="{{ LibrariesPath }}/opus-cache" install \
 	&& cd .. \
@@ -304,10 +305,7 @@ RUN git clone -b v0.8.1 --depth=1 {{ GIT }}/libjxl/libjxl.git \
 FROM builder AS rnnoise
 RUN git clone -b master --depth=1 {{ GIT }}/desktop-app/rnnoise \
 	&& cd rnnoise \
-	&& cmake -GNinja -B build . \
-		-DCMAKE_BUILD_TYPE=None \
-		-DCMAKE_C_FLAGS="$CFLAGS -DFLOAT_APPROX" \
-		-DCMAKE_CXX_FLAGS="$CXXFLAGS -DFLOAT_APPROX" \
+	&& cmake -GNinja -B build . -DCMAKE_BUILD_TYPE=None \
 	&& cmake --build build --parallel \
 	&& mkdir -p "{{ LibrariesPath }}/rnnoise-cache/usr/local/include" \
 	&& cp "include/rnnoise.h" "{{ LibrariesPath }}/rnnoise-cache/usr/local/include/" \
@@ -696,6 +694,18 @@ RUN git clone -b 2.76.0 --depth=1 {{ GIT }}/GNOME/glibmm.git \
 	&& cd .. \
 	&& rm -rf glibmm
 
+FROM patches AS gobject-introspection
+COPY --link --from=libffi {{ LibrariesPath }}/libffi-cache /
+COPY --link --from=glibmm {{ LibrariesPath }}/glibmm-cache /
+
+RUN git clone -b 1.76.1 --depth=1 {{ GIT }}/GNOME/gobject-introspection.git \
+	&& cd gobject-introspection \
+	&& meson build --buildtype=plain \
+	&& meson compile -C build \
+	&& DESTDIR="{{ LibrariesPath }}/gobject-introspection-cache" meson install -C build \
+	&& cd .. \
+	&& rm -rf gobject-introspection
+
 FROM patches AS qt
 COPY --link --from=libffi {{ LibrariesPath }}/libffi-cache /
 COPY --link --from=zlib {{ LibrariesPath }}/zlib-cache /
@@ -717,7 +727,7 @@ ENV OPENSSL_ROOT_DIR {{ OPENSSL_PREFIX }}
 
 RUN git clone -b {{ QT_TAG }} --depth=1 https://code.qt.io/qt/qt5.git qt_{{ QT }} \
 	&& cd qt_{{ QT }} \
-	&& git submodule update --init --recursive --depth=1 qtbase qtdeclarative qtwayland qtimageformats qtsvg qt5compat qtshadertools \
+	&& git submodule update --init --recursive --depth=1 qtbase qtdeclarative qtwayland qtimageformats qtsvg qtshadertools \
 	&& cd qtbase \
 	&& find ../../patches/qtbase_{{ QT }} -type f -print0 | sort -z | xargs -r0 git apply \
 	&& cd ../qtdeclarative \
@@ -775,7 +785,7 @@ COPY --link --from=pipewire {{ LibrariesPath }}/pipewire-cache /
 RUN git init tg_owt \
 	&& cd tg_owt \
 	&& git remote add origin {{ GIT }}/desktop-app/tg_owt.git \
-	&& git fetch --depth=1 origin 5098730b9eb6173f0b52068fe2555b7c1015123a \
+	&& git fetch --depth=1 origin dcb5069ff76bd293e86928804208737e6cee2ccc \
 	&& git reset --hard FETCH_HEAD \
 	&& git submodule update --init --recursive --depth=1 \
 	&& rm -rf .git \
@@ -842,6 +852,7 @@ COPY --link --from=openal {{ LibrariesPath }}/openal-cache /
 COPY --link --from=openssl {{ LibrariesPath }}/openssl-cache /
 COPY --link --from=xkbcommon {{ LibrariesPath }}/xkbcommon-cache /
 COPY --link --from=glibmm {{ LibrariesPath }}/glibmm-cache /
+COPY --link --from=gobject-introspection {{ LibrariesPath }}/gobject-introspection-cache /
 COPY --link --from=qt {{ LibrariesPath }}/qt-cache /
 COPY --link --from=breakpad {{ LibrariesPath }}/breakpad-cache /
 COPY --link --from=webrtc {{ LibrariesPath }}/tg_owt tg_owt
@@ -854,6 +865,8 @@ COPY --link --from=webrtc_debug {{ LibrariesPath }}/tg_owt/out/Debug tg_owt/out/
 WORKDIR ../tdesktop
 ENV QT {{ QT }}
 ENV OPENSSL_ROOT_DIR {{ OPENSSL_PREFIX }}
+ENV BOOST_INCLUDEDIR /usr/include/boost169
+ENV BOOST_LIBRARYDIR /usr/lib64/boost169
 
 VOLUME [ "/usr/src/tdesktop" ]
 ENTRYPOINT [ "scl", "enable", "rh-python38", "--", "scl", "enable", "llvm-toolset-7.0", "--", "scl", "enable", "devtoolset-10", "--" ]

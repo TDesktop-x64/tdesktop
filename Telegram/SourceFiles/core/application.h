@@ -195,6 +195,7 @@ public:
 	bool hideMediaView();
 
 	[[nodiscard]] QPoint getPointForCallPanelCenter() const;
+	[[nodiscard]] bool isSharingScreen() const;
 
 	void startSettingsAndBackground();
 	[[nodiscard]] Settings &settings();
@@ -312,6 +313,9 @@ public:
 	void handleAppActivated();
 	void handleAppDeactivated();
 	[[nodiscard]] rpl::producer<bool> appDeactivatedValue() const;
+
+	void materializeLocalDrafts();
+	[[nodiscard]] rpl::producer<> materializeLocalDraftsRequests() const;
 
 	void switchDebugMode();
 	void writeInstallBetaVersionsSetting();
@@ -442,6 +446,8 @@ private:
 	base::flat_map<not_null<QWidget*>, LeaveFilter> _leaveFilters;
 
 	rpl::event_stream<Media::View::OpenRequest> _openInMediaViewRequests;
+
+	rpl::event_stream<> _materializeLocalDraftsRequests;
 
 	rpl::lifetime _lifetime;
 

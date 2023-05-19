@@ -158,7 +158,7 @@ void ShowCallsBox(not_null<Window::SessionController*> window) {
 					Window::SectionShow(anim::type::instant));
 			};
 			const auto clearAll = crl::guard(box, [=] {
-				Ui::BoxShow(box).showBox(Box(Calls::ClearCallsBox, window));
+				box->uiShow()->showBox(Box(Calls::ClearCallsBox, window));
 			});
 			state->menu->addAction(
 				tr::lng_settings_section_call_settings(tr::now),

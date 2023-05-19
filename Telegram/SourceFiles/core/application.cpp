@@ -920,6 +920,14 @@ rpl::producer<bool> Application::appDeactivatedValue() const {
 	});
 }
 
+void Application::materializeLocalDrafts() {
+	_materializeLocalDraftsRequests.fire({});
+}
+
+rpl::producer<> Application::materializeLocalDraftsRequests() const {
+	return _materializeLocalDraftsRequests.events();
+}
+
 void Application::switchDebugMode() {
 	if (Logs::DebugEnabled()) {
 		Logs::SetDebugEnabled(false);
@@ -1574,6 +1582,10 @@ QPoint Application::getPointForCallPanelCenter() const {
 		return window->getPointForCallPanelCenter();
 	}
 	return QGuiApplication::primaryScreen()->geometry().center();
+}
+
+bool Application::isSharingScreen() const {
+	return _calls->isSharingScreen();
 }
 
 // macOS Qt bug workaround, sometimes no leaveEvent() gets to the nested widgets.

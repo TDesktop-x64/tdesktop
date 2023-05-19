@@ -80,6 +80,26 @@ constexpr auto kPinnedMessageTextLimit = 16;
 
 using ItemPreview = HistoryView::ItemPreview;
 
+[[nodiscard]] TextWithEntities SpoilerLoginCode(TextWithEntities text) {
+	const auto r = QRegularExpression(u"([\\d\\-]{5,7})"_q);
+	const auto m = r.match(text.text);
+	if (!m.hasMatch()) {
+		return text;
+	}
+	const auto codeStart = int(m.capturedStart(1));
+	const auto codeLength = int(m.capturedLength(1));
+	auto i = text.entities.begin();
+	const auto e = text.entities.end();
+	while (i != e && i->offset() < codeStart) {
+		if (i->offset() + i->length() > codeStart) {
+			return text; // Entities should not intersect code.
+		}
+		++i;
+	}
+	text.entities.insert(i, { EntityType::Spoiler, codeStart, codeLength });
+	return text;
+}
+
 [[nodiscard]] bool HasNotEmojiAndSpaces(const QString &text) {
 	if (text.isEmpty()) {
 		return false;
@@ -2821,8 +2841,9 @@ bool HistoryItem::isEmpty() const {
 		&& !Has<HistoryMessageLogEntryOriginal>();
 }
 
-TextWithEntities HistoryItem::notificationText() const {
-	const auto result = [&] {
+TextWithEntities HistoryItem::notificationText(
+		NotificationTextOptions options) const {
+	auto result = [&] {
 		if (_media && !isService()) {
 			return _media->notificationText();
 		} else if (!emptyText()) {
@@ -2830,6 +2851,11 @@ TextWithEntities HistoryItem::notificationText() const {
 		}
 		return TextWithEntities();
 	}();
+	if (options.spoilerLoginCode
+		&& !out()
+		&& history()->peer->isNotificationsUser()) {
+		result = SpoilerLoginCode(std::move(result));
+	}
 	if (result.text.size() <= kNotificationTextLimit) {
 		return result;
 	}
@@ -2859,6 +2885,11 @@ ItemPreview HistoryItem::toPreview(ToPreviewOptions options) const {
 		}
 		return {};
 	}();
+	if (options.spoilerLoginCode
+		&& !out()
+		&& history()->peer->isNotificationsUser()) {
+		result.text = SpoilerLoginCode(std::move(result.text));
+	}
 	const auto fromSender = [](not_null<PeerData*> sender) {
 		return sender->isSelf()
 			? tr::lng_from_you(tr::now)
@@ -4862,7 +4893,7 @@ void HistoryItem::setupTTLChange() {
 		const auto my = context.other.value<ClickHandlerContext>();
 		if (const auto controller = my.sessionWindow.get()) {
 			const auto validator = TTLMenu::TTLValidator(
-				std::make_shared<Window::Show>(controller),
+				controller->uiShow(),
 				peer);
 			if (validator.can()) {
 				validator.showBox();

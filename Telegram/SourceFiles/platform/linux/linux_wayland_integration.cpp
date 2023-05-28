@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "platform/linux/linux_wayland_integration.h"
 
+#include "base/platform/linux/base_linux_wayland_utilities.h"
 #include "base/platform/base_platform_info.h"
 #include "base/qt_signal_producer.h"
 #include "base/flat_map.h"
@@ -14,67 +15,33 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtGui/QGuiApplication>
 #include <QtGui/QWindow>
+#include <qpa/qplatformnativeinterface.h>
 #include <qpa/qplatformwindow_p.h>
 #include <wayland-client.h>
 
 using namespace QNativeInterface;
 using namespace QNativeInterface::Private;
+using namespace base::Platform::Wayland;
 
 namespace Platform {
 namespace internal {
-namespace {
-
-struct WlRegistryDeleter {
-	void operator()(wl_registry *value) {
-		wl_registry_destroy(value);
-	}
-};
-
-struct PlasmaSurfaceDeleter {
-	void operator()(org_kde_plasma_surface *value) {
-		org_kde_plasma_surface_destroy(value);
-	}
-};
-
-template <typename T>
-class QtWaylandAutoDestroyer : public T {
-public:
-	QtWaylandAutoDestroyer() = default;
-
-	~QtWaylandAutoDestroyer() {
-		if (!this->isInitialized()) {
-			return;
-		}
-
-		static constexpr auto HasDestroy = requires(const T &t) {
-			t.destroy();
-		};
-
-		if constexpr (HasDestroy) {
-			this->destroy();
-		} else {
-			free(this->object());
-			this->init(nullptr);
-		}
-	}
-};
-
-} // namespace
 
 struct WaylandIntegration::Private {
-	org_kde_plasma_surface *plasmaSurface(QWindow *window);
-	std::unique_ptr<wl_registry, WlRegistryDeleter> registry;
-	QtWaylandAutoDestroyer<QtWayland::org_kde_plasma_shell> plasmaShell;
+	QtWayland::org_kde_plasma_surface plasmaSurface(QWindow *window);
+
+	std::unique_ptr<wl_registry, RegistryDeleter> registry;
+	AutoDestroyer<QtWayland::org_kde_plasma_shell> plasmaShell;
 	uint32_t plasmaShellName = 0;
-	base::flat_map<wl_surface*, std::unique_ptr<
-		org_kde_plasma_surface,
-		PlasmaSurfaceDeleter>> plasmaSurfaces;
+	base::flat_map<
+		wl_surface*,
+		AutoDestroyer<QtWayland::org_kde_plasma_surface>
+	> plasmaSurfaces;
 	rpl::lifetime lifetime;
 
-	static const struct wl_registry_listener RegistryListener;
+	static const wl_registry_listener RegistryListener;
 };
 
-const struct wl_registry_listener WaylandIntegration::Private::RegistryListener = {
+const wl_registry_listener WaylandIntegration::Private::RegistryListener = {
 	decltype(wl_registry_listener::global)(+[](
 			Private *data,
 			wl_registry *registry,
@@ -91,40 +58,39 @@ const struct wl_registry_listener WaylandIntegration::Private::RegistryListener 
 			wl_registry *registry,
 			uint32_t name) {
 		if (name == data->plasmaShellName) {
-			free(data->plasmaShell.object());
-			data->plasmaShell.init(nullptr);
+			data->plasmaShell = {};
 			data->plasmaShellName = 0;
 		}
 	}),
 };
 
-org_kde_plasma_surface *WaylandIntegration::Private::plasmaSurface(
+QtWayland::org_kde_plasma_surface WaylandIntegration::Private::plasmaSurface(
 		QWindow *window) {
 	if (!plasmaShell.isInitialized()) {
-		return nullptr;
+		return {};
 	}
 
 	const auto native = window->nativeInterface<QWaylandWindow>();
 	if (!native) {
-		return nullptr;
+		return {};
 	}
 
 	const auto surface = native->surface();
 	if (!surface) {
-		return nullptr;
+		return {};
 	}
 
 	const auto it = plasmaSurfaces.find(surface);
 	if (it != plasmaSurfaces.cend()) {
-		return it->second.get();
+		return it->second;
 	}
 
-	const auto result = plasmaShell.get_surface(surface);
-	if (!result) {
-		return nullptr;
+	const auto plasmaSurface = plasmaShell.get_surface(surface);
+	if (!plasmaSurface) {
+		return {};
 	}
 
-	plasmaSurfaces.emplace(surface, result);
+	const auto result = plasmaSurfaces.emplace(surface, plasmaSurface);
 
 	base::qt_signal_producer(
 		native,
@@ -136,7 +102,7 @@ org_kde_plasma_surface *WaylandIntegration::Private::plasmaSurface(
 		}
 	}, lifetime);
 
-	return result;
+	return result.first->second;
 }
 
 WaylandIntegration::WaylandIntegration()
@@ -157,22 +123,6 @@ WaylandIntegration::WaylandIntegration()
 		&Private::RegistryListener,
 		_private.get());
 
-	base::qt_signal_producer(
-		qApp,
-		&QObject::destroyed
-	) | rpl::start_with_next([=] {
-		// too late for standard destructors, just free
-		for (auto it = _private->plasmaSurfaces.begin()
-			; it != _private->plasmaSurfaces.cend()
-			; ++it) {
-			free(it->second.release());
-			_private->plasmaSurfaces.erase(it);
-		}
-		free(_private->plasmaShell.object());
-		_private->plasmaShell.init(nullptr);
-		free(_private->registry.release());
-	}, _private->lifetime);
-
 	wl_display_roundtrip(display);
 }
 
@@ -180,8 +130,15 @@ WaylandIntegration::~WaylandIntegration() = default;
 
 WaylandIntegration *WaylandIntegration::Instance() {
 	if (!IsWayland()) return nullptr;
-	static WaylandIntegration instance;
-	return &instance;
+	static std::optional<WaylandIntegration> instance(std::in_place);
+	base::qt_signal_producer(
+		QGuiApplication::platformNativeInterface(),
+		&QObject::destroyed
+	) | rpl::start_with_next([&] {
+		instance = std::nullopt;
+	}, instance->_private->lifetime);
+	if (!instance) return nullptr;
+	return &*instance;
 }
 
 bool WaylandIntegration::skipTaskbarSupported() {
@@ -190,11 +147,11 @@ bool WaylandIntegration::skipTaskbarSupported() {
 
 void WaylandIntegration::skipTaskbar(QWindow *window, bool skip) {
 	auto plasmaSurface = _private->plasmaSurface(window);
-	if (!plasmaSurface) {
+	if (!plasmaSurface.isInitialized()) {
 		return;
 	}
 
-	org_kde_plasma_surface_set_skip_taskbar(plasmaSurface, skip);
+	plasmaSurface.set_skip_taskbar(skip);
 }
 
 } // namespace internal

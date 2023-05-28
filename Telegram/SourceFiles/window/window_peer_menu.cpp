@@ -35,6 +35,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/peers/edit_contact_box.h"
 #include "boxes/share_box.h"
 #include "calls/calls_instance.h"
+#include "inline_bots/bot_attach_web_view.h" // InlineBots::PeerType.
 #include "ui/boxes/report_box.h"
 #include "ui/toast/toast.h"
 #include "ui/text/format_values.h"
@@ -1687,7 +1688,8 @@ QPointer<Ui::BoxContent> ShowChooseRecipientBox(
 		not_null<Window::SessionNavigation*> navigation,
 		FnMut<bool(not_null<Data::Thread*>)> &&chosen,
 		rpl::producer<QString> titleOverride,
-		FnMut<void()> &&successCallback) {
+		FnMut<void()> &&successCallback,
+		InlineBots::PeerTypes typesRestriction) {
 	const auto weak = std::make_shared<QPointer<Ui::BoxContent>>();
 	auto callback = [
 		chosen = std::move(chosen),
@@ -1703,6 +1705,23 @@ QPointer<Ui::BoxContent> ShowChooseRecipientBox(
 			success();
 		}
 	};
+	auto filter = typesRestriction
+		? [=](not_null<Data::Thread*> thread) -> bool {
+			using namespace InlineBots;
+			const auto peer = thread->peer();
+			if (const auto user = peer->asUser()) {
+				if (user->isBot()) {
+					return (typesRestriction & PeerType::Bot);
+				} else {
+					return (typesRestriction & PeerType::User);
+				}
+			} else if (peer->isBroadcast()) {
+				return (typesRestriction & PeerType::Broadcast);
+			} else {
+				return (typesRestriction & PeerType::Group);
+			}
+		}
+		: Fn<bool(not_null<Data::Thread*>)>();
 	auto initBox = [=](not_null<PeerListBox*> box) {
 		box->addButton(tr::lng_cancel(), [box] {
 			box->closeBox();
@@ -1714,7 +1733,8 @@ QPointer<Ui::BoxContent> ShowChooseRecipientBox(
 	*weak = navigation->parentController()->show(Box<PeerListBox>(
 		std::make_unique<ChooseRecipientBoxController>(
 			&navigation->session(),
-			std::move(callback)),
+			std::move(callback),
+			std::move(filter)),
 		std::move(initBox)));
 	return weak->data();
 }

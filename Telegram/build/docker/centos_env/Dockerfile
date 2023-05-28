@@ -1,6 +1,6 @@
 {%- set GIT = "https://github.com" -%}
 {%- set GIT_FREEDESKTOP = GIT ~ "/gitlab-freedesktop-mirrors" -%}
-{%- set QT = "6.5.0" -%}
+{%- set QT = "6.5.1" -%}
 {%- set QT_TAG = "v" ~ QT -%}
 {%- set QT_PREFIX = "/usr/local/desktop-app/Qt-" ~ QT -%}
 {%- set OPENSSL_VER = "1_1_1" -%}
@@ -58,7 +58,7 @@ ENV CXXFLAGS $CFLAGS
 FROM builder AS patches
 RUN git clone {{ GIT }}/desktop-app/patches.git \
 	&& cd patches \
-	&& git checkout bf05b2a1cc \
+	&& git checkout 1d72fdb335 \
 	&& rm -rf .git
 
 FROM builder AS nasm
@@ -694,7 +694,7 @@ RUN git clone -b 2.76.0 --depth=1 {{ GIT }}/GNOME/glibmm.git \
 	&& cd .. \
 	&& rm -rf glibmm
 
-FROM patches AS gobject-introspection
+FROM builder AS gobject-introspection
 COPY --link --from=libffi {{ LibrariesPath }}/libffi-cache /
 COPY --link --from=glibmm {{ LibrariesPath }}/glibmm-cache /
 
@@ -744,7 +744,6 @@ RUN git clone -b {{ QT_TAG }} --depth=1 https://code.qt.io/qt/qt5.git qt_{{ QT }
 		-qt-harfbuzz \
 		-qt-pcre \
 		-no-icu \
-		-no-feature-xcb-xlib \
 		-no-feature-xcb-sm \
 		-no-feature-egl-extension-platform-wayland \
 		-static \

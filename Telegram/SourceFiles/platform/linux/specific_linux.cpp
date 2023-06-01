@@ -674,21 +674,21 @@ void start() {
 				+ u".desktop"_q;
 		}
 
-		if (!Core::UpdaterDisabled()) {
-			QByteArray md5Hash(h);
-			if (!Launcher::Instance().customWorkingDir()) {
-				const auto exePath = QFile::encodeName(
-					cExeDir() + cExeName());
+		//if (!Core::UpdaterDisabled()) {
+		//	QByteArray md5Hash(h);
+		//	if (!Launcher::Instance().customWorkingDir()) {
+		//		const auto exePath = QFile::encodeName(
+		//			cExeDir() + cExeName());
 
-				hashMd5Hex(
-					exePath.constData(),
-					exePath.size(),
-					md5Hash.data());
-			}
+		//		hashMd5Hex(
+		//			exePath.constData(),
+		//			exePath.size(),
+		//			md5Hash.data());
+		//	}
 
-			return u"org.telegram.desktop._%1.desktop"_q.arg(
-				md5Hash.constData());
-		}
+		//	return u"org.telegram.desktop._%1.desktop"_q.arg(
+		//		md5Hash.constData());
+		//}
 
 		return u"org.telegram.desktop.desktop"_q;
 	}());

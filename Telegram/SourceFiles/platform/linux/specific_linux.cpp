@@ -53,6 +53,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <iostream>
 
+#include "core/version.h"
+
 using namespace Platform;
 using Platform::internal::WaylandIntegration;
 
@@ -471,9 +473,8 @@ bool GenerateDesktopFile(
 			appimagePath.size(),
 			md5Hash);
 
-		QFile::remove(u"%1appimagekit_%2-%3.desktop"_q.arg(
+		QFile::remove(u"%1appimagekit_%2.desktop"_q.arg(
 			targetPath,
-			md5Hash,
 			AppName.utf16().replace(' ', '_')));
 
 		const auto d = QFile::encodeName(QDir(cWorkingDir()).absolutePath());
@@ -485,9 +486,8 @@ bool GenerateDesktopFile(
 			hashMd5Hex(exePath.constData(), exePath.size(), md5Hash);
 		}
 
-		QFile::remove(u"%1org.telegram.desktop.%2.desktop"_q.arg(
-			targetPath,
-			md5Hash));
+		QFile::remove(u"%1org.telegram.desktop.desktop"_q.arg(
+			targetPath));
 	}
 
 	return true;

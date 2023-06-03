@@ -53,8 +53,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <iostream>
 
-#include "core/version.h"
-
 using namespace Platform;
 using Platform::internal::WaylandIntegration;
 

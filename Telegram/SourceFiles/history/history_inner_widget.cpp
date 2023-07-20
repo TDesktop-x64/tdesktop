@@ -2088,7 +2088,7 @@ void HistoryInner::contextMenuEvent(QContextMenuEvent *e) {
 Api::SendAction HistoryInner::prepareSendAction(
 		History *history, Api::SendOptions options) const {
 	auto result = Api::SendAction(history, options);
-	result.replyTo = 0;
+	result.replyTo = FullReplyTo();
 	if (history->peer->isUser()) {
 		result.options.sendAs = nullptr;
 	}
@@ -2488,7 +2488,9 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 									message.action.options.sendAs = nullptr;
 								}
 								if (GetEnhancedBool("repeater_reply_to_orig_msg")) {
-									message.action.replyTo = item->idOriginal();
+									message.action.replyTo = FullReplyTo{
+																.msgId = item->idOriginal(),
+															};
 								}
 								api->sendMessage(std::move(message));
 							}, &st::menuIconDiscussion);
@@ -2502,7 +2504,9 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 										action.options.sendAs = nullptr;
 									}
 									if (GetEnhancedBool("repeater_reply_to_orig_msg")) {
-										action.replyTo = item->idOriginal();
+										action.replyTo = FullReplyTo{
+															.msgId = item->idOriginal(),
+														};
 									}
 
 									const auto history = item->history()->peer->owner().history(item->history()->peer);
@@ -2783,7 +2787,9 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 									message.action.options.sendAs = nullptr;
 								}
 								if (GetEnhancedBool("repeater_reply_to_orig_msg")) {
-									message.action.replyTo = item->idOriginal();
+									message.action.replyTo = FullReplyTo{
+																.msgId = item->idOriginal(),
+															};
 								}
 								api->sendMessage(std::move(message));
 							}, &st::menuIconDiscussion);

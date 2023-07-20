@@ -489,7 +489,7 @@ void AddMsgsFromUserAction(
 Api::SendAction prepareSendAction(
 		History *history, Api::SendOptions options) {
 	auto result = Api::SendAction(history, options);
-	result.replyTo = 0;
+	result.replyTo = FullReplyTo();
 	if (history->peer->isUser()) {
 		result.options.sendAs = nullptr;
 	}
@@ -520,8 +520,10 @@ void AddRepeaterAction(
 					}
 
 					if (item->topic()) {
-						action.replyTo = item->topicRootId();
-						action.topicRootId = item->topicRootId();
+						action.replyTo = FullReplyTo{
+											.msgId = item->topicRootId(),
+											.topicRootId = item->topicRootId(),
+										};
 					}
 
 					const auto history = item->history()->peer->owner().history(item->history()->peer);
@@ -541,11 +543,13 @@ void AddRepeaterAction(
 						message.action.options.sendAs = nullptr;
 					}
 					if (item->topic()) {
-						message.action.replyTo = item->topicRootId();
-						message.action.topicRootId = item->topicRootId();
+						message.action.replyTo = FullReplyTo{
+													.msgId = item->topicRootId(),
+													.topicRootId = item->topicRootId(),
+												};
 					}
 					if (GetEnhancedBool("repeater_reply_to_orig_msg")) {
-						message.action.replyTo = item->idOriginal();
+						message.action.replyTo.msgId = item->idOriginal();
 					}
 					api->sendMessage(std::move(message));
 				}, &st::menuIconDiscussion);
@@ -560,11 +564,13 @@ void AddRepeaterAction(
 							action.options.sendAs = nullptr;
 						}
 						if (item->topic()) {
-							action.replyTo = item->topicRootId();
-							action.topicRootId = item->topicRootId();
+							action.replyTo = FullReplyTo{
+												.msgId = item->topicRootId(),
+												.topicRootId = item->topicRootId(),
+											};
 						}
 						if (GetEnhancedBool("repeater_reply_to_orig_msg")) {
-							action.replyTo = item->idOriginal();
+							action.replyTo.msgId = item->idOriginal();
 						}
 
 						const auto history = item->history()->peer->owner().history(item->history()->peer);
@@ -584,8 +590,10 @@ void AddRepeaterAction(
 							message.action.options.sendAs = nullptr;
 						}
 						if (item->topic()) {
-							message.action.replyTo = item->topicRootId();
-							message.action.topicRootId = item->topicRootId();
+							message.action.replyTo = FullReplyTo{
+														.msgId = item->topicRootId(),
+														.topicRootId = item->topicRootId(),
+													};
 						}
 						Api::SendExistingDocument(std::move(message), document);
 					}, &st::menuIconDiscussion);

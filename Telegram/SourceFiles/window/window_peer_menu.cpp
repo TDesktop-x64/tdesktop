@@ -2047,7 +2047,7 @@ QPointer<Ui::BoxContent> ShowOldForwardMessagesBox(
 Api::SendAction prepareSendAction(
 		History *history, Api::SendOptions options) {
 	auto result = Api::SendAction(history, options);
-	result.replyTo = 0;
+	result.replyTo = FullReplyTo();
 	return result;
 }
 
@@ -2162,7 +2162,7 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 				message.textWithTags = comment;
 				message.action.options = options;
 				message.action.clearDraft = false;
-				message.action.topicRootId = topicRootId;
+				message.action.replyTo.topicRootId = topicRootId;
 				api.sendMessage(std::move(message));
 			}
 			histories.sendRequest(history, requestType, [=](Fn<void()> finish) {

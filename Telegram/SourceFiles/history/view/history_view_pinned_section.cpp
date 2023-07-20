@@ -46,6 +46,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "platform/platform_specific.h"
 #include "lang/lang_keys.h"
 #include "styles/style_chat.h"
+#include "styles/style_chat_helpers.h"
 #include "styles/style_window.h"
 #include "styles/style_info.h"
 #include "styles/style_boxes.h"
@@ -508,6 +509,9 @@ void PinnedWidget::listDeleteRequest() {
 	confirmDeleteSelected();
 }
 
+void PinnedWidget::listTryProcessKeyInput(not_null<QKeyEvent*> e) {
+}
+
 rpl::producer<Data::MessagesSlice> PinnedWidget::listSource(
 		Data::MessagePosition aroundId,
 		int limitBefore,
@@ -654,14 +658,14 @@ void PinnedWidget::listShowPremiumToast(not_null<DocumentData*> document) {
 void PinnedWidget::listOpenPhoto(
 		not_null<PhotoData*> photo,
 		FullMsgId context) {
-	controller()->openPhoto(photo, context, MsgId());
+	controller()->openPhoto(photo, { context });
 }
 
 void PinnedWidget::listOpenDocument(
 		not_null<DocumentData*> document,
 		FullMsgId context,
 		bool showInMediaView) {
-	controller()->openDocument(document, context, MsgId(), showInMediaView);
+	controller()->openDocument(document, showInMediaView, { context });
 }
 
 void PinnedWidget::listPaintEmpty(

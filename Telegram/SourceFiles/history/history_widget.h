@@ -285,6 +285,8 @@ public:
 
 	bool notify_switchInlineBotButtonReceived(const QString &query, UserData *samePeerBot, MsgId samePeerReplyTo);
 
+	void tryProcessKeyInput(not_null<QKeyEvent*> e);
+
 	~HistoryWidget();
 
 protected:

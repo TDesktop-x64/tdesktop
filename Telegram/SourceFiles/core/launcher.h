@@ -20,9 +20,15 @@ public:
 
 	static std::unique_ptr<Launcher> Create(int argc, char *argv[]);
 
+	static Launcher &Instance() {
+		Expects(InstanceSetter::Instance != nullptr);
+
+		return *InstanceSetter::Instance;
+	}
+
 	virtual int exec();
 
-	QString argumentsString() const;
+	const QStringList &arguments() const;
 	bool customWorkingDir() const;
 
 	uint64 installationTag() const;
@@ -32,7 +38,7 @@ public:
 	void writeDebugModeSetting();
 	void writeInstallBetaVersionsSetting();
 
-	virtual ~Launcher() = default;
+	virtual ~Launcher();
 
 protected:
 	enum class UpdaterLaunch {
@@ -60,6 +66,17 @@ private:
 	virtual bool launchUpdater(UpdaterLaunch action) = 0;
 
 	int executeApplication();
+
+	struct InstanceSetter {
+		InstanceSetter(not_null<Launcher*> instance) {
+			Expects(Instance == nullptr);
+
+			Instance = instance;
+		}
+
+		static Launcher *Instance;
+	};
+	InstanceSetter _setter = { this };
 
 	int _argc;
 	char **_argv;

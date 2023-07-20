@@ -281,6 +281,8 @@ base::options::toggle OptionFractionalScalingEnabled({
 const char kOptionFractionalScalingEnabled[] = "fractional-scaling-enabled";
 const char kOptionFreeType[] = "freetype";
 
+Launcher *Launcher::InstanceSetter::Instance = nullptr;
+
 std::unique_ptr<Launcher> Launcher::Create(int argc, char *argv[]) {
 	return std::make_unique<Platform::Launcher>(argc, argv);
 }
@@ -288,15 +290,18 @@ std::unique_ptr<Launcher> Launcher::Create(int argc, char *argv[]) {
 Launcher::Launcher(int argc, char *argv[])
 : _argc(argc)
 , _argv(argv)
+, _arguments(readArguments(_argc, _argv))
 , _baseIntegration(_argc, _argv) {
 	crl::toggle_fp_exceptions(true);
 
 	base::Integration::Set(&_baseIntegration);
 }
 
-void Launcher::init() {
-	_arguments = readArguments(_argc, _argv);
+Launcher::~Launcher() {
+	InstanceSetter::Instance = nullptr;
+}
 
+void Launcher::init() {
 	prepareSettings();
 	initQtMessageLogging();
 
@@ -343,7 +348,7 @@ int Launcher::exec() {
 	}
 
 	// Must be started before Platform is started.
-	Logs::start(this);
+	Logs::start();
 	base::options::init(cWorkingDir() + "tdata/experimental_options.json");
 
 	// Must be called after options are inited.
@@ -425,8 +430,8 @@ QStringList Launcher::readArguments(int argc, char *argv[]) const {
 	return result;
 }
 
-QString Launcher::argumentsString() const {
-	return _arguments.join(' ');
+const QStringList &Launcher::arguments() const {
+	return _arguments;
 }
 
 bool Launcher::customWorkingDir() const {
@@ -436,17 +441,6 @@ bool Launcher::customWorkingDir() const {
 void Launcher::prepareSettings() {
 	auto path = base::Platform::CurrentExecutablePath(_argc, _argv);
 	LOG(("Executable path before check: %1").arg(path));
-	if (!path.isEmpty()) {
-		auto info = QFileInfo(path);
-		if (info.isSymLink()) {
-			info = QFileInfo(info.symLinkTarget());
-		}
-		if (info.exists()) {
-			const auto dir = info.absoluteDir().absolutePath();
-			gExeDir = (dir.endsWith('/') ? dir : (dir + '/'));
-			gExeName = info.fileName();
-		}
-	}
 	if (cExeName().isEmpty()) {
 		LOG(("WARNING: Could not compute executable path, some features will be disabled."));
 	}
@@ -558,7 +552,7 @@ void Launcher::processArguments() {
 
 int Launcher::executeApplication() {
 	FilteredCommandLineArguments arguments(_argc, _argv);
-	Sandbox sandbox(this, arguments.count(), arguments.values());
+	Sandbox sandbox(arguments.count(), arguments.values());
 	Ui::MainQueueProcessor processor;
 	base::ConcurrentTimerEnvironment environment;
 	return sandbox.start();

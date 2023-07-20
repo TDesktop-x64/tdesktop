@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace style {
 struct ShortInfoCover;
+struct ShortInfoBox;
 } // namespace style
 
 namespace Media::Streaming {
@@ -145,7 +146,8 @@ public:
 		rpl::producer<PeerShortInfoFields> fields,
 		rpl::producer<QString> status,
 		rpl::producer<PeerShortInfoUserpic> userpic,
-		Fn<bool()> videoPaused);
+		Fn<bool()> videoPaused,
+		const style::ShortInfoBox *stOverride);
 	~PeerShortInfoBox();
 
 	[[nodiscard]] rpl::producer<> openRequests() const;
@@ -168,6 +170,7 @@ private:
 	[[nodiscard]] rpl::producer<TextWithEntities> aboutValue() const;
 	[[nodiscard]] rpl::producer<QString> userIdValue() const;
 
+	const style::ShortInfoBox &_st;
 	const PeerShortInfoType _type = PeerShortInfoType::User;
 
 	rpl::variable<PeerShortInfoFields> _fields;

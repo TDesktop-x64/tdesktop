@@ -3347,7 +3347,8 @@ bool InnerWidget::chooseRow(
 			row.newWindow = (modifiers & Qt::ControlModifier);
 		}
 		row.userpicClick = (_lastRowLocalMouseX >= 0)
-			&& (_lastRowLocalMouseX < _st->nameLeft);
+			&& (_lastRowLocalMouseX < _st->nameLeft)
+			&& (width() > _narrowWidth);
 		return row;
 	};
 	auto chosen = modifyChosenRow(computeChosenRow(), modifiers);

@@ -548,6 +548,7 @@ void ListWidget::refreshRows() {
 	resizeToWidth(width());
 	restoreScrollState();
 	mouseActionUpdate();
+	update();
 }
 
 bool ListWidget::preventAutoHide() const {
@@ -1943,6 +1944,7 @@ void ListWidget::applyDragSelection(SelectedMap &applyTo) const {
 
 void ListWidget::refreshHeight() {
 	resize(width(), recountHeight());
+	update();
 }
 
 int ListWidget::recountHeight() {

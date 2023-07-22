@@ -746,7 +746,7 @@ void MainMenu::setupMenu() {
 		});
 		addAction(
 			tr::lng_create_supergroup_title(),
-			{ &st::settingsIconGroup, kIconLightBlue }
+			{ &st::menuIconGroups }
 		)->setClickedCallback([=] {
 			controller->showNewSupergroup();
 		});
@@ -864,7 +864,7 @@ void MainMenu::setupMenu() {
 
 	_showPhoneToggle = addAction(
 		tr::lng_settings_show_phone_number(),
-		{ &st::settingsIconCalls, kIconDarkBlue }
+		{ &st::menuIconPhone }
 	)->toggleOn(rpl::single(GetEnhancedBool("show_phone_number")));
 
 	_showPhoneToggle->toggledChanges(

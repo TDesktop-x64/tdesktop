@@ -411,7 +411,7 @@ bool PeerListStories::handleClick(not_null<PeerData*> peer) {
 	if (point && point->x() < st.photoPosition.x() + st.photoSize) {
 		if (const auto window = peer->session().tryResolveWindow()) {
 			if (const auto user = peer->asUser()) {
-				if (user->hasActiveStories()) {
+				if (!GetEnhancedBool("hide_stories") && user->hasActiveStories()) {
 					window->openPeerStories(peer->id);
 					return true;
 				}
@@ -454,6 +454,9 @@ void PeerListStories::applyForRow(
 		int count,
 		int unread,
 		bool force) {
+	if (GetEnhancedBool("hide_stories")) {
+		return;
+	}
 	auto &counts = _counts[row->id()];
 	if (!force && counts.count == count && counts.unread == unread) {
 		return;

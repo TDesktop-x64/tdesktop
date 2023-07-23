@@ -826,6 +826,9 @@ void Widget::setupMainMenuToggle() {
 }
 
 void Widget::setupStories() {
+	if (GetEnhancedBool("hide_stories")) {
+		return;
+	}
 	_stories->verticalScrollEvents(
 	) | rpl::start_with_next([=](not_null<QWheelEvent*> e) {
 		_scroll->viewportEvent(e);

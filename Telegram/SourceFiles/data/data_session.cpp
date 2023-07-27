@@ -315,7 +315,9 @@ Session::Session(not_null<Main::Session*> session)
 			}
 		}, _lifetime);
 
-		_stories->loadMore(Data::StorySourcesList::NotHidden);
+		if (!GetEnhancedBool("hide_stories")) {
+			_stories->loadMore(Data::StorySourcesList::NotHidden);
+		}
 	});
 }
 

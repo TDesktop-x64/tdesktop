@@ -1061,6 +1061,7 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 	_translateTracker->startBunch();
 	auto readTill = (HistoryItem*)nullptr;
 	auto readContents = base::flat_set<not_null<HistoryItem*>>();
+	const auto markingAsViewed = _widget->markingContentsRead();
 	const auto guard = gsl::finally([&] {
 		if (_pinnedItem) {
 			_translateTracker->add(_pinnedItem);
@@ -1069,7 +1070,7 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 		if (readTill && _widget->markingMessagesRead()) {
 			session().data().histories().readInboxTill(readTill);
 		}
-		if (!readContents.empty() && _widget->markingContentsRead()) {
+		if (markingAsViewed && !readContents.empty()) {
 			session().api().markContentsRead(readContents);
 		}
 		_userpicsCache.clear();
@@ -1102,7 +1103,7 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 			} else if (isUnread) {
 				readTill = item;
 			}
-			if (item->hasViews()) {
+			if (markingAsViewed && item->hasViews()) {
 				session().api().views().scheduleIncrement(item);
 			}
 			if (withReaction) {

@@ -2070,6 +2070,7 @@ void Panel::showNiceTooltip(
 			(normal ? widget().get() : container),
 			std::move(text),
 			st::groupCallNiceTooltipLabel);
+		label->resizeToNaturalWidth(label->naturalWidth());
 		if (normal) {
 			return label;
 		}

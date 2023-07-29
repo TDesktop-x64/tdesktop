@@ -19,7 +19,7 @@ ENV LIBRARY_PATH /usr/local/lib64:/usr/local/lib:/lib64:/lib:/usr/lib64:/usr/lib
 ENV LD_LIBRARY_PATH $LIBRARY_PATH
 ENV PKG_CONFIG_PATH /usr/local/lib64/pkgconfig:/usr/local/lib/pkgconfig:/usr/local/share/pkgconfig
 
-RUN yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm \
+RUN ulimit -n 1024000 && yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm \
 	&& yum -y install https://packages.endpointdev.com/rhel/7/os/x86_64/endpoint-repo.x86_64.rpm \
 	&& yum -y install centos-release-scl \
 	&& yum -y install git rh-python38-python-pip rh-python38-python-devel \

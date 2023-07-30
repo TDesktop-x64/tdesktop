@@ -122,6 +122,9 @@ Main::Session &Stories::session() const {
 }
 
 void Stories::apply(const MTPDupdateStory &data) {
+	if (GetEnhancedBool("hide_stories")) {
+		return;
+	}
 	const auto peerId = peerFromUser(data.vuser_id());
 	const auto user = not_null(_owner->peer(peerId)->asUser());
 	const auto now = base::unixtime::now();
@@ -171,6 +174,9 @@ void Stories::apply(const MTPDupdateStory &data) {
 }
 
 void Stories::apply(const MTPDupdateReadStories &data) {
+	if (GetEnhancedBool("hide_stories")) {
+		return;
+	}
 	bumpReadTill(peerFromUser(data.vuser_id()), data.vmax_id().v);
 }
 

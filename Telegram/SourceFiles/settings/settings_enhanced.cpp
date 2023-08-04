@@ -412,12 +412,12 @@ namespace Settings {
 				tr::lng_settings_auto_unmute(),
 				st::settingsButtonNoIcon
 		)->toggleOn(
-				rpl::single(GetEnhancedBool("show_scheduled_button"))
+				rpl::single(GetEnhancedBool("auto_unmute"))
 		)->toggledChanges(
 		) | rpl::filter([=](bool toggled) {
-			return (toggled != GetEnhancedBool("show_scheduled_button"));
+			return (toggled != GetEnhancedBool("auto_unmute"));
 		}) | rpl::start_with_next([=](bool toggled) {
-			SetEnhancedValue("show_scheduled_button", toggled);
+			SetEnhancedValue("auto_unmute", toggled);
 			EnhancedSettings::Write();
 		}, container->lifetime());
 

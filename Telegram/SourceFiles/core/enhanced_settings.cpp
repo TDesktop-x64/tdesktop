@@ -357,9 +357,9 @@ namespace EnhancedSettings {
 		settings.insert(qsl("disable_cloud_draft_sync"), GetEnhancedBool("disable_cloud_draft_sync"));
 		settings.insert(qsl("hide_classic_fwd"), GetEnhancedBool("hide_classic_fwd"));
 		settings.insert(qsl("show_scheduled_button"), GetEnhancedBool("show_scheduled_button"));
-		settings.insert(qsl("stereo_mode"), GetEnhancedBool("show_scheduled_button"));
+		settings.insert(qsl("stereo_mode"), GetEnhancedBool("stereo_mode"));
 		settings.insert(qsl("radio_controller"), GetEnhancedString("radio_controller"));
-		settings.insert(qsl("auto_unmute"), GetEnhancedBool("show_scheduled_button"));
+		settings.insert(qsl("auto_unmute"), GetEnhancedBool("auto_unmute"));
 		settings.insert(qsl("bitrate"), GetEnhancedInt("bitrate"));
 		settings.insert(qsl("hide_all_chats"), GetEnhancedBool("hide_all_chats"));
 		settings.insert(qsl("replace_edit_button"), GetEnhancedBool("replace_edit_button"));

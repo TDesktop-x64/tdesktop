@@ -900,7 +900,7 @@ void OverlayWidget::savePosition() {
 
 void OverlayWidget::updateGeometry(bool inMove) {
 	initFullScreen();
-	if (_fullscreen) {
+	if (_fullscreen && (!Platform::IsWindows11OrGreater() || !isHidden())) {
 		updateGeometryToScreen(inMove);
 	} else if (_windowed && _normalGeometryInited) {
 		_window->setGeometry(_normalGeometry);
@@ -3214,6 +3214,12 @@ void OverlayWidget::show(OpenRequest request) {
 		// Count top notch on macOS before counting geometry.
 		_helper->beforeShow(_fullscreen);
 	}
+	if (_cachedShow) {
+		_cachedShow->showOrHideBoxOrLayer(
+			v::null,
+			Ui::LayerOption::CloseOther,
+			anim::type::instant);
+	}
 	if (photo) {
 		if (contextItem && contextPeer) {
 			return;
@@ -3542,6 +3548,9 @@ void OverlayWidget::showAndActivate() {
 		_wasWindowedMode = true;
 	} else if (_fullscreen) {
 		_window->showFullScreen();
+		if (Platform::IsWindows11OrGreater()) {
+			updateGeometry();
+		}
 	} else {
 		_window->showMaximized();
 	}
@@ -4058,8 +4067,8 @@ void OverlayWidget::restartAtSeekPosition(crl::time position) {
 		const auto messageId = _message ? _message->fullId() : FullMsgId();
 		options.audioId = AudioMsgId(_document, messageId);
 		options.speed = _stories
-			? Core::App().settings().videoPlaybackSpeed()
-			: 1.;
+			? 1.
+			: Core::App().settings().videoPlaybackSpeed();
 		if (_pip) {
 			_pip = nullptr;
 		}

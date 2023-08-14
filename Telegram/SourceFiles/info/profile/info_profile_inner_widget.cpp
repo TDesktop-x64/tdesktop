@@ -215,7 +215,8 @@ object_ptr<Ui::RpWidget> InnerWidget::setupSharedMedia(
 			st::infoSharedMediaButtonIconPosition);
 	};
 
-	if (auto user = _peer->asUser()) {
+	const auto user = _peer->asUser();
+	if (user && !GetEnhancedBool("hide_stories")) {
 		addStoriesButton(user, st::infoIconMediaStories);
 	}
 	addMediaButton(MediaType::Photo, st::infoIconMediaPhoto);
@@ -225,7 +226,7 @@ object_ptr<Ui::RpWidget> InnerWidget::setupSharedMedia(
 	addMediaButton(MediaType::Link, st::infoIconMediaLink);
 	addMediaButton(MediaType::RoundVoiceFile, st::infoIconMediaVoice);
 	addMediaButton(MediaType::GIF, st::infoIconMediaGif);
-	if (auto user = _peer->asUser()) {
+	if (user) {
 		addCommonGroupsButton(user, st::infoIconMediaGroup);
 	}
 

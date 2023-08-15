@@ -123,7 +123,7 @@ std::map<int, const char*> BetaLogs() {
 		"- Deprecate macOS 10.12, Ubuntu 18.04 and CentOS 7 in July.\n"
 	},
 	{
-		4008011,
+		1000089,
 		"- Fix initial video playback speed.\n"
 
 		"- Use native window resize on Windows 11.\n"

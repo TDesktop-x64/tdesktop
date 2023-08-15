@@ -109,6 +109,7 @@ namespace Settings {
 			return;
 		}
 		_requestId = App::wnd()->sessionController()->session().api().request(MTPcontacts_GetBlocked(
+				MTP_flags(0),
 				MTP_int(offset),
 				MTP_int(100)
 		)).done([=](const MTPcontacts_Blocked &result) {

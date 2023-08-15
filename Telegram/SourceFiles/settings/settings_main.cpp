@@ -402,7 +402,7 @@ void SetupSections(
 	addSection(
 		tr::lng_settings_enhanced(),
 		Enhanced::Id(),
-		{ &st::settingsIconGeneral, kIconRed });
+		{ &st::menuIconManage });
 
 	SetupPowerSavingButton(&controller->window(), container);
 	SetupLanguageButton(&controller->window(), container);

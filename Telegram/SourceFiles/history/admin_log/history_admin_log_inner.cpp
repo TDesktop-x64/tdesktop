@@ -1469,7 +1469,7 @@ void InnerWidget::suggestRestrictParticipant(
 				editRestrictions(false, ChatRestrictionsInfo());
 			}).send();
 		}
-	}, &st::menuIconRestrict);
+	}, &st::menuIconPermissions);
 
 	_menu->addAction(tr::lng_context_remove_from_group(tr::now), [=] {
 		PeerData* sender = nullptr;

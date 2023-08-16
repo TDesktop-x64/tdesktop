@@ -2037,6 +2037,7 @@ void HistoryWidget::showHistory(
 				return;
 			}
 			if (!IsServerMsgId(showAtMsgId)
+				&& !IsClientMsgId(showAtMsgId)
 				&& !IsServerMsgId(-showAtMsgId)) {
 				// To end or to unread.
 				destroyUnreadBar();
@@ -5699,6 +5700,7 @@ int HistoryWidget::countInitialScrollTop() {
 		return _list->historyScrollTop();
 	} else if (_showAtMsgId
 		&& (IsServerMsgId(_showAtMsgId)
+			|| IsClientMsgId(_showAtMsgId)
 			|| IsServerMsgId(-_showAtMsgId))) {
 		const auto item = getItemFromHistoryOrMigrated(_showAtMsgId);
 		const auto itemTop = _list->itemTop(item);

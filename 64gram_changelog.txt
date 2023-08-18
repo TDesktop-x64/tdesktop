@@ -1,0 +1,4 @@
+1.0.89 (16.08.23)
+
+- [Improve] hide stories
+- [Fix] enhanced settings can't save

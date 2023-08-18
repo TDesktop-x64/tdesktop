@@ -1,3 +1,3 @@
 [D-BUS Service]
-Name=org.telegram.desktop
+Name=io.github.tdesktop_x64.TDesktop
 Exec=@CMAKE_INSTALL_FULL_BINDIR@/telegram-desktop

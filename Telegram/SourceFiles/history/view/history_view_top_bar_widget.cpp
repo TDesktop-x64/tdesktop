@@ -45,6 +45,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "calls/calls_instance.h"
 #include "data/data_peer_values.h"
 #include "data/data_group_call.h" // GroupCall::input.
+#include "data/data_chat_filters.h"
 #include "data/data_folder.h"
 #include "data/data_session.h"
 #include "data/data_channel.h"
@@ -726,7 +727,13 @@ void TopBarWidget::infoClicked() {
 
 void TopBarWidget::backClicked() {
 	if (_activeChat.key.folder()) {
-		_controller->closeFolder();
+		if (GetEnhancedBool("hide_all_chats")) {
+			const auto filters = &_controller->session().data().chatsFilters();
+			const auto lookup_id = filters->lookupId(_controller->session().premium() ? 0 : 1);
+			_controller->setActiveChatsFilter(lookup_id);
+		} else {
+			_controller->closeFolder();
+		}
 	} else if (_activeChat.section == Section::ChatsList
 		&& _activeChat.key.history()
 		&& _activeChat.key.history()->isForum()) {

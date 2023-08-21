@@ -1032,9 +1032,13 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 
 		auto trect = inner.marginsRemoved(st::msgPadding);
 
-		const auto reactionsTop = (reactionsInBubble && !_viewButton)
-			? st::mediaInBubbleSkip
+		const auto additionalInfoSkip = (mediaDisplayed
+			&& !media->additionalInfoString().isEmpty())
+			? st::msgDateFont->height
 			: 0;
+		const auto reactionsTop = (reactionsInBubble && !_viewButton)
+			? (additionalInfoSkip + st::mediaInBubbleSkip)
+			: additionalInfoSkip;
 		const auto reactionsHeight = reactionsInBubble
 			? (reactionsTop + _reactions->height())
 			: 0;
@@ -2051,9 +2055,13 @@ TextState Message::textState(
 			return result;
 		}
 		auto trect = inner.marginsRemoved(st::msgPadding);
-		const auto reactionsTop = (reactionsInBubble && !_viewButton)
-			? st::mediaInBubbleSkip
+		const auto additionalInfoSkip = (mediaDisplayed
+			&& !media->additionalInfoString().isEmpty())
+			? st::msgDateFont->height
 			: 0;
+		const auto reactionsTop = (reactionsInBubble && !_viewButton)
+			? (additionalInfoSkip + st::mediaInBubbleSkip)
+			: additionalInfoSkip;
 		const auto reactionsHeight = reactionsInBubble
 			? (reactionsTop + _reactions->height())
 			: 0;
@@ -3794,6 +3802,10 @@ int Message::resizeContentGetHeight(int newWidth) {
 			if (reactionsInBubble) {
 				if (!mediaDisplayed || _viewButton) {
 					newHeight += st::mediaInBubbleSkip;
+				} else if (!media->additionalInfoString().isEmpty()) {
+					// In round videos in a web page status text is painted
+					// in the bottom left corner, reactions should be below.
+					newHeight += st::msgDateFont->height;
 				}
 				newHeight += _reactions->height();
 			}

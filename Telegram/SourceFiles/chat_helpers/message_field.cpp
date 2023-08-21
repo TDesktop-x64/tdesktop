@@ -305,6 +305,19 @@ TextWithTags PrepareEditText(not_null<HistoryItem*> item) {
 	};
 }
 
+bool EditTextChanged(
+		not_null<HistoryItem*> item,
+		const TextWithTags &updated) {
+	const auto original = PrepareEditText(item);
+
+	// Tags can be different for the same entities, because for
+	// animated emoji each tag contains a different random number.
+	// So we compare entities instead of tags.
+	return (original.text != updated.text)
+		|| (TextUtilities::ConvertTextTagsToEntities(original.tags)
+			!= TextUtilities::ConvertTextTagsToEntities(updated.tags));
+}
+
 Fn<bool(
 	Ui::InputField::EditLinkSelection selection,
 	QString text,
@@ -621,6 +634,10 @@ void MessageLinksParser::parseNow() {
 	parse();
 }
 
+void MessageLinksParser::setDisabled(bool disabled) {
+	_disabled = disabled;
+}
+
 bool MessageLinksParser::eventFilter(QObject *object, QEvent *event) {
 	if (object == _field) {
 		if (event->type() == QEvent::KeyPress) {
@@ -651,7 +668,7 @@ void MessageLinksParser::parse() {
 	const auto &text = textWithTags.text;
 	const auto &tags = textWithTags.tags;
 	const auto &markdownTags = _field->getMarkdownTags();
-	if (text.isEmpty()) {
+	if (_disabled || text.isEmpty()) {
 		_list = QStringList();
 		return;
 	}

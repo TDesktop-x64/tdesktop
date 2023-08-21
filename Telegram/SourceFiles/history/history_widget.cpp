@@ -1829,7 +1829,10 @@ bool HistoryWidget::notify_switchInlineBotButtonReceived(
 void HistoryWidget::tryProcessKeyInput(not_null<QKeyEvent*> e) {
 	e->accept();
 	keyPressEvent(e);
-	if (!e->isAccepted() && _canSendTexts && _field->isVisible()) {
+	if (!e->isAccepted()
+		&& _canSendTexts
+		&& _field->isVisible()
+		&& !e->text().isEmpty()) {
 		_field->setFocusFast();
 		QCoreApplication::sendEvent(_field->rawTextEdit(), e);
 	}
@@ -1938,12 +1941,6 @@ bool HistoryWidget::applyDraft(FieldHistoryAction fieldHistoryAction) {
 	_textUpdateEvents = TextUpdateEvent::SaveDraft
 		| TextUpdateEvent::SendTyping;
 
-	// Save links from _field to _parsedLinks without generating preview.
-	_previewState = Data::PreviewState::Cancelled;
-	_fieldLinksParser->parseNow();
-	_parsedLinks = _fieldLinksParser->list().current();
-	_previewState = draft->previewState;
-
 	_processingReplyItem = _replyEditMsg = nullptr;
 	_processingReplyId = _replyToId = 0;
 	setEditMsgId(editMsgId);
@@ -1961,6 +1958,19 @@ bool HistoryWidget::applyDraft(FieldHistoryAction fieldHistoryAction) {
 		_processingReplyId = draft ? draft->msgId : MsgId();
 		processReply();
 	}
+
+	// Save links from _field to _parsedLinks without generating preview.
+	_previewState = Data::PreviewState::Cancelled;
+	if (_editMsgId) {
+		_fieldLinksParser->setDisabled(!_replyEditMsg
+			|| (_replyEditMsg->media()
+				&& !_replyEditMsg->media()->webpage()));
+	}
+	_fieldLinksParser->parseNow();
+	_parsedLinks = _fieldLinksParser->list().current();
+	_previewState = draft->previewState;
+	checkPreview();
+
 	return true;
 }
 
@@ -2493,6 +2503,9 @@ void HistoryWidget::registerDraftSource() {
 void HistoryWidget::setEditMsgId(MsgId msgId) {
 	unregisterDraftSources();
 	_editMsgId = msgId;
+	if (_fieldLinksParser && !_editMsgId) {
+		_fieldLinksParser->setDisabled(false);
+	}
 	if (!msgId) {
 		_canReplaceMedia = false;
 	}
@@ -7794,7 +7807,7 @@ void HistoryWidget::escape() {
 		cancelInlineBot();
 	} else if (_editMsgId) {
 		if (_replyEditMsg
-			&& PrepareEditText(_replyEditMsg) != _field->getTextWithTags()) {
+			&& EditTextChanged(_replyEditMsg, _field->getTextWithTags())) {
 			controller()->show(Ui::MakeConfirmBox({
 				.text = tr::lng_cancel_edit_post_sure(),
 				.confirmed = crl::guard(this, [this](Fn<void()> &&close) {

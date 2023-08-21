@@ -1698,7 +1698,6 @@ void HistoryInner::mouseActionStart(const QPoint &screenPos, Qt::MouseButton but
 				if (uponSelected) {
 					_mouseAction = MouseAction::PrepareDrag; // start text drag
 				} else if (!_pressWasInactive) {
-					const auto media = Element::Pressed()->media();
 					if (_mouseCursorState == CursorState::Date) {
 						_mouseAction = MouseAction::PrepareDrag; // start sticker drag or by-date drag
 					} else {
@@ -2554,11 +2553,16 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					_menu->addAction(tr::lng_context_repeater(tr::now), std::move(repeatSubmenu), &st::menuIconDiscussion);
 				}
 				if (item->canDelete()) {
-					_menu->addAction(Ui::DeleteMessageContextAction(
-						_menu->menu(),
-						[=] { deleteItem(itemId); },
-						item->ttlDestroyAt(),
-						[=] { _menu = nullptr; }));
+					const auto callback = [=] { deleteItem(itemId); };
+					if (item->isUploading()) {
+						_menu->addAction(tr::lng_context_cancel_upload(tr::now), callback, &st::menuIconCancel);
+					} else {
+						_menu->addAction(Ui::DeleteMessageContextAction(
+							_menu->menu(),
+							callback,
+							item->ttlDestroyAt(),
+							[=] { _menu = nullptr; }));
+					}
 				}
 				if (!blockSender && item->suggestReport()) {
 					_menu->addAction(tr::lng_context_report_msg(tr::now), [=] {
@@ -3001,9 +3005,12 @@ void HistoryInner::copyContextImage(
 		FullMsgId itemId) {
 	const auto item = session().data().message(itemId);
 	const auto media = photo->activeMediaView();
+	const auto restricted = item
+		? showCopyMediaRestriction(item)
+		: IsServerMsgId(itemId.msg);
 	if (photo->isNull() || !media || !media->loaded()) {
 		return;
-	} else if (!showCopyMediaRestriction(item)) {
+	} else if (!restricted) {
 		media->setToClipboard();
 	}
 }

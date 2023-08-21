@@ -1898,6 +1898,7 @@ void OverlayWidget::resizeContentByScreenSize() {
 		_y = content.y();
 		_w = content.width();
 		_h = content.height();
+		_zoom = 0;
 		updateNavigationControlsGeometry();
 		return;
 	}
@@ -2059,6 +2060,9 @@ void OverlayWidget::zoomOut() {
 }
 
 void OverlayWidget::zoomReset() {
+	if (_stories || _fullScreenVideo) {
+		return;
+	}
 	auto newZoom = _zoom;
 	const auto full = _fullScreenVideo ? _zoomToScreen : _zoomToDefault;
 	if (_zoom == 0) {
@@ -2513,19 +2517,26 @@ void OverlayWidget::downloadMedia() {
 		} else {
 			if (_document->filepath(true).isEmpty()
 				&& !_document->loading()) {
+				const auto document = _document;
+				const auto checkSaveStarted = [=] {
+					if (isHidden() || _document != document) {
+						return;
+					}
+					_documentLoadingTo = _document->loadingFilePath();
+					if (_stories && _documentLoadingTo.isEmpty()) {
+						const auto toName = _document->filepath(true);
+						if (!toName.isEmpty()) {
+							showSaveMsgToast(
+								toName,
+								tr::lng_mediaview_video_saved_to);
+						}
+					}
+				};
 				DocumentSaveClickHandler::SaveAndTrack(
 					_message ? _message->fullId() : FullMsgId(),
 					_document,
-					DocumentSaveClickHandler::Mode::ToFile);
-				_documentLoadingTo = _document->loadingFilePath();
-				if (_stories && _documentLoadingTo.isEmpty()) {
-					toName = _document->filepath(true);
-					if (!toName.isEmpty()) {
-						showSaveMsgToast(
-							toName,
-							tr::lng_mediaview_video_saved_to);
-					}
-				}
+					DocumentSaveClickHandler::Mode::ToFile,
+					crl::guard(_widget, checkSaveStarted));
 			} else {
 				_saveVisible = computeSaveButtonVisible();
 				update(_saveNavOver);
@@ -4384,7 +4395,9 @@ int OverlayWidget::storiesTopNotchSkip() {
 void OverlayWidget::playbackToggleFullScreen() {
 	Expects(_streamed != nullptr);
 
-	if (!videoShown() || (!_streamed->controls && !_fullScreenVideo)) {
+	if (_stories
+		|| !videoShown()
+		|| (!_streamed->controls && !_fullScreenVideo)) {
 		return;
 	}
 	_fullScreenVideo = !_fullScreenVideo;
@@ -5179,7 +5192,9 @@ void OverlayWidget::handleWheelEvent(not_null<QWheelEvent*> e) {
 }
 
 void OverlayWidget::setZoomLevel(int newZoom, bool force) {
-	if (!force && _zoom == newZoom) {
+	if (_stories
+		|| (!force && _zoom == newZoom)
+		|| (_fullScreenVideo && newZoom != kZoomToScreenLevel)) {
 		return;
 	}
 

@@ -1122,10 +1122,7 @@ void Controller::fillManageSection() {
 		//|| canEditInviteLinks
 		|| canViewOrEditLinkedChat
 		|| canEditType) {
-		AddSkip(
-			_controls.buttonsLayout,
-			st::editPeerTopButtonsLayoutSkip,
-			st::editPeerTopButtonsLayoutSkipCustomBottom);
+		AddSkip(_controls.buttonsLayout);
 	}
 
 	if (canEditReactions()) {
@@ -1295,8 +1292,7 @@ void Controller::fillManageSection() {
 	}
 
 	if (canEditStickers || canDeleteChannel) {
-		AddSkip(_controls.buttonsLayout,
-			st::editPeerTopButtonsLayoutSkipCustomTop);
+		AddSkip(_controls.buttonsLayout);
 	}
 
 	if (canEditStickers) {
@@ -1319,6 +1315,10 @@ void Controller::fillManageSection() {
 				: tr::lng_profile_delete_channel)(),
 			[=]{ deleteWithConfirmation(); }
 		);
+	}
+
+	if (canEditStickers || canDeleteChannel) {
+		AddSkip(_controls.buttonsLayout);
 	}
 }
 

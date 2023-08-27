@@ -1,4 +1,4 @@
-﻿# 64Gram – Base on [Telegram Desktop](https://github.com/telegramdesktop/tdesktop)
+﻿# 64Gram – Based on [Telegram Desktop](https://github.com/telegramdesktop/tdesktop)
 
 The source code is published under GPLv3 with OpenSSL exception, the license is available [here][license].
 
@@ -25,6 +25,10 @@ Linux 64 bit
 macOS > 10.12 and above
 
 The latest version is available on the [Release](https://github.com/TDesktop-x64/tdesktop/releases) page.
+
+For Linux users, flatpak is available at Flathub:
+
+<a href='https://flathub.org/apps/io.github.tdesktop_x64.TDesktop'><img width='240' alt='Download on Flathub' src='https://dl.flathub.org/assets/badges/flathub-badge-en.png'/></a>
 
 ## Localization
 

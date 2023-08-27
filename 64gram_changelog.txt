@@ -1,3 +1,9 @@
+1.0.90 (23.08.23)
+
+- [Fix] active chat folder when back from archived chats with hide all chats
+- [Fix] repeater crash when repeat a non-exist message
+- [Fix] active chat folder when hide all chats is enabled
+
 1.0.89 (16.08.23)
 
 - [Improve] hide stories

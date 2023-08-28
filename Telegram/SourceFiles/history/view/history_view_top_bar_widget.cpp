@@ -929,7 +929,7 @@ void TopBarWidget::updateControlsGeometry() {
 
 	auto widthLeft = qMin(width() - buttonsWidth, -2 * st::defaultActiveButton.width);
 	auto buttonFullWidth = qMin(-(widthLeft / 2), 0);
-	if (!GetEnhancedBool("hide_classic_fwd")) {
+	if (!GetEnhancedBool("hide_classic_fwd") && _canForward) {
 		_oldForward->show();
 		_oldForward->setFullWidth(buttonFullWidth);
 	} else {
@@ -943,7 +943,7 @@ void TopBarWidget::updateControlsGeometry() {
 
 	selectedButtonsTop += (height() - _forward->height()) / 2;
 
-	if (!GetEnhancedBool("hide_classic_fwd")) {
+	if (!GetEnhancedBool("hide_classic_fwd") && _canForward) {
 		_oldForward->moveToLeft(buttonsLeft, selectedButtonsTop);
 		if (!_oldForward->isHidden()) {
 			buttonsLeft += _oldForward->width() + st::topBarActionSkip;

@@ -8,7 +8,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_inner_widget.h"
 
 #include "core/file_utilities.h"
-#include "core/crash_reports.h"
 #include <core/shortcuts.h>
 #include "core/click_handler_types.h"
 #include "history/history.h"
@@ -34,7 +33,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "ui/widgets/menu/menu_multiline_action.h"
 #include "ui/widgets/popup_menu.h"
-#include "ui/image/image.h"
 #include "ui/effects/path_shift_gradient.h"
 #include "ui/effects/message_sending_animation_controller.h"
 #include "ui/effects/reaction_fly_animation.h"
@@ -43,16 +41,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/boxes/report_box.h"
 #include "ui/layers/generic_box.h"
 #include "ui/controls/delete_message_context_action.h"
-#include "ui/controls/who_reacted_context_action.h"
 #include "ui/painter.h"
 #include "ui/ui_utility.h"
-#include "ui/cached_round_corners.h"
 #include "ui/inactive_press.h"
-#include "window/window_adaptive.h"
 #include "window/window_session_controller.h"
 #include "window/window_controller.h"
 #include "window/window_peer_menu.h"
-#include "window/window_controller.h"
 #include "window/notifications_manager.h"
 #include "boxes/about_sponsored_box.h"
 #include "boxes/delete_messages_box.h"
@@ -100,12 +94,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_file_origin.h"
 #include "data/data_histories.h"
 #include "data/data_changes.h"
-#include "data/stickers/data_stickers.h"
 #include "data/data_sponsored_messages.h"
 #include "dialogs/ui/dialogs_video_userpic.h"
 #include "settings/settings_premium.h"
 #include "styles/style_chat.h"
-#include "styles/style_window.h" // st::windowMinWidth
 #include "styles/style_menu_icons.h"
 
 #include <QtGui/QClipboard>

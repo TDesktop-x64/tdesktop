@@ -585,7 +585,7 @@ void TopBarWidget::paintTopBar(Painter &p) {
 			{
 				.peer = peer,
 				.verified = &st::dialogsVerifiedIcon,
-				.premium = &st::dialogsPremiumIcon,
+				.premium = &st::dialogsPremiumIcon.icon,
 				.scam = &st::attentionButtonFg,
 				.premiumFg = &st::dialogsVerifiedIconBg,
 				.customEmojiRepaint = [=] { update(); },

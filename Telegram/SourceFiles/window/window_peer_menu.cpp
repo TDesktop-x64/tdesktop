@@ -2009,9 +2009,8 @@ QPointer<Ui::BoxContent> ShowOldForwardMessagesBox(
 
 	const auto field = comment->entity();
 
-	QObject::connect(field, &Ui::InputField::submitted, [=] {
-		submit({});
-	});
+	field->submits(
+	) | rpl::start_with_next([=] { submit({}); }, field->lifetime());
 	InitMessageFieldHandlers(
 		session,
 		show,

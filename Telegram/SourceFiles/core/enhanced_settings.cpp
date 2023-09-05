@@ -12,7 +12,7 @@ https://github.com/TDesktop-x64/tdesktop/blob/dev/LEGAL
 #include "core/application.h"
 #include "base/parse_helper.h"
 #include "facades.h"
-#include "ui/widgets/input_fields.h"
+#include "ui/widgets/fields/input_field.h"
 #include "lang/lang_cloud_manager.h"
 
 #include <QtCore/QJsonDocument>

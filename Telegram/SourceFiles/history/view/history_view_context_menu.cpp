@@ -512,6 +512,7 @@ void AddRepeaterAction(
 		if (GetEnhancedBool("show_repeater_option")) {
 			if (item->allowsForward()) {
 				repeatSubmenu->addAction(tr::lng_context_repeat_msg(tr::now), [=] {
+					if (item->id <= 0) return;
 					const auto api = &item->history()->peer->session().api();
 					auto action = Api::SendAction(item->history()->peer->owner().history(item->history()->peer), Api::SendOptions{ .sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer) });
 					action.clearDraft = false;
@@ -604,6 +605,7 @@ void AddRepeaterAction(
 			}
 			if (item->allowsForward()) {
 				fwdSubmenu->addAction(tr::lng_forward_to_saved_message(tr::now), [=] {
+					if (item->id <= 0) return;
 					const auto api = &item->history()->peer->session().api();
 					auto action = Api::SendAction(item->history()->peer->owner().history(api->session().user()->asUser()));
 					action.clearDraft = false;

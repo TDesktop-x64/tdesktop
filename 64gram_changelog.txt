@@ -1,4 +1,4 @@
-1.0.91 (06.09.23)
+1.0.92 (06.09.23)
 
 - [Fix] crash when repeat or save a non-exist message
 

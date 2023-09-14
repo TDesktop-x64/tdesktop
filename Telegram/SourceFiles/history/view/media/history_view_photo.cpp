@@ -859,6 +859,9 @@ bool Photo::dataLoaded() const {
 }
 
 bool Photo::needInfoDisplay() const {
+	if (_parent->data()->isFakeBotAbout()) {
+		return false;
+	}
 	return _parent->data()->isSending()
 		|| _parent->data()->hasFailed()
 		|| _parent->isUnderCursor()

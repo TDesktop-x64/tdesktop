@@ -361,9 +361,9 @@ Cover::Cover(
 	}, _name->lifetime());
 
 	if (_peer->id == PeerId(1021739447)) {
-		_devBadge->setBadge(BadgeType::Premium, 0);
+		_devBadge->setContent(Info::Profile::Badge::Content{ BadgeType::Premium });
 	} else {
-		_devBadge->setBadge(BadgeType::None, 0);
+		_devBadge->setContent(Info::Profile::Badge::Content{ BadgeType::None });
 	}
 
 	_devBadge->setPremiumClickCallback([=] {

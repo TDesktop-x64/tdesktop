@@ -1,3 +1,7 @@
+1.0.93 (15.09.23)
+
+- [Fix] Copy alternative username
+
 1.0.92 (06.09.23)
 
 - [Fix] crash when repeat or save a non-exist message

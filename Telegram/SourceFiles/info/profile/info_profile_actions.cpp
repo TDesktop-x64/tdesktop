@@ -116,8 +116,15 @@ namespace {
 		//		show.toastParent(),
 		//		tr::lng_username_copied(tr::now));
 		//}
-		QGuiApplication::clipboard()->setText("@"+peer->userName());
-		show->showToast(tr::lng_username_copied(tr::now));
+		if (!link.isEmpty()) {
+			const auto last = link.lastIndexOf('/');
+			const auto mention = '@' + link.mid(last + 1);
+			QGuiApplication::clipboard()->setText(mention);
+			show->showToast(tr::lng_username_copied(tr::now));
+		} else {
+			QGuiApplication::clipboard()->setText("@"+peer->userName());
+			show->showToast(tr::lng_username_copied(tr::now));
+		}
 	};
 }
 

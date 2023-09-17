@@ -1,3 +1,7 @@
+1.0.94 (17.09.23)
+
+- [Fix] pin to top
+
 1.0.93 (15.09.23)
 
 - [Fix] Copy alternative username

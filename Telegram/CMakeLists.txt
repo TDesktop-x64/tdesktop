@@ -1482,6 +1482,7 @@ PRIVATE
     qrc/emoji_5.qrc
     qrc/emoji_6.qrc
     qrc/emoji_7.qrc
+    qrc/emoji_8.qrc
     qrc/emoji_preview.qrc
     qrc/telegram/animations.qrc
     qrc/telegram/export.qrc

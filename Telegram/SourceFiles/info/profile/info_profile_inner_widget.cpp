@@ -202,12 +202,15 @@ object_ptr<Ui::RpWidget> InnerWidget::setupSharedMedia(
 			st::infoSharedMediaButtonIconPosition);
 	};
 	auto addStoriesButton = [&](
-			not_null<UserData*> user,
+			not_null<PeerData*> peer,
 			const style::icon &icon) {
+		if (peer->isChat()) {
+			return;
+		}
 		auto result = Media::AddStoriesButton(
 			content,
 			_controller,
-			user,
+			peer,
 			tracker);
 		object_ptr<Profile::FloatingIcon>(
 			result,
@@ -215,9 +218,9 @@ object_ptr<Ui::RpWidget> InnerWidget::setupSharedMedia(
 			st::infoSharedMediaButtonIconPosition);
 	};
 
-	const auto user = _peer->asUser();
+	addStoriesButton(_peer, st::infoIconMediaStories);
 	if (user && !GetEnhancedBool("hide_stories")) {
-		addStoriesButton(user, st::infoIconMediaStories);
+		addStoriesButton(_peer, st::infoIconMediaStories);
 	}
 	addMediaButton(MediaType::Photo, st::infoIconMediaPhoto);
 	addMediaButton(MediaType::Video, st::infoIconMediaVideo);

@@ -5550,10 +5550,15 @@ bool OverlayWidget::handleDoubleClick(
 		Qt::MouseButton button) {
 	updateOver(position);
 
-	if (_over != Over::Video || !_streamed || button != Qt::LeftButton) {
+	if (_over != Over::Video || button != Qt::LeftButton) {
 		return false;
 	} else if (_stories) {
+		if (ClickHandler::getActive()) {
+			return false;
+		}
 		toggleFullScreen(_windowed);
+	} else if (!_streamed) {
+		return false;
 	} else {
 		playbackToggleFullScreen();
 		playbackPauseResume();
@@ -5698,7 +5703,7 @@ void OverlayWidget::updateOver(QPoint pos) {
 		lnk = _groupThumbs->getState(point);
 		lnkhost = this;
 	} else if (_stories) {
-		lnk = _stories->lookupLocationHandler(pos);
+		lnk = _stories->lookupAreaHandler(pos);
 		lnkhost = this;
 	}
 

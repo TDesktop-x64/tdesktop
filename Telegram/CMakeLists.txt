@@ -415,6 +415,7 @@ PRIVATE
     core/crash_report_window.h
     core/crash_reports.cpp
     core/crash_reports.h
+    core/deadlock_detector.h
     core/enhanced_settings.cpp
     core/enhanced_settings.h
     core/file_utilities.cpp

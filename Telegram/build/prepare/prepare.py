@@ -844,6 +844,7 @@ win:
     )
 
 depends:patches/build_libvpx_win.sh
+    %THIRDPARTY_DIR%\\msys64\\usr\\bin\\sed.exe -i 's/-j8/-j%NUMBER_OF_PROCESSORS%/g' ../patches/build_libvpx_win.sh
     bash --login ../patches/build_libvpx_win.sh
 
     SET PATH=%PATH_BACKUP_%
@@ -949,7 +950,7 @@ win:
     SET MSYS2_PATH_TYPE=inherit
 
 depends:patches/build_ffmpeg_win.sh
-    %THIRDPARTY_DIR%\\msys64\\usr\\bin\\sed.exe -i 's/-j4/-j%NUMBER_OF_PROCESSORS%/g' ../patches/build_ffmpeg_win.sh
+    %THIRDPARTY_DIR%\\msys64\\usr\\bin\\sed.exe -i 's/-j8/-j%NUMBER_OF_PROCESSORS%/g' ../patches/build_ffmpeg_win.sh
     bash --login ../patches/build_ffmpeg_win.sh
 
     SET PATH=%PATH_BACKUP_%

@@ -1,3 +1,7 @@
+1.0.97 (26.09.23)
+
+- No changelog
+
 1.0.96 (23.09.23)
 
 - No changelog

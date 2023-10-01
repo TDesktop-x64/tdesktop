@@ -786,10 +786,9 @@ QString ApiWrap::exportDirectMessageLink(
 
 QString ApiWrap::exportDirectStoryLink(not_null<Data::Story*> story) {
 	const auto storyId = story->fullId();
-	const auto user = story->peer()->asUser();
-	Assert(user != nullptr);
+	const auto peer = story->peer();
 	const auto fallback = [&] {
-		const auto base = user->username();
+		const auto base = peer->userName();
 		const auto story = QString::number(storyId.story);
 		const auto query = base + "/s/" + story;
 		return session().createInternalLinkFull(query);
@@ -799,7 +798,7 @@ QString ApiWrap::exportDirectStoryLink(not_null<Data::Story*> story) {
 		? i->second
 		: fallback();
 	request(MTPstories_ExportStoryLink(
-		story->peer()->input,
+		peer->input,
 		MTP_int(story->id())
 	)).done([=](const MTPExportedStoryLink &result) {
 		const auto link = qs(result.data().vlink());
@@ -2446,7 +2445,13 @@ void ApiWrap::refreshFileReference(
 	};
 	v::match(origin.data, [&](Data::FileOriginMessage data) {
 		if (const auto item = _session->data().message(data)) {
-			if (item->isScheduled()) {
+			const auto media = item->media();
+			const auto storyId = media ? media->storyId() : FullStoryId();
+			if (storyId) {
+				request(MTPstories_GetStoriesByID(
+					_session->data().peer(storyId.peer)->input,
+					MTP_vector<MTPint>(1, MTP_int(storyId.story))));
+			} else if (item->isScheduled()) {
 				const auto &scheduled = _session->data().scheduledMessages();
 				const auto realId = scheduled.lookupId(item);
 				request(MTPmessages_GetScheduledMessages(

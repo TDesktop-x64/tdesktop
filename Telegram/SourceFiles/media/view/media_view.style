@@ -1020,3 +1020,4 @@ storiesLikeCountStyle: TextStyle(defaultTextStyle) {
 	linkFont: font(32px semibold);
 	linkFontOver: font(32px semibold underline);
 }
+storiesChangelogFooterWidthMin: 240px;

@@ -1176,8 +1176,11 @@ void Stories::toggleHidden(
 		bool hidden,
 		std::shared_ptr<Ui::Show> show) {
 	const auto peer = _owner->peer(peerId);
+	const auto justRemove = peer->isServiceUser() && hidden;
 	if (peer->hasStoriesHidden() != hidden) {
-		peer->setStoriesHidden(hidden);
+		if (!justRemove) {
+			peer->setStoriesHidden(hidden);
+		}
 		session().api().request(MTPstories_TogglePeerStoriesHidden(
 			peer->input,
 			MTP_bool(hidden)
@@ -1186,7 +1189,7 @@ void Stories::toggleHidden(
 
 	const auto name = peer->shortName();
 	const auto guard = gsl::finally([&] {
-		if (show) {
+		if (show && !justRemove) {
 			const auto phrase = hidden
 				? tr::lng_stories_hidden_to_contacts
 				: tr::lng_stories_shown_in_chats;
@@ -1197,6 +1200,11 @@ void Stories::toggleHidden(
 				Ui::Text::RichLangValue));
 		}
 	});
+
+	if (justRemove) {
+		apply(peer, nullptr);
+		return;
+	}
 
 	const auto i = _all.find(peerId);
 	if (i == end(_all)) {

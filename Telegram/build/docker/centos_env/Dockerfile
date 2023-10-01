@@ -1,7 +1,7 @@
 {%- set GIT = "https://github.com" -%}
 {%- set GIT_FREEDESKTOP = GIT ~ "/gitlab-freedesktop-mirrors" -%}
-{%- set QT = "6.5.2" -%}
-{%- set QT_TAG = "v" ~ QT -%}
+{%- set QT = "6.6.0" -%}
+{%- set QT_TAG = "v" ~ QT ~ "-rc1" -%}
 {%- set QT_PREFIX = "/usr/local/desktop-app/Qt-" ~ QT -%}
 {%- set OPENSSL_VER = "1_1_1" -%}
 {%- set OPENSSL_PREFIX = "/usr/local/desktop-app/openssl-1.1.1" -%}
@@ -54,7 +54,7 @@ FROM builder AS patches
 RUN git init patches \
 	&& cd patches \
 	&& git remote add origin {{ GIT }}/desktop-app/patches.git \
-	&& git fetch --depth=1 origin 2c464cfbd9fa3c1d88335cf9462c8ef96542f87c \
+	&& git fetch --depth=1 origin 413a12468bfdd02b9f1372c5c139753b0c5a432e \
 	&& git reset --hard FETCH_HEAD \
 	&& rm -rf .git
 
@@ -211,7 +211,7 @@ FROM builder AS libvpx
 RUN git init libvpx \
 	&& cd libvpx \
 	&& git remote add origin {{ GIT }}/webmproject/libvpx.git \
-	&& git fetch --depth=1 origin e1c124f8965f166d3e9ca26c9215ebc3ec3a1d72 \
+	&& git fetch --depth=1 origin 51057f4ba894e13f9bba278905bacf6aaaecd992 \
 	&& git reset --hard FETCH_HEAD \
 	&& CFLAGS="$CFLAGS -fno-lto" CXXFLAGS="$CXXFLAGS -fno-lto" ./configure \
 		--disable-examples \
@@ -767,6 +767,7 @@ RUN git clone -b {{ QT_TAG }} --depth=1 https://code.qt.io/qt/qt5.git qt_{{ QT }
 		-qt-harfbuzz \
 		-qt-pcre \
 		-no-icu \
+		INPUT_forkfd_pidfd=no \
 		-no-feature-xcb-sm \
 		-static \
 		-dbus-runtime \

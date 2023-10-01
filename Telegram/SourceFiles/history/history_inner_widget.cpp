@@ -1742,16 +1742,16 @@ std::unique_ptr<QMimeData> HistoryInner::prepareDrag() {
 		return nullptr;
 	}
 
-	const auto mouseActionView = viewByItem(_mouseActionItem);
+	const auto pressedView = viewByItem(_mouseActionItem);
 	bool uponSelected = false;
-	if (mouseActionView) {
+	if (pressedView) {
 		if (!_selected.empty() && _selected.cbegin()->second == FullSelection) {
-			uponSelected = _dragStateItem
-				&& (_selected.find(_dragStateItem) != _selected.cend());
+			uponSelected = _mouseActionItem
+				&& (_selected.find(_mouseActionItem) != _selected.cend());
 		} else {
 			StateRequest request;
 			request.flags |= Ui::Text::StateRequest::Flag::LookupSymbol;
-			auto dragState = mouseActionView->textState(_dragStartPosition, request);
+			auto dragState = pressedView->textState(_dragStartPosition, request);
 			uponSelected = (dragState.cursor == CursorState::Text);
 			if (uponSelected) {
 				if (_selected.empty()
@@ -1792,19 +1792,15 @@ std::unique_ptr<QMimeData> HistoryInner::prepareDrag() {
 			}
 		}
 		return mimeData;
-	} else if (_dragStateItem) {
-		const auto view = viewByItem(_dragStateItem);
-		if (!view) {
-			return nullptr;
-		}
+	} else if (pressedView) {
 		auto forwardIds = MessageIdsList();
 		if (_mouseCursorState == CursorState::Date) {
-			forwardIds = session().data().itemOrItsGroup(_dragStateItem);
-		} else if (view->isHiddenByGroup() && pressedHandler) {
-			forwardIds = MessageIdsList(1, _dragStateItem->fullId());
-		} else if (const auto media = view->media()) {
+			forwardIds = session().data().itemOrItsGroup(_mouseActionItem);
+		} else if (pressedView->isHiddenByGroup() && pressedHandler) {
+			forwardIds = MessageIdsList(1, _mouseActionItem->fullId());
+		} else if (const auto media = pressedView->media()) {
 			if (media->dragItemByHandler(pressedHandler)) {
-				forwardIds = MessageIdsList(1, _dragStateItem->fullId());
+				forwardIds = MessageIdsList(1, _mouseActionItem->fullId());
 			}
 		}
 		if (forwardIds.empty()) {
@@ -1813,7 +1809,7 @@ std::unique_ptr<QMimeData> HistoryInner::prepareDrag() {
 		session().data().setMimeForwardIds(std::move(forwardIds));
 		auto result = std::make_unique<QMimeData>();
 		result->setData(u"application/x-td-forward"_q, "1");
-		if (const auto media = view->media()) {
+		if (const auto media = pressedView->media()) {
 			if (const auto document = media->getDocument()) {
 				const auto filepath = document->filepath(true);
 				if (!filepath.isEmpty()) {
@@ -2371,8 +2367,9 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 		const auto item = _dragStateItem;
 		const auto itemId = item ? item->fullId() : FullMsgId();
 		if (isUponSelected > 0) {
+			const auto selectedText = getSelectedText();
 			if (!hasCopyRestrictionForSelected()
-				&& !getSelectedText().empty()) {
+				&& !selectedText.empty()) {
 				_menu->addAction(
 					(isUponSelected > 1
 						? tr::lng_context_copy_selected_items(tr::now)
@@ -2380,11 +2377,12 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					[=] { copySelectedText(); },
 					&st::menuIconCopy);
 			}
-			if (!Ui::SkipTranslate(getSelectedText().rich)) {
+			if (item && !Ui::SkipTranslate(selectedText.rich)) {
+				const auto peer = item->history()->peer;
 				_menu->addAction(tr::lng_context_translate_selected({}), [=] {
 					_controller->show(Box(
 						Ui::TranslateBox,
-						item->history()->peer,
+						peer,
 						MsgId(),
 						getSelectedText().rich,
 						hasCopyRestrictionForSelected()));
@@ -2426,7 +2424,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					_widget->confirmDeleteSelected();
 				}, &st::menuIconDelete);
 			}
-			if (selectedState.count > 0) {
+			if (selectedState.count > 0 && !hasCopyRestrictionForSelected()) {
 				Menu::AddDownloadFilesAction(_menu, controller, _selected, this);
 			}
 			_menu->addAction(tr::lng_context_clear_selection(tr::now), [=] {
@@ -2603,7 +2601,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					[=] { copySelectedText(); },
 					&st::menuIconCopy);
 			}
-			if (!Ui::SkipTranslate(selectedText.rich)) {
+			if (item && !Ui::SkipTranslate(selectedText.rich)) {
 				const auto peer = item->history()->peer;
 				_menu->addAction(tr::lng_context_translate_selected({}), [=] {
 					_controller->show(Box(
@@ -2740,7 +2738,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					_widget->confirmDeleteSelected();
 				}, &st::menuIconDelete);
 			}
-			if (selectedState.count > 0) {
+			if (selectedState.count > 0 && !hasCopyRestrictionForSelected()) {
 				Menu::AddDownloadFilesAction(_menu, controller, _selected, this);
 			}
 			_menu->addAction(tr::lng_context_clear_selection(tr::now), [=] {
@@ -3172,7 +3170,7 @@ void HistoryInner::keyPressEvent(QKeyEvent *e) {
 		&& !showCopyRestrictionForSelected()) {
 		TextUtilities::SetClipboardText(getSelectedText(), QClipboard::FindBuffer);
 #endif // Q_OS_MAC
-	} else if (e == QKeySequence::Delete) {
+	} else if (e == QKeySequence::Delete || e->key() == Qt::Key_Backspace) {
 		auto selectedState = getSelectionState();
 		if (selectedState.count > 0
 			&& selectedState.canDeleteCount == selectedState.count) {

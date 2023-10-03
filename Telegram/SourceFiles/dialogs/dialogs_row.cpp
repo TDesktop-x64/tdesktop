@@ -448,7 +448,7 @@ void Row::paintUserpic(
 		? ((peer->isUser() || peer->isBroadcast()) ? peer : nullptr)
 		: nullptr;
 	const auto storiesFolder = peer ? nullptr : _id.folder();
-	const auto storiesHas = storiesPeer
+	const auto storiesHas = GetEnhancedBool("hide_stories") ? false : storiesPeer
 		? storiesPeer->hasActiveStories()
 		: storiesFolder
 		? storiesFolder->storiesCount()

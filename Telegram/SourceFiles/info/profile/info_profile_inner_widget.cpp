@@ -219,7 +219,6 @@ object_ptr<Ui::RpWidget> InnerWidget::setupSharedMedia(
 	};
 
 	const auto user = _peer->asUser();
-	addStoriesButton(_peer, st::infoIconMediaStories);
 	if (user && !GetEnhancedBool("hide_stories")) {
 		addStoriesButton(_peer, st::infoIconMediaStories);
 	}

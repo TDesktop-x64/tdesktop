@@ -1,7 +1,7 @@
 {%- set GIT = "https://github.com" -%}
 {%- set GIT_FREEDESKTOP = GIT ~ "/gitlab-freedesktop-mirrors" -%}
 {%- set QT = "6.6.0" -%}
-{%- set QT_TAG = "v" ~ QT ~ "-rc1" -%}
+{%- set QT_TAG = "v" ~ QT -%}
 {%- set QT_PREFIX = "/usr/local/desktop-app/Qt-" ~ QT -%}
 {%- set OPENSSL_VER = "1_1_1" -%}
 {%- set OPENSSL_PREFIX = "/usr/local/desktop-app/openssl-1.1.1" -%}
@@ -54,7 +54,7 @@ FROM builder AS patches
 RUN git init patches \
 	&& cd patches \
 	&& git remote add origin {{ GIT }}/desktop-app/patches.git \
-	&& git fetch --depth=1 origin 413a12468bfdd02b9f1372c5c139753b0c5a432e \
+	&& git fetch --depth=1 origin c80c0d530200e3f27a9a39b4f230919529e73bd2 \
 	&& git reset --hard FETCH_HEAD \
 	&& rm -rf .git
 
@@ -757,6 +757,11 @@ RUN git clone -b {{ QT_TAG }} --depth=1 https://code.qt.io/qt/qt5.git qt_{{ QT }
 	&& git submodule update --init --recursive --depth=1 qtbase qtdeclarative qtwayland qtimageformats qtsvg qtshadertools \
 	&& cd qtbase \
 	&& find ../../patches/qtbase_{{ QT }} -type f -print0 | sort -z | xargs -r0 git apply \
+	&& cd ../qtwayland \
+	&& git fetch origin v6.5.3 \
+	&& git checkout FETCH_HEAD \
+	&& git fetch origin da4bb4885d91fad53a573bbeacf1b0705eb5b1a5 \
+	&& git cherry-pick -n FETCH_HEAD \
 	&& cd .. \
 	&& ./configure -prefix "{{ QT_PREFIX }}" \
 		CMAKE_BUILD_TYPE=None \

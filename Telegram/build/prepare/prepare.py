@@ -952,6 +952,10 @@ win:
     git checkout n11.1.5.1
 """)
 
+stage('regex', """
+    git clone -b boost-1.83.0 https://github.com/boostorg/regex.git
+""")
+
 stage('ffmpeg', """
     git clone https://github.com/FFmpeg/FFmpeg.git ffmpeg
     cd ffmpeg
@@ -1213,7 +1217,7 @@ stage('crashpad', """
 mac:
     git clone https://github.com/desktop-app/crashpad.git
     cd crashpad
-    git checkout c1b7afa2fd
+    git checkout 171b601938
     git submodule init
     git submodule update third_party/mini_chromium
     ZLIB_PATH=$USED_PREFIX/include

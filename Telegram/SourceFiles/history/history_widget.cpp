@@ -38,6 +38,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/chat/message_bar.h"
 #include "ui/chat/attach/attach_send_files_way.h"
 #include "ui/chat/choose_send_as.h"
+#include "ui/effects/spoiler_mess.h"
 #include "ui/image/image.h"
 #include "ui/painter.h"
 #include "ui/power_saving.h"
@@ -1797,7 +1798,7 @@ bool HistoryWidget::notify_switchInlineBotButtonReceived(
 			MessageCursor cursor = {
 				int(textWithTags.text.size()),
 				int(textWithTags.text.size()),
-				QFIXED_MAX,
+				Ui::kQFixedMax,
 			};
 			_history->setLocalDraft(std::make_unique<Data::Draft>(
 				textWithTags,
@@ -6281,7 +6282,11 @@ void HistoryWidget::mousePressEvent(QMouseEvent *e) {
 			crl::guard(_list, [=] { cancelEdit(); }));
 	} else if (_inReplyEditForward) {
 		if (isReadyToForward) {
-			_forwardPanel->editOptions(controller()->uiShow());
+			if (e->button() != Qt::LeftButton) {
+				_forwardPanel->editToNextOption();
+			} else {
+				_forwardPanel->editOptions(controller()->uiShow());
+			}
 		} else {
 			controller()->showPeerHistory(
 				_peer,
@@ -7315,7 +7320,7 @@ void HistoryWidget::editMessage(not_null<HistoryItem*> item) {
 	const auto cursor = MessageCursor {
 		int(editData.text.size()),
 		int(editData.text.size()),
-		QFIXED_MAX
+		Ui::kQFixedMax
 	};
 	const auto previewPage = [&]() -> WebPageData* {
 		if (const auto media = item->media()) {
@@ -7617,7 +7622,7 @@ void HistoryWidget::updatePreview() {
 				Ui::NameTextOptions());
 			auto linkText = QStringView(_previewLinks).split(' ').at(0).toString();
 			_previewDescription.setText(
-				st::messageTextStyle,
+				st::defaultTextStyle,
 				linkText,
 				Ui::DialogTextOptions());
 
@@ -7638,7 +7643,7 @@ void HistoryWidget::updatePreview() {
 				preview.title,
 				Ui::NameTextOptions());
 			_previewDescription.setText(
-				st::messageTextStyle,
+				st::defaultTextStyle,
 				preview.description,
 				Ui::DialogTextOptions());
 		}
@@ -7947,7 +7952,7 @@ void HistoryWidget::updateReplyEditText(not_null<HistoryItem*> item) {
 		.customEmojiRepaint = [=] { updateField(); },
 	};
 	_replyEditMsgText.setMarkedText(
-		st::messageTextStyle,
+		st::defaultTextStyle,
 		item->inReplyText(),
 		Ui::DialogTextOptions(),
 		context);
@@ -8138,7 +8143,7 @@ void HistoryWidget::drawField(Painter &p, const QRect &rect) {
 					.now = now,
 					.pausedEmoji = paused || On(PowerSaving::kEmojiChat),
 					.pausedSpoiler = pausedSpoiler,
-					.elisionLines = 1,
+					.elisionOneLine = true,
 				});
 			} else {
 				p.setFont(st::msgDateFont);

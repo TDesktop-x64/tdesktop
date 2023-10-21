@@ -20,6 +20,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/ui_integration.h"
 #include "core/crash_reports.h"
 #include "core/sandbox.h"
+#include "core/shortcuts.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/buttons.h"
 #include "ui/image/image.h"
@@ -457,6 +458,19 @@ OverlayWidget::OverlayWidget()
 		st::mediaviewFileSize * cIntRetinaFactor(),
 		QImage::Format_ARGB32_Premultiplied);
 	_docRectImage.setDevicePixelRatio(cIntRetinaFactor());
+
+	Shortcuts::Requests(
+	) | rpl::start_with_next([=](not_null<Shortcuts::Request*> request) {
+		request->check(
+			Shortcuts::Command::MediaViewerFullscreen
+		) && request->handle([=] {
+			if (_streamed) {
+				playbackToggleFullScreen();
+				return true;
+			}
+			return false;
+		});
+	}, lifetime());
 
 	setupWindow();
 
@@ -5019,7 +5033,6 @@ void OverlayWidget::paintCaptionContent(
 	}
 	if (inner.intersects(clip)) {
 		p.setPen(st::mediaviewCaptionFg);
-		const auto lineHeight = st::mediaviewCaptionStyle.font->height;
 		_caption.draw(p, {
 			.position = inner.topLeft(),
 			.availableWidth = inner.width(),
@@ -5027,7 +5040,7 @@ void OverlayWidget::paintCaptionContent(
 			.spoiler = Ui::Text::DefaultSpoilerCache(),
 			.pausedEmoji = On(PowerSaving::kEmojiChat),
 			.pausedSpoiler = On(PowerSaving::kChatSpoiler),
-			.elisionLines = inner.height() / lineHeight,
+			.elisionHeight = inner.height(),
 			.elisionRemoveFromEnd = _captionSkipBlockWidth,
 		});
 

@@ -7,7 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "ui/text/text.h" // For QFIXED_MAX
+#include "ui/text/text.h" // Ui::kQFixedMax.
 #include "data/data_peer_id.h"
 #include "data/data_msg_id.h"
 #include "base/qt/qt_compare.h"
@@ -196,7 +196,7 @@ struct MessageCursor {
 
 	int position = 0;
 	int anchor = 0;
-	int scroll = QFIXED_MAX;
+	int scroll = Ui::kQFixedMax;
 
 };
 
@@ -303,6 +303,8 @@ enum class MessageFlag : uint64 {
 	FakeBotAbout          = (1ULL << 36),
 
 	StoryItem             = (1ULL << 37),
+
+	InHighlightProcess    = (1ULL << 38),
 };
 inline constexpr bool is_flag_type(MessageFlag) { return true; }
 using MessageFlags = base::flags<MessageFlag>;

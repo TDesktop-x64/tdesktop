@@ -23,7 +23,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/unixtime.h"
 #include "boxes/delete_messages_box.h"
 #include "boxes/max_invite_box.h"
-#include "boxes/add_contact_box.h"
 #include "boxes/choose_filter_box.h"
 #include "boxes/create_poll_box.h"
 #include "boxes/pin_messages_box.h"
@@ -54,7 +53,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "menu/menu_ttl_validator.h"
 #include "apiwrap.h"
 #include "mainwidget.h"
-#include "mainwindow.h"
 #include "api/api_blocked_peers.h"
 #include "api/api_chat_filters.h"
 #include "api/api_sending.h"
@@ -65,14 +63,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item_helpers.h" // GetErrorTextForSending.
 #include "history/history_widget.h"
 #include "history/view/history_view_context_menu.h"
-#include "window/window_adaptive.h" // Adaptive::isThreeColumn
 #include "window/window_session_controller.h"
 #include "window/window_controller.h"
 #include "settings/settings_advanced.h"
 #include "support/support_helper.h"
-#include "info/info_memento.h"
 #include "info/info_controller.h"
+#include "info/info_memento.h"
 #include "info/profile/info_profile_values.h"
+#include "info/statistics/info_statistics_widget.h"
 #include "info/stories/info_stories_widget.h"
 #include "data/notify/data_notify_settings.h"
 #include "data/data_changes.h"
@@ -82,7 +80,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_poll.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
-#include "data/data_drafts.h"
 #include "data/data_forum.h"
 #include "data/data_forum_topic.h"
 #include "data/data_user.h"
@@ -298,6 +295,7 @@ private:
 	void addSearchTopics();
 	void addDeleteTopic();
 	void addVideoChat();
+	void addViewStatistics();
 
 	not_null<SessionController*> _controller;
 	Dialogs::EntryState _request;
@@ -1012,6 +1010,21 @@ void Filler::addManageChat() {
 	}, &st::menuIconManage);
 }
 
+void Filler::addViewStatistics() {
+	if (const auto channel = _peer->asChannel()) {
+		if (channel->flags() & ChannelDataFlag::CanGetStatistics) {
+			const auto controller = _controller;
+			const auto weak = base::make_weak(_thread);
+			const auto peer = _peer;
+			_addAction(tr::lng_stats_title(tr::now), [=] {
+				if (const auto strong = weak.get()) {
+					controller->showSection(Info::Statistics::Make(peer, {}));
+				}
+			}, &st::menuIconStats);
+		}
+	}
+}
+
 void Filler::addCreatePoll() {
 	const auto can = _topic
 		? Data::CanSend(_topic, ChatRestriction::SendPolls)
@@ -1308,6 +1321,7 @@ void Filler::fillProfileActions() {
 	addGiftPremium();
 	addBotToGroup();
 	addNewMembers();
+	addViewStatistics();
 	addStoryArchive();
 	addManageChat();
 	addTopicLink();

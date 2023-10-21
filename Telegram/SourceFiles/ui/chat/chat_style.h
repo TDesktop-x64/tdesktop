@@ -76,6 +76,8 @@ struct MessageStyle {
 	style::icon historyPollChoiceRight = { Qt::Uninitialized };
 	style::icon historyTranscribeIcon = { Qt::Uninitialized };
 	style::icon historyTranscribeHide = { Qt::Uninitialized };
+	std::unique_ptr<Text::QuotePaintCache> blockquoteCache;
+	std::unique_ptr<Text::QuotePaintCache> preCache;
 
 };
 
@@ -167,6 +169,8 @@ public:
 	void apply(not_null<ChatTheme*> theme);
 	void applyCustomPalette(const style::palette *palette);
 	void applyAdjustedServiceBg(QColor serviceBg);
+
+	[[nodiscard]] std::span<Ui::Text::SpecialColor> highlightColors() const;
 
 	[[nodiscard]] rpl::producer<> paletteChanged() const {
 		return _paletteChanged.events();
@@ -331,6 +335,8 @@ private:
 	mutable CornersPixmaps _msgBotKbOverBgAddCornersLarge;
 	mutable CornersPixmaps _msgSelectOverlayCorners[
 		int(CachedCornerRadius::kCount)];
+
+	mutable std::vector<Ui::Text::SpecialColor> _highlightColors;
 
 	style::TextPalette _historyPsaForwardPalette;
 	style::TextPalette _imgReplyTextPalette;

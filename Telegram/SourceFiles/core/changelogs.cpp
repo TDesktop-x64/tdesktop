@@ -31,7 +31,7 @@ std::map<int, const char*> BetaLogs() {
 		"- Fix memory leak in Direct3D 11 media viewer on Windows.\n"
 	},
 	{
-		4010004,
+		1000099,
 		"- Statistics in channels and group chats.\n"
 
 		"- Nice looking code blocks with syntax highlight.\n"

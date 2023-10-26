@@ -14,7 +14,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item.h"
 #include "info/info_controller.h"
 #include "info/info_memento.h"
-#include "info/boosts/info_boosts_widget.h"
 #include "info/statistics/info_statistics_list_controllers.h"
 #include "info/statistics/info_statistics_recent_message.h"
 #include "info/statistics/info_statistics_widget.h"
@@ -125,10 +124,9 @@ void FillStatistic(
 					ProcessZoom(descriptor, widget, graph.zoomToken, type);
 					widget->setTitle(rpl::duplicate(title));
 				} else if (!graph.error.isEmpty()) {
-					Ui::Toast::Show(descriptor.toastParent, graph.error);
 				}
-			}, [=](const QString &error) {
-			}, [=] {
+			}, [](const QString &error) {
+			}, [] {
 			}, content->lifetime());
 
 			addSkip(wrap->entity());
@@ -514,20 +512,6 @@ void InnerWidget::load() {
 					descriptor.api->channelStats(),
 					descriptor.api->supergroupStats(),
 				};
-				if (_state.stats.channel) {
-					::Settings::AddSkip(inner);
-					const auto button = ::Settings::AddButton(
-						inner,
-						tr::lng_boosts_title(),
-						st::boostsButton);
-					const auto controller = _controller;
-					button->setClickedCallback([=, peer = descriptor.peer] {
-						controller->showSection(Info::Boosts::Make(peer));
-					});
-					::Settings::AddSkip(inner);
-					::Settings::AddDivider(inner);
-					::Settings::AddSkip(inner);
-				}
 				fill();
 
 				finishLoading();
@@ -557,6 +541,14 @@ void InnerWidget::fill() {
 		lifetime().make_state<Api::Statistics>(&_peer->session().api()),
 		_controller->uiShow()->toastParent(),
 	};
+	if (_state.stats.message) {
+		if (const auto i = _peer->owner().message(_contextId)) {
+			::Settings::AddSkip(inner);
+			inner->add(object_ptr<MessagePreview>(this, i, -1, -1, QImage()));
+			::Settings::AddSkip(inner);
+			::Settings::AddDivider(inner);
+		}
+	}
 	FillOverview(inner, _state.stats);
 	FillStatistic(inner, descriptor, _state.stats);
 	const auto &channel = _state.stats.channel;
@@ -568,8 +560,7 @@ void InnerWidget::fill() {
 		const auto showPeerInfo = [=](not_null<PeerData*> peer) {
 			_showRequests.fire({ .info = peer->id });
 		};
-		const auto addSkip = [&](
-				not_null<Ui::VerticalLayout*> c) {
+		const auto addSkip = [&](not_null<Ui::VerticalLayout*> c) {
 			::Settings::AddSkip(c);
 			::Settings::AddDivider(c);
 			::Settings::AddSkip(c);

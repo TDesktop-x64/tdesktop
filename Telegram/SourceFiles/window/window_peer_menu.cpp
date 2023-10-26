@@ -69,6 +69,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "support/support_helper.h"
 #include "info/info_controller.h"
 #include "info/info_memento.h"
+#include "info/boosts/info_boosts_widget.h"
 #include "info/profile/info_profile_values.h"
 #include "info/statistics/info_statistics_widget.h"
 #include "info/stories/info_stories_widget.h"
@@ -1021,6 +1022,13 @@ void Filler::addViewStatistics() {
 					controller->showSection(Info::Statistics::Make(peer, {}));
 				}
 			}, &st::menuIconStats);
+			if (!channel->isMegagroup()) {
+				_addAction(tr::lng_boosts_title(tr::now), [=] {
+					if (const auto strong = weak.get()) {
+						controller->showSection(Info::Boosts::Make(peer));
+					}
+				}, &st::menuIconBoosts);
+			}
 		}
 	}
 }

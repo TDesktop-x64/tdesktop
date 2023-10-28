@@ -360,7 +360,7 @@ HistoryItem::HistoryItem(
 			setMedia(*media);
 			if (_media && _media->webpage()) {
 				if (isBlocked) {
-					_media->webpage()->applyChanges(WebPageType::Article, "", "", "", "", TextWithEntities(), FullStoryId(), nullptr, nullptr, WebPageCollage(), 0, "", 0);
+					_media->webpage()->applyChanges(WebPageType::Article, "", "", "", "", TextWithEntities(), FullStoryId(), nullptr, nullptr,  WebPageCollage(), 0, 0, "", 0);
 				}
 			}
 		}
@@ -3505,7 +3505,7 @@ void HistoryItem::createComponents(const MTPDmessage &data, bool blocked) {
 	if (_media && _media->document() && _media->document()->sticker()) {
 		if (blocked) {
 			config.originalDate = 1;
-			config.senderNameOriginal = QString("Blocked User");
+			config.originalSenderName = QString("Blocked User");
 		}
 	}
 	createComponents(std::move(config));

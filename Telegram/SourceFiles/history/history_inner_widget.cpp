@@ -2315,7 +2315,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			const auto msgSigned = pinItem->mainView()->data()->Get<HistoryMessageSigned>();
 			if (msgSigned) {
 				_menu->addAction(tr::lng_context_show_messages_from(tr::now), [=] {
-					App::searchByHashtag(msgSigned->author, peer, item->from());
+					App::searchByHashtag(msgSigned->postAuthor, peer, item->from());
 				}, &st::menuIconInfo);
 			} else {
 				_menu->addAction(tr::lng_context_show_messages_from(tr::now), [=] {
@@ -2585,7 +2585,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 								}
 								if (GetEnhancedBool("repeater_reply_to_orig_msg")) {
 									message.action.replyTo = FullReplyTo{
-																.msgId = item->idOriginal(),
+																.messageId = item->fullId(),
 															};
 								}
 								api->sendMessage(std::move(message));
@@ -2602,7 +2602,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 									}
 									if (GetEnhancedBool("repeater_reply_to_orig_msg")) {
 										action.replyTo = FullReplyTo{
-															.msgId = item->idOriginal(),
+															.messageId = item->fullId(),
 														};
 									}
 
@@ -2899,7 +2899,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 								}
 								if (GetEnhancedBool("repeater_reply_to_orig_msg")) {
 									message.action.replyTo = FullReplyTo{
-																.msgId = item->idOriginal(),
+																.messageId = item->fullId(),
 															};
 								}
 								api->sendMessage(std::move(message));

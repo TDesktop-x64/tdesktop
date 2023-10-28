@@ -477,7 +477,7 @@ void AddMsgsFromUserAction(
 		const auto msgSigned = item->Get<HistoryMessageSigned>();
 		if (msgSigned) {
 			menu->addAction(tr::lng_context_show_messages_from(tr::now), [=] {
-				App::searchByHashtag(msgSigned->author, peer, item->from());
+				App::searchByHashtag(msgSigned->postAuthor, peer, item->from());
 			}, &st::menuIconInfo);
 		} else {
 			menu->addAction(tr::lng_context_show_messages_from(tr::now), [=] {
@@ -523,7 +523,7 @@ void AddRepeaterAction(
 
 					if (item->topic()) {
 						action.replyTo = FullReplyTo{
-											.msgId = item->topicRootId(),
+											.messageId = item->fullId(),
 											.topicRootId = item->topicRootId(),
 										};
 					}
@@ -547,12 +547,12 @@ void AddRepeaterAction(
 					}
 					if (item->topic()) {
 						message.action.replyTo = FullReplyTo{
-													.msgId = item->topicRootId(),
+													.messageId = item->fullId(),
 													.topicRootId = item->topicRootId(),
 												};
 					}
 					if (GetEnhancedBool("repeater_reply_to_orig_msg")) {
-						message.action.replyTo.msgId = item->idOriginal();
+						message.action.replyTo.messageId = item->fullId();
 					}
 					api->sendMessage(std::move(message));
 				}, &st::menuIconDiscussion);
@@ -569,12 +569,12 @@ void AddRepeaterAction(
 						}
 						if (item->topic()) {
 							action.replyTo = FullReplyTo{
-												.msgId = item->topicRootId(),
+												.messageId = item->fullId(),
 												.topicRootId = item->topicRootId(),
 											};
 						}
 						if (GetEnhancedBool("repeater_reply_to_orig_msg")) {
-							action.replyTo.msgId = item->idOriginal();
+							action.replyTo.messageId = item->fullId();
 						}
 
 						const auto history = item->history()->peer->owner().history(item->history()->peer);
@@ -596,7 +596,7 @@ void AddRepeaterAction(
 						}
 						if (item->topic()) {
 							message.action.replyTo = FullReplyTo{
-														.msgId = item->topicRootId(),
+														.messageId = item->fullId(),
 														.topicRootId = item->topicRootId(),
 													};
 						}

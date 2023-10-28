@@ -12,6 +12,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_text_entities.h"
 #include "api/api_chat_filters.h"
 #include "api/api_chat_invite.h"
+#include "api/api_premium.h"
 #include "base/qthelp_regex.h"
 #include "base/qthelp_url.h"
 #include "lang/lang_cloud_manager.h"
@@ -23,6 +24,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/boxes/confirm_box.h"
 #include "boxes/share_box.h"
 #include "boxes/connection_box.h"
+#include "boxes/gift_premium_box.h"
 #include "boxes/sticker_set_box.h"
 #include "boxes/sessions_box.h"
 #include "boxes/language_box.h"
@@ -347,6 +349,11 @@ bool ResolveUsernameOrPhone(
 		qthelp::UrlParamNameTransform::ToLower);
 	const auto domainParam = params.value(u"domain"_q);
 	const auto appnameParam = params.value(u"appname"_q);
+
+	if (domainParam == u"giftcode"_q && !appnameParam.isEmpty()) {
+		ResolveGiftCode(controller, appnameParam);
+		return true;
+	}
 
 	// Fix t.me/s/username links.
 	const auto webChannelPreviewLink = (domainParam == u"s"_q)
@@ -1138,7 +1145,7 @@ QString TryConvertUrlToLocal(QString url) {
 			"("
 				"/?\\?|"
 				"/?$|"
-				"/[a-zA-Z0-9\\.\\_]+/?(\\?|$)|"
+				"/[a-zA-Z0-9\\.\\_\\-]+/?(\\?|$)|"
 				"/\\d+/?(\\?|$)|"
 				"/s/\\d+/?(\\?|$)|"
 				"/\\d+/\\d+/?(\\?|$)"
@@ -1163,7 +1170,7 @@ QString TryConvertUrlToLocal(QString url) {
 				added = u"&post="_q + postMatch->captured(1);
 			} else if (const auto storyMatch = regex_match(u"^/s/(\\d+)(/?\\?|/?$)"_q, usernameMatch->captured(2))) {
 				added = u"&story="_q + storyMatch->captured(1);
-			} else if (const auto appNameMatch = regex_match(u"^/([a-zA-Z0-9\\.\\_]+)(/?\\?|/?$)"_q, usernameMatch->captured(2))) {
+			} else if (const auto appNameMatch = regex_match(u"^/([a-zA-Z0-9\\.\\_\\-]+)(/?\\?|/?$)"_q, usernameMatch->captured(2))) {
 				added = u"&appname="_q + appNameMatch->captured(1);
 			}
 			return base + added + (params.isEmpty() ? QString() : '&' + params);

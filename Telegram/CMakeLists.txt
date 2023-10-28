@@ -198,6 +198,8 @@ PRIVATE
     boxes/peers/edit_participant_box.h
     boxes/peers/edit_participants_box.cpp
     boxes/peers/edit_participants_box.h
+    boxes/peers/edit_peer_color_box.cpp
+    boxes/peers/edit_peer_color_box.h
     boxes/peers/edit_peer_common.h
     boxes/peers/edit_peer_info_box.cpp
     boxes/peers/edit_peer_info_box.h
@@ -655,6 +657,8 @@ PRIVATE
     history/view/controls/history_view_compose_controls.h
     history/view/controls/history_view_compose_search.cpp
     history/view/controls/history_view_compose_search.h
+    history/view/controls/history_view_draft_options.cpp
+    history/view/controls/history_view_draft_options.h
     history/view/controls/history_view_forward_panel.cpp
     history/view/controls/history_view_forward_panel.h
     history/view/controls/history_view_ttl_button.cpp
@@ -663,6 +667,8 @@ PRIVATE
     history/view/controls/history_view_voice_record_bar.h
     history/view/controls/history_view_voice_record_button.cpp
     history/view/controls/history_view_voice_record_button.h
+    history/view/controls/history_view_webpage_processor.cpp
+    history/view/controls/history_view_webpage_processor.h
     history/view/media/history_view_call.cpp
     history/view/media/history_view_call.h
     history/view/media/history_view_contact.cpp
@@ -681,6 +687,8 @@ PRIVATE
     history/view/media/history_view_game.h
     history/view/media/history_view_gif.cpp
     history/view/media/history_view_gif.h
+    history/view/media/history_view_giveaway.cpp
+    history/view/media/history_view_giveaway.h
     history/view/media/history_view_invoice.cpp
     history/view/media/history_view_invoice.h
     history/view/media/history_view_large_emoji.cpp
@@ -820,20 +828,6 @@ PRIVATE
     history/history_view_highlight_manager.h
     history/history_widget.cpp
     history/history_widget.h
-    info/info_content_widget.cpp
-    info/info_content_widget.h
-    info/info_controller.cpp
-    info/info_controller.h
-    info/info_layer_widget.cpp
-    info/info_layer_widget.h
-    info/info_memento.cpp
-    info/info_memento.h
-    info/info_section_widget.cpp
-    info/info_section_widget.h
-    info/info_top_bar.cpp
-    info/info_top_bar.h
-    info/info_wrap_widget.cpp
-    info/info_wrap_widget.h
     info/boosts/info_boosts_inner_widget.cpp
     info/boosts/info_boosts_inner_widget.h
     info/boosts/info_boosts_widget.cpp
@@ -920,6 +914,20 @@ PRIVATE
     info/userpic/info_userpic_emoji_builder_preview.h
     info/userpic/info_userpic_emoji_builder_widget.cpp
     info/userpic/info_userpic_emoji_builder_widget.h
+    info/info_content_widget.cpp
+    info/info_content_widget.h
+    info/info_controller.cpp
+    info/info_controller.h
+    info/info_layer_widget.cpp
+    info/info_layer_widget.h
+    info/info_memento.cpp
+    info/info_memento.h
+    info/info_section_widget.cpp
+    info/info_section_widget.h
+    info/info_top_bar.cpp
+    info/info_top_bar.h
+    info/info_wrap_widget.cpp
+    info/info_wrap_widget.h
     inline_bots/bot_attach_web_view.cpp
     inline_bots/bot_attach_web_view.h
     inline_bots/inline_bot_layout_internal.cpp

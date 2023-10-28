@@ -77,6 +77,7 @@ public:
 	QString phraseFormattingItalic() override;
 	QString phraseFormattingUnderline() override;
 	QString phraseFormattingStrikeOut() override;
+	QString phraseFormattingBlockquote() override;
 	QString phraseFormattingMonospace() override;
 	QString phraseFormattingSpoiler() override;
 	QString phraseButtonOk() override;
@@ -91,6 +92,7 @@ public:
 	QString phraseBotAllowWrite() override;
 	QString phraseBotAllowWriteTitle() override;
 	QString phraseBotAllowWriteConfirm() override;
+	QString phraseQuoteHeaderCopy() override;
 
 };
 

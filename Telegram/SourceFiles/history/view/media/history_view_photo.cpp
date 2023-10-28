@@ -410,7 +410,7 @@ void Photo::draw(Painter &p, const PaintContext &context) const {
 			.availableWidth = captionw,
 			.palette = &stm->textPalette,
 			.pre = stm->preCache.get(),
-			.blockquote = stm->blockquoteCache.get(),
+			.blockquote = context.quoteCache(parent()->colorIndex()),
 			.colors = context.st->highlightColors(),
 			.spoiler = Ui::Text::DefaultSpoilerCache(),
 			.now = context.now,
@@ -1056,6 +1056,15 @@ bool Photo::videoAutoplayEnabled() const {
 
 TextForMimeData Photo::selectedText(TextSelection selection) const {
 	return _caption.toTextForMimeData(selection);
+}
+
+TextWithEntities Photo::selectedQuote(TextSelection selection) const {
+	return parent()->selectedQuote(_caption, selection);
+}
+
+TextSelection Photo::selectionFromQuote(
+		const TextWithEntities &quote) const {
+	return parent()->selectionFromQuote(_caption, quote);
 }
 
 void Photo::hideSpoilers() {

@@ -354,6 +354,11 @@ ListWidget::ListWidget(
 		update();
 	}, lifetime());
 
+	session().data().peerDecorationsUpdated(
+	) | rpl::start_with_next([=] {
+		update();
+	}, lifetime());
+
 	session().data().itemRemoved(
 	) | rpl::start_with_next([=](not_null<const HistoryItem*> item) {
 		itemRemoved(item);
@@ -1736,7 +1741,7 @@ not_null<Ui::PathShiftGradient*> ListWidget::elementPathShiftGradient() {
 	return _pathGradient.get();
 }
 
-void ListWidget::elementReplyTo(const FullMsgId &to) {
+void ListWidget::elementReplyTo(const FullReplyTo &to) {
 	replyToMessageRequestNotify(to);
 }
 
@@ -2475,7 +2480,7 @@ void ListWidget::mouseDoubleClickEvent(QMouseEvent *e) {
 		mouseActionCancel();
 		switch (CurrentQuickAction()) {
 		case DoubleClickQuickAction::Reply: {
-			replyToMessageRequestNotify(_overElement->data()->fullId());
+			replyToMessageRequestNotify({ _overElement->data()->fullId() });
 		} break;
 		case DoubleClickQuickAction::React: {
 			toggleFavoriteReaction(_overElement);
@@ -2572,6 +2577,7 @@ void ListWidget::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 		: _overElement
 		? _overElement->data().get()
 		: nullptr;
+	const auto overItemView = viewForItem(overItem);
 	const auto clickedReaction = link
 		? link->property(
 			kReactionsCountEmojiProperty).value<Data::ReactionId>()
@@ -2598,6 +2604,9 @@ void ListWidget::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 	request.view = _overElement;
 	request.item = overItem;
 	request.pointState = _overState.pointState;
+	request.quote = (overItemView && _selectedTextItem == overItem)
+		? overItemView->selectedQuote(_selectedTextRange)
+		: TextWithEntities();
 	request.selectedText = _selectedText;
 	request.selectedItems = collectSelectedItems();
 	const auto hasSelection = !request.selectedItems.empty()
@@ -3856,12 +3865,12 @@ bool ListWidget::lastMessageEditRequestNotify() const {
 	}
 }
 
-rpl::producer<FullMsgId> ListWidget::replyToMessageRequested() const {
+rpl::producer<FullReplyTo> ListWidget::replyToMessageRequested() const {
 	return _requestedToReplyToMessage.events();
 }
 
-void ListWidget::replyToMessageRequestNotify(FullMsgId item) {
-	_requestedToReplyToMessage.fire(std::move(item));
+void ListWidget::replyToMessageRequestNotify(FullReplyTo id) {
+	_requestedToReplyToMessage.fire(std::move(id));
 }
 
 rpl::producer<FullMsgId> ListWidget::readMessageRequested() const {
@@ -3879,10 +3888,10 @@ void ListWidget::replyNextMessage(FullMsgId fullId, bool next) {
 			if (!view->data()->isRegular()) {
 				return replyNextMessage(newFullId, next);
 			}
-			replyToMessageRequestNotify(newFullId);
+			replyToMessageRequestNotify({ newFullId });
 			_requestedToShowMessage.fire_copy(newFullId);
 		} else {
-			replyToMessageRequestNotify(FullMsgId());
+			replyToMessageRequestNotify({});
 			_highlighter.clear();
 		}
 	};

@@ -323,7 +323,7 @@ Panel::Panel(
 , _menuButtons(menuButtons)
 , _widget(std::make_unique<SeparatePanel>())
 , _allowClipboardRead(allowClipboardRead) {
-	_widget->setInnerSize(st::paymentsPanelSize);
+	_widget->setInnerSize(st::botWebViewPanelSize);
 	_widget->setWindowFlag(Qt::WindowStaysOnTopHint, false);
 
 	_widget->closeRequests(
@@ -522,7 +522,7 @@ bool Panel::showWebview(
 		_webviewBottom->resize(_webviewBottom->width(), height);
 	}
 	_widget->setMenuAllowed([=](const Ui::Menu::MenuCallback &callback) {
-		if (_menuButtons & MenuButton::Settings) {
+		if (_hasSettingsButton) {
 			callback(tr::lng_bot_settings(tr::now), [=] {
 				postEvent("settings_button_pressed");
 			}, &st::menuIconSettings);
@@ -628,6 +628,8 @@ bool Panel::createWebview(const Webview::ThemeParams &params) {
 			processMainButtonMessage(arguments);
 		} else if (command == "web_app_setup_back_button") {
 			processBackButtonMessage(arguments);
+		} else if (command == "web_app_setup_settings_button") {
+			processSettingsButtonMessage(arguments);
 		} else if (command == "web_app_request_theme") {
 			_themeUpdateForced.fire({});
 		} else if (command == "web_app_request_viewport") {
@@ -656,7 +658,7 @@ bool Panel::createWebview(const Webview::ThemeParams &params) {
 	});
 
 	raw->setNavigationStartHandler([=](const QString &uri, bool newWindow) {
-		if (_delegate->botHandleLocalUri(uri)) {
+		if (_delegate->botHandleLocalUri(uri, false)) {
 			return false;
 		} else if (newWindow) {
 			return true;
@@ -741,16 +743,17 @@ void Panel::switchInlineQueryMessage(const QJsonObject &args) {
 
 void Panel::openTgLink(const QJsonObject &args) {
 	if (args.isEmpty()) {
+		LOG(("BotWebView Error: Bad arguments in 'web_app_open_tg_link'."));
 		_delegate->botClose();
 		return;
 	}
 	const auto path = args["path_full"].toString();
 	if (path.isEmpty()) {
-		LOG(("BotWebView Error: Bad 'path_full' in openTgLink."));
+		LOG(("BotWebView Error: Bad 'path_full' in 'web_app_open_tg_link'."));
 		_delegate->botClose();
 		return;
 	}
-	_delegate->botHandleLocalUri("https://t.me" + path);
+	_delegate->botHandleLocalUri("https://t.me" + path, true);
 }
 
 void Panel::openExternalLink(const QJsonObject &args) {
@@ -1102,6 +1105,10 @@ void Panel::processMainButtonMessage(const QJsonObject &args) {
 
 void Panel::processBackButtonMessage(const QJsonObject &args) {
 	_widget->setBackAllowed(args["is_visible"].toBool());
+}
+
+void Panel::processSettingsButtonMessage(const QJsonObject &args) {
+	_hasSettingsButton = args["is_visible"].toBool();
 }
 
 void Panel::processHeaderColor(const QJsonObject &args) {

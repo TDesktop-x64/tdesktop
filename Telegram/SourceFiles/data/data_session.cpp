@@ -713,6 +713,19 @@ not_null<UserData*> Session::processUser(const MTPUser &data) {
 		if (canShareThisContact != result->canShareThisContactFast()) {
 			flags |= UpdateFlag::CanShareContact;
 		}
+
+		auto decorationsUpdated = false;
+		if (result->changeColorIndex(data.vcolor())) {
+			flags |= UpdateFlag::Color;
+			decorationsUpdated = true;
+		}
+		if (result->changeBackgroundEmojiId(data.vbackground_emoji_id())) {
+			flags |= UpdateFlag::BackgroundEmoji;
+			decorationsUpdated = true;
+		}
+		if (decorationsUpdated && result->isMinimalLoaded()) {
+			_peerDecorationsUpdated.fire_copy(result);
+		}
 	});
 
 	if (minimal) {
@@ -992,6 +1005,18 @@ not_null<PeerData*> Session::processChat(const MTPChat &data) {
 		}
 		if (wasCallNotEmpty != Data::ChannelHasActiveCall(channel)) {
 			flags |= UpdateFlag::GroupCall;
+		}
+		auto decorationsUpdated = false;
+		if (result->changeColorIndex(data.vcolor())) {
+			flags |= UpdateFlag::Color;
+			decorationsUpdated = true;
+		}
+		if (result->changeBackgroundEmojiId(data.vbackground_emoji_id())) {
+			flags |= UpdateFlag::BackgroundEmoji;
+			decorationsUpdated = true;
+		}
+		if (decorationsUpdated && result->isMinimalLoaded()) {
+			_peerDecorationsUpdated.fire_copy(result);
 		}
 	}, [&](const MTPDchannelForbidden &data) {
 		const auto channel = result->asChannel();
@@ -3268,8 +3293,10 @@ not_null<WebPageData*> Session::processWebpage(const MTPWebPage &data) {
 		return processWebpage(data.c_webPage());
 	case mtpc_webPageEmpty: {
 		const auto result = webpage(data.c_webPageEmpty().vid().v);
+		result->type = WebPageType::None;
 		if (result->pendingTill > 0) {
-			result->pendingTill = -1; // failed
+			result->pendingTill = 0;
+			result->failed = 1;
 			notifyWebPageUpdateDelayed(result);
 		}
 		return result;
@@ -3290,12 +3317,13 @@ not_null<WebPageData*> Session::processWebpage(const MTPDwebPage &data) {
 	return result;
 }
 
-not_null<WebPageData*> Session::processWebpage(const MTPDwebPagePending &data) {
+not_null<WebPageData*> Session::processWebpage(
+		const MTPDwebPagePending &data) {
 	constexpr auto kDefaultPendingTimeout = 60;
 	const auto result = webpage(data.vid().v);
 	webpageApplyFields(
 		result,
-		WebPageType::Article,
+		WebPageType::None,
 		QString(),
 		QString(),
 		QString(),
@@ -3307,6 +3335,7 @@ not_null<WebPageData*> Session::processWebpage(const MTPDwebPagePending &data) {
 		WebPageCollage(),
 		0,
 		QString(),
+		false,
 		data.vdate().v
 			? data.vdate().v
 			: (base::unixtime::now() + kDefaultPendingTimeout));
@@ -3330,6 +3359,7 @@ not_null<WebPageData*> Session::webpage(
 		WebPageCollage(),
 		0,
 		QString(),
+		false,
 		TimeId(0));
 }
 
@@ -3346,6 +3376,7 @@ not_null<WebPageData*> Session::webpage(
 		WebPageCollage &&collage,
 		int duration,
 		const QString &author,
+		bool hasLargeMedia,
 		TimeId pendingTill) {
 	const auto result = webpage(id);
 	webpageApplyFields(
@@ -3362,6 +3393,7 @@ not_null<WebPageData*> Session::webpage(
 		std::move(collage),
 		duration,
 		author,
+		hasLargeMedia,
 		pendingTill);
 	return result;
 }
@@ -3461,6 +3493,7 @@ void Session::webpageApplyFields(
 		WebPageCollage(this, data),
 		data.vduration().value_or_empty(),
 		qs(data.vauthor().value_or_empty()),
+		data.is_has_large_media(),
 		pendingTill);
 }
 
@@ -3478,6 +3511,7 @@ void Session::webpageApplyFields(
 		WebPageCollage &&collage,
 		int duration,
 		const QString &author,
+		bool hasLargeMedia,
 		TimeId pendingTill) {
 	const auto requestPending = (!page->pendingTill && pendingTill > 0);
 	const auto changed = page->applyChanges(
@@ -3493,6 +3527,7 @@ void Session::webpageApplyFields(
 		std::move(collage),
 		duration,
 		author,
+		hasLargeMedia,
 		pendingTill);
 	if (requestPending) {
 		_session->api().requestWebPageDelayed(page);
@@ -4326,7 +4361,8 @@ auto Session::dialogsRowReplacements() const
 
 void Session::serviceNotification(
 		const TextWithEntities &message,
-		const MTPMessageMedia &media) {
+		const MTPMessageMedia &media,
+		bool invertMedia) {
 	const auto date = base::unixtime::now();
 	if (!peerLoaded(PeerData::kServiceNotificationsId)) {
 		processUser(MTP_user(
@@ -4349,25 +4385,32 @@ void Session::serviceNotification(
 			MTPstring(), // lang_code
 			MTPEmojiStatus(),
 			MTPVector<MTPUsername>(),
-			MTPint())); // stories_max_id
+			MTPint(), // stories_max_id
+			MTP_int(0), // color
+			MTPlong())); // background_emoji_id
 	}
 	const auto history = this->history(PeerData::kServiceNotificationsId);
+	const auto insert = [=] {
+		insertCheckedServiceNotification(message, media, date, invertMedia);
+	};
 	if (!history->folderKnown()) {
-		histories().requestDialogEntry(history, [=] {
-			insertCheckedServiceNotification(message, media, date);
-		});
+		histories().requestDialogEntry(history, insert);
 	} else {
-		insertCheckedServiceNotification(message, media, date);
+		insert();
 	}
 }
 
 void Session::insertCheckedServiceNotification(
 		const TextWithEntities &message,
 		const MTPMessageMedia &media,
-		TimeId date) {
+		TimeId date,
+		bool invertMedia) {
 	const auto flags = MTPDmessage::Flag::f_entities
 		| MTPDmessage::Flag::f_from_id
-		| MTPDmessage::Flag::f_media;
+		| MTPDmessage::Flag::f_media
+		| (invertMedia
+			? MTPDmessage::Flag::f_invert_media
+			: MTPDmessage::Flag());
 	const auto localFlags = MessageFlag::ClientSideUnread
 		| MessageFlag::Local;
 	auto sending = TextWithEntities(), left = message;
@@ -4509,6 +4552,10 @@ void Session::webViewResultSent(WebViewResultSent &&sent) {
 
 auto Session::webViewResultSent() const -> rpl::producer<WebViewResultSent> {
 	return _webViewResultSent.events();
+}
+
+rpl::producer<not_null<PeerData*>> Session::peerDecorationsUpdated() const {
+	return _peerDecorationsUpdated.events();
 }
 
 void Session::clearLocalStorage() {

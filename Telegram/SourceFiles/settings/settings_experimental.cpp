@@ -20,6 +20,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "chat_helpers/tabbed_panel.h"
 #include "dialogs/dialogs_widget.h"
 #include "dialogs/dialogs_inner_widget.h"
+#include "info/profile/info_profile_actions.h"
 #include "lang/lang_keys.h"
 #include "mainwindow.h"
 #include "media/player/media_player_instance.h"
@@ -143,6 +144,7 @@ void SetupExperimental(
 	addToggle(Core::kOptionFractionalScalingEnabled);
 	addToggle(Window::kOptionViewProfileInChatsListContextMenu);
 	addToggle(Dialogs::kOptionCtrlClickChatNewWindow);
+	addToggle(Info::Profile::kOptionShowPeerIdBelowAbout);
 	addToggle(Ui::GL::kOptionAllowLinuxNvidiaOpenGL);
 	addToggle(Ui::kOptionUseSmallMsgBubbleRadius);
 	addToggle(Media::Player::kOptionDisableAutoplayNext);

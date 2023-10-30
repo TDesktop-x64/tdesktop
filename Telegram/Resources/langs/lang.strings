@@ -546,6 +546,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_workmode_tray" = "Show tray icon";
 "lng_settings_workmode_window" = "Show taskbar icon";
 "lng_settings_close_to_taskbar" = "Close to taskbar";
+"lng_settings_monochrome_icon" = "Use monochrome icon";
 "lng_settings_window_system" = "Window title";
 "lng_settings_title_chat_name" = "Show chat name";
 "lng_settings_title_account_name" = "Show active account";
@@ -1166,6 +1167,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_mute_box_title" = "Mute notifications for...";
 
 "lng_preview_loading" = "Getting Link Info...";
+"lng_preview_cant" = "Could not generate preview for this link.";
 
 "lng_profile_settings_section" = "Settings";
 "lng_profile_bot_settings" = "Bot Settings";
@@ -2370,6 +2372,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_saved_messages" = "Saved Messages";
 "lng_saved_short" = "Save";
 "lng_saved_forward_here" = "Forward messages here for quick access";
+"lng_saved_quote_here" = "Quote here to save";
 
 "lng_scheduled_messages" = "Scheduled Messages";
 "lng_scheduled_messages_empty" = "No scheduled messages here yet...";

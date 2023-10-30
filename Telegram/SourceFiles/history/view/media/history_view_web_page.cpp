@@ -242,7 +242,7 @@ QSize WebPage::countOptimalSize() {
 	using Flag = MediaWebPageFlag;
 	if (_data->hasLargeMedia && (_flags & Flag::ForceLargeMedia)) {
 		_asArticle = 0;
-	} else if (_data->photo && (_flags & Flag::ForceSmallMedia)) {
+	} else if (_data->hasLargeMedia && (_flags & Flag::ForceSmallMedia)) {
 		_asArticle = 1;
 	} else {
 		_asArticle = _data->computeDefaultSmallMedia();
@@ -801,7 +801,11 @@ ClickHandlerPtr WebPage::replaceAttachLink(
 	if (!_attach->isReadyForOpen()
 		|| (_siteName.isEmpty()
 			&& _title.isEmpty()
-			&& _description.isEmpty())) {
+			&& _description.isEmpty())
+		|| (_data->document
+			&& !_data->document->isWallPaper()
+			&& !_data->document->isTheme())
+		|| !_data->collage.items.empty()) {
 		return link;
 	}
 	return _openl;

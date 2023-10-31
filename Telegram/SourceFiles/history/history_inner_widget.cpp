@@ -209,10 +209,6 @@ public:
 			not_null<const Element*> view) override {
 		return (Element::Moused() == view);
 	}
-	[[nodiscard]] float64 elementHighlightOpacity(
-			not_null<const HistoryItem*> item) const override {
-		return _widget ? _widget->elementHighlightOpacity(item) : 0.;
-	}
 	bool elementInSelectionMode() override {
 		return _widget ? _widget->inSelectionMode() : false;
 	}
@@ -1069,6 +1065,7 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 	auto clip = e->rect();
 
 	auto context = preparePaintContext(clip);
+	context.highlightPathCache = &_highlightPathCache;
 	_pathGradient->startFrame(
 		0,
 		width(),
@@ -1152,7 +1149,7 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 			} else if (item->isUnreadMention()
 				&& !item->isUnreadMedia()) {
 				readContents.insert(item);
-				_widget->enqueueMessageHighlight(view);
+				_widget->enqueueMessageHighlight(view, {});
 			}
 		}
 		session().data().reactions().poll(item, context.now);
@@ -1194,6 +1191,7 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 				view,
 				selfromy - mtop,
 				seltoy - mtop);
+			context.highlight = _widget->itemHighlight(view->data());
 			view->draw(p, context);
 			processPainted(view, top, height);
 
@@ -1228,9 +1226,10 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 		const auto &sendingAnimation = _controller->sendingAnimation();
 		while (top < drawToY) {
 			const auto height = view->height();
+			const auto item = view->data();
 			if ((context.clip.y() < height)
 				&& (hdrawtop < top + height)
-				&& !sendingAnimation.hasAnimatedMessage(view->data())) {
+				&& !sendingAnimation.hasAnimatedMessage(item)) {
 				context.reactionInfo
 					= _reactionsManager->currentReactionPaintInfo();
 				context.outbg = view->hasOutLayout();
@@ -1238,6 +1237,7 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 					view,
 					selfromy - htop,
 					seltoy - htop);
+				context.highlight = _widget->itemHighlight(item);
 				view->draw(p, context);
 				processPainted(view, top, height);
 			}
@@ -2432,15 +2432,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				: (Data::CanSendAnything(peer)
 					&& (!peer->isChannel() || peer->asChannel()->amIn()));
 		}();
-		const auto canReply = canSendReply || [&] {
-			const auto peer = item->history()->peer;
-			if (const auto chat = peer->asChat()) {
-				return !chat->isForbidden();
-			} else if (const auto channel = peer->asChannel()) {
-				return !channel->isForbidden();
-			}
-			return true;
-		}();
+		const auto canReply = canSendReply || item->allowsForward();
 		if (canReply) {
 			const auto itemId = item->fullId();
 			const auto quote = selectedQuote(item);
@@ -2451,6 +2443,9 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			_menu->addAction(text, [=] {
 				if (canSendReply) {
 					_widget->replyToMessage({ itemId, quote });
+					if (!quote.empty()) {
+						_widget->clearSelected();
+					}
 				} else {
 					HistoryView::Controls::ShowReplyToChatBox(
 						controller->uiShow(),
@@ -3733,11 +3728,6 @@ bool HistoryInner::elementIntersectsRange(
 void HistoryInner::elementStartStickerLoop(
 		not_null<const Element*> view) {
 	_animatedStickersPlayed.emplace(view->data());
-}
-
-float64 HistoryInner::elementHighlightOpacity(
-		not_null<const HistoryItem*> item) const {
-	return _widget->highlightOpacity(item);
 }
 
 void HistoryInner::elementShowPollResults(

@@ -749,6 +749,7 @@ void Document::draw(
 	if (const auto captioned = Get<HistoryDocumentCaptioned>()) {
 		p.setPen(stm->historyTextFg);
 		_parent->prepareCustomEmojiPaint(p, context, captioned->caption);
+		auto highlightRequest = context.computeHighlightCache();
 		captioned->caption.draw(p, {
 			.position = { st::msgPadding.left(), captiontop },
 			.availableWidth = captionw,
@@ -761,6 +762,7 @@ void Document::draw(
 			.pausedEmoji = context.paused || On(PowerSaving::kEmojiChat),
 			.pausedSpoiler = context.paused || On(PowerSaving::kChatSpoiler),
 			.selection = selection,
+			.highlight = highlightRequest ? &*highlightRequest : nullptr,
 		});
 	}
 }

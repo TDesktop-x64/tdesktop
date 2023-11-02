@@ -890,7 +890,7 @@ void HistoryMessageReply::paint(
 	}
 	Ui::Text::ValidateQuotePaintCache(*cache, quoteSt);
 	Ui::Text::FillQuotePaint(p, rect, *cache, quoteSt);
-	if (backgroundEmoji) {
+	if (!Ui::UncoloredQuoteEnabled() && backgroundEmoji) {
 		ValidateBackgroundEmoji(
 			backgroundEmojiId,
 			backgroundEmoji,

@@ -78,6 +78,10 @@ void EnsurePreCache(
 
 const char kOptionUncoloredQuote[] = "uncolored_quote";
 
+bool UncoloredQuoteEnabled() {
+	return UncoloredQuote.value();
+}
+
 not_null<const MessageStyle*> ChatPaintContext::messageStyle() const {
 	return &st->messageStyle(outbg, selected());
 }

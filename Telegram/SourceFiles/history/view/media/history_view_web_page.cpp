@@ -91,8 +91,8 @@ std::vector<std::unique_ptr<Data::Media>> PrepareCollageMedia(
 		? tr::lng_view_button_theme(tr::now)
 		: (type == WebPageType::Story)
 		? tr::lng_view_button_story(tr::now)
-		: (type == WebPageType::Message)
-		? tr::lng_view_button_message(tr::now)
+		//: (type == WebPageType::Message)
+		//? tr::lng_view_button_message(tr::now)
 		: (type == WebPageType::Group)
 		? tr::lng_view_button_group(tr::now)
 		: (type == WebPageType::WallPaper)
@@ -787,9 +787,9 @@ TextState WebPage::textState(QPoint point, StateRequest request) const {
 			result.link = replaceAttachLink(result.link);
 		}
 	}
-	if (!result.link && outer.contains(point)) {
-		result.link = _openl;
-	}
+	//if (!result.link && outer.contains(point)) {
+	//	result.link = _openl;
+	//}
 	_lastPoint = point - outer.topLeft();
 
 	result.symbol += symbolAdd;
@@ -805,7 +805,8 @@ ClickHandlerPtr WebPage::replaceAttachLink(
 		|| (_data->document
 			&& !_data->document->isWallPaper()
 			&& !_data->document->isTheme())
-		|| !_data->collage.items.empty()) {
+		|| !_data->collage.items.empty()
+		|| _data->photo) {
 		return link;
 	}
 	return _openl;

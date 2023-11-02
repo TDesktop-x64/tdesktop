@@ -186,7 +186,7 @@ public:
 
 	void enqueueMessageHighlight(
 		not_null<HistoryView::Element*> view,
-		TextSelection part);
+		const TextWithEntities &part);
 	[[nodiscard]] Ui::ChatPaintHighlight itemHighlight(
 		not_null<const HistoryItem*> item) const;
 
@@ -558,6 +558,7 @@ private:
 
 	void setupPreview();
 	void editDraftOptions();
+	void jumpToReply(FullReplyTo to);
 
 	void messagesReceived(not_null<PeerData*> peer, const MTPmessages_Messages &messages, int requestId);
 	void messagesFailed(const MTP::Error &error, int requestId);

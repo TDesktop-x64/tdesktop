@@ -1217,7 +1217,7 @@ TextForMimeData Document::selectedText(TextSelection selection) const {
 	return result;
 }
 
-TextWithEntities Document::selectedQuote(TextSelection selection) const {
+SelectedQuote Document::selectedQuote(TextSelection selection) const {
 	if (const auto voice = Get<HistoryDocumentVoice>()) {
 		const auto length = voice->transcribeText.length();
 		if (selection.from < length) {
@@ -1228,16 +1228,21 @@ TextWithEntities Document::selectedQuote(TextSelection selection) const {
 			voice->transcribeText);
 	}
 	if (const auto captioned = Get<HistoryDocumentCaptioned>()) {
-		return parent()->selectedQuote(captioned->caption, selection);
+		return Element::FindSelectedQuote(
+			captioned->caption,
+			selection,
+			_realParent);
 	}
 	return {};
 }
 
 TextSelection Document::selectionFromQuote(
+		not_null<HistoryItem*> item,
 		const TextWithEntities &quote) const {
 	if (const auto captioned = Get<HistoryDocumentCaptioned>()) {
-		const auto result = parent()->selectionFromQuote(
+		const auto result = Element::FindSelectionFromQuote(
 			captioned->caption,
+			item,
 			quote);
 		if (result.empty()) {
 			return {};
@@ -1397,6 +1402,8 @@ void Document::drawGrouped(
 		float64 highlightOpacity,
 		not_null<uint64*> cacheKey,
 		not_null<QPixmap*> cache) const {
+	const auto maybeMediaHighlight = context.highlightPathCache
+		&& context.highlightPathCache->isEmpty();
 	p.translate(geometry.topLeft());
 	draw(
 		p,
@@ -1404,6 +1411,10 @@ void Document::drawGrouped(
 		geometry.width(),
 		LayoutMode::Grouped,
 		rounding);
+	if (maybeMediaHighlight
+		&& !context.highlightPathCache->isEmpty()) {
+		context.highlightPathCache->translate(geometry.topLeft());
+	}
 	p.translate(-geometry.topLeft());
 }
 

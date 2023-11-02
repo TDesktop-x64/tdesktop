@@ -710,13 +710,10 @@ bool ListWidget::isBelowPosition(Data::MessagePosition position) const {
 
 void ListWidget::highlightMessage(
 		FullMsgId itemId,
-		const TextWithEntities &highlightPart) {
-	const auto view = !highlightPart.empty()
-		? viewForItem(itemId)
-		: nullptr;
-	_highlighter.highlight(
-		itemId,
-		view ? view->selectionFromQuote(highlightPart) : TextSelection());
+		const TextWithEntities &part) {
+	if (const auto view = viewForItem(itemId)) {
+		_highlighter.highlight(view, part);
+	}
 }
 
 void ListWidget::showAroundPosition(
@@ -2581,7 +2578,6 @@ void ListWidget::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 		: _overElement
 		? _overElement->data().get()
 		: nullptr;
-	const auto overItemView = viewForItem(overItem);
 	const auto clickedReaction = link
 		? link->property(
 			kReactionsCountEmojiProperty).value<Data::ReactionId>()
@@ -2608,9 +2604,12 @@ void ListWidget::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 	request.view = _overElement;
 	request.item = overItem;
 	request.pointState = _overState.pointState;
-	request.quote = (overItemView && _selectedTextItem == overItem)
-		? overItemView->selectedQuote(_selectedTextRange)
-		: TextWithEntities();
+	const auto quote = (_overElement
+		&& _selectedTextItem == _overElement->data())
+		? _overElement->selectedQuote(_selectedTextRange)
+		: SelectedQuote();
+	request.quote = quote.text;
+	request.quoteItem = quote.item;
 	request.selectedText = _selectedText;
 	request.selectedItems = collectSelectedItems();
 	const auto hasSelection = !request.selectedItems.empty()

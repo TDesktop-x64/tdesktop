@@ -1682,7 +1682,10 @@ void HistoryInner::mouseActionStart(const QPoint &screenPos, Qt::MouseButton but
 		Ui::MarkInactivePress(_controller->widget(), false);
 	}
 
-	if (ClickHandler::getPressed()) {
+	const auto pressed = ClickHandler::getPressed();
+	if (pressed
+		&& (!Element::Hovered()
+			|| !Element::Hovered()->allowTextSelectionByHandler(pressed))) {
 		_mouseAction = MouseAction::PrepareDrag;
 	} else if (inSelectionMode()) {
 		if (_dragStateItem
@@ -2115,7 +2118,7 @@ void HistoryInner::toggleFavoriteReaction(not_null<Element*> view) const {
 	item->toggleReaction(favorite, HistoryItem::ReactionSource::Quick);
 }
 
-TextWithEntities HistoryInner::selectedQuote(
+HistoryView::SelectedQuote HistoryInner::selectedQuote(
 		not_null<HistoryItem*> item) const {
 	if (_selected.size() != 1
 		|| _selected.begin()->first != item
@@ -2434,11 +2437,13 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 		}();
 		const auto canReply = canSendReply || item->allowsForward();
 		if (canReply) {
-			const auto itemId = item->fullId();
-			const auto quote = selectedQuote(item);
-			auto text = quote.empty()
-				? tr::lng_context_reply_msg(tr::now)
-				: tr::lng_context_quote_and_reply(tr::now);
+			const auto selected = selectedQuote(item);
+			auto text = selected
+				? tr::lng_context_quote_and_reply(tr::now)
+				: tr::lng_context_reply_msg(tr::now);
+			const auto replyToItem = selected.item ? selected.item : item;
+			const auto itemId = replyToItem->fullId();
+			const auto quote = selected.text;
 			text.replace('&', u"&&"_q);
 			_menu->addAction(text, [=] {
 				if (canSendReply) {
@@ -4095,6 +4100,10 @@ void HistoryInner::mouseActionUpdate() {
 					if (const auto view = viewByItem(_mouseActionItem)) {
 						selState = view->adjustSelection(selState, _mouseSelectType);
 					}
+				}
+				if (!selState.empty()) {
+					// We started selecting text in web page preview.
+					ClickHandler::unpressed();
 				}
 				if (_selected[_mouseActionItem] != selState) {
 					_selected[_mouseActionItem] = selState;

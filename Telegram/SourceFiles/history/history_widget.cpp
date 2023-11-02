@@ -1293,7 +1293,7 @@ void HistoryWidget::scrollToAnimationCallback(
 
 void HistoryWidget::enqueueMessageHighlight(
 		not_null<HistoryView::Element*> view,
-		TextSelection part) {
+		const TextWithEntities &part) {
 	_highlighter.enqueue(view, part);
 }
 
@@ -1416,9 +1416,7 @@ void HistoryWidget::updateInlineBotQuery() {
 			_inlineBotResolveRequestId = _api.request(MTPcontacts_ResolveUsername(
 				MTP_string(username)
 			)).done([=](const MTPcontacts_ResolvedPeer &result) {
-				Expects(result.type() == mtpc_contacts_resolvedPeer);
-
-				const auto &data = result.c_contacts_resolvedPeer();
+				const auto &data = result.data();
 				const auto resolvedBot = [&]() -> UserData* {
 					if (const auto user = session().data().processUsers(
 							data.vusers())) {
@@ -5282,7 +5280,7 @@ void HistoryWidget::updateFieldPlaceholder() {
 	if (!_editMsgId && _inlineBot && !_inlineLookingUpBot) {
 		_field->setPlaceholder(
 			rpl::single(_inlineBot->botInfo->inlinePlaceholder.mid(1)),
-			_inlineBot->username().size() + 2);
+			_inlineBotUsername.size() + 2);
 		return;
 	}
 
@@ -5795,8 +5793,7 @@ int HistoryWidget::countInitialScrollTop() {
 
 			enqueueMessageHighlight(
 				view,
-				view->selectionFromQuote(
-					base::take(_showAtMsgHighlightPart)));
+				base::take(_showAtMsgHighlightPart));
 			const auto result = itemTopForHighlight(view);
 			createUnreadBarIfBelowVisibleArea(result);
 			return result;
@@ -6368,6 +6365,8 @@ void HistoryWidget::mousePressEvent(QMouseEvent *e) {
 		} else {
 			_forwardPanel->editOptions(controller()->uiShow());
 		}
+	} else if (_replyTo && (e->modifiers() & Qt::ControlModifier)) {
+		jumpToReply(_replyTo);
 	} else if (_replyTo) {
 		editDraftOptions();
 	} else if (_kbReplyTo) {
@@ -6396,12 +6395,9 @@ void HistoryWidget::editDraftOptions() {
 		_preview->apply(webpage);
 	};
 	const auto replyToId = reply.messageId;
-	const auto highlight = [=] {
-		controller()->showPeerHistory(
-			replyToId.peer,
-			Window::SectionShow::Way::Forward,
-			replyToId.msg);
-	};
+	const auto highlight = crl::guard(this, [=](FullReplyTo to) {
+		jumpToReply(to);
+	});
 
 	using namespace HistoryView::Controls;
 	EditDraftOptions({
@@ -6415,6 +6411,12 @@ void HistoryWidget::editDraftOptions() {
 		.highlight = highlight,
 		.clearOldDraft = [=] { ClearDraftReplyTo(history, 0, replyToId); },
 	});
+}
+
+void HistoryWidget::jumpToReply(FullReplyTo to) {
+	if (const auto item = session().data().message(to.messageId)) {
+		JumpToMessageClickHandler(item, {}, to.quote)->onClick({});
+	}
 }
 
 void HistoryWidget::keyPressEvent(QKeyEvent *e) {

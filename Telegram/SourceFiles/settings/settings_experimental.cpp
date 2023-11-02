@@ -33,6 +33,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_document_resolver.h"
 #include "styles/style_settings.h"
 #include "styles/style_layers.h"
+#include "ui/chat/chat_style.h"
 
 namespace Settings {
 namespace {
@@ -147,6 +148,7 @@ void SetupExperimental(
 	addToggle(Info::Profile::kOptionShowPeerIdBelowAbout);
 	addToggle(Ui::GL::kOptionAllowLinuxNvidiaOpenGL);
 	addToggle(Ui::kOptionUseSmallMsgBubbleRadius);
+	addToggle(Ui::kOptionUncoloredQuote);
 	addToggle(Media::Player::kOptionDisableAutoplayNext);
 	addToggle(kOptionSendLargePhotos);
 	addToggle(Webview::kOptionWebviewDebugEnabled);

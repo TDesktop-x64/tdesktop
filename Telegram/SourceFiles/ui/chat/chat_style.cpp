@@ -16,9 +16,18 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat.h"
 #include "styles/style_dialogs.h"
 #include "styles/style_widgets.h"
+#include "base/options.h"
 
 namespace Ui {
 namespace {
+
+base::options::toggle UncoloredQuote({
+	.id = kOptionUncoloredQuote,
+	.name = "Uncolored Quote",
+	.description = "Uncolored quote/webpage/game etc.",
+	.defaultValue = false,
+	.restartRequired = true,
+});
 
 void EnsureCorners(
 		CornersPixmaps &corners,
@@ -38,7 +47,7 @@ void EnsureBlockquoteCache(
 	}
 	cache = std::make_unique<Text::QuotePaintCache>();
 	const auto &colors = values();
-	cache->bg = colors.bg;
+	cache->bg = UncoloredQuote.value() ? QColor(0, 0, 0, 0) : colors.bg;
 	cache->outlines = colors.outlines;
 	cache->icon = colors.name;
 }
@@ -66,6 +75,8 @@ void EnsurePreCache(
 }
 
 } // namespace
+
+const char kOptionUncoloredQuote[] = "uncolored_quote";
 
 not_null<const MessageStyle*> ChatPaintContext::messageStyle() const {
 	return &st->messageStyle(outbg, selected());

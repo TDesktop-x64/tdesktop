@@ -91,8 +91,8 @@ std::vector<std::unique_ptr<Data::Media>> PrepareCollageMedia(
 		? tr::lng_view_button_theme(tr::now)
 		: (type == WebPageType::Story)
 		? tr::lng_view_button_story(tr::now)
-		//: (type == WebPageType::Message)
-		//? tr::lng_view_button_message(tr::now)
+		: (type == WebPageType::Message)
+		? tr::lng_view_button_message(tr::now)
 		: (type == WebPageType::Group)
 		? tr::lng_view_button_group(tr::now)
 		: (type == WebPageType::WallPaper)
@@ -162,10 +162,10 @@ QSize WebPage::countOptimalSize() {
 	// Detect _openButtonWidth before counting paddings.
 	_openButton = QString();
 	_openButtonWidth = 0;
-	if (HasButton(_data)) {
-		_openButton = PageToPhrase(_data);
-		_openButtonWidth = st::semiboldFont->width(_openButton);
-	}
+	//if (HasButton(_data)) {
+	//	_openButton = PageToPhrase(_data);
+	//	_openButtonWidth = st::semiboldFont->width(_openButton);
+	//}
 
 	const auto padding = inBubblePadding() + innerMargin();
 	const auto versionChanged = (_dataVersion != _data->version);

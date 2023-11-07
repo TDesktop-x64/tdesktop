@@ -1759,12 +1759,12 @@ void HistoryInner::mouseActionStart(const QPoint &screenPos, Qt::MouseButton but
 							_selected.emplace(_mouseActionItem, selStatus);
 							_mouseAction = MouseAction::Selecting;
 							repaintItem(_mouseActionItem);
-						} else if (!hasSelectRestriction()) {
+						} else if (true) {
 							_mouseAction = MouseAction::PrepareSelect;
 						}
 					}
 				}
-			} else if (!_pressWasInactive && !hasSelectRestriction()) {
+			} else if (!_pressWasInactive) {
 				_mouseAction = MouseAction::PrepareSelect; // start items select
 			}
 		}
@@ -1793,8 +1793,7 @@ std::unique_ptr<QMimeData> HistoryInner::prepareDrag() {
 	}
 
 	const auto pressedHandler = ClickHandler::getPressed();
-	if (dynamic_cast<VoiceSeekClickHandler*>(pressedHandler.get())
-		|| hasCopyRestriction()) {
+	if (dynamic_cast<VoiceSeekClickHandler*>(pressedHandler.get())) {
 		return nullptr;
 	}
 
@@ -2032,8 +2031,7 @@ void HistoryInner::mouseActionFinish(
 
 	if (QGuiApplication::clipboard()->supportsSelection()
 		&& !_selected.empty()
-		&& _selected.cbegin()->second != FullSelection
-		&& !hasCopyRestriction(_selected.cbegin()->first)) {
+		&& _selected.cbegin()->second != FullSelection) {
 		const auto [item, selection] = *_selected.cbegin();
 		if (const auto view = viewByItem(item)) {
 			TextUtilities::SetClipboardText(
@@ -2334,7 +2332,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 	const auto addPhotoActions = [&](not_null<PhotoData*> photo, HistoryItem *item) {
 		const auto media = photo->activeMediaView();
 		const auto itemId = item ? item->fullId() : FullMsgId();
-		if (!photo->isNull() && media && media->loaded() && !hasCopyMediaRestriction(item)) {
+		if (!photo->isNull() && media && media->loaded()) {
 			_menu->addAction(tr::lng_context_save_image(tr::now), base::fn_delayed(st::defaultDropdownMenu.menu.ripple.hideDuration, this, [=] {
 				savePhotoToFile(photo);
 			}), &st::menuIconSaveImage);
@@ -2385,7 +2383,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				showContextInFolder(document);
 			}, &st::menuIconShowInFolder);
 		}
-		if (item && !hasCopyMediaRestriction(item)) {
+		if (item) {
 			HistoryView::AddSaveSoundForNotifications(
 				_menu,
 				item,
@@ -2408,8 +2406,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			not_null<HistoryItem*> item,
 			bool asGroup = true) {
 		if (item->isRegular()
-			&& !item->isService()
-			&& !hasSelectRestriction()) {
+			&& !item->isService()) {
 			const auto itemId = item->fullId();
 			_menu->addAction(tr::lng_context_select_msg(tr::now), [=] {
 				if (const auto item = session->data().message(itemId)) {
@@ -2479,8 +2476,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 
 		if (isUponSelected > 0) {
 			const auto selectedText = getSelectedText();
-			if (!hasCopyRestrictionForSelected()
-				&& !selectedText.empty()) {
+			if (!selectedText.empty()) {
 				_menu->addAction(
 					(isUponSelected > 1
 						? tr::lng_context_copy_selected_items(tr::now)
@@ -2535,7 +2531,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					_widget->confirmDeleteSelected();
 				}, &st::menuIconDelete);
 			}
-			if (selectedState.count > 0 && !hasCopyRestrictionForSelected()) {
+			if (selectedState.count > 0) {
 				Menu::AddDownloadFilesAction(_menu, controller, _selected, this);
 			}
 			_menu->addAction(tr::lng_context_clear_selection(tr::now), [=] {
@@ -2705,7 +2701,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 		if (isUponSelected > 0) {
 			addReplyAction(item);
 			const auto selectedText = getSelectedText();
-			if (!hasCopyRestrictionForSelected() && !selectedText.empty()) {
+			if (!selectedText.empty()) {
 				_menu->addAction(
 					((isUponSelected > 1)
 						? tr::lng_context_copy_selected_items(tr::now)
@@ -2742,7 +2738,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 								Api::ToggleFavedSticker(controller->uiShow(), document, itemId);
 							}, isFaved ? &st::menuIconUnfave : &st::menuIconFave);
 						}
-						if (!hasCopyMediaRestriction(item)) {
+						if (true) {
 							_menu->addAction(tr::lng_context_save_image(tr::now), base::fn_delayed(st::defaultDropdownMenu.menu.ripple.hideDuration, this, [=] {
 								saveDocumentToFile(itemId, document);
 							}), &st::menuIconDownload);
@@ -2769,8 +2765,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					FillSponsoredMessagesMenu(controller, itemId, _menu);
 				}
 				if (!item->isService() && view && actionText.isEmpty()) {
-					if (!hasCopyRestriction(item)
-						&& (view->hasVisibleText() || mediaHasTextForCopy)) {
+					if (view->hasVisibleText() || mediaHasTextForCopy) {
 						_menu->addAction(
 							tr::lng_context_copy_text(tr::now),
 							[=] { copyContextText(itemId); },
@@ -2851,7 +2846,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					_widget->confirmDeleteSelected();
 				}, &st::menuIconDelete);
 			}
-			if (selectedState.count > 0 && !hasCopyRestrictionForSelected()) {
+			if (selectedState.count > 0) {
 				Menu::AddDownloadFilesAction(_menu, controller, _selected, this);
 			}
 			_menu->addAction(tr::lng_context_clear_selection(tr::now), [=] {
@@ -3086,7 +3081,7 @@ bool HistoryInner::showCopyRestrictionForSelected() {
 }
 
 void HistoryInner::copySelectedText() {
-	if (!showCopyRestrictionForSelected()) {
+	if (true) {
 		TextUtilities::SetClipboardText(getSelectedText());
 	}
 }
@@ -3116,7 +3111,7 @@ void HistoryInner::copyContextImage(
 	const auto item = session().data().message(itemId);
 	const auto media = photo->activeMediaView();
 	const auto restricted = item
-		? showCopyMediaRestriction(item)
+		? false
 		: IsServerMsgId(itemId.msg);
 	if (photo->isNull() || !media || !media->loaded()) {
 		return;
@@ -3177,7 +3172,7 @@ void HistoryInner::saveContextGif(FullMsgId itemId) {
 
 void HistoryInner::copyContextText(FullMsgId itemId) {
 	if (const auto item = session().data().message(itemId)) {
-		if (!showCopyRestriction(item)) {
+		if (true) {
 			if (const auto group = session().data().groups().find(item)) {
 				TextUtilities::SetClipboardText(HistoryGroupText(group));
 			} else {
@@ -3279,8 +3274,7 @@ void HistoryInner::keyPressEvent(QKeyEvent *e) {
 		copySelectedText();
 #ifdef Q_OS_MAC
 	} else if (e->key() == Qt::Key_E
-		&& e->modifiers().testFlag(Qt::ControlModifier)
-		&& !showCopyRestrictionForSelected()) {
+		&& e->modifiers().testFlag(Qt::ControlModifier)) {
 		TextUtilities::SetClipboardText(getSelectedText(), QClipboard::FindBuffer);
 #endif // Q_OS_MAC
 	} else if (e == QKeySequence::Delete || e->key() == Qt::Key_Backspace) {
@@ -4212,7 +4206,7 @@ void HistoryInner::mouseActionUpdate() {
 void HistoryInner::updateDragSelection(Element *dragSelFrom, Element *dragSelTo, bool dragSelecting) {
 	if (_dragSelFrom == dragSelFrom && _dragSelTo == dragSelTo && _dragSelecting == dragSelecting) {
 		return;
-	} else if (dragSelFrom && hasSelectRestriction()) {
+	} else if (dragSelFrom && false) {
 		updateDragSelection(nullptr, nullptr, false);
 		return;
 	}
@@ -4367,7 +4361,7 @@ void HistoryInner::notifyMigrateUpdated() {
 }
 
 void HistoryInner::applyDragSelection() {
-	if (!hasSelectRestriction()) {
+	if (true) {
 		applyDragSelection(&_selected);
 	}
 }

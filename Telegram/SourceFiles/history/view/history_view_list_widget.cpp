@@ -1336,7 +1336,7 @@ void ListWidget::cancelSelection() {
 }
 
 void ListWidget::selectItem(not_null<HistoryItem*> item) {
-	if (hasSelectRestriction()) {
+	if (false) {
 		return;
 	} else if (const auto view = viewForItem(item)) {
 		clearTextSelection();
@@ -1349,7 +1349,7 @@ void ListWidget::selectItem(not_null<HistoryItem*> item) {
 }
 
 void ListWidget::selectItemAsGroup(not_null<HistoryItem*> item) {
-	if (hasSelectRestriction()) {
+	if (false) {
 		return;
 	} else if (const auto view = viewForItem(item)) {
 		clearTextSelection();
@@ -2286,7 +2286,7 @@ bool ListWidget::eventHook(QEvent *e) {
 }
 
 void ListWidget::applyDragSelection() {
-	if (!hasSelectRestriction()) {
+	if (true) {
 		applyDragSelection(_selected);
 	}
 	clearDragSelection();
@@ -2447,15 +2447,11 @@ void ListWidget::keyPressEvent(QKeyEvent *e) {
 			_delegate->listCancelRequest();
 		}
 	} else if (e == QKeySequence::Copy
-		&& (hasSelectedText() || hasSelectedItems())
-		&& !showCopyRestriction()
-		&& !hasCopyRestrictionForSelected()) {
+		&& (hasSelectedText() || hasSelectedItems())) {
 		TextUtilities::SetClipboardText(getSelectedText());
 #ifdef Q_OS_MAC
 	} else if (e->key() == Qt::Key_E
-		&& e->modifiers().testFlag(Qt::ControlModifier)
-		&& !showCopyRestriction()
-		&& !hasCopyRestrictionForSelected()) {
+		&& e->modifiers().testFlag(Qt::ControlModifier)) {
 		TextUtilities::SetClipboardText(getSelectedText(), QClipboard::FindBuffer);
 #endif // Q_OS_MAC
 	} else if (e == QKeySequence::Delete || e->key() == Qt::Key_Backspace) {
@@ -2935,8 +2931,7 @@ void ListWidget::leaveEventHook(QEvent *e) {
 
 void ListWidget::updateDragSelection() {
 	if (!_overState.itemId
-		|| !_pressState.itemId
-		|| hasSelectRestriction()) {
+		|| !_pressState.itemId) {
 		clearDragSelection();
 		return;
 	} else if (_items.empty() || !_overElement || !_selectEnabled) {
@@ -3142,7 +3137,7 @@ void ListWidget::mouseActionStart(
 	} else if (hasSelectedItems()) {
 		if (overSelectedItems()) {
 			_mouseAction = MouseAction::PrepareDrag;
-		} else if (!_pressWasInactive && !hasSelectRestriction()) {
+		} else if (!_pressWasInactive) {
 			_mouseAction = MouseAction::PrepareSelect;
 		}
 	}
@@ -3187,7 +3182,7 @@ void ListWidget::mouseActionStart(
 							_mouseTextSymbol,
 							_mouseTextSymbol));
 						_mouseAction = MouseAction::Selecting;
-					} else if (!hasSelectRestriction()) {
+					} else if (true) {
 						_mouseAction = MouseAction::PrepareSelect;
 					}
 				}
@@ -3316,8 +3311,7 @@ void ListWidget::mouseActionFinish(
 
 	if (QGuiApplication::clipboard()->supportsSelection()
 		&& _selectedTextItem
-		&& _selectedTextRange.from != _selectedTextRange.to
-		&& !hasCopyRestriction(_selectedTextItem)) {
+		&& _selectedTextRange.from != _selectedTextRange.to) {
 		if (const auto view = viewForItem(_selectedTextItem)) {
 			TextUtilities::SetClipboardText(
 				view->selectedText(_selectedTextRange),
@@ -3565,8 +3559,7 @@ std::unique_ptr<QMimeData> ListWidget::prepareDrag() {
 		return nullptr;
 	}
 	auto pressedHandler = ClickHandler::getPressed();
-	if (dynamic_cast<VoiceSeekClickHandler*>(pressedHandler.get())
-		|| hasCopyRestriction()) {
+	if (dynamic_cast<VoiceSeekClickHandler*>(pressedHandler.get())) {
 		return nullptr;
 	}
 

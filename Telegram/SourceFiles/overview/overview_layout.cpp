@@ -1061,7 +1061,6 @@ Document::Document(
 
 bool Document::downloadInCorner() const {
 	return _data->isAudioFile()
-		&& parent()->allowsForward()
 		&& _data->canBeStreamed(parent())
 		&& !_data->inappPlaybackFailed();
 }

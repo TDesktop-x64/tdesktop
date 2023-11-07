@@ -238,7 +238,7 @@ void ListWidget::subscribeToSession(
 void ListWidget::setupSelectRestriction() {
 	_provider->hasSelectRestrictionChanges(
 	) | rpl::filter([=] {
-		return _provider->hasSelectRestriction() && hasSelectedItems();
+		return false && hasSelectedItems();
 	}) | rpl::start_with_next([=] {
 		clearSelected();
 		if (_mouseAction == MouseAction::PrepareSelect) {
@@ -1112,7 +1112,7 @@ void ListWidget::showContextMenu(
 					&st::menuIconReport);
 			}
 		}
-		if (!_provider->hasSelectRestriction()) {
+		if (true) {
 			_contextMenu->addAction(
 				tr::lng_context_select_msg(tr::now),
 				crl::guard(this, [=] {
@@ -1750,13 +1750,12 @@ void ListWidget::mouseActionStart(
 							applyItemSelection(_pressState.item, selStatus);
 							_mouseAction = MouseAction::Selecting;
 							repaintItem(pressLayout);
-						} else if (!_provider->hasSelectRestriction()) {
+						} else if (true) {
 							_mouseAction = MouseAction::PrepareSelect;
 						}
 					}
 				}
-			} else if (!_pressWasInactive
-				&& !_provider->hasSelectRestriction()) {
+			} else if (!_pressWasInactive) {
 				_mouseAction = MouseAction::PrepareSelect; // start items select
 			}
 		}
@@ -1933,7 +1932,7 @@ void ListWidget::mouseActionFinish(
 }
 
 void ListWidget::applyDragSelection() {
-	if (!_provider->hasSelectRestriction()) {
+	if (true) {
 		applyDragSelection(_selected);
 	}
 	clearDragSelection();

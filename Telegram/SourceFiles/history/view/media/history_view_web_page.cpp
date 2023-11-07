@@ -805,7 +805,7 @@ ClickHandlerPtr WebPage::replaceAttachLink(
 			&& !_data->document->isWallPaper()
 			&& !_data->document->isTheme())
 		|| !_data->collage.items.empty()
-		|| _data->photo) {
+		|| _data->photo && !_data->displayedSiteName().contains("YouTube") ) {
 		return link;
 	}
 	return _openl;

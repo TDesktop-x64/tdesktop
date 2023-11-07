@@ -984,8 +984,7 @@ bool RepliesWidget::confirmSendingFiles(
 		insertTextOnCancel));
 
 	//ActivateWindow(controller());
-	const auto shown = controller()->show(std::move(box));
-	shown->setCloseByOutsideClick(false);
+	controller()->show(std::move(box));
 
 	return true;
 }
@@ -2032,7 +2031,7 @@ bool RepliesWidget::showMessage(
 	}
 	const auto id = FullMsgId(_history->peer->id, messageId);
 	const auto message = _history->owner().message(id);
-	if (!message || !message->inThread(_rootId)) {
+	if (!message || (!message->inThread(_rootId) && id.msg != _rootId)) {
 		return false;
 	}
 	const auto originMessage = [&]() -> HistoryItem* {
@@ -2528,7 +2527,25 @@ void RepliesWidget::listUpdateDateLink(
 }
 
 bool RepliesWidget::listElementHideReply(not_null<const Element*> view) {
-	return (view->data()->replyToId() == _rootId);
+	if (const auto reply = view->data()->Get<HistoryMessageReply>()) {
+		const auto replyToPeerId = reply->externalPeerId()
+			? reply->externalPeerId()
+			: _history->peer->id;
+		if (reply->fields().manualQuote) {
+			return false;
+		} else if (replyToPeerId == _history->peer->id) {
+			return (reply->messageId() == _rootId);
+		} else if (_root) {
+			const auto forwarded = _root->Get<HistoryMessageForwarded>();
+			if (forwarded
+				&& forwarded->savedFromPeer
+				&& forwarded->savedFromPeer->id == replyToPeerId
+				&& forwarded->savedFromMsgId == reply->messageId()) {
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 bool RepliesWidget::listElementShownUnread(not_null<const Element*> view) {

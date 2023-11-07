@@ -13,6 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/unixtime.h"
 #include "base/weak_ptr.h"
 #include "boxes/peers/prepare_short_info_box.h"
+#include "data/data_boosts.h"
 #include "data/data_changes.h"
 #include "data/data_channel.h"
 #include "data/data_media_types.h" // Data::Giveaway
@@ -31,7 +32,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/effects/premium_stars_colored.h"
 #include "ui/effects/premium_top_bar.h"
 #include "ui/layers/generic_box.h"
-#include "ui/text/format_values.h"
 #include "ui/text/text_utilities.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/gradient_round_button.h"
@@ -40,9 +40,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_peer_menu.h" // ShowChooseRecipientBox.
 #include "window/window_session_controller.h"
 #include "styles/style_boxes.h"
-#include "styles/style_layers.h"
-#include "styles/style_chat_helpers.h"
+#include "styles/style_giveaway.h"
 #include "styles/style_info.h"
+#include "styles/style_layers.h"
 #include "styles/style_premium.h"
 
 #include <QtGui/QGuiApplication>
@@ -237,11 +237,7 @@ void GiftBox(
 	}, box->lifetime());
 }
 
-struct GiftCodeLink {
-	QString text;
-	QString link;
-};
-[[nodiscard]] GiftCodeLink MakeGiftCodeLink(
+[[nodiscard]] Data::GiftCodeLink MakeGiftCodeLink(
 		not_null<Main::Session*> session,
 		const QString &slug) {
 	const auto path = u"giftcode/"_q + slug;
@@ -693,7 +689,8 @@ void GiveawayInfoBox(
 		text.append(' ').append(tr::lng_prizes_end_activated(
 			tr::now,
 			lt_count,
-			info.activatedCount));
+			info.activatedCount,
+			Ui::Text::RichLangValue));
 	}
 	if (!info.giftCode.isEmpty()) {
 		text.append("\n\n");

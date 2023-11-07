@@ -13,6 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/layers/generic_box.h"
 #include "ui/text/text_utilities.h"
 #include "ui/widgets/buttons.h"
+#include "styles/style_giveaway.h"
 #include "styles/style_layers.h"
 #include "styles/style_premium.h"
 
@@ -61,6 +62,14 @@ void BoostBox(
 		box->verticalLayout(),
 		data.boost,
 		st::boxRowPadding);
+
+	{
+		const auto &d = data.boost;
+		if (!d.nextLevelBoosts
+			|| ((d.thisLevelBoosts == d.boosts) && d.mine)) {
+			--data.boost.level;
+		}
+	}
 
 	box->addTopButton(st::boxTitleClose, [=] { box->closeBox(); });
 

@@ -18,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/reactions/history_view_reactions.h"
 #include "history/view/reactions/history_view_reactions_button.h"
 #include "history/view/history_view_group_call_bar.h" // UserpicInRow.
+#include "history/view/history_view_reply.h"
 #include "history/view/history_view_view_button.h" // ViewButton.
 #include "history/history.h"
 #include "boxes/share_box.h"
@@ -406,6 +407,7 @@ Message::Message(
 	Element *replacing)
 : Element(delegate, data, replacing, Flag(0))
 , _invertMedia(data->invertMedia() && !data->emptyText())
+, _hideReply(delegate->elementHideReply(this))
 , _bottomInfo(
 		&data->history()->owner().reactions(),
 		BottomInfoDataFromMessage(this)) {
@@ -601,6 +603,14 @@ auto Message::takeReactionAnimations()
 
 QSize Message::performCountOptimalSize() {
 	const auto item = data();
+
+	const auto replyData = item->Get<HistoryMessageReply>();
+	if (replyData && !_hideReply) {
+		AddComponents(Reply::Bit());
+	} else {
+		RemoveComponents(Reply::Bit());
+	}
+
 	const auto markup = item->inlineReplyMarkup();
 	const auto reactionsKey = [&] {
 		return embedReactionsInBottomInfo()
@@ -610,7 +620,6 @@ QSize Message::performCountOptimalSize() {
 			: 2;
 	};
 	const auto oldKey = reactionsKey();
-	refreshIsTopicRootReply();
 	validateText();
 	validateInlineKeyboard(markup);
 	updateViewButtonExistence();
@@ -637,16 +646,18 @@ QSize Message::performCountOptimalSize() {
 	if (_reactions) {
 		_reactions->initDimensions();
 	}
+
+	const auto reply = Get<Reply>();
+	if (reply) {
+		reply->update(this, replyData);
+	}
+
 	if (drawBubble()) {
 		const auto forwarded = item->Get<HistoryMessageForwarded>();
-		const auto reply = displayedReply();
 		const auto via = item->Get<HistoryMessageVia>();
 		const auto entry = logEntryOriginal();
 		if (forwarded) {
 			forwarded->create(via);
-		}
-		if (reply) {
-			reply->updateName(item);
 		}
 
 		auto mediaDisplayed = false;
@@ -676,6 +687,10 @@ QSize Message::performCountOptimalSize() {
 				std::min(st::msgMaxWidth, reactionsMaxWidth));
 			if (!mediaDisplayed || _viewButton) {
 				minHeight += st::mediaInBubbleSkip;
+			} else if (!media->additionalInfoString().isEmpty()) {
+				// In round videos in a web page status text is painted
+				// in the bottom left corner, reactions should be below.
+				minHeight += st::msgDateFont->height;
 			}
 			if (maxWidth >= reactionsMaxWidth) {
 				minHeight += _reactions->minHeight();
@@ -775,13 +790,9 @@ QSize Message::performCountOptimalSize() {
 				accumulate_max(maxWidth, namew);
 			}
 			if (reply) {
-				auto replyw = st::msgPadding.left()
+				const auto replyw = st::msgPadding.left()
 					+ reply->maxWidth()
 					+ st::msgPadding.right();
-				if (reply->originalVia) {
-					replyw += st::msgServiceFont->spacew
-						+ reply->originalVia->maxWidth;
-				}
 				accumulate_max(maxWidth, replyw);
 			}
 			if (entry) {
@@ -1226,9 +1237,11 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 		p.restore();
 	}
 
-	if (const auto reply = displayedReply()) {
-		if (reply->isNameUpdated(data())) {
-			const_cast<Message*>(this)->setPendingResize();
+	if (const auto reply = Get<Reply>()) {
+		if (const auto replyData = item->Get<HistoryMessageReply>()) {
+			if (reply->isNameUpdated(this, replyData)) {
+				const_cast<Message*>(this)->setPendingResize();
+			}
 		}
 	}
 }
@@ -1608,8 +1621,15 @@ void Message::paintReplyInfo(
 		Painter &p,
 		QRect &trect,
 		const PaintContext &context) const {
-	if (const auto reply = displayedReply()) {
-		reply->paint(p, this, context, trect.x(), trect.y(), trect.width(), true);
+	if (const auto reply = Get<Reply>()) {
+		reply->paint(
+			p,
+			this,
+			context,
+			trect.x(),
+			trect.y(),
+			trect.width(),
+			true);
 		trect.setY(trect.y() + reply->height());
 	}
 }
@@ -1763,7 +1783,7 @@ void Message::clickHandlerPressedChanged(
 		toggleTopicButtonRipple(pressed);
 	} else if (_viewButton) {
 		_viewButton->checkLink(handler, pressed);
-	} else if (const auto reply = displayedReply()
+	} else if (const auto reply = Get<Reply>()
 		; reply && (handler == reply->link())) {
 		toggleReplyRipple(pressed);
 	}
@@ -1806,32 +1826,24 @@ void Message::toggleRightActionRipple(bool pressed) {
 }
 
 void Message::toggleReplyRipple(bool pressed) {
-	const auto reply = displayedReply();
+	const auto reply = Get<Reply>();
 	if (!reply) {
 		return;
 	}
 
 	if (pressed) {
-		if (!reply->ripple.animation && !unwrapped()) {
+		if (!unwrapped()) {
 			const auto &padding = st::msgPadding;
 			const auto geometry = countGeometry();
-			const auto item = data();
 			const auto margins = reply->margins();
 			const auto size = QSize(
 				geometry.width() - padding.left() - padding.right(),
 				reply->height() - margins.top() - margins.bottom());
-			reply->ripple.animation = std::make_unique<Ui::RippleAnimation>(
-				st::defaultRippleAnimation,
-				Ui::RippleAnimation::RoundRectMask(
-					size,
-					st::messageQuoteStyle.radius),
-				[=] { item->history()->owner().requestItemRepaint(item); });
+			reply->createRippleAnimation(this, size);
 		}
-		if (reply->ripple.animation) {
-			reply->ripple.animation->add(reply->ripple.lastPoint);
-		}
-	} else if (reply->ripple.animation) {
-		reply->ripple.animation->lastStop();
+		reply->addRipple();
+	} else {
+		reply->stopLastRipple();
 	}
 }
 
@@ -2492,7 +2504,7 @@ bool Message::getStateReplyInfo(
 		QPoint point,
 		QRect &trect,
 		not_null<TextState*> outResult) const {
-	if (const auto reply = displayedReply()) {
+	if (const auto reply = Get<Reply>()) {
 		const auto margins = reply->margins();
 		const auto height = reply->height();
 		if (point.y() >= trect.top() && point.y() < trect.top() + height) {
@@ -2504,7 +2516,7 @@ bool Message::getStateReplyInfo(
 			if (g.contains(point)) {
 				if (const auto link = reply->link()) {
 					outResult->link = reply->link();
-					reply->ripple.lastPoint = point - g.topLeft();
+					reply->saveRipplePoint(point - g.topLeft());
 				}
 			}
 			return true;
@@ -2587,7 +2599,7 @@ void Message::updatePressed(QPoint point) {
 				auto fwdheight = ((forwarded->text.maxWidth() > trect.width()) ? 2 : 1) * st::semiboldFont->height;
 				trect.setTop(trect.top() + fwdheight);
 			}
-			if (const auto reply = item->Get<HistoryMessageReply>()) {
+			if (const auto reply = Get<Reply>()) {
 				trect.setTop(trect.top() + reply->height());
 			}
 			if (const auto via = item->Get<HistoryMessageVia>()) {
@@ -3133,13 +3145,6 @@ WebPage *Message::logEntryOriginal() const {
 	return nullptr;
 }
 
-HistoryMessageReply *Message::displayedReply() const {
-	if (const auto reply = data()->Get<HistoryMessageReply>()) {
-		return delegate()->elementHideReply(this) ? nullptr : reply;
-	}
-	return nullptr;
-}
-
 bool Message::toggleSelectionByHandlerClick(
 		const ClickHandlerPtr &handler) const {
 	if (_comments && _comments->link == handler) {
@@ -3590,7 +3595,7 @@ void Message::updateMediaInBubbleState() {
 		return displayFromName()
 			|| displayedTopicButton()
 			|| displayForwardedFrom()
-			|| displayedReply()
+			|| Has<Reply>()
 			|| item->Has<HistoryMessageVia>();
 	};
 	auto entry = logEntryOriginal();
@@ -3715,7 +3720,7 @@ QRect Message::innerGeometry() const {
 				+ st::topicButtonSkip);
 		}
 		// Skip displayForwardedFrom() until there are no animations for it.
-		if (const auto reply = displayedReply()) {
+		if (const auto reply = Get<Reply>()) {
 			// See paintReplyInfo().
 			result.translate(0, reply->height());
 		}
@@ -3887,7 +3892,7 @@ int Message::resizeContentGetHeight(int newWidth) {
 			textWidth - 2 * st::msgDateDelta.x()));
 
 	if (bubble) {
-		auto reply = displayedReply();
+		auto reply = Get<Reply>();
 		auto via = item->Get<HistoryMessageVia>();
 		auto entry = logEntryOriginal();
 
@@ -3977,7 +3982,6 @@ int Message::resizeContentGetHeight(int newWidth) {
 			newHeight += reply->resizeToWidth(contentWidth
 				- st::msgPadding.left()
 				- st::msgPadding.right());
-			reply->ripple.animation = nullptr;
 		}
 		if (needInfoDisplay()) {
 			newHeight += (bottomInfoHeight - st::msgDateFont->height);

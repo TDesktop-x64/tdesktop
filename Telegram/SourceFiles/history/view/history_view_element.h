@@ -49,6 +49,7 @@ enum class InfoDisplayType : char;
 struct StateRequest;
 struct TextState;
 class Media;
+class Reply;
 
 enum class Context : char {
 	History,
@@ -433,6 +434,7 @@ public:
 	[[nodiscard]] virtual bool hasFromPhoto() const;
 	[[nodiscard]] virtual bool displayFromPhoto() const;
 	[[nodiscard]] virtual bool hasFromName() const;
+	[[nodiscard]] bool displayReply() const;
 	[[nodiscard]] virtual bool displayFromName() const;
 	[[nodiscard]] virtual TopicButton *displayedTopicButton() const;
 	[[nodiscard]] virtual bool displayForwardedFrom() const;
@@ -456,7 +458,6 @@ public:
 		std::optional<QPoint> pressPoint) const;
 	[[nodiscard]] virtual TimeId displayedEditDate() const;
 	[[nodiscard]] virtual bool hasVisibleText() const;
-	[[nodiscard]] virtual HistoryMessageReply *displayedReply() const;
 	virtual void applyGroupAdminChanges(
 		const base::flat_set<UserId> &changes) {
 	}
@@ -564,7 +565,6 @@ protected:
 
 	void clearSpecialOnlyEmoji();
 	void checkSpecialOnlyEmoji();
-	void refreshIsTopicRootReply();
 
 private:
 	// This should be called only from previousInBlocksChanged()

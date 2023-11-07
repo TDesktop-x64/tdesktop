@@ -18,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "settings/settings_common.h"
 #include "ui/effects/toggle_arrow.h"
+#include "ui/empty_userpic.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
 #include "ui/widgets/buttons.h"
@@ -29,6 +30,62 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace Info::Statistics {
 namespace {
+
+using BoostCallback = Fn<void(const Data::Boost &)>;
+constexpr auto kColorIndexUnclaimed = int(3);
+constexpr auto kColorIndexPending = int(4);
+
+[[nodiscard]] QImage Badge(
+		const style::TextStyle &textStyle,
+		const QString &text,
+		int badgeHeight,
+		const style::margins &textPadding,
+		const style::color &bg,
+		const style::color &fg,
+		float64 bgOpacity,
+		const style::margins &iconPadding,
+		const style::icon &icon) {
+	auto badgeText = Ui::Text::String(textStyle, text);
+	const auto badgeTextWidth = badgeText.maxWidth();
+	const auto badgex = 0;
+	const auto badgey = 0;
+	const auto badgeh = 0 + badgeHeight;
+	const auto badgew = badgeTextWidth
+		+ rect::m::sum::h(textPadding);
+	auto result = QImage(
+		QSize(badgew, badgeh) * style::DevicePixelRatio(),
+		QImage::Format_ARGB32_Premultiplied);
+	result.fill(Qt::transparent);
+	result.setDevicePixelRatio(style::DevicePixelRatio());
+	{
+		auto p = Painter(&result);
+
+		p.setPen(Qt::NoPen);
+		p.setBrush(bg);
+
+		const auto r = QRect(badgex, badgey, badgew, badgeh);
+		{
+			auto hq = PainterHighQualityEnabler(p);
+			auto o = ScopedPainterOpacity(p, bgOpacity);
+			p.drawRoundedRect(r, badgeh / 2, badgeh / 2);
+		}
+
+		p.setPen(fg);
+		p.setBrush(Qt::NoBrush);
+		badgeText.drawLeftElided(
+			p,
+			r.x() + textPadding.left(),
+			badgey + textPadding.top(),
+			badgew,
+			badgew * 2);
+
+		icon.paint(
+			p,
+			QPoint(r.x() + iconPadding.left(), r.y() + iconPadding.top()),
+			badgew * 2);
+	}
+	return result;
+}
 
 void AddArrow(not_null<Ui::RpWidget*> parent) {
 	const auto arrow = Ui::CreateChild<Ui::RpWidget>(parent.get());
@@ -100,7 +157,7 @@ struct MembersDescriptor final {
 
 struct BoostsDescriptor final {
 	Data::BoostsListSlice firstSlice;
-	Fn<void(not_null<PeerData*>)> showPeerInfo;
+	BoostCallback boostClickedCallback;
 	not_null<PeerData*> peer;
 };
 
@@ -321,6 +378,192 @@ void PublicForwardsController::appendRow(
 	return;
 }
 
+class BoostRow final : public PeerListRow {
+public:
+	BoostRow(not_null<PeerData*> peer, const Data::Boost &boost);
+	BoostRow(const Data::Boost &boost);
+
+	[[nodiscard]] const Data::Boost &boost() const;
+	[[nodiscard]] QString generateName() override;
+
+	[[nodiscard]] PaintRoundImageCallback generatePaintUserpicCallback(
+		bool forceRound) override;
+
+	int paintNameIconGetWidth(
+		Painter &p,
+		Fn<void()> repaint,
+		crl::time now,
+		int nameLeft,
+		int nameTop,
+		int nameWidth,
+		int availableWidth,
+		int outerWidth,
+		bool selected) override;
+
+	QSize rightActionSize() const override;
+	QMargins rightActionMargins() const override;
+	bool rightActionDisabled() const override;
+	void rightActionPaint(
+		Painter &p,
+		int x,
+		int y,
+		int outerWidth,
+		bool selected,
+		bool actionSelected) override;
+
+private:
+	void init();
+	void invalidateBadges();
+
+	const Data::Boost _boost;
+	Ui::EmptyUserpic _userpic;
+	QImage _badge;
+	QImage _rightBadge;
+
+};
+
+BoostRow::BoostRow(not_null<PeerData*> peer, const Data::Boost &boost)
+: PeerListRow(peer, UniqueRowIdFromString(boost.id))
+, _boost(boost)
+, _userpic(Ui::EmptyUserpic::UserpicColor(0), QString()) {
+	init();
+}
+
+BoostRow::BoostRow(const Data::Boost &boost)
+: PeerListRow(UniqueRowIdFromString(boost.id))
+, _boost(boost)
+, _userpic(
+	Ui::EmptyUserpic::UserpicColor(boost.isUnclaimed
+		? kColorIndexUnclaimed
+		: kColorIndexPending),
+	QString()) {
+	init();
+}
+
+void BoostRow::init() {
+	invalidateBadges();
+	constexpr auto kMonthsDivider = int(30 * 86400);
+	const auto months = (_boost.expiresAt - _boost.date.toSecsSinceEpoch())
+		/ kMonthsDivider;
+	auto status = !PeerListRow::special()
+		? tr::lng_boosts_list_status(
+			tr::now,
+			lt_date,
+			langDateTime(_boost.date))
+		: tr::lng_months_tiny(tr::now, lt_count, months)
+			+ ' '
+			+ QChar(0x2022)
+			+ ' '
+			+ langDateTime(_boost.date);
+	PeerListRow::setCustomStatus(std::move(status));
+}
+
+const Data::Boost &BoostRow::boost() const {
+	return _boost;
+}
+
+QString BoostRow::generateName() {
+	return !PeerListRow::special()
+		? PeerListRow::generateName()
+		: _boost.isUnclaimed
+		? tr::lng_boosts_list_unclaimed(tr::now)
+		: tr::lng_boosts_list_pending(tr::now);
+}
+
+PaintRoundImageCallback BoostRow::generatePaintUserpicCallback(bool force) {
+	if (!PeerListRow::special()) {
+		return PeerListRow::generatePaintUserpicCallback(force);
+	}
+	return [=](Painter &p, int x, int y, int outerWidth, int size) mutable {
+		_userpic.paintCircle(p, x, y, outerWidth, size);
+	};
+}
+
+void BoostRow::invalidateBadges() {
+	_badge = _boost.multiplier
+		? Badge(
+			st::statisticsDetailsBottomCaptionStyle,
+			QString::number(_boost.multiplier),
+			st::boostsListBadgeHeight,
+			st::boostsListBadgeTextPadding,
+			st::premiumButtonBg2,
+			st::premiumButtonFg,
+			1.,
+			st::boostsListMiniIconPadding,
+			st::boostsListMiniIcon)
+		: QImage();
+
+	constexpr auto kBadgeBgOpacity = 0.2;
+	const auto &rightColor = _boost.isGiveaway
+		? st::historyPeer4UserpicBg2
+		: st::historyPeer8UserpicBg2;
+	const auto &rightIcon = _boost.isGiveaway
+		? st::boostsListGiveawayMiniIcon
+		: st::boostsListGiftMiniIcon;
+	_rightBadge = (_boost.isGift || _boost.isGiveaway)
+		? Badge(
+			st::boostsListRightBadgeTextStyle,
+			_boost.isGiveaway
+				? tr::lng_gift_link_reason_giveaway(tr::now)
+				: tr::lng_gift_link_label_gift(tr::now),
+			st::boostsListRightBadgeHeight,
+			st::boostsListRightBadgeTextPadding,
+			rightColor,
+			rightColor,
+			kBadgeBgOpacity,
+			st::boostsListGiftMiniIconPadding,
+			rightIcon)
+		: QImage();
+}
+
+
+QSize BoostRow::rightActionSize() const {
+	return _rightBadge.size() / style::DevicePixelRatio();
+}
+
+QMargins BoostRow::rightActionMargins() const {
+	return st::boostsListRightBadgePadding;
+}
+
+bool BoostRow::rightActionDisabled() const {
+	return true;
+}
+
+void BoostRow::rightActionPaint(
+		Painter &p,
+		int x,
+		int y,
+		int outerWidth,
+		bool selected,
+		bool actionSelected) {
+	if (!_rightBadge.isNull()) {
+		p.drawImage(x, y, _rightBadge);
+	}
+}
+
+int BoostRow::paintNameIconGetWidth(
+		Painter &p,
+		Fn<void()> repaint,
+		crl::time now,
+		int nameLeft,
+		int nameTop,
+		int nameWidth,
+		int availableWidth,
+		int outerWidth,
+		bool selected) {
+	if (_badge.isNull()) {
+		return 0;
+	}
+	const auto badgew = _badge.width() / style::DevicePixelRatio();
+	const auto nameTooLarge = (nameWidth > availableWidth);
+	const auto &padding = st::boostsListBadgePadding;
+	const auto left = nameTooLarge
+		? ((nameLeft + availableWidth) - badgew - padding.left())
+		: (nameLeft + nameWidth + padding.right());
+	p.drawImage(left, nameTop + padding.top(), _badge);
+	return badgew + (nameTooLarge ? padding.left() : 0);
+}
+
 class BoostsController final : public PeerListController {
 public:
 	explicit BoostsController(BoostsDescriptor d);
@@ -331,28 +574,30 @@ public:
 	void loadMoreRows() override;
 
 	[[nodiscard]] bool skipRequest() const;
-	void setLimit(int limit);
+	void requestNext();
+
+	[[nodiscard]] rpl::producer<int> totalBoostsValue() const;
 
 private:
 	void applySlice(const Data::BoostsListSlice &slice);
 
 	const not_null<Main::Session*> _session;
-	Fn<void(not_null<PeerData*>)> _showPeerInfo;
+	BoostCallback _boostClickedCallback;
 
 	Api::Boosts _api;
 	Data::BoostsListSlice _firstSlice;
 	Data::BoostsListSlice::OffsetToken _apiToken;
 
-	int _limit = 0;
-
 	bool _allLoaded = false;
 	bool _requesting = false;
+
+	rpl::variable<int> _totalBoosts;
 
 };
 
 BoostsController::BoostsController(BoostsDescriptor d)
 : _session(&d.peer->session())
-, _showPeerInfo(std::move(d.showPeerInfo))
+, _boostClickedCallback(std::move(d.boostClickedCallback))
 , _api(d.peer)
 , _firstSlice(std::move(d.firstSlice)) {
 	PeerListController::setStyleOverrides(&st::boostsListBox);
@@ -366,8 +611,7 @@ bool BoostsController::skipRequest() const {
 	return _requesting || _allLoaded;
 }
 
-void BoostsController::setLimit(int limit) {
-	_limit = limit;
+void BoostsController::requestNext() {
 	_requesting = true;
 	_api.requestBoosts(_apiToken, [=](const Data::BoostsListSlice &slice) {
 		_requesting = false;
@@ -387,26 +631,32 @@ void BoostsController::applySlice(const Data::BoostsListSlice &slice) {
 	_allLoaded = slice.allLoaded;
 	_apiToken = slice.token;
 
-	const auto formatter = u"MMM d, yyyy"_q;
+	auto sumFromSlice = 0;
 	for (const auto &item : slice.list) {
-		const auto user = session().data().user(item.userId);
-		if (delegate()->peerListFindRow(user->id.value)) {
-			continue;
-		}
-		auto row = std::make_unique<PeerListRow>(user);
-		row->setCustomStatus(tr::lng_boosts_list_status(
-			tr::now,
-			lt_date,
-			QLocale().toString(item.expirationDate, formatter)));
+		sumFromSlice += item.multiplier ? item.multiplier : 1;
+		auto row = [&] {
+			if (item.userId && !item.isUnclaimed) {
+				const auto user = session().data().user(item.userId);
+				return std::make_unique<BoostRow>(user, item);
+			} else {
+				return std::make_unique<BoostRow>(item);
+			}
+		}();
 		delegate()->peerListAppendRow(std::move(row));
 	}
 	delegate()->peerListRefreshRows();
+	_totalBoosts = _totalBoosts.current() + sumFromSlice;
 }
 
 void BoostsController::rowClicked(not_null<PeerListRow*> row) {
-	crl::on_main([=, peer = row->peer()] {
-		_showPeerInfo(peer);
-	});
+	if (_boostClickedCallback) {
+		_boostClickedCallback(
+			static_cast<const BoostRow*>(row.get())->boost());
+	}
+}
+
+rpl::producer<int> BoostsController::totalBoostsValue() const {
+	return _totalBoosts.value();
 }
 
 } // namespace
@@ -512,53 +762,52 @@ void AddMembersList(
 void AddBoostsList(
 		const Data::BoostsListSlice &firstSlice,
 		not_null<Ui::VerticalLayout*> container,
-		Fn<void(not_null<PeerData*>)> showPeerInfo,
+		BoostCallback boostClickedCallback,
 		not_null<PeerData*> peer,
 		rpl::producer<QString> title) {
-	const auto max = firstSlice.total;
+	const auto max = firstSlice.multipliedTotal;
 	struct State final {
 		State(BoostsDescriptor d) : controller(std::move(d)) {
 		}
 		PeerListContentDelegateSimple delegate;
 		BoostsController controller;
-		int limit = Api::Boosts::kFirstSlice;
 	};
-	auto d = BoostsDescriptor{ firstSlice, std::move(showPeerInfo), peer };
+	auto d = BoostsDescriptor{ firstSlice, boostClickedCallback, peer };
 	const auto state = container->lifetime().make_state<State>(std::move(d));
 
 	state->delegate.setContent(container->add(
 		object_ptr<PeerListContent>(container, &state->controller)));
 	state->controller.setDelegate(&state->delegate);
 
-	if (max <= state->limit) {
-		return;
-	}
 	const auto wrap = container->add(
 		object_ptr<Ui::SlideWrap<Ui::SettingsButton>>(
 			container,
 			object_ptr<Ui::SettingsButton>(
 				container,
-				tr::lng_boosts_show_more(),
+				(firstSlice.token.gifts
+					? tr::lng_boosts_show_more_gifts
+					: tr::lng_boosts_show_more_boosts)(
+						lt_count,
+						state->controller.totalBoostsValue(
+						) | rpl::map(
+							max - rpl::mappers::_1
+						) | tr::to_count()),
 				st::statisticsShowMoreButton)),
 		{ 0, -st::settingsButton.padding.top(), 0, 0 });
 	const auto button = wrap->entity();
 	AddArrow(button);
 
 	const auto showMore = [=] {
-		if (state->controller.skipRequest()) {
-			return;
+		if (!state->controller.skipRequest()) {
+			state->controller.requestNext();
+			container->resizeToWidth(container->width());
 		}
-		state->limit = std::min(int(max), state->limit + Api::Boosts::kLimit);
-		state->controller.setLimit(state->limit);
-		if (state->limit == max) {
-			wrap->toggle(false, anim::type::instant);
-		}
-		container->resizeToWidth(container->width());
 	};
+	wrap->toggleOn(
+		state->controller.totalBoostsValue(
+		) | rpl::map(rpl::mappers::_1 > 0 && rpl::mappers::_1 < max),
+		anim::type::instant);
 	button->setClickedCallback(showMore);
-	if (state->limit == max) {
-		wrap->toggle(false, anim::type::instant);
-	}
 }
 
 } // namespace Info::Statistics

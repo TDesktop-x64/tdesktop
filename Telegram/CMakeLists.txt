@@ -774,6 +774,8 @@ PRIVATE
     history/view/history_view_quick_action.h
     history/view/history_view_replies_section.cpp
     history/view/history_view_replies_section.h
+    history/view/history_view_reply.cpp
+    history/view/history_view_reply.h
     history/view/history_view_requests_bar.cpp
     history/view/history_view_requests_bar.h
     history/view/history_view_schedule_box.cpp
@@ -828,6 +830,10 @@ PRIVATE
     history/history_view_highlight_manager.h
     history/history_widget.cpp
     history/history_widget.h
+    info/boosts/giveaway/giveaway_list_controllers.cpp
+    info/boosts/giveaway/giveaway_list_controllers.h
+    info/boosts/create_giveaway_box.cpp
+    info/boosts/create_giveaway_box.h
     info/boosts/info_boosts_inner_widget.cpp
     info/boosts/info_boosts_inner_widget.h
     info/boosts/info_boosts_widget.cpp
@@ -1549,7 +1555,39 @@ elseif (APPLE)
     endif()
 
     set(icons_path ${CMAKE_CURRENT_SOURCE_DIR}/Telegram/Images.xcassets)
-    target_add_resource(Telegram ${icons_path})
+    if (CMAKE_GENERATOR STREQUAL Xcode)
+        target_add_resource(Telegram ${icons_path})
+    else()
+        set(icon_path ${icons_path}/Icon.iconset)
+        find_program(ICONUTIL iconutil)
+        find_program(PNG2ICNS png2icns)
+        if (ICONUTIL)
+            add_custom_command(
+                OUTPUT Icon.icns
+                COMMAND ${ICONUTIL}
+                ARGS
+                    --convert icns
+                    --output Icon.icns
+                    ${icon_path}
+            )
+        elseif (PNG2ICNS)
+            add_custom_command(
+                OUTPUT Icon.icns
+                COMMAND ${PNG2ICNS}
+                ARGS
+                    Icon.icns
+                    ${icon_path}/icon_16x16.png
+                    ${icon_path}/icon_32x32.png
+                    ${icon_path}/icon_128x128.png
+                    ${icon_path}/icon_256x256.png
+                    ${icon_path}/icon_512x512.png
+            )
+        endif()
+        if (ICONUTIL OR PNG2ICNS)
+            set_source_files_properties(Icon.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+            target_add_resource(Telegram Icon.icns)
+        endif()
+    endif()
 
     set(lang_packs
         en
@@ -1576,24 +1614,17 @@ elseif (APPLE)
         COMMAND cp ${CMAKE_BINARY_DIR}/lib_ui.rcc $<TARGET_FILE_DIR:Telegram>/../Resources
         COMMAND cp ${CMAKE_BINARY_DIR}/lib_spellcheck.rcc $<TARGET_FILE_DIR:Telegram>/../Resources
     )
-    if (NOT build_macstore)
+    if (NOT build_macstore AND NOT DESKTOP_APP_DISABLE_CRASH_REPORTS)
+        if (DESKTOP_APP_MAC_ARCH STREQUAL "x86_64" OR DESKTOP_APP_MAC_ARCH STREQUAL "arm64")
+            set(crashpad_dir_part ".${DESKTOP_APP_MAC_ARCH}")
+        else()
+            set(crashpad_dir_part "")
+        endif()
         add_custom_command(TARGET Telegram
         PRE_LINK
-            COMMAND mkdir -p $<TARGET_FILE_DIR:Telegram>/../Frameworks
-            COMMAND cp $<TARGET_FILE:Updater> $<TARGET_FILE_DIR:Telegram>/../Frameworks/
+            COMMAND mkdir -p $<TARGET_FILE_DIR:Telegram>/../Helpers
+            COMMAND cp ${libs_loc}/crashpad/out/$<IF:$<CONFIG:Debug>,Debug,Release>${crashpad_dir_part}/crashpad_handler $<TARGET_FILE_DIR:Telegram>/../Helpers/
         )
-        if (NOT DESKTOP_APP_DISABLE_CRASH_REPORTS)
-            if (DESKTOP_APP_MAC_ARCH STREQUAL "x86_64" OR DESKTOP_APP_MAC_ARCH STREQUAL "arm64")
-                set(crashpad_dir_part ".${DESKTOP_APP_MAC_ARCH}")
-            else()
-                set(crashpad_dir_part "")
-            endif()
-            add_custom_command(TARGET Telegram
-            PRE_LINK
-                COMMAND mkdir -p $<TARGET_FILE_DIR:Telegram>/../Helpers
-                COMMAND cp ${libs_loc}/crashpad/out/$<IF:$<CONFIG:Debug>,Debug,Release>${crashpad_dir_part}/crashpad_handler $<TARGET_FILE_DIR:Telegram>/../Helpers/
-            )
-        endif()
     endif()
 else()
     target_link_libraries(Telegram
@@ -1642,13 +1673,23 @@ if (build_macstore)
         COMMAND rm -rf $<TARGET_FILE_DIR:Telegram>/../Frameworks/Breakpad.framework/Resources/Inspector
     )
 else()
-    set(bundle_identifier "com.tdesktop.Telegram$<$<CONFIG:Debug>:Debug>")
+    if (CMAKE_GENERATOR STREQUAL Xcode)
+        set(bundle_identifier "com.tdesktop.Telegram$<$<CONFIG:Debug>:Debug>")
+    else()
+        set(bundle_identifier "com.tdesktop.Telegram")
+    endif()
     set(bundle_entitlements "Telegram.entitlements")
     if (LINUX AND DESKTOP_APP_USE_PACKAGED)
         set(output_name "telegram-desktop")
     else()
         set(output_name "Telegram")
     endif()
+endif()
+
+if (CMAKE_GENERATOR STREQUAL Xcode)
+    set(bundle_identifier_plist "$(PRODUCT_BUNDLE_IDENTIFIER)")
+else()
+    set(bundle_identifier_plist ${bundle_identifier})
 endif()
 
 set_target_properties(Telegram PROPERTIES
@@ -1724,7 +1765,7 @@ endif()
 
 target_prepare_qrc(Telegram)
 
-if ((NOT DESKTOP_APP_DISABLE_AUTOUPDATE OR APPLE) AND NOT build_macstore AND NOT build_winstore)
+if (NOT DESKTOP_APP_DISABLE_AUTOUPDATE AND NOT build_macstore AND NOT build_winstore)
     add_executable(Updater WIN32)
     init_non_host_target(Updater)
 
@@ -1762,6 +1803,12 @@ if ((NOT DESKTOP_APP_DISABLE_AUTOUPDATE OR APPLE) AND NOT build_macstore AND NOT
         else()
             target_link_options(Updater PRIVATE -municode)
         endif()
+    elseif (APPLE)
+        add_custom_command(TARGET Updater
+        PRE_LINK
+            COMMAND mkdir -p $<TARGET_FILE_DIR:Telegram>/../Frameworks
+            COMMAND cp $<TARGET_FILE:Updater> $<TARGET_FILE_DIR:Telegram>/../Frameworks/
+        )
     endif()
 
     if (DESKTOP_APP_SPECIAL_TARGET)

@@ -7,10 +7,18 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "info/boosts/info_boosts_inner_widget.h"
 
+#include "api/api_premium.h"
 #include "api/api_statistics.h"
+#include "boxes/gift_premium_box.h"
 #include "boxes/peers/edit_peer_invite_link.h"
+#include "data/data_peer.h"
+#include "data/data_session.h"
+#include "data/data_user.h"
+#include "info/boosts/create_giveaway_box.h"
 #include "info/boosts/info_boosts_widget.h"
 #include "info/info_controller.h"
+#include "info/profile/info_profile_icon.h"
+#include "info/statistics/info_statistics_inner_widget.h" // FillLoading.
 #include "info/statistics/info_statistics_list_controllers.h"
 #include "lang/lang_keys.h"
 #include "settings/settings_common.h"
@@ -19,7 +27,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/controls/invite_link_buttons.h"
 #include "ui/controls/invite_link_label.h"
 #include "ui/rect.h"
+#include "ui/widgets/buttons.h"
+#include "ui/widgets/discrete_sliders.h"
 #include "ui/widgets/labels.h"
+#include "ui/wrap/slide_wrap.h"
 #include "styles/style_info.h"
 #include "styles/style_statistics.h"
 
@@ -56,11 +67,12 @@ void FillOverview(
 		object_ptr<Ui::RpWidget>(content),
 		st::statisticsLayerMargins);
 
-	const auto addPrimary = [&](float64 v) {
+	const auto addPrimary = [&](float64 v, bool approximately = false) {
 		return Ui::CreateChild<Ui::FlatLabel>(
 			container,
 			(v >= 0)
-				? Lang::FormatCountToShort(v).string
+				? (approximately && v ? QChar(0x2248) : QChar())
+					+ Lang::FormatCountToShort(v).string
 				: QString(),
 			st::statisticsOverviewValue);
 	};
@@ -98,10 +110,11 @@ void FillOverview(
 
 
 	const auto topLeftLabel = addPrimary(stats.level);
-	const auto topRightLabel = addPrimary(stats.premiumMemberCount);
+	const auto topRightLabel = addPrimary(stats.premiumMemberCount, true);
 	const auto bottomLeftLabel = addPrimary(stats.boostCount);
-	const auto bottomRightLabel = addPrimary(
-		stats.nextLevelBoostCount - stats.boostCount);
+	const auto bottomRightLabel = addPrimary(std::max(
+		stats.nextLevelBoostCount - stats.boostCount,
+		0));
 
 	addSub(
 		topLeftLabel,
@@ -173,6 +186,36 @@ void FillShareLink(
 	::Settings::AddSkip(content, st::boostsLinkFieldPadding.bottom());
 }
 
+void FillGetBoostsButton(
+		not_null<Ui::VerticalLayout*> content,
+		not_null<Controller*> controller,
+		std::shared_ptr<Ui::Show> show,
+		not_null<PeerData*> peer) {
+	if (!Api::PremiumGiftCodeOptions(peer).giveawayGiftsPurchaseAvailable()) {
+		return;
+	}
+	::Settings::AddSkip(content);
+	const auto &st = st::getBoostsButton;
+	const auto &icon = st::getBoostsButtonIcon;
+	const auto button = content->add(
+		::Settings::CreateButton(
+			content.get(),
+			tr::lng_boosts_get_boosts(),
+			st));
+	button->setClickedCallback([=] {
+		show->showBox(Box(CreateGiveawayBox, controller, peer));
+	});
+	Ui::CreateChild<Info::Profile::FloatingIcon>(
+		button,
+		icon,
+		QPoint{
+			st::infoSharedMediaButtonIconPosition.x(),
+			(st.height + rect::m::sum::v(st.padding) - icon.height()) / 2,
+		})->show();
+	::Settings::AddSkip(content);
+	::Settings::AddDividerText(content, tr::lng_boosts_get_boosts_subtext());
+}
+
 } // namespace
 
 InnerWidget::InnerWidget(
@@ -188,12 +231,18 @@ InnerWidget::InnerWidget(
 void InnerWidget::load() {
 	const auto api = lifetime().make_state<Api::Boosts>(_peer);
 
+	Info::Statistics::FillLoading(
+		this,
+		_loaded.events_starting_with(false) | rpl::map(!rpl::mappers::_1),
+		_showFinished.events());
+
 	_showFinished.events(
 	) | rpl::take(1) | rpl::start_with_next([=] {
 		api->request(
 		) | rpl::start_with_error_done([](const QString &error) {
 		}, [=] {
 			_state = api->boostStatus();
+			_loaded.fire(true);
 			fill();
 		}, lifetime());
 	}, lifetime());
@@ -232,30 +281,89 @@ void InnerWidget::fill() {
 	::Settings::AddDivider(inner);
 	::Settings::AddSkip(inner);
 
-	if (status.firstSlice.total > 0) {
-		::Settings::AddSkip(inner);
-		using PeerPtr = not_null<PeerData*>;
-		const auto header = inner->add(
-			object_ptr<Statistic::Header>(inner),
-			st::statisticsLayerMargins
-				+ st::boostsChartHeaderPadding);
-		header->resizeToWidth(header->width());
-		header->setTitle(tr::lng_boosts_list_title(
+	const auto hasBoosts = (status.firstSliceBoosts.multipliedTotal > 0);
+	const auto hasGifts = (status.firstSliceGifts.multipliedTotal > 0);
+	if (hasBoosts || hasGifts) {
+		auto boostClicked = [=](const Data::Boost &boost) {
+			if (!boost.giftCodeLink.slug.isEmpty()) {
+				ResolveGiftCode(_controller, boost.giftCodeLink.slug);
+			} else if (boost.userId) {
+				const auto user = _peer->owner().user(boost.userId);
+				crl::on_main(this, [=] {
+					_controller->showPeerInfo(user);
+				});
+			} else if (!boost.isUnclaimed) {
+				_show->showToast(tr::lng_boosts_list_pending_about(tr::now));
+			}
+		};
+
+#ifdef _DEBUG
+		const auto hasOneTab = false;
+#else
+		const auto hasOneTab = (hasBoosts != hasGifts);
+#endif
+		const auto boostsTabText = tr::lng_boosts_list_title(
 			tr::now,
 			lt_count,
-			status.firstSlice.total));
-		header->setSubTitle({});
+			status.firstSliceBoosts.multipliedTotal);
+		const auto giftsTabText = tr::lng_boosts_list_tab_gifts(
+			tr::now,
+			lt_count,
+			status.firstSliceGifts.multipliedTotal);
+		if (hasOneTab) {
+			::Settings::AddSkip(inner);
+			const auto header = inner->add(
+				object_ptr<Statistic::Header>(inner),
+				st::statisticsLayerMargins
+					+ st::boostsChartHeaderPadding);
+			header->resizeToWidth(header->width());
+			header->setTitle(hasBoosts ? boostsTabText : giftsTabText);
+			header->setSubTitle({});
+		}
+
+		const auto slider = inner->add(
+			object_ptr<Ui::SlideWrap<Ui::SettingsSlider>>(
+				inner,
+				object_ptr<Ui::SettingsSlider>(
+					inner,
+					st::defaultTabsSlider)));
+		slider->toggle(!hasOneTab, anim::type::instant);
+		slider->entity()->addSection(boostsTabText);
+		slider->entity()->addSection(giftsTabText);
+
+		const auto boostsWrap = inner->add(
+			object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+				inner,
+				object_ptr<Ui::VerticalLayout>(inner)));
+		const auto giftsWrap = inner->add(
+			object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+				inner,
+				object_ptr<Ui::VerticalLayout>(inner)));
+		boostsWrap->toggle(hasOneTab ? true : hasBoosts, anim::type::instant);
+		giftsWrap->toggle(hasOneTab ? false : hasGifts, anim::type::instant);
+
+		slider->entity()->sectionActivated(
+		) | rpl::start_with_next([=](int index) {
+			boostsWrap->toggle(!index, anim::type::instant);
+			giftsWrap->toggle(index, anim::type::instant);
+		}, inner->lifetime());
+
 		Statistics::AddBoostsList(
-			status.firstSlice,
-			inner,
-			[=](PeerPtr p) { _controller->showPeerInfo(p); },
+			status.firstSliceBoosts,
+			boostsWrap->entity(),
+			boostClicked,
 			_peer,
 			tr::lng_boosts_title());
+		Statistics::AddBoostsList(
+			status.firstSliceGifts,
+			giftsWrap->entity(),
+			std::move(boostClicked),
+			_peer,
+			tr::lng_boosts_title());
+
 		::Settings::AddSkip(inner);
-		::Settings::AddDividerText(
-			inner,
-			tr::lng_boosts_list_subtext());
 		::Settings::AddSkip(inner);
+		::Settings::AddDividerText(inner, tr::lng_boosts_list_subtext());
 	}
 
 	::Settings::AddSkip(inner);
@@ -264,6 +372,8 @@ void InnerWidget::fill() {
 	FillShareLink(inner, _show, status.link, _peer);
 	::Settings::AddSkip(inner);
 	::Settings::AddDividerText(inner, tr::lng_boosts_link_subtext());
+
+	FillGetBoostsButton(inner, _controller, _show, _peer);
 
 	resizeToWidth(width());
 	crl::on_main([=]{ fakeShowed->fire({}); });

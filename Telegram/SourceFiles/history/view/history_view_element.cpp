@@ -18,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/reactions/history_view_reactions_button.h"
 #include "history/view/reactions/history_view_reactions.h"
 #include "history/view/history_view_cursor_state.h"
+#include "history/view/history_view_reply.h"
 #include "history/view/history_view_spoiler_click_handler.h"
 #include "history/history.h"
 #include "history/history_item.h"
@@ -500,7 +501,8 @@ Element::Element(
 	| Flag::NeedsResize
 	| (IsItemScheduledUntilOnline(data)
 		? Flag::ScheduledUntilOnline
-		: Flag()))
+		: Flag())
+	| (countIsTopicRootReply() ? Flag::TopicRootReply : Flag()))
 , _context(delegate->elementContext()) {
 	history()->owner().registerItemView(this);
 	refreshMedia(replacing);
@@ -1262,15 +1264,6 @@ QSize Element::countCurrentSize(int newWidth) {
 	return performCountCurrentSize(newWidth);
 }
 
-void Element::refreshIsTopicRootReply() {
-	const auto topicRootReply = countIsTopicRootReply();
-	if (topicRootReply) {
-		_flags |= Flag::TopicRootReply;
-	} else {
-		_flags &= ~Flag::TopicRootReply;
-	}
-}
-
 bool Element::countIsTopicRootReply() const {
 	const auto item = data();
 	if (!item->history()->isForum()) {
@@ -1365,6 +1358,10 @@ bool Element::hasFromName() const {
 	return false;
 }
 
+bool Element::displayReply() const {
+	return Has<Reply>();
+}
+
 bool Element::displayFromName() const {
 	return false;
 }
@@ -1420,10 +1417,6 @@ ClickHandlerPtr Element::rightActionLink(
 
 TimeId Element::displayedEditDate() const {
 	return TimeId(0);
-}
-
-HistoryMessageReply *Element::displayedReply() const {
-	return nullptr;
 }
 
 bool Element::toggleSelectionByHandlerClick(
@@ -1485,7 +1478,7 @@ void Element::unloadHeavyPart() {
 	if (_flags & Flag::HeavyCustomEmoji) {
 		_flags &= ~Flag::HeavyCustomEmoji;
 		_text.unloadPersistentAnimation();
-		if (const auto reply = data()->Get<HistoryMessageReply>()) {
+		if (const auto reply = Get<Reply>()) {
 			reply->unloadPersistentAnimation();
 		}
 	}

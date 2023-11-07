@@ -533,8 +533,13 @@ rpl::producer<rpl::no_value, QString> Boosts::request() {
 			};
 			_boostStatus.link = qs(data.vboost_url());
 
-			requestBoosts({}, [=](Data::BoostsListSlice &&slice) {
-				_boostStatus.firstSlice = std::move(slice);
+			using namespace Data;
+			requestBoosts({ .gifts = false }, [=](BoostsListSlice &&slice) {
+				_boostStatus.firstSliceBoosts = std::move(slice);
+				requestBoosts({ .gifts = true }, [=](BoostsListSlice &&s) {
+					_boostStatus.firstSliceGifts = std::move(s);
+					consumer.put_done();
+				});
 				consumer.put_done();
 			});
 		}).fail([=](const MTP::Error &error) {
@@ -553,8 +558,11 @@ void Boosts::requestBoosts(
 	}
 	constexpr auto kTlFirstSlice = tl::make_int(kFirstSlice);
 	constexpr auto kTlLimit = tl::make_int(kLimit);
+	const auto gifts = token.gifts;
 	_requestId = _api.request(MTPpremium_GetBoostsList(
-		MTP_flags(0),
+		gifts
+			? MTP_flags(MTPpremium_GetBoostsList::Flag::f_gifts)
+			: MTP_flags(0),
 		_peer->input,
 		MTP_string(token.next),
 		token.next.isEmpty() ? kTlFirstSlice : kTlLimit
@@ -567,19 +575,41 @@ void Boosts::requestBoosts(
 		auto list = std::vector<Data::Boost>();
 		list.reserve(data.vboosts().v.size());
 		for (const auto &boost : data.vboosts().v) {
+			const auto &data = boost.data();
+			const auto path = data.vused_gift_slug()
+				? (u"giftcode/"_q + qs(data.vused_gift_slug()->v))
+				: QString();
+			auto giftCodeLink = !path.isEmpty()
+				? Data::GiftCodeLink{
+					_peer->session().createInternalLink(path),
+					_peer->session().createInternalLinkFull(path),
+					qs(data.vused_gift_slug()->v),
+				}
+				: Data::GiftCodeLink();
 			list.push_back({
-				boost.data().vuser_id().value_or_empty(),
-				QDateTime::fromSecsSinceEpoch(boost.data().vexpires().v),
+				data.is_gift(),
+				data.is_giveaway(),
+				data.is_unclaimed(),
+				qs(data.vid()),
+				data.vuser_id().value_or_empty(),
+				data.vgiveaway_msg_id()
+					? FullMsgId{ _peer->id, data.vgiveaway_msg_id()->v }
+					: FullMsgId(),
+				QDateTime::fromSecsSinceEpoch(data.vdate().v),
+				data.vexpires().v,
+				std::move(giftCodeLink),
+				data.vmultiplier().value_or_empty(),
 			});
 		}
 		done(Data::BoostsListSlice{
 			.list = std::move(list),
-			.total = data.vcount().v,
+			.multipliedTotal = data.vcount().v,
 			.allLoaded = (data.vcount().v == data.vboosts().v.size()),
 			.token = Data::BoostsListSlice::OffsetToken{
-				data.vnext_offset()
+				.next = data.vnext_offset()
 					? qs(*data.vnext_offset())
-					: QString()
+					: QString(),
+				.gifts = gifts,
 			},
 		});
 	}).fail([=] {

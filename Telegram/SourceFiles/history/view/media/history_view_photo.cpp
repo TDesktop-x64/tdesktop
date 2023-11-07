@@ -1086,7 +1086,7 @@ bool Photo::needsBubble() const {
 		&& (item->repliesAreComments()
 			|| item->externalReply()
 			|| item->viaBot()
-			|| _parent->displayedReply()
+			|| _parent->displayReply()
 			|| _parent->displayForwardedFrom()
 			|| _parent->displayFromName()
 			|| _parent->displayedTopicButton());

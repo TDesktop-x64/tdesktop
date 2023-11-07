@@ -47,6 +47,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/storage_shared_media.h"
 #include "storage/localstorage.h"
 #include "chat_helpers/stickers_dice_pack.h" // Stickers::DicePacks::IsSlot.
+#include "chat_helpers/stickers_gift_box_pack.h"
 #include "data/data_session.h"
 #include "data/data_auto_download.h"
 #include "data/data_photo.h"
@@ -369,6 +370,7 @@ Giveaway ComputeGiveawayData(
 		.untilDate = data.vuntil_date().v,
 		.quantity = data.vquantity().v,
 		.months = data.vmonths().v,
+		.all = !data.is_only_new_subscribers(),
 	};
 	result.channels.reserve(data.vchannels().v.size());
 	const auto owner = &item->history()->owner();
@@ -705,7 +707,7 @@ ItemPreview MediaPhoto::toPreview(ToPreviewOptions options) const {
 		}
 	}
 	const auto type = tr::lng_in_dlg_photo(tr::now);
-	const auto caption = options.hideCaption
+	const auto caption = (options.hideCaption || options.ignoreMessageText)
 		? TextWithEntities()
 		: options.translated
 		? parent()->translatedText()
@@ -951,7 +953,7 @@ ItemPreview MediaFile::toPreview(ToPreviewOptions options) const {
 		}
 		return tr::lng_in_dlg_file(tr::now);
 	}();
-	const auto caption = options.hideCaption
+	const auto caption = (options.hideCaption || options.ignoreMessageText)
 		? TextWithEntities()
 		: options.translated
 		? parent()->translatedText()
@@ -1500,7 +1502,9 @@ bool MediaWebPage::replyPreviewLoaded() const {
 }
 
 ItemPreview MediaWebPage::toPreview(ToPreviewOptions options) const {
-	auto text = options.translated
+	auto text = options.ignoreMessageText
+		? TextWithEntities()
+		: options.translated
 		? parent()->translatedText()
 		: parent()->originalText();
 	if (text.empty()) {
@@ -2038,28 +2042,23 @@ MediaStory::MediaStory(
 	owner->registerStoryItem(storyId, parent);
 
 	const auto stories = &owner->stories();
-	if (const auto maybeStory = stories->lookup(storyId)) {
-		if (!_mention) {
-			parent->setText((*maybeStory)->caption());
-		}
-	} else {
-		if (maybeStory.error() == NoStory::Unknown) {
-			stories->resolve(storyId, crl::guard(this, [=] {
-				if (const auto maybeStory = stories->lookup(storyId)) {
-					if (!_mention) {
-						parent->setText((*maybeStory)->caption());
-					}
-				} else {
-					_expired = true;
+	const auto maybeStory = stories->lookup(storyId);
+	if (!maybeStory && maybeStory.error() == NoStory::Unknown) {
+		stories->resolve(storyId, crl::guard(this, [=] {
+			if (const auto maybeStory = stories->lookup(storyId)) {
+				if (!_mention && _viewMayExist) {
+					parent->setText((*maybeStory)->caption());
 				}
-				if (_mention) {
-					parent->updateStoryMentionText();
-				}
-				parent->history()->owner().requestItemViewRefresh(parent);
-			}));
-		} else {
-			_expired = true;
-		}
+			} else {
+				_expired = true;
+			}
+			if (_mention) {
+				parent->updateStoryMentionText();
+			}
+			parent->history()->owner().requestItemViewRefresh(parent);
+		}));
+	} else if (!maybeStory) {
+		_expired = true;
 	}
 }
 
@@ -2154,6 +2153,7 @@ std::unique_ptr<HistoryView::Media> MediaStory::createView(
 		if (_mention) {
 			return nullptr;
 		}
+		_viewMayExist = true;
 		return std::make_unique<HistoryView::Photo>(
 			message,
 			realParent,
@@ -2161,6 +2161,7 @@ std::unique_ptr<HistoryView::Media> MediaStory::createView(
 			spoiler);
 	}
 	_expired = false;
+	_viewMayExist = true;
 	const auto story = *maybeStory;
 	if (_mention) {
 		return std::make_unique<HistoryView::ServiceBox>(
@@ -2189,6 +2190,7 @@ MediaGiveaway::MediaGiveaway(
 	const Giveaway &data)
 : Media(parent)
 , _giveaway(data) {
+	parent->history()->session().giftBoxStickersPacks().load();
 }
 
 std::unique_ptr<Media> MediaGiveaway::clone(not_null<HistoryItem*> parent) {

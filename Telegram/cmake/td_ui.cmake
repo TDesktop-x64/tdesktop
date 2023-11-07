@@ -23,6 +23,7 @@ set(style_files
     calls/calls.style
     export/view/export.style
     info/info.style
+    info/boosts/giveaway/giveaway.style
     info/userpic/info_userpic_builder.style
     intro/intro.style
     media/player/media_player.style
@@ -108,6 +109,11 @@ PRIVATE
     info/userpic/info_userpic_color_circle_button.h
     info/userpic/info_userpic_emoji_builder_layer.cpp
     info/userpic/info_userpic_emoji_builder_layer.h
+
+    info/boosts/giveaway/giveaway_type_row.cpp
+    info/boosts/giveaway/giveaway_type_row.h
+    info/boosts/giveaway/select_countries_box.cpp
+    info/boosts/giveaway/select_countries_box.h
 
     layout/abstract_layout_item.cpp
     layout/abstract_layout_item.h

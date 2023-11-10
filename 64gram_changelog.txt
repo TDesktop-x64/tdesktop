@@ -1,3 +1,11 @@
+1.1.3 (10.11.23)
+
+- [Remove] Pin to top
+
+1.1.2 (07.11.23)
+
+- [Fix] youtube preview link clickable
+
 1.1.1 (03.11.23)
 
 - [New] "Uncolored Quote" option

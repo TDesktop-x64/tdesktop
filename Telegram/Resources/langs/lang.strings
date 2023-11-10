@@ -2038,6 +2038,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_premium_gift_terms_link" = "here";
 
 "lng_boost_channel_button" = "Boost Channel";
+"lng_boost_again_button" = "Boost Again";
 "lng_boost_level#one" = "Level {count}";
 "lng_boost_level#other" = "Level {count}";
 "lng_boost_channel_title_first" = "Enable stories for channel";
@@ -2059,6 +2060,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_boost_channel_post_stories#other" = "post **{count} stories** per day";
 "lng_boost_error_gifted_title" = "Can't boost with gifted Premium!";
 "lng_boost_error_gifted_text" = "Because your **Telegram Premium** subscription was gifted to you, you can't use it to boost channels.";
+"lng_boost_need_more" = "More boosts needed";
+"lng_boost_need_more_text#one" = "To boost {channel}, gift **Telegram Premium** to a friend and get **{count}** boosts.";
+"lng_boost_need_more_text#other" = "To boost {channel}, gift **Telegram Premium** to a friend and get **{count}** boosts.";
+"lng_boost_need_more_again#one" = "To boost {channel} again, gift **Telegram Premium** to a friend and get **{count}** additional boost.";
+"lng_boost_need_more_again#other" = "To boost {channel} again, gift **Telegram Premium** to a friend and get **{count}** additional boosts.";
 "lng_boost_error_already_title" = "Already Boosted!";
 "lng_boost_error_already_text" = "You are already boosting this channel.";
 "lng_boost_error_premium_title" = "Premium needed!";
@@ -2068,6 +2074,19 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_boost_error_flood_text" = "You can change the channel you boost only once a day. Next time you can boost is in {left}.";
 "lng_boost_now_instead" = "You currently boost {channel}. Do you want to boost {other} instead?";
 "lng_boost_now_replace" = "Replace";
+"lng_boost_reassign_title" = "Reassign boost";
+"lng_boost_reassign_text" = "To boost {channel}, reassign a previous boost or {gift}.";
+"lng_boost_reassign_gift#one" = "gift **Telegram Premium** to a friend to get **{count}** additional boost";
+"lng_boost_reassign_gift#other" = "gift **Telegram Premium** to a friend to get **{count}** additional boosts";
+"lng_boost_remove_title" = "Remove your boost from";
+"lng_boost_reassign_button" = "Reassign";
+"lng_boost_available_in" = "available in {duration}";
+"lng_boost_available_in_toast#one" = "Wait until the boost is available or get **{count}** more boost by gifting a **Telegram Premium** subscription.";
+"lng_boost_available_in_toast#other" = "Wait until the boost is available or get **{count}** more boosts by gifting a **Telegram Premium** subscription.";
+"lng_boost_reassign_done#one" = "{count} boost is reassigned from {channels}.";
+"lng_boost_reassign_done#other" = "{count} boosts are reassigned from {channels}.";
+"lng_boost_reassign_channels#one" = "{count} channel";
+"lng_boost_reassign_channels#other" = "{count} channels";
 
 "lng_boost_channel_title_color" = "Enable colors";
 "lng_boost_channel_needs_level_color#one" = "Your channel needs to reach **Level {count}** to change channel color.";
@@ -2105,6 +2124,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_giveaway_users_about" = "Choose if you want to limit the giveaway only to those who joined the channel after the giveaway started or to users from specific countries.";
 "lng_giveaway_start" = "Start Giveaway";
 "lng_giveaway_award" = "Gift Premium";
+"lng_giveaway_start_sure" = "Are you sure you want to start this prepaid giveaway now? This action cannot be undone.";
 "lng_giveaway_date_title" = "Date when giveaway ends";
 "lng_giveaway_date" = "Date and Time";
 "lng_giveaway_date_about#one" = "Choose when {count} subscriber	of your channel will be randomly selected to receive Telegram Premium.";
@@ -2207,6 +2227,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_gift_link_used_about" = "This link was used to activate\na **Telegram Premium** subscription.";
 "lng_gift_link_used_footer" = "This link was used on {date}.";
 "lng_gift_link_expired" = "Gift code link expired";
+"lng_gift_link_pending_about" = "This link allows {user} to activate\na **Telegram Premium** subscription.";
+"lng_gift_link_pending_toast" = "Only the recipient can see the link.";
+"lng_gift_link_pending_footer" = "This link hasn't been activated yet.";
 
 "lng_accounts_limit_title" = "Limit Reached";
 "lng_accounts_limit1#one" = "You have reached the limit of **{count}** connected accounts.";
@@ -4337,8 +4360,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_boosts_existing" = "Existing boosts";
 "lng_boosts_premium_audience" = "Premium subscribers";
 "lng_boosts_next_level" = "Boosts to level up";
-"lng_boosts_list_title#one" = "{count} booster";
-"lng_boosts_list_title#other" = "{count} boosters";
+"lng_boosts_list_title#one" = "{count} Boost";
+"lng_boosts_list_title#other" = "{count} Boosts";
 "lng_boosts_list_subtext" = "Your channel is currently boosted by these users.";
 "lng_boosts_show_more_boosts#one" = "Show {count} More Boosts";
 "lng_boosts_show_more_boosts#other" = "Show {count} More Boosts";
@@ -4354,6 +4377,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_boosts_list_pending_about" = "The recipient will be selected when the giveaway ends.";
 "lng_boosts_list_tab_gifts#one" = "{count} Gifts";
 "lng_boosts_list_tab_gifts#other" = "{count} Gifts";
+
+"lng_boosts_prepaid_giveaway_title" = "Prepaid giveaways";
+"lng_boosts_prepaid_giveaway_single" = "Prepaid giveaway";
+"lng_boosts_prepaid_giveaway_quantity#one" = "{count} Telegram Premium";
+"lng_boosts_prepaid_giveaway_quantity#other" = "{count} Telegram Premium";
+"lng_boosts_prepaid_giveaway_moths#one" = "{count}-month subscriptions";
+"lng_boosts_prepaid_giveaway_moths#other" = "{count}-month subscriptions";
+"lng_boosts_prepaid_giveaway_status#one" = "{count} subscription {duration}";
+"lng_boosts_prepaid_giveaway_status#other" = "{count} subscriptions {duration}";
 
 // Wnd specific
 

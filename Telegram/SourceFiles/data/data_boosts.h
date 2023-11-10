@@ -10,7 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Data {
 
 struct BoostsOverview final {
-	bool isBoosted = false;
+	int mine = 0;
 	int level = 0;
 	int boostCount = 0;
 	int currentLevelBoostCount = 0;
@@ -34,7 +34,8 @@ struct Boost final {
 	UserId userId = UserId(0);
 	FullMsgId giveawayMessage;
 	QDateTime date;
-	crl::time expiresAt = 0;
+	QDateTime expiresAt;
+	int expiresAfterMonths = 0;
 	GiftCodeLink giftCodeLink;
 	int multiplier = 0;
 };
@@ -50,10 +51,18 @@ struct BoostsListSlice final {
 	OffsetToken token;
 };
 
+struct BoostPrepaidGiveaway final {
+	int months = 0;
+	uint64 id = 0;
+	int quantity = 0;
+	QDateTime date;
+};
+
 struct BoostStatus final {
 	BoostsOverview overview;
 	BoostsListSlice firstSliceBoosts;
 	BoostsListSlice firstSliceGifts;
+	std::vector<BoostPrepaidGiveaway> prepaidGiveaway;
 	QString link;
 };
 

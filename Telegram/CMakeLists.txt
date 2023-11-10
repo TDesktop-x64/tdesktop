@@ -221,6 +221,8 @@ PRIVATE
     boxes/peers/peer_short_info_box.h
     boxes/peers/prepare_short_info_box.cpp
     boxes/peers/prepare_short_info_box.h
+    boxes/peers/replace_boost_box.cpp
+    boxes/peers/replace_boost_box.h
     boxes/about_box.cpp
     boxes/about_box.h
     boxes/about_sponsored_box.cpp
@@ -1862,6 +1864,7 @@ if (LINUX AND DESKTOP_APP_USE_PACKAGED)
     install(FILES "Resources/art/icon128.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/128x128/apps" RENAME "telegram.png")
     install(FILES "Resources/art/icon256.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps" RENAME "telegram.png")
     install(FILES "Resources/art/icon512.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/512x512/apps" RENAME "telegram.png")
+    install(FILES "Resources/icons/tray_monochrome.svg" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/symbolic/apps" RENAME "telegram-symbolic.svg")
     install(FILES "../lib/xdg/io.github.tdesktop_x64.TDesktop.desktop" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications")
     install(FILES "${CMAKE_CURRENT_BINARY_DIR}/io.github.tdesktop_x64.TDesktop.service" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/dbus-1/services")
     install(FILES "${CMAKE_CURRENT_BINARY_DIR}/io.github.tdesktop_x64.TDesktop.metainfo.xml" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/metainfo")

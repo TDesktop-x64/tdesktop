@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_session.h"
 #include "data/data_user.h"
 #include "history/history_item.h"
+#include "info/boosts/giveaway/boost_badge.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "settings/settings_common.h"
@@ -34,58 +35,6 @@ namespace {
 using BoostCallback = Fn<void(const Data::Boost &)>;
 constexpr auto kColorIndexUnclaimed = int(3);
 constexpr auto kColorIndexPending = int(4);
-
-[[nodiscard]] QImage Badge(
-		const style::TextStyle &textStyle,
-		const QString &text,
-		int badgeHeight,
-		const style::margins &textPadding,
-		const style::color &bg,
-		const style::color &fg,
-		float64 bgOpacity,
-		const style::margins &iconPadding,
-		const style::icon &icon) {
-	auto badgeText = Ui::Text::String(textStyle, text);
-	const auto badgeTextWidth = badgeText.maxWidth();
-	const auto badgex = 0;
-	const auto badgey = 0;
-	const auto badgeh = 0 + badgeHeight;
-	const auto badgew = badgeTextWidth
-		+ rect::m::sum::h(textPadding);
-	auto result = QImage(
-		QSize(badgew, badgeh) * style::DevicePixelRatio(),
-		QImage::Format_ARGB32_Premultiplied);
-	result.fill(Qt::transparent);
-	result.setDevicePixelRatio(style::DevicePixelRatio());
-	{
-		auto p = Painter(&result);
-
-		p.setPen(Qt::NoPen);
-		p.setBrush(bg);
-
-		const auto r = QRect(badgex, badgey, badgew, badgeh);
-		{
-			auto hq = PainterHighQualityEnabler(p);
-			auto o = ScopedPainterOpacity(p, bgOpacity);
-			p.drawRoundedRect(r, badgeh / 2, badgeh / 2);
-		}
-
-		p.setPen(fg);
-		p.setBrush(Qt::NoBrush);
-		badgeText.drawLeftElided(
-			p,
-			r.x() + textPadding.left(),
-			badgey + textPadding.top(),
-			badgew,
-			badgew * 2);
-
-		icon.paint(
-			p,
-			QPoint(r.x() + iconPadding.left(), r.y() + iconPadding.top()),
-			badgew * 2);
-	}
-	return result;
-}
 
 void AddArrow(not_null<Ui::RpWidget*> parent) {
 	const auto arrow = Ui::CreateChild<Ui::RpWidget>(parent.get());
@@ -442,19 +391,16 @@ BoostRow::BoostRow(const Data::Boost &boost)
 
 void BoostRow::init() {
 	invalidateBadges();
-	constexpr auto kMonthsDivider = int(30 * 86400);
-	const auto months = (_boost.expiresAt - _boost.date.toSecsSinceEpoch())
-		/ kMonthsDivider;
 	auto status = !PeerListRow::special()
 		? tr::lng_boosts_list_status(
 			tr::now,
 			lt_date,
-			langDateTime(_boost.date))
-		: tr::lng_months_tiny(tr::now, lt_count, months)
+			langDayOfMonth(_boost.expiresAt.date()))
+		: tr::lng_months_tiny(tr::now, lt_count, _boost.expiresAfterMonths)
 			+ ' '
 			+ QChar(0x2022)
 			+ ' '
-			+ langDateTime(_boost.date);
+			+ langDayOfMonth(_boost.date.date());
 	PeerListRow::setCustomStatus(std::move(status));
 }
 
@@ -476,12 +422,17 @@ PaintRoundImageCallback BoostRow::generatePaintUserpicCallback(bool force) {
 	}
 	return [=](Painter &p, int x, int y, int outerWidth, int size) mutable {
 		_userpic.paintCircle(p, x, y, outerWidth, size);
+		(_boost.isUnclaimed
+			? st::boostsListUnclaimedIcon
+			: st::boostsListUnknownIcon).paintInCenter(
+				p,
+				{ x, y, size, size });
 	};
 }
 
 void BoostRow::invalidateBadges() {
 	_badge = _boost.multiplier
-		? Badge(
+		? CreateBadge(
 			st::statisticsDetailsBottomCaptionStyle,
 			QString::number(_boost.multiplier),
 			st::boostsListBadgeHeight,
@@ -501,7 +452,7 @@ void BoostRow::invalidateBadges() {
 		? st::boostsListGiveawayMiniIcon
 		: st::boostsListGiftMiniIcon;
 	_rightBadge = (_boost.isGift || _boost.isGiveaway)
-		? Badge(
+		? CreateBadge(
 			st::boostsListRightBadgeTextStyle,
 			_boost.isGiveaway
 				? tr::lng_gift_link_reason_giveaway(tr::now)
@@ -745,7 +696,6 @@ void AddMembersList(
 				container,
 				tr::lng_stories_show_more())),
 		{ 0, -st::settingsButton.padding.top(), 0, 0 });
-	const auto button = wrap->entity();
 
 	const auto showMore = [=] {
 		state->limit = std::min(int(max), state->limit + kPerPage);
@@ -755,7 +705,7 @@ void AddMembersList(
 		}
 		container->resizeToWidth(container->width());
 	};
-	button->setClickedCallback(showMore);
+	wrap->entity()->setClickedCallback(showMore);
 	showMore();
 }
 

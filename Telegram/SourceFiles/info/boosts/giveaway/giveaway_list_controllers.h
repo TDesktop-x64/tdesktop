@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "boxes/peers/edit_participants_box.h"
 
+class ChannelData;
 class PeerData;
 class PeerListRow;
 
@@ -27,7 +28,10 @@ class AwardMembersListController : public ParticipantsBoxController {
 public:
 	AwardMembersListController(
 		not_null<Window::SessionNavigation*> navigation,
-		not_null<PeerData*> peer);
+		not_null<PeerData*> peer,
+		std::vector<not_null<PeerData*>> selected);
+
+	void prepare() override;
 
 	void setCheckError(Fn<bool(int)> callback);
 
@@ -40,6 +44,8 @@ public:
 
 private:
 	Fn<bool(int)> _checkErrorCallback;
+
+	std::vector<not_null<PeerData*>> _selected;
 
 };
 
@@ -55,6 +61,7 @@ public:
 	Main::Session &session() const override;
 	void prepare() override;
 	void rowClicked(not_null<PeerListRow*> row) override;
+	void loadMoreRows() override;
 
 	std::unique_ptr<PeerListRow> createSearchRow(
 		not_null<PeerData*> peer) override;
@@ -71,6 +78,8 @@ private:
 	Fn<bool(int)> _checkErrorCallback;
 
 	std::vector<not_null<PeerData*>> _selected;
+	std::unique_ptr<std::vector<not_null<ChannelData*>>> _otherChannels;
+	int _lastAddedIndex = 0;
 
 	rpl::lifetime _apiLifetime;
 

@@ -9,6 +9,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 class PeerData;
 
+namespace Data {
+struct BoostPrepaidGiveaway;
+} // namespace Data
+
 namespace Info {
 class Controller;
 } // namespace Info
@@ -20,4 +24,6 @@ class GenericBox;
 void CreateGiveawayBox(
 	not_null<Ui::GenericBox*> box,
 	not_null<Info::Controller*> controller,
-	not_null<PeerData*> peer);
+	not_null<PeerData*> peer,
+	Fn<void()> reloadOnDone,
+	std::optional<Data::BoostPrepaidGiveaway> prepaidGiveaway);

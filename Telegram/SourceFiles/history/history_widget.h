@@ -655,7 +655,6 @@ private:
 	MTP::Sender _api;
 	FullReplyTo _replyTo;
 	Ui::Text::String _replyToName;
-	int _replyToNameVersion = 0;
 
 	FullReplyTo _processingReplyTo;
 	HistoryItem *_processingReplyItem = nullptr;
@@ -695,8 +694,6 @@ private:
 	Fn<bool(QPainter &p, QRect to)> _previewDrawPreview;
 	Ui::Text::String _previewTitle;
 	Ui::Text::String _previewDescription;
-
-	bool _replyForwardPressed = false;
 
 	PeerData *_peer = nullptr;
 

@@ -463,9 +463,13 @@ bool TabbedPanel::eventFilter(QObject *obj, QEvent *e) {
 	if (TabbedPanelShowOnClick.value()) {
 		return false;
 	} else if (e->type() == QEvent::Enter) {
-		otherEnter();
+		if (!GetEnhancedBool("donthover_emojis")) {
+			otherEnter();
+		}
 	} else if (e->type() == QEvent::Leave) {
-		otherLeave();
+		if (!GetEnhancedBool("donthover_emojis")) {
+			otherLeave();
+		}
 	}
 	return false;
 }

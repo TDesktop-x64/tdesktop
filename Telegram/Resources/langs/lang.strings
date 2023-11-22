@@ -4483,6 +4483,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_show_seconds" = "Time with seconds";
 "lng_settings_hide_counter" = "Hide online users counter";
 "lng_settings_hide_stories" = "Hide Stories";
+"lng_settings_donthover_emojis" = "Do not show Emojis on hover";
 "lng_settings_translate_to_tc" = "使用正體中文翻譯訊息";
 "lng_settings_restart_hint" = "WARNING: Changing options that are colored in red will take effect only after the app restarts.";
 

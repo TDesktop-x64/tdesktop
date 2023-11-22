@@ -552,6 +552,20 @@ namespace Settings {
 			EnhancedSettings::Write();
 		}, container->lifetime());
 
+		AddButton(
+				container,
+				  tr::lng_settings_donthover_emojis(),
+				st::settingsButtonNoIcon
+		)->toggleOn(
+				rpl::single(GetEnhancedBool("donthover_emojis"))
+		)->toggledValue(
+		) | rpl::filter([](bool enabled) {
+			return (enabled != GetEnhancedBool("donthover_emojis"));
+		}) | rpl::start_with_next([=](bool enabled) {
+			SetEnhancedValue("donthover_emojis", enabled);
+			EnhancedSettings::Write();
+		}, container->lifetime());
+
 		AddSkip(container);
 	}
 

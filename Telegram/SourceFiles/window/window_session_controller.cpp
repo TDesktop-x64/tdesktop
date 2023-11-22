@@ -2725,6 +2725,9 @@ void SessionController::openPeerStory(
 void SessionController::openPeerStories(
 		PeerId peerId,
 		std::optional<Data::StorySourcesList> list) {
+	if (GetEnhancedBool("dontopen_stories")) {
+		return;
+	}
 	using namespace Media::View;
 	using namespace Data;
 

@@ -322,6 +322,7 @@ namespace EnhancedSettings {
 		settings.insert(qsl("hide_counter"), false);
 		settings.insert(qsl("translate_to_tc"), false);
 		settings.insert(qsl("hide_stories"), false);
+		settings.insert(qsl("dontopen_stories"), false);
 
 		auto document = QJsonDocument();
 		document.setObject(settings);
@@ -372,6 +373,7 @@ namespace EnhancedSettings {
 		settings.insert(qsl("hide_counter"), GetEnhancedBool("hide_counter"));
 		settings.insert(qsl("translate_to_tc"), GetEnhancedBool("translate_to_tc"));
 		settings.insert(qsl("hide_stories"), GetEnhancedBool("hide_stories"));
+		settings.insert(qsl("dontopen_stories"), GetEnhancedBool("dontopen_stories"));
 
 		auto document = QJsonDocument();
 		document.setObject(settings);

@@ -552,6 +552,20 @@ namespace Settings {
 			EnhancedSettings::Write();
 		}, container->lifetime());
 
+		AddButton(
+				container,
+				  tr::lng_settings_dontopen_stories(),
+				st::settingsButtonNoIcon
+		)->toggleOn(
+				rpl::single(GetEnhancedBool("dontopen_stories"))
+		)->toggledValue(
+		) | rpl::filter([](bool enabled) {
+			return (enabled != GetEnhancedBool("dontopen_stories"));
+		}) | rpl::start_with_next([=](bool enabled) {
+			SetEnhancedValue("dontopen_stories", enabled);
+			EnhancedSettings::Write();
+		}, container->lifetime());
+
 		AddSkip(container);
 	}
 

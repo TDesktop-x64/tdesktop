@@ -367,7 +367,7 @@ void Photo::draw(Painter &p, const PaintContext &context) const {
 		}
 	}
 
-	const auto showEnlarge = loaded && _showEnlarge;
+	const auto showEnlarge = false;
 	const auto paintInCenter = (radial || (!loaded && !_data->loading()));
 	if (paintInCenter || showEnlarge) {
 		p.setPen(Qt::NoPen);

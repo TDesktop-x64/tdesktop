@@ -117,6 +117,9 @@ PRIVATE
     info/boosts/giveaway/select_countries_box.cpp
     info/boosts/giveaway/select_countries_box.h
 
+    intro/intro_code_input.cpp
+    intro/intro_code_input.h
+
     layout/abstract_layout_item.cpp
     layout/abstract_layout_item.h
     layout/layout_mosaic.cpp
@@ -169,6 +172,9 @@ PRIVATE
     platform/mac/file_bookmark_mac.mm
     platform/platform_file_bookmark.h
 
+    settings/settings_common.cpp
+    settings/settings_common.h
+
     statistics/chart_lines_filter_controller.cpp
     statistics/chart_lines_filter_controller.h
     statistics/chart_rulers_data.cpp
@@ -180,7 +186,12 @@ PRIVATE
     statistics/statistics_common.h
     statistics/statistics_data_deserialize.cpp
     statistics/statistics_data_deserialize.h
+    statistics/statistics_format_values.cpp
+    statistics/statistics_format_values.h
+    statistics/view/abstract_chart_view.cpp
     statistics/view/abstract_chart_view.h
+    statistics/view/bar_chart_view.cpp
+    statistics/view/bar_chart_view.h
     statistics/view/chart_rulers_view.cpp
     statistics/view/chart_rulers_view.h
     statistics/view/chart_view_factory.cpp
@@ -189,8 +200,6 @@ PRIVATE
     statistics/view/linear_chart_view.h
     statistics/view/stack_chart_common.cpp
     statistics/view/stack_chart_common.h
-    statistics/view/stack_chart_view.cpp
-    statistics/view/stack_chart_view.h
     statistics/view/stack_linear_chart_common.cpp
     statistics/view/stack_linear_chart_common.h
     statistics/view/stack_linear_chart_view.cpp
@@ -329,6 +338,8 @@ PRIVATE
     ui/effects/round_checkbox.h
     ui/effects/scroll_content_shadow.cpp
     ui/effects/scroll_content_shadow.h
+    ui/effects/shake_animation.cpp
+    ui/effects/shake_animation.h
     ui/effects/snowflakes.cpp
     ui/effects/snowflakes.h
     ui/effects/toggle_arrow.cpp
@@ -368,6 +379,8 @@ PRIVATE
     ui/grouped_layout.h
     ui/power_saving.cpp
     ui/power_saving.h
+    ui/vertical_list.cpp
+    ui/vertical_list.h
     ui/unread_badge_paint.cpp
     ui/unread_badge_paint.h
     ui/userpic_view.cpp

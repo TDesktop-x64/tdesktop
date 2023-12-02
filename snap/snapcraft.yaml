@@ -259,6 +259,26 @@ parts:
     after:
       - mozjpeg
 
+  glib:
+    source: https://github.com/GNOME/glib.git
+    source-depth: 1
+    source-tag: 2.78.1
+    plugin: meson
+    build-packages:
+      - mm-common
+      - ninja-build
+    meson-parameters:
+      - --buildtype=release
+      - --prefix=/usr
+      - --strip
+      - -Dtests=false
+    prime:
+      - -./usr/include
+      - -./usr/lib/$CRAFT_ARCH_TRIPLET/pkgconfig
+      - -./usr/lib/$CRAFT_ARCH_TRIPLET/*.so
+    after:
+      - meson-deps
+
   glibmm:
     source: https://github.com/GNOME/glibmm.git
     source-depth: 1
@@ -277,14 +297,13 @@ parts:
       - -Dsigc++-3.0:build-documentation=false
       - -Dsigc++-3.0:build-examples=false
       - -Dsigc++-3.0:validation=false
-      - -Dglib:tests=false
-      - -Dglib:introspection=disabled
     prime:
       - -./usr/include
       - -./usr/lib/$CRAFT_ARCH_TRIPLET/pkgconfig
       - -./usr/lib/$CRAFT_ARCH_TRIPLET/*.so
     after:
       - meson-deps
+      - glib
 
   libjxl:
     source: https://github.com/libjxl/libjxl.git
@@ -478,21 +497,15 @@ parts:
       - libxkbcommon-x11-0
       - zlib1g
     override-pull: |
-      QT=6.6.0
+      QT=6.6.1
 
-      git clone -b v${QT} --depth=1 https://code.qt.io/qt/qt5.git .
+      git clone -b v${QT} --depth=1 https://github.com/qt/qt5.git .
       git submodule update --init --recursive --depth=1 qtbase qtdeclarative qtwayland qtimageformats qtsvg qtshadertools
 
       cd qtbase
       find $CRAFT_STAGE/patches/qtbase_${QT} -type f -print0 | sort -z | xargs -r0 git apply
-      cd ../qtsvg
-      git fetch origin v6.5.3
-      git checkout FETCH_HEAD
       cd ../qtwayland
-      git fetch origin v6.5.3
-      git checkout FETCH_HEAD
-      git fetch origin da4bb4885d91fad53a573bbeacf1b0705eb5b1a5
-      git cherry-pick -n FETCH_HEAD
+      find $CRAFT_STAGE/patches/qtwayland_${QT} -type f -print0 | sort -z | xargs -r0 git apply
       sed -i 's/qMin(version, 8)/qMin(version, 7)/' src/client/qwaylandinputdevice.cpp
       cd ..
     override-build: |
@@ -529,7 +542,7 @@ parts:
       - -./usr/mkspecs
       - -./usr/modules
     after:
-      - glibmm
+      - glib
       - mozjpeg
       - patches
 
@@ -614,5 +627,5 @@ parts:
       - -./usr/lib/$CRAFT_ARCH_TRIPLET/*.a
     after:
       - ffmpeg
-      - glibmm
+      - glib
       - mozjpeg

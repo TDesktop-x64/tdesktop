@@ -17,12 +17,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_folder.h"
 #include "data/data_forum.h"
 #include "data/data_forum_icons.h"
-#include "data/data_location.h"
 #include "data/data_histories.h"
 #include "data/data_group_call.h"
 #include "data/data_message_reactions.h"
-#include "data/data_peer_bot_command.h"
-#include "data/data_user_names.h"
 #include "data/notify/data_notify_settings.h"
 #include "main/main_session.h"
 #include "main/session/send_as_peers.h"
@@ -30,7 +27,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "history/history.h"
 #include "lang/lang_keys.h"
-#include "main/main_session.h"
 #include "api/api_chat_invite.h"
 #include "api/api_invite_links.h"
 #include "apiwrap.h"
@@ -176,7 +172,7 @@ void ChannelData::setFlags(ChannelDataFlags which) {
 			session().changes().peerUpdated(this, UpdateFlag::Migration);
 		}
 	}
-	if (diff & (Flag::Forum | Flag::CallNotEmpty)) {
+	if (diff & (Flag::Forum | Flag::CallNotEmpty | Flag::SimilarExpanded)) {
 		if (const auto history = this->owner().historyLoaded(this)) {
 			if (diff & Flag::CallNotEmpty) {
 				history->updateChatListEntry();
@@ -188,6 +184,11 @@ void ChannelData::setFlags(ChannelDataFlags which) {
 					if (const auto forum = this->forum()) {
 						forum->preloadTopics();
 					}
+				}
+			}
+			if (diff & Flag::SimilarExpanded) {
+				if (const auto item = history->joinedMessageInstance()) {
+					history->owner().requestItemResize(item);
 				}
 			}
 		}
@@ -474,6 +475,14 @@ void ChannelData::applyEditBanned(
 		}
 	}
 	session().changes().peerUpdated(this, flags);
+}
+
+void ChannelData::setViewAsMessagesFlag(bool enabled) {
+	if (viewForumAsMessages() == enabled) {
+		return;
+	}
+	setFlags((flags() & ~Flag::ViewAsMessages)
+		| (enabled ? Flag::ViewAsMessages : Flag()));
 }
 
 void ChannelData::markForbidden() {
@@ -1020,7 +1029,8 @@ void ApplyChannelUpdate(
 		| Flag::AntiSpam
 		| Flag::Location
 		| Flag::ParticipantsHidden
-		| Flag::CanGetStatistics;
+		| Flag::CanGetStatistics
+		| Flag::ViewAsMessages;
 	channel->setFlags((channel->flags() & ~mask)
 		| (update.is_can_set_username() ? Flag::CanSetUsername : Flag())
 		| (update.is_can_view_participants()
@@ -1033,7 +1043,10 @@ void ApplyChannelUpdate(
 		| (update.is_participants_hidden()
 			? Flag::ParticipantsHidden
 			: Flag())
-		| (update.is_can_view_stats() ? Flag::CanGetStatistics : Flag()));
+		| (update.is_can_view_stats() ? Flag::CanGetStatistics : Flag())
+		| (update.is_view_forum_as_messages()
+			? Flag::ViewAsMessages
+			: Flag()));
 	channel->setUserpicPhoto(update.vchat_photo());
 	if (const auto migratedFrom = update.vmigrated_from_chat_id()) {
 		channel->addFlags(Flag::Megagroup);

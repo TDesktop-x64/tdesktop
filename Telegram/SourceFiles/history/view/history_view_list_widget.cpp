@@ -710,9 +710,10 @@ bool ListWidget::isBelowPosition(Data::MessagePosition position) const {
 
 void ListWidget::highlightMessage(
 		FullMsgId itemId,
-		const TextWithEntities &part) {
+		const TextWithEntities &part,
+		int partOffsetHint) {
 	if (const auto view = viewForItem(itemId)) {
-		_highlighter.highlight(view, part);
+		_highlighter.highlight({ view->data(), part, partOffsetHint });
 	}
 }
 
@@ -788,7 +789,10 @@ bool ListWidget::showAtPositionNow(
 		computeScrollTo(*scrollTop, position, params.animated);
 		if (position != Data::MaxMessagePosition
 			&& position != Data::UnreadMessagePosition) {
-			highlightMessage(position.fullId, params.highlightPart);
+			highlightMessage(
+				position.fullId,
+				params.highlightPart,
+				params.highlightPartOffsetHint);
 		}
 		if (done) {
 			const auto found = !position.fullId.peer
@@ -2144,7 +2148,7 @@ void ListWidget::paintEvent(QPaintEvent *e) {
 			} else if (item->isUnreadMention()
 				&& !item->isUnreadMedia()) {
 				readContents.insert(item);
-				_highlighter.enqueue(view, {});
+				_highlighter.enqueue({ item });
 			}
 		}
 		session->data().reactions().poll(item, context.now);
@@ -2604,12 +2608,10 @@ void ListWidget::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 	request.view = _overElement;
 	request.item = overItem;
 	request.pointState = _overState.pointState;
-	const auto quote = (_overElement
+	request.quote = (_overElement
 		&& _selectedTextItem == _overElement->data())
 		? _overElement->selectedQuote(_selectedTextRange)
 		: SelectedQuote();
-	request.quote = quote.text;
-	request.quoteItem = quote.item;
 	request.selectedText = _selectedText;
 	request.selectedItems = collectSelectedItems();
 	const auto hasSelection = !request.selectedItems.empty()
@@ -3808,8 +3810,6 @@ void ListWidget::viewReplaced(not_null<const Element*> was, Element *now) {
 }
 
 void ListWidget::itemRemoved(not_null<const HistoryItem*> item) {
-	saveScrollState();
-
 	if (_reactionsItem.current() == item) {
 		_reactionsItem = nullptr;
 	}
@@ -3826,6 +3826,12 @@ void ListWidget::itemRemoved(not_null<const HistoryItem*> item) {
 	if (i == end(_views)) {
 		return;
 	}
+
+	saveScrollState();
+	const auto guard = gsl::finally([&] {
+		restoreScrollState();
+	});
+
 	const auto view = i->second.get();
 	_items.erase(
 		ranges::remove(_items, view, [](auto view) { return view.get(); }),

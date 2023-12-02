@@ -140,22 +140,6 @@ struct HistoryMessageForwarded : public RuntimeComponent<HistoryMessageForwarded
 	bool story = false;
 };
 
-struct HistoryMessageSponsored : public RuntimeComponent<HistoryMessageSponsored, HistoryItem> {
-	enum class Type : uchar {
-		User,
-		Group,
-		Broadcast,
-		Post,
-		Bot,
-		ExternalLink,
-	};
-	std::unique_ptr<HiddenSenderInfo> sender;
-	Type type = Type::User;
-	bool recommended = false;
-	bool isForceUserpicDisplay = false;
-	QString externalLink;
-};
-
 class ReplyToMessagePointer final {
 public:
 	ReplyToMessagePointer(HistoryItem *item = nullptr) : _data(item) {
@@ -233,7 +217,7 @@ private:
 };
 
 struct ReplyFields {
-	ReplyFields clone(not_null<HistoryItem*> parent) const;
+	[[nodiscard]] ReplyFields clone(not_null<HistoryItem*> parent) const;
 
 	TextWithEntities quote;
 	std::unique_ptr<Data::Media> externalMedia;
@@ -244,8 +228,9 @@ struct ReplyFields {
 	MsgId messageId = 0;
 	MsgId topMessageId = 0;
 	StoryId storyId = 0;
-	bool topicPost = false;
-	bool manualQuote = false;
+	uint32 quoteOffset : 30 = 0;
+	uint32 manualQuote : 1 = 0;
+	uint32 topicPost : 1 = 0;
 };
 
 [[nodiscard]] ReplyFields ReplyFieldsFromMTP(

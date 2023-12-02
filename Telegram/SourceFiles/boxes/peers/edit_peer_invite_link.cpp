@@ -29,6 +29,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/text_utilities.h"
 #include "ui/boxes/edit_invite_link.h"
 #include "ui/painter.h"
+#include "ui/vertical_list.h"
 #include "boxes/share_box.h"
 #include "history/view/history_view_group_call_bar.h" // GenerateUserpics...
 #include "history/history_item_helpers.h" // GetErrorTextForSending.
@@ -39,14 +40,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "window/window_session_controller.h"
 #include "window/window_controller.h"
-#include "settings/settings_common.h"
 #include "mtproto/sender.h"
 #include "qr/qr_generate.h"
 #include "intro/intro_qr.h" // TelegramLogoImage
 #include "styles/style_boxes.h"
 #include "styles/style_layers.h" // st::boxDividerLabel.
 #include "styles/style_info.h"
-#include "styles/style_settings.h"
 #include "styles/style_menu_icons.h"
 
 #include <QtGui/QGuiApplication>
@@ -434,7 +433,7 @@ void Controller::addHeaderBlock(not_null<Ui::VerticalLayout*> container) {
 		AddDeleteLinkButton(container, deleteLink);
 	}
 
-	AddSkip(container, st::inviteLinkJoinedRowPadding.bottom() * 2);
+	Ui::AddSkip(container, st::inviteLinkJoinedRowPadding.bottom() * 2);
 
 	auto grayLabelText = dataValue(
 	) | rpl::map([=](const LinkData &data) {
@@ -457,7 +456,7 @@ void Controller::addHeaderBlock(not_null<Ui::VerticalLayout*> container) {
 					container,
 					tr::lng_group_invite_expired_about(),
 					st::boxAttentionDividerLabel),
-				st::settingsDividerLabelPadding)));
+				st::defaultBoxDividerLabelPadding)));
 	const auto grayLabelWrap = container->add(
 		object_ptr<Ui::SlideWrap<Ui::DividerLabel>>(
 			container,
@@ -467,12 +466,12 @@ void Controller::addHeaderBlock(not_null<Ui::VerticalLayout*> container) {
 					container,
 					std::move(grayLabelText),
 					st::boxDividerLabel),
-				st::settingsDividerLabelPadding)));
+				st::defaultBoxDividerLabelPadding)));
 	const auto justDividerWrap = container->add(
 		object_ptr<Ui::SlideWrap<>>(
 			container,
 			object_ptr<Ui::BoxContentDivider>(container)));
-	AddSkip(container);
+	Ui::AddSkip(container);
 
 	dataValue(
 	) | rpl::start_with_next([=](const LinkData &data) {
@@ -509,15 +508,15 @@ not_null<Ui::SlideWrap<>*> Controller::addRequestedListBlock(
 	const auto wrap = result->entity();
 	// Make this container occupy full width.
 	wrap->add(object_ptr<Ui::RpWidget>(wrap));
-	AddDivider(wrap);
-	AddSkip(wrap);
+	Ui::AddDivider(wrap);
+	Ui::AddSkip(wrap);
 	auto requestedCount = dataValue(
 	) | rpl::filter([](const LinkData &data) {
 		return data.requested > 0;
 	}) | rpl::map([=](const LinkData &data) {
 		return float64(data.requested);
 	});
-	AddSubsectionTitle(
+	Ui::AddSubsectionTitle(
 		wrap,
 		tr::lng_group_invite_requested_full(
 			lt_count_decimal,
@@ -588,14 +587,14 @@ void Controller::setupAboveJoinedWidget() {
 	if (revoked || !current.permanent) {
 		addHeaderBlock(container);
 	}
-	AddSubsectionTitle(
+	Ui::AddSubsectionTitle(
 		container,
 		tr::lng_group_invite_created_by());
 	AddSinglePeerRow(
 		container,
 		current.admin,
 		rpl::single(langDateTime(base::unixtime::parse(current.date))));
-	AddSkip(container, st::membersMarginBottom);
+	Ui::AddSkip(container, st::membersMarginBottom);
 
 	auto requestedWrap = addRequestedListBlock(container);
 
@@ -609,8 +608,8 @@ void Controller::setupAboveJoinedWidget() {
 	// Make this container occupy full width.
 	listHeader->add(object_ptr<Ui::RpWidget>(listHeader));
 
-	AddDivider(listHeader);
-	AddSkip(listHeader);
+	Ui::AddDivider(listHeader);
+	Ui::AddSkip(listHeader);
 
 	auto listHeaderText = dataValue(
 	) | rpl::map([=](const LinkData &data) {
@@ -665,7 +664,7 @@ void Controller::setupAboveJoinedWidget() {
 	const auto remaining = Ui::CreateChild<Ui::FlatLabel>(
 		listHeader,
 		std::move(remainingText),
-		st::settingsSubsectionTitleRight);
+		st::inviteLinkTitleRight);
 	dataValue(
 	) | rpl::start_with_next([=](const LinkData &data) {
 		remaining->setTextColorOverride(

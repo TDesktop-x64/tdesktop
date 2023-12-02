@@ -19,17 +19,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/painter.h"
+#include "ui/vertical_list.h"
 #include "lang/lang_keys.h"
 #include "ui/boxes/confirm_box.h"
 #include "boxes/peer_list_controllers.h"
 #include "boxes/peers/edit_peer_invite_link.h"
-#include "settings/settings_common.h" // AddDivider.
 #include "apiwrap.h"
 #include "base/weak_ptr.h"
 #include "base/unixtime.h"
 #include "styles/style_info.h"
 #include "styles/style_layers.h" // st::boxDividerLabel
-#include "styles/style_settings.h" // st::settingsDividerLabelPadding
 #include "styles/style_menu_icons.h"
 
 namespace {
@@ -875,8 +874,6 @@ void ManageInviteLinksBox(
 		not_null<UserData*> admin,
 		int count,
 		int revokedCount) {
-	using namespace Settings;
-
 	const auto show = Main::MakeSessionShow(
 		box->uiShow(),
 		&peer->session());
@@ -901,14 +898,14 @@ void ManageInviteLinksBox(
 			std::move(status));
 	}
 
-	AddSubsectionTitle(container, tr::lng_create_permanent_link_title());
+	Ui::AddSubsectionTitle(container, tr::lng_create_permanent_link_title());
 	AddPermanentLinkBlock(
 		show,
 		container,
 		peer,
 		admin,
 		permanentFromList->events());
-	AddDivider(container);
+	Ui::AddDivider(container);
 
 	auto otherHeader = (Ui::SlideWrap<>*)nullptr;
 	if (admin->isSelf()) {
@@ -923,7 +920,7 @@ void ManageInviteLinksBox(
 			object_ptr<Ui::FlatLabel>(
 				container,
 				tr::lng_group_invite_other_list(),
-				st::settingsSubsectionTitle),
+				st::defaultSubsectionTitle),
 			st::inviteLinkRevokedTitlePadding));
 	}
 
@@ -949,7 +946,7 @@ void ManageInviteLinksBox(
 				container,
 				tr::lng_group_invite_add_about(),
 				st::boxDividerLabel),
-			st::settingsDividerLabelPadding)),
+			st::defaultBoxDividerLabelPadding)),
 		style::margins(0, st::inviteLinkCreateSkip, 0, 0));
 
 	const auto adminsDivider = container->add(object_ptr<Ui::SlideWrap<>>(
@@ -960,7 +957,7 @@ void ManageInviteLinksBox(
 		object_ptr<Ui::FlatLabel>(
 			container,
 			tr::lng_group_invite_other_title(),
-			st::settingsSubsectionTitle),
+			st::defaultSubsectionTitle),
 		st::inviteLinkRevokedTitlePadding));
 	const auto admins = AddAdminsList(show, container, peer, admin);
 
@@ -972,7 +969,7 @@ void ManageInviteLinksBox(
 		object_ptr<Ui::FlatLabel>(
 			container,
 			tr::lng_group_invite_revoked_title(),
-			st::settingsSubsectionTitle),
+			st::defaultSubsectionTitle),
 		st::inviteLinkRevokedTitlePadding));
 	const auto revoked = AddLinksList(
 		show,

@@ -17,11 +17,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/boosts/giveaway/boost_badge.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
-#include "settings/settings_common.h"
 #include "ui/effects/toggle_arrow.h"
 #include "ui/empty_userpic.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
+#include "ui/vertical_list.h"
 #include "ui/widgets/buttons.h"
 #include "ui/wrap/slide_wrap.h"
 #include "ui/wrap/vertical_layout.h"
@@ -57,11 +57,11 @@ void AddArrow(not_null<Ui::RpWidget*> parent) {
 	arrow->show();
 }
 
-void AddSubsectionTitle(
+void AddSubtitle(
 		not_null<Ui::VerticalLayout*> container,
 		rpl::producer<QString> title) {
 	const auto &subtitlePadding = st::settingsButton.padding;
-	::Settings::AddSubsectionTitle(
+	Ui::AddSubsectionTitle(
 		container,
 		std::move(title),
 		{ 0, -subtitlePadding.top(), 0, -subtitlePadding.bottom() });
@@ -91,11 +91,11 @@ void AddSubsectionTitle(
 	return resultText;
 }
 
-struct Descriptor final {
+struct PublicForwardsDescriptor final {
 	Data::PublicForwardsSlice firstSlice;
 	Fn<void(FullMsgId)> showPeerHistory;
 	not_null<PeerData*> peer;
-	FullMsgId contextId;
+	Data::RecentPostId contextId;
 };
 
 struct MembersDescriptor final {
@@ -229,7 +229,7 @@ void MembersController::rowClicked(not_null<PeerListRow*> row) {
 
 class PublicForwardsController final : public PeerListController {
 public:
-	explicit PublicForwardsController(Descriptor d);
+	explicit PublicForwardsController(PublicForwardsDescriptor d);
 
 	Main::Session &session() const override;
 	void prepare() override;
@@ -251,7 +251,7 @@ private:
 
 };
 
-PublicForwardsController::PublicForwardsController(Descriptor d)
+PublicForwardsController::PublicForwardsController(PublicForwardsDescriptor d)
 : _session(&d.peer->session())
 , _showPeerHistory(std::move(d.showPeerHistory))
 , _api(d.peer->asChannel(), d.contextId)
@@ -282,8 +282,11 @@ void PublicForwardsController::applySlice(
 	_apiToken = slice.token;
 
 	for (const auto &item : slice.list) {
-		if (const auto peer = session().data().peerLoaded(item.peer)) {
-			appendRow(peer, item.msg);
+		// TODO support stories.
+		if (const auto fullId = item.messageId) {
+			if (const auto peer = session().data().peerLoaded(fullId.peer)) {
+				appendRow(peer, fullId.msg);
+			}
 		}
 	}
 	delegate()->peerListRefreshRows();
@@ -617,26 +620,27 @@ void AddPublicForwards(
 		not_null<Ui::VerticalLayout*> container,
 		Fn<void(FullMsgId)> showPeerHistory,
 		not_null<PeerData*> peer,
-		FullMsgId contextId) {
+		Data::RecentPostId contextId) {
 	if (!peer->isChannel()) {
 		return;
 	}
 
 	struct State final {
-		State(Descriptor d) : controller(std::move(d)) {
+		State(PublicForwardsDescriptor d) : controller(std::move(d)) {
 		}
 		PeerListContentDelegateSimple delegate;
 		PublicForwardsController controller;
 	};
-	const auto state = container->lifetime().make_state<State>(Descriptor{
+	auto d = PublicForwardsDescriptor{
 		firstSlice,
 		std::move(showPeerHistory),
 		peer,
 		contextId,
-	});
+	};
+	const auto state = container->lifetime().make_state<State>(std::move(d));
 
 	if (const auto total = firstSlice.total; total > 0) {
-		AddSubsectionTitle(
+		AddSubtitle(
 			container,
 			tr::lng_stats_overview_message_public_share(
 				lt_count_decimal,
@@ -683,7 +687,7 @@ void AddMembersList(
 	};
 	const auto state = container->lifetime().make_state<State>(std::move(d));
 
-	AddSubsectionTitle(container, std::move(title));
+	AddSubtitle(container, std::move(title));
 
 	state->delegate.setContent(container->add(
 		object_ptr<PeerListContent>(container, &state->controller)));

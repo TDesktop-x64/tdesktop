@@ -361,7 +361,7 @@ void SettingsBox(
 			Core::App().saveSettingsDelayed();
 		}, layout->lifetime());
 
-	AddButton(
+	AddButtonWithIcon(
 		layout,
 		tr::lng_settings_stereo_mode(),
 		st::groupCallSettingsButton

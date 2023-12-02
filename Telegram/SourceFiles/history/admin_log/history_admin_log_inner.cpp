@@ -64,6 +64,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtWidgets/QApplication>
 #include <QtGui/QClipboard>
 
+#include "boxes/abstract_box.h"
+
 namespace AdminLog {
 namespace {
 

@@ -9,12 +9,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "lottie/lottie_icon.h"
 #include "ui/painter.h"
-#include "settings/settings_enhanced.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/continuous_sliders.h"
 #include "ui/widgets/labels.h"
 #include "ui/wrap/vertical_layout.h"
-#include "core/application.h"
 #include "styles/style_settings.h"
 
 #include <QAction>

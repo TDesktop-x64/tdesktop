@@ -58,6 +58,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtGui/QGuiApplication>
 
+#include "boxes/abstract_box.h"
+
 namespace Core {
 namespace {
 

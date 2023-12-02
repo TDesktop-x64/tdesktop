@@ -104,6 +104,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <api/api_text_entities.h>
 #include <history/view/history_view_pinned_section.h>
 
+#include "boxes/abstract_box.h"
+
 namespace Window {
 namespace {
 

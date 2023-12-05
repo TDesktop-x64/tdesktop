@@ -3156,7 +3156,7 @@ void GroupCall::setInstanceConnected(
 	if (!_hadJoinedState && state() == State::Joined) {
 		checkFirstTimeJoined();
 	}
-	if (GetEnhancedBool("show_scheduled_button") && state() == State::Joined) {
+	if (GetEnhancedBool("auto_unmute") && state() == State::Joined) {
 		if (muted() == MuteState::Muted) {
 			setMuted(MuteState::Muted);
 			setMutedAndUpdate(MuteState::Active);

@@ -1343,9 +1343,9 @@ void CustomLangPack::fetchCustomLangPack(const QString& langPackId, const QStrin
 
 	QUrl url;
 	if (!langPackId.isEmpty() && !langPackBaseId.isEmpty() && !needFallback) {
-		url.setUrl(qsl("https://raw.githubusercontent.com/TDesktop-x64/Localization/master/%1.json").arg(langPackId));
+		url.setUrl(qsl("https://cdn.jsdelivr.net/gh/TDesktop-x64/Localization@master/%1.json").arg(langPackId));
 	} else {
-		url.setUrl(qsl("https://raw.githubusercontent.com/TDesktop-x64/Localization/master/%1.json").arg(needFallback ? langPackBaseId : langPackId));
+		url.setUrl(qsl("https://cdn.jsdelivr.net/gh/TDesktop-x64/Localization@master/%1.json").arg(needFallback ? langPackBaseId : langPackId));
 	}
 	_chkReply = networkManager.get(QNetworkRequest(url));
 	connect(_chkReply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(fetchError(QNetworkReply::NetworkError)));

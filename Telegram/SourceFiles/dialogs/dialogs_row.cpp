@@ -305,7 +305,7 @@ void Row::updateCornerBadgeShown(
 		} else if (peer->isChannel()
 			&& Data::ChannelHasActiveCall(peer->asChannel())) {
 			return kTopLayer;
-		} else if (!peer->isForum() && (peer->isChat() || peer->isMegagroup())){
+		} else if (!peer->isForum() && (peer->isChat() || peer->isMegagroup()) && GetEnhancedBool("show_group_sender_avatar")){
 			return kTopLayer;
 		} else if (peer->messagesTTL()) {
 			return kBottomLayer;
@@ -441,14 +441,11 @@ void Row::paintUserpic(
 		PeerData *peer,
 		Ui::VideoUserpic *videoUserpic,
 		const Ui::PaintContext &context) const {
-	auto showCornerAvatar = false;
 	if (peer) {
 		updateCornerBadgeShown(peer);
-		showCornerAvatar = !peer->isForum() && (peer->isChat() || peer->isMegagroup());
 	}
 
-	const auto cornerBadgeShown = showCornerAvatar ||
-		! _cornerBadgeUserpic
+	const auto cornerBadgeShown = !_cornerBadgeUserpic
 		? _cornerBadgeShown
 		: !_cornerBadgeUserpic->layersManager.isDisplayedNone();
 	const auto storiesPeer = peer

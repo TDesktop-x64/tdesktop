@@ -306,7 +306,7 @@ bool SkipTranslate(TextWithEntities textWithEntities) {
 	const auto skip = Core::App().settings().skipTranslationLanguages();
 	return result.known() && ranges::contains(skip, result);
 #else
-    return false;
+	return false;
 #endif
 }
 

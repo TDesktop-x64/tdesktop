@@ -1,4 +1,4 @@
-﻿{
+{
     "lng_intro_about2": "Welcome to the 64Gram Desktop app.\nIt's fast and secure.",
 
     "lng_settings_enhanced": "Enhanced Settings",
@@ -25,7 +25,8 @@
     "lng_settings_replace_edit_button": "Replace \"Edit\" button by Saved Messages",
     "lng_settings_disable_link_warning": "Disable open link warning",
     "lng_settings_hide_messages": "Hide messages from blocked user",
-    "lng_settings_disable_premium_animation": "Disable Premium Animation",
+	"lng_settings_disable_premium_animation": "Disable Premium Animation",
+	"lng_settings_show_group_sender_avatar": "Show sender's avatar in groups",
     "lng_settings_show_seconds": "Time with seconds",
     "lng_settings_hide_counter": "Hide online users counter",
     "lng_settings_hide_stories": "Hide Stories",

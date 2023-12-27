@@ -275,6 +275,20 @@ namespace Settings {
 			EnhancedSettings::Write();
 		}, container->lifetime());
 
+		AddButtonWithIcon(
+				inner,
+				tr::lng_settings_show_group_sender_avatar(),
+				st::settingsButtonNoIcon
+		)->toggleOn(
+				rpl::single(GetEnhancedBool("show_group_sender_avatar"))
+		)->toggledChanges(
+		) | rpl::filter([=](bool toggled) {
+			return (toggled != GetEnhancedBool("show_group_sender_avatar"));
+		}) | rpl::start_with_next([=](bool toggled) {
+			SetEnhancedValue("show_group_sender_avatar", toggled);
+			EnhancedSettings::Write();
+		}, container->lifetime());
+
 		QString langPackBaseId = Lang::GetInstance().baseId();
 		if (langPackBaseId == "zh-hant-raw" || langPackBaseId == "zh-hans-raw") {
 			AddButtonWithIcon(

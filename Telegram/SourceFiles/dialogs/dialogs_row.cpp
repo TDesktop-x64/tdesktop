@@ -305,11 +305,14 @@ void Row::updateCornerBadgeShown(
 		} else if (peer->isChannel()
 			&& Data::ChannelHasActiveCall(peer->asChannel())) {
 			return kTopLayer;
+		} else if (!peer->isForum() && (peer->isChat() || peer->isMegagroup()) && GetEnhancedBool("show_group_sender_avatar")){
+			return kTopLayer;
 		} else if (peer->messagesTTL()) {
 			return kBottomLayer;
 		}
 		return kNoneLayer;
 	}();
+	const_cast<Row*>(this)->_hasVideoCall = peer->isChannel() && Data::ChannelHasActiveCall(peer->asChannel());
 	setCornerBadgeShown(nextLayer, std::move(updateCallback));
 	if ((nextLayer == kTopLayer) && user) {
 		peer->owner().watchForOffline(user, now);
@@ -547,13 +550,19 @@ void Row::paintUserpic(
 	p.setOpacity(
 		_cornerBadgeUserpic->layersManager.progressForLayer(kTopLayer));
 	p.translate(context.st->padding.left(), context.st->padding.top());
-	actionPainter->paintSpeaking(
-		p,
-		context.st->photoSize - skip.x() - size,
-		context.st->photoSize - skip.y() - size,
-		context.width,
-		bg,
-		context.now);
+	if(_hasVideoCall){
+		actionPainter->paintSpeaking(
+			p,
+			context.st->photoSize - skip.x() - size,
+			context.st->photoSize - skip.y() - size,
+			context.width,
+			bg,
+			context.now);
+	}
+	else {
+		const auto lastMessageFrom = history->lastMessage()->from();
+		lastMessageFrom->paintUserpic(p, userpicCornerView(), context.st->photoSize - skip.x() - size, context.st->photoSize - skip.y() - size, size);
+	}
 	p.translate(-context.st->padding.left(), -context.st->padding.top());
 	p.setOpacity(1.);
 }

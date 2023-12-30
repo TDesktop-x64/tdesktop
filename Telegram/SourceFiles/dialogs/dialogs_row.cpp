@@ -558,10 +558,8 @@ void Row::paintUserpic(
 			context.width,
 			bg,
 			context.now);
-	}
-	else {
-		const auto lastMessageFrom = history->lastMessage()->from();
-		lastMessageFrom->paintUserpic(p, userpicCornerView(), context.st->photoSize - skip.x() - size, context.st->photoSize - skip.y() - size, size);
+	} else if (const auto lastMessage = history->lastMessage()) {
+		lastMessage->from()->paintUserpic(p, userpicCornerView(), context.st->photoSize - skip.x() - size, context.st->photoSize - skip.y() - size, size);
 	}
 	p.translate(-context.st->padding.left(), -context.st->padding.top());
 	p.setOpacity(1.);

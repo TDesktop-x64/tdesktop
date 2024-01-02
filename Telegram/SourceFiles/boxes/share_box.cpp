@@ -849,7 +849,7 @@ void ShareBox::Inner::loadProfilePhotos(int yFrom) {
 		if (!_chatsIndexed->empty()) {
 			const auto index = yFrom / _rowHeight;
 			auto i = _chatsIndexed->begin()
-				+ std::min(index, _chatsIndexed->size());;
+				+ std::min(index, _chatsIndexed->size());
 			for (auto end = _chatsIndexed->cend(); i != end; ++i) {
 				if (((*i)->index() * _rowHeight) >= yTo) {
 					break;

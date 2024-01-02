@@ -1296,7 +1296,6 @@ void Stories::sendIncrementViewsRequests() {
 	if (_incrementViewsPending.empty()) {
 		return;
 	}
-	auto ids = QVector<MTPint>();
 	struct Prepared {
 		PeerId peer = 0;
 		QVector<MTPint> ids;

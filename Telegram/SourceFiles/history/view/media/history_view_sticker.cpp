@@ -410,8 +410,7 @@ bool Sticker::mirrorHorizontal() const {
 	if (!hasPremiumEffect()) {
 		return false;
 	}
-	const auto rightAligned = _parent->hasOutLayout()
-		&& !_parent->delegate()->elementIsChatWide();
+	const auto rightAligned = _parent->hasRightLayout();
 	return !rightAligned;
 }
 

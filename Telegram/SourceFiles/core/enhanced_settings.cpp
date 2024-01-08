@@ -369,7 +369,7 @@ namespace EnhancedSettings {
 		settings.insert(qsl("disable_link_warning"), GetEnhancedBool("disable_link_warning"));
 		settings.insert(qsl("blocked_user_spoiler_mode"), GetEnhancedBool("blocked_user_spoiler_mode"));
 		settings.insert(qsl("disable_premium_animation"), GetEnhancedBool("disable_premium_animation"));
-		settings.insert(qsl("show_group_sender_avatar"), GetEnhancedBool("disable_premium_animation"));
+		settings.insert(qsl("show_group_sender_avatar"), GetEnhancedBool("show_group_sender_avatar"));
 		settings.insert(qsl("show_seconds"), GetEnhancedBool("show_seconds"));
 		settings.insert(qsl("hide_counter"), GetEnhancedBool("hide_counter"));
 		settings.insert(qsl("translate_to_tc"), GetEnhancedBool("translate_to_tc"));

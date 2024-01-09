@@ -2350,7 +2350,9 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				showContextInFolder(document);
 			}, &st::menuIconShowInFolder);
 		}
-		if (item && !hasCopyMediaRestriction(item)) {
+		if (item
+			&& !hasCopyMediaRestriction(item)
+			&& !HistoryView::ItemHasTtl(item)) {
 			HistoryView::AddSaveSoundForNotifications(
 				_menu,
 				item,

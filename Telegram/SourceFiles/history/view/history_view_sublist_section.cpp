@@ -259,7 +259,7 @@ not_null<Data::SavedSublist*> SublistWidget::sublist() const {
 
 Dialogs::RowDescriptor SublistWidget::activeChat() const {
 	return {
-		_history,
+		_sublist,
 		FullMsgId(_history->peer->id, ShowAtUnreadMsgId)
 	};
 }
@@ -291,6 +291,10 @@ bool SublistWidget::showInternal(
 		}
 	}
 	return false;
+}
+
+bool SublistWidget::sameTypeAs(not_null<Window::SectionMemento*> memento) {
+	return dynamic_cast<SublistMemento*>(memento.get()) != nullptr;
 }
 
 void SublistWidget::setInternalState(

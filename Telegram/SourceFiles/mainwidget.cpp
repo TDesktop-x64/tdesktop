@@ -755,7 +755,6 @@ void MainWidget::handleAudioUpdate(const Media::Player::TrackState &state) {
 	const auto item = session().data().message(state.id.contextId());
 	if (!Media::Player::IsStoppedOrStopping(state.state)) {
 		const auto ttlSeconds = item
-			&& !item->out()
 			&& item->media()
 			&& item->media()->ttlSeconds();
 		if (!ttlSeconds) {
@@ -1379,7 +1378,7 @@ void MainWidget::showHistory(
 
 	if (!back && (way != Way::ClearStack)) {
 		// This may modify the current section, for example remove its contents.
-		saveSectionInStack();
+		saveSectionInStack(params);
 	}
 
 	if (_history->peer()
@@ -1501,13 +1500,23 @@ Ui::ChatTheme *MainWidget::customChatTheme() const {
 	return _history->customChatTheme();
 }
 
-void MainWidget::saveSectionInStack() {
+bool MainWidget::saveSectionInStack(
+		const SectionShow &params,
+		Window::SectionWidget *newMainSection) {
 	if (_mainSection) {
 		if (auto memento = _mainSection->createMemento()) {
+			if (params.dropSameFromStack
+				&& newMainSection
+				&& newMainSection->sameTypeAs(memento.get())) {
+				// When choosing saved sublist we want to save the original
+				// "Saved Messages" in the stack, but don't save every
+				// sublist in a new stack entry when clicking them through.
+				return false;
+			}
 			_stack.push_back(std::make_unique<StackItemSection>(
 				std::move(memento)));
 		} else {
-			return;
+			return false;
 		}
 	} else if (const auto history = _history->history()) {
 		_stack.push_back(std::make_unique<StackItemHistory>(
@@ -1515,7 +1524,7 @@ void MainWidget::saveSectionInStack() {
 			_history->msgId(),
 			_history->replyReturns()));
 	} else {
-		return;
+		return false;
 	}
 	const auto raw = _stack.back().get();
 	raw->setThirdSectionWeak(_thirdSection.data());
@@ -1528,6 +1537,7 @@ void MainWidget::saveSectionInStack() {
 			}
 		}
 	}, raw->lifetime());
+	return true;
 }
 
 void MainWidget::showSection(
@@ -1730,7 +1740,11 @@ void MainWidget::showNewSection(
 
 	if (saveInStack) {
 		// This may modify the current section, for example remove its contents.
-		saveSectionInStack();
+		if (!saveSectionInStack(params, newMainSection)) {
+			saveInStack = false;
+			animatedShow = false;
+			animationParams = Window::SectionSlideParams();
+		}
 	}
 	auto &settingSection = newThirdSection
 		? _thirdSection
@@ -2446,6 +2460,10 @@ auto MainWidget::thirdSectionForCurrentMainSection(
 		return std::make_shared<Info::Memento>(
 			peer,
 			Info::Memento::DefaultSection(peer));
+	} else if (const auto sublist = key.sublist()) {
+		return std::make_shared<Info::Memento>(
+			session().user(),
+			Info::Memento::DefaultSection(session().user()));
 	}
 	Unexpected("Key in MainWidget::thirdSectionForCurrentMainSection().");
 }

@@ -54,7 +54,7 @@ FROM builder AS patches
 RUN git init patches \
 	&& cd patches \
 	&& git remote add origin {{ GIT }}/desktop-app/patches.git \
-	&& git fetch --depth=1 origin 78fe199b743df0358c04502d6947cd42bb5d16ed \
+	&& git fetch --depth=1 origin 4ff99fa2d8836f2cd9befe6cf38ce87dc20f276b \
 	&& git reset --hard FETCH_HEAD \
 	&& rm -rf .git
 
@@ -70,8 +70,11 @@ RUN git clone -b nasm-2.15.05 --depth=1 {{ GIT }}/netwide-assembler/nasm.git \
 	&& rm -rf nasm
 
 FROM builder AS zlib
-RUN git clone -b v1.2.13 --depth=1 {{ GIT }}/madler/zlib.git \
+RUN git init zlib \
 	&& cd zlib \
+	&& git remote add origin {{ GIT }}/madler/zlib.git \
+	&& git fetch --depth=1 origin 643e17b7498d12ab8d15565662880579692f769d \
+	&& git reset --hard FETCH_HEAD \
 	&& ./configure \
 	&& make -j$(nproc) \
 	&& make DESTDIR="{{ LibrariesPath }}/zlib-cache" install \

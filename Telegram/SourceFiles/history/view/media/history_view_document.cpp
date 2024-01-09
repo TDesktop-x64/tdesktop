@@ -24,24 +24,18 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_cursor_state.h"
 #include "history/view/history_view_transcribe_button.h"
 #include "history/view/media/history_view_media_common.h"
-#include "ui/image/image.h"
 #include "ui/text/format_values.h"
 #include "ui/text/format_song_document_name.h"
 #include "ui/text/text_utilities.h"
-#include "ui/chat/message_bubble.h"
 #include "ui/chat/chat_style.h"
-#include "ui/cached_round_corners.h"
 #include "ui/painter.h"
 #include "ui/power_saving.h"
 #include "ui/rect.h"
-#include "ui/ui_utility.h"
 #include "data/data_session.h"
 #include "data/data_document.h"
 #include "data/data_document_media.h"
 #include "data/data_document_resolver.h"
-#include "data/data_media_types.h"
 #include "data/data_file_click_handler.h"
-#include "data/data_file_origin.h"
 #include "api/api_transcribes.h"
 #include "apiwrap.h"
 #include "styles/style_chat.h"
@@ -54,30 +48,36 @@ constexpr auto kAudioVoiceMsgUpdateView = crl::time(100);
 
 void DrawCornerBadgeTTL(
 		QPainter &p,
-		const style::color &color,
+		const style::color &bg,
+		const style::color &fg,
 		const QRect &circleRect) {
 	p.save();
-	const auto partRect = QRect(
-		circleRect.left() + circleRect.width() - st::dialogsTTLBadgeSize * 0.85,
-		circleRect.top() + circleRect.height() - st::dialogsTTLBadgeSize * 0.85,
+	const auto partRect = QRectF(
+		rect::right(circleRect)
+			- st::dialogsTTLBadgeSize
+			+ rect::m::sum::h(st::dialogsTTLBadgeInnerMargins),
+		rect::bottom(circleRect)
+			- st::dialogsTTLBadgeSize
+			+ rect::m::sum::v(st::dialogsTTLBadgeInnerMargins),
 		st::dialogsTTLBadgeSize,
 		st::dialogsTTLBadgeSize);
 
 	auto hq = PainterHighQualityEnabler(p);
-	p.setBrush(color);
+	p.setPen(Qt::NoPen);
+	p.setBrush(bg);
 	p.drawEllipse(partRect);
 
 	const auto innerRect = partRect - st::dialogsTTLBadgeInnerMargins;
 	const auto ttlText = u"1"_q;
 
 	p.setFont(st::dialogsScamFont);
-	p.setPen(st::premiumButtonFg);
+	p.setPen(fg);
 	p.drawText(innerRect, ttlText, style::al_center);
 
 	constexpr auto kPenWidth = 1.5;
 
 	const auto penWidth = style::ConvertScaleExact(kPenWidth);
-	auto pen = QPen(st::premiumButtonFg);
+	auto pen = QPen(fg);
 	pen.setJoinStyle(Qt::RoundJoin);
 	pen.setCapStyle(Qt::RoundCap);
 	pen.setWidthF(penWidth);
@@ -87,7 +87,7 @@ void DrawCornerBadgeTTL(
 	p.drawArc(innerRect, arc::kQuarterLength, arc::kHalfLength);
 
 	p.setClipRect(innerRect
-		- QMargins(innerRect.width() / 2, 0, -penWidth, -penWidth));
+		- QMarginsF(innerRect.width() / 2, -penWidth, -penWidth, -penWidth));
 	pen.setStyle(Qt::DotLine);
 	p.setPen(pen);
 	p.drawEllipse(innerRect);
@@ -138,6 +138,29 @@ void DrawCornerBadgeTTL(
 	return [=](QPainter &p, QRect r, QColor c) {
 		(state->idle ? state->idle : state->start)->paintInCenter(p, r, c);
 	};
+}
+
+void FillThumbnailOverlay(
+		QPainter &p,
+		QRect rect,
+		Ui::BubbleRounding rounding,
+		const PaintContext &context) {
+	using Corner = Ui::BubbleCornerRounding;
+	using Radius = Ui::CachedCornerRadius;
+	auto corners = Ui::CornersPixmaps();
+	const auto &st = context.st;
+	const auto lookup = [&](Corner corner) {
+		switch (corner) {
+		case Corner::None: return Radius::Small;
+		case Corner::Small: return Radius::ThumbSmall;
+		case Corner::Large: return Radius::ThumbLarge;
+		}
+		Unexpected("Corner value in FillThumbnailOverlay.");
+	};
+	for (auto i = 0; i != 4; ++i) {
+		corners.p[i] = st->msgSelectOverlayCorners(lookup(rounding[i])).p[i];
+	}
+	Ui::FillComplexOverlayRect(p, rect, st->msgSelectOverlay(), corners);
 }
 
 [[nodiscard]] QString CleanTagSymbols(const QString &value) {
@@ -324,7 +347,8 @@ Document::Document(
 				::Media::Player::instance()->tracksFinished(
 				) | rpl::filter([=](AudioMsgId::Type type) {
 					return (type == AudioMsgId::Type::Voice);
-				}) | rpl::to_empty
+				}) | rpl::to_empty,
+				::Media::Player::instance()->stops(AudioMsgId::Type::Voice)
 			) | rpl::start_with_next([=]() mutable {
 				_drawTtl = nullptr;
 				const auto item = _parent->data();
@@ -647,7 +671,7 @@ void Document::draw(
 		validateThumbnail(thumbed, st.thumbSize, rounding);
 		p.drawImage(rthumb, thumbed->thumbnail);
 		if (context.selected()) {
-			fillThumbnailOverlay(p, rthumb, rounding, context);
+			FillThumbnailOverlay(p, rthumb, rounding, context);
 		}
 
 		if (radial || (!loaded && !_data->loading()) || _data->waitingForAlbum()) {
@@ -723,10 +747,6 @@ void Document::draw(
 				PainterHighQualityEnabler hq(p);
 				p.setBrush(stm->msgFileBg);
 				p.drawEllipse(inner);
-
-				if (_parent->data()->media()->ttlSeconds()) {
-					DrawCornerBadgeTTL(p, stm->msgFileBg, inner);
-				}
 			}
 		}
 
@@ -893,7 +913,7 @@ void Document::draw(
 			.availableWidth = captionw,
 			.palette = &stm->textPalette,
 			.pre = stm->preCache.get(),
-			.blockquote = context.quoteCache(parent()->colorIndex()),
+			.blockquote = context.quoteCache(parent()->contentColorIndex()),
 			.colors = context.st->highlightColors(),
 			.spoiler = Ui::Text::DefaultSpoilerCache(),
 			.now = context.now,
@@ -902,6 +922,12 @@ void Document::draw(
 			.selection = selection,
 			.highlight = highlightRequest ? &*highlightRequest : nullptr,
 		});
+	}
+	if (_parent->data()->media() && _parent->data()->media()->ttlSeconds()) {
+		const auto &fg = context.outbg
+			? st::historyFileOutIconFg
+			: st::historyFileInIconFg;
+		DrawCornerBadgeTTL(p, stm->msgFileBg, fg, inner);
 	}
 }
 
@@ -965,29 +991,6 @@ void Document::validateThumbnail(
 	thumbed->thumbnail = std::move(thumbnail);
 	thumbed->blurred = !normal;
 	thumbed->rounding = rounding;
-}
-
-void Document::fillThumbnailOverlay(
-		QPainter &p,
-		QRect rect,
-		Ui::BubbleRounding rounding,
-		const PaintContext &context) const {
-	using Corner = Ui::BubbleCornerRounding;
-	using Radius = Ui::CachedCornerRadius;
-	auto corners = Ui::CornersPixmaps();
-	const auto &st = context.st;
-	const auto lookup = [&](Corner corner) {
-		switch (corner) {
-		case Corner::None: return Radius::Small;
-		case Corner::Small: return Radius::ThumbSmall;
-		case Corner::Large: return Radius::ThumbLarge;
-		}
-		Unexpected("Corner value in Document::fillThumbnailOverlay.");
-	};
-	for (auto i = 0; i != 4; ++i) {
-		corners.p[i] = st->msgSelectOverlayCorners(lookup(rounding[i])).p[i];
-	}
-	Ui::FillComplexOverlayRect(p, rect, st->msgSelectOverlay(), corners);
 }
 
 bool Document::hasHeavyPart() const {
@@ -1706,7 +1709,7 @@ bool DrawThumbnailAsSongCover(
 		const style::color &colored,
 		const std::shared_ptr<Data::DocumentMedia> &dataMedia,
 		const QRect &rect,
-		const bool selected) {
+		bool selected) {
 	if (!dataMedia) {
 		return false;
 	}

@@ -162,6 +162,7 @@ struct SectionShow {
 	bool childColumn = false;
 	bool forbidLayer = false;
 	bool reapplyLocalDraft = false;
+	bool dropSameFromStack = false;
 	Origin origin;
 
 };
@@ -602,7 +603,7 @@ private:
 	struct CachedTheme;
 
 	void init();
-	void initSupportMode();
+	void setupShortcuts();
 	void refreshFiltersMenu();
 	void checkOpenedFilter();
 	void suggestArchiveAndMute();

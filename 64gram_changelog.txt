@@ -1,3 +1,25 @@
+1.1.9 (09.01.24)
+
+- No changelog
+
+1.1.8 (02.01.24)
+
+- No changelog
+
+1.1.7 (31.12.23)
+
+- [Fix] Show sender's avatar in groups
+
+1.1.6 (14.11.23)
+
+- [Fix] voice chat auto unmute
+- [New] Add a little avatar of the sender on the corner of a group icon in chat list (Enhanced settings)
+
+1.1.5 (03.12.23)
+
+- [Fix] hide stories
+- [UI] remove enlarge photo button
+
 1.1.4 (14.11.23)
 
 - No changelog

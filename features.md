@@ -54,3 +54,6 @@
 50. Disable Premium Animation
 51. Message time with seconds
 52. Ban button for Join Requests
+53. Hide stories
+54. "Uncolored Quote" option
+55. Show sender's avatar in groups

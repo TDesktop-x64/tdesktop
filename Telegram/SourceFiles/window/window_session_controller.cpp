@@ -1243,7 +1243,7 @@ void SessionController::setupShortcuts() {
 		auto &&accounts = ranges::views::zip(
 			Shortcuts::kShowAccount,
 			ranges::views::ints(0, accountsCount));
-		for (const auto [command, index] : accounts) {
+		for (const auto &[command, index] : accounts) {
 			request->check(command) && request->handle([=] {
 				const auto list = app->domain().orderedAccounts();
 				if (index >= list.size()) {
@@ -2779,7 +2779,7 @@ void SessionController::openPeerStories(
 HistoryView::PaintContext SessionController::preparePaintContext(
 		PaintContextArgs &&args) {
 	const auto visibleAreaTopLocal = content()->mapFromGlobal(
-		QPoint(0, args.visibleAreaTopGlobal)).y();
+		args.visibleAreaPositionGlobal).y();
 	const auto viewport = QRect(
 		0,
 		args.visibleAreaTop - visibleAreaTopLocal,

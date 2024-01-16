@@ -2623,12 +2623,15 @@ bool HistoryWidget::updateReplaceMediaButton() {
 		return false;
 	}
 	_replaceMedia.create(this, st::historyReplaceMedia);
+	const auto hideDuration = st::historyReplaceMedia.ripple.hideDuration;
 	_replaceMedia->setClickedCallback([=] {
-		EditCaptionBox::StartMediaReplace(
-			controller(),
-			{ _history->peer->id, _editMsgId },
-			_field->getTextWithTags(),
-			crl::guard(_list, [=] { cancelEdit(); }));
+		base::call_delayed(hideDuration, this, [=] {
+			EditCaptionBox::StartMediaReplace(
+				controller(),
+				{ _history->peer->id, _editMsgId },
+				_field->getTextWithTags(),
+				crl::guard(_list, [=] { cancelEdit(); }));
+		});
 	});
 	return true;
 }
@@ -6366,7 +6369,8 @@ std::optional<bool> HistoryWidget::cornerButtonsDownShown() {
 	if (!_list || _firstLoadRequest) {
 		return false;
 	}
-	if (_voiceRecordBar->isLockPresent()) {
+	if (_voiceRecordBar->isLockPresent()
+		|| _voiceRecordBar->isTTLButtonShown()) {
 		return false;
 	}
 	if (!_history->loadedAtBottom() || _cornerButtons.replyReturn()) {

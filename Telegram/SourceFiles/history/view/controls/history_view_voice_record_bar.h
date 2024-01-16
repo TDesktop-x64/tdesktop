@@ -98,6 +98,7 @@ public:
 	[[nodiscard]] bool isListenState() const;
 	[[nodiscard]] bool isActive() const;
 	[[nodiscard]] bool isRecordingByAnotherBar() const;
+	[[nodiscard]] bool isTTLButtonShown() const;
 
 private:
 	enum class StopType {
@@ -125,7 +126,7 @@ private:
 	[[nodiscard]] bool recordingAnimationCallback(crl::time now);
 
 	void stop(bool send);
-	void stopRecording(StopType type);
+	void stopRecording(StopType type, bool ttlBeforeHide = false);
 	void visibilityAnimate(bool show, Fn<void()> &&callback);
 
 	[[nodiscard]] bool showRecordButton() const;
@@ -148,6 +149,7 @@ private:
 
 	void computeAndSetLockProgress(QPoint globalPos);
 
+	[[nodiscard]] bool peekTTLState() const;
 	[[nodiscard]] bool takeTTLState() const;
 
 	const style::RecordBar &_st;
@@ -155,9 +157,9 @@ private:
 	const std::shared_ptr<ChatHelpers::Show> _show;
 	const std::shared_ptr<Ui::SendButton> _send;
 	const std::unique_ptr<RecordLock> _lock;
-	const std::unique_ptr<Ui::AbstractButton> _ttlButton;
 	const std::unique_ptr<VoiceRecordButton> _level;
 	const std::unique_ptr<CancelButton> _cancel;
+	std::unique_ptr<Ui::AbstractButton> _ttlButton;
 	std::unique_ptr<ListenWrap> _listen;
 
 	base::Timer _startTimer;

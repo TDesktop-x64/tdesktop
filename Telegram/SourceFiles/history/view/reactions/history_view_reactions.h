@@ -41,6 +41,7 @@ struct InlineListData {
 		InBubble  = 0x01,
 		OutLayout = 0x02,
 		Flipped   = 0x04,
+		Tags      = 0x08,
 	};
 	friend inline constexpr bool is_flag_type(Flag) { return true; };
 	using Flags = base::flags<Flag>;
@@ -92,6 +93,9 @@ public:
 		ReactionId,
 		std::unique_ptr<Ui::ReactionFlyAnimation>> animations);
 
+	[[nodiscard]] static float64 TagDotAlpha();
+	[[nodiscard]] static QImage PrepareTagBg(QColor tagBg, QColor dotBg);
+
 private:
 	struct Userpics {
 		QImage image;
@@ -103,6 +107,7 @@ private:
 	void layout();
 	void layoutButtons();
 
+	void setButtonTag(Button &button);
 	void setButtonCount(Button &button, int count);
 	void setButtonUserpics(
 		Button &button,
@@ -115,6 +120,13 @@ private:
 		QPoint innerTopLeft,
 		const PaintContext &context,
 		const QColor &textColor) const;
+	void paintSingleBg(
+		Painter &p,
+		const QRect &fill,
+		const QColor &color,
+		float64 opacity) const;
+
+	void validateTagBg(const QColor &color) const;
 
 	QSize countOptimalSize() override;
 
@@ -124,6 +136,8 @@ private:
 	Data _data;
 	std::vector<Button> _buttons;
 	QSize _skipBlock;
+	mutable QImage _tagBg;
+	mutable QColor _tagBgColor;
 	mutable QImage _customCache;
 	mutable int _customSkip = 0;
 	bool _hasCustomEmoji = false;

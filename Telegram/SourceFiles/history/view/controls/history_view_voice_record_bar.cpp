@@ -31,7 +31,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/effects/animation_value.h"
 #include "ui/effects/ripple_animation.h"
 #include "ui/text/format_values.h"
+#include "ui/text/text_utilities.h"
 #include "ui/painter.h"
+#include "ui/widgets/tooltip.h"
 #include "ui/rect.h"
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
@@ -278,7 +280,6 @@ protected:
 private:
 	const style::RecordBar &_st;
 	const QRect _rippleRect;
-	const QString _text;
 
 	Ui::Animations::Simple _activeAnimation;
 
@@ -290,11 +291,11 @@ TTLButton::TTLButton(
 : RippleButton(parent, st.lock.ripple)
 , _st(st)
 , _rippleRect(Rect(Size(st::historyRecordLockTopShadow.width()))
-	- (st::historyRecordLockRippleMargin))
-, _text(u"1"_q) {
-	resize(Size(st::historyRecordLockTopShadow.width()));
+	- (st::historyRecordLockRippleMargin)) {
+	QWidget::resize(Size(st::historyRecordLockTopShadow.width()));
+	Ui::AbstractButton::setDisabled(true);
 
-	setClickedCallback([=] {
+	Ui::AbstractButton::setClickedCallback([=] {
 		Ui::AbstractButton::setDisabled(!Ui::AbstractButton::isDisabled());
 		const auto isActive = !Ui::AbstractButton::isDisabled();
 		_activeAnimation.start(
@@ -304,6 +305,77 @@ TTLButton::TTLButton(
 			st::historyRecordVoiceShowDuration);
 	});
 
+	Ui::RpWidget::shownValue() | rpl::filter(
+		rpl::mappers::_1
+	) | rpl::take(1) | rpl::start_with_next([=] {
+		auto text = rpl::conditional(
+			Core::App().settings().ttlVoiceClickTooltipHiddenValue(),
+			tr::lng_record_once_active_tooltip(
+				Ui::Text::RichLangValue),
+			tr::lng_record_once_first_tooltip(
+				Ui::Text::RichLangValue));
+		const auto tooltip = Ui::CreateChild<Ui::ImportantTooltip>(
+			parent.get(),
+			object_ptr<Ui::PaddingWrap<Ui::FlatLabel>>(
+				parent.get(),
+				Ui::MakeNiceTooltipLabel(
+					parent,
+					std::move(text),
+					st::historyMessagesTTLLabel.minWidth,
+					st::ttlMediaImportantTooltipLabel),
+				st::defaultImportantTooltip.padding),
+			st::historyRecordTooltip);
+		Ui::RpWidget::geometryValue(
+		) | rpl::start_with_next([=](const QRect &r) {
+			if (r.isEmpty()) {
+				return;
+			}
+			tooltip->pointAt(r, RectPart::Right, [=](QSize size) {
+				return QPoint(
+					r.left()
+						- size.width()
+						- st::defaultImportantTooltip.padding.left(),
+					r.top()
+						+ r.height()
+						- size.height()
+						+ st::historyRecordTooltip.padding.top());
+			});
+		}, tooltip->lifetime());
+		tooltip->show();
+		if (!Core::App().settings().ttlVoiceClickTooltipHidden()) {
+			clicks(
+			) | rpl::take(1) | rpl::start_with_next([=] {
+				Core::App().settings().setTtlVoiceClickTooltipHidden(true);
+			}, tooltip->lifetime());
+			tooltip->toggleAnimated(true);
+		} else {
+			tooltip->toggleFast(false);
+		}
+
+		clicks(
+		) | rpl::start_with_next([=] {
+			const auto toggled = !Ui::AbstractButton::isDisabled();
+			tooltip->toggleAnimated(toggled);
+
+			if (toggled) {
+				constexpr auto kTimeout = crl::time(3000);
+				tooltip->hideAfter(kTimeout);
+			}
+		}, tooltip->lifetime());
+
+		Ui::RpWidget::geometryValue(
+		) | rpl::map([=](const QRect &r) {
+			return (r.left() + r.width() > parentWidget()->width());
+		}) | rpl::distinct_until_changed(
+		) | rpl::start_with_next([=](bool toHide) {
+			const auto isFirstTooltip =
+				!Core::App().settings().ttlVoiceClickTooltipHidden();
+			if (isFirstTooltip || (!isFirstTooltip && toHide)) {
+				tooltip->toggleAnimated(!toHide);
+			}
+		}, tooltip->lifetime());
+	}, lifetime());
+
 	paintRequest(
 	) | rpl::start_with_next([=](const QRect &clip) {
 		auto p = QPainter(this);
@@ -312,49 +384,16 @@ TTLButton::TTLButton(
 
 		Ui::RippleButton::paintRipple(p, _rippleRect.x(), _rippleRect.y());
 
-		const auto innerRect = QRectF(inner)
-			- st::historyRecordLockMargin * 2;
-		auto hq = PainterHighQualityEnabler(p);
-
-		p.setFont(st::semiboldFont);
-		p.setPen(_st.lock.fg);
-		p.drawText(inner, _text, style::al_center);
-
-		const auto penWidth = st::historyRecordTTLLineWidth;
-		auto pen = QPen(_st.lock.fg);
-		pen.setJoinStyle(Qt::RoundJoin);
-		pen.setCapStyle(Qt::RoundCap);
-		pen.setWidthF(penWidth);
-
-		p.setPen(pen);
-		p.setBrush(Qt::NoBrush);
-		p.drawArc(innerRect, arc::kQuarterLength, arc::kHalfLength);
-
-		{
-			p.setClipRect(innerRect
-				- QMarginsF(
-					innerRect.width() / 2,
-					-penWidth,
-					-penWidth,
-					-penWidth));
-			pen.setStyle(Qt::DotLine);
-			p.setPen(pen);
-			p.drawEllipse(innerRect);
-			p.setClipping(false);
-		}
-
 		const auto activeProgress = _activeAnimation.value(
 			!Ui::AbstractButton::isDisabled() ? 1 : 0);
+
+		p.setOpacity(1. - activeProgress);
+		st::historyRecordVoiceOnceInactive.paintInCenter(p, inner);
+
 		if (activeProgress) {
 			p.setOpacity(activeProgress);
-			pen.setStyle(Qt::SolidLine);
-			pen.setBrush(st::windowBgActive);
-			p.setPen(pen);
-			p.setBrush(pen.brush());
-			p.drawEllipse(innerRect);
-
-			p.setPen(st::windowFgActive);
-			p.drawText(innerRect, _text, style::al_center);
+			st::historyRecordVoiceOnceBg.paintInCenter(p, inner);
+			st::historyRecordVoiceOnceFg.paintInCenter(p, inner);
 		}
 
 	}, lifetime());
@@ -362,7 +401,7 @@ TTLButton::TTLButton(
 
 void TTLButton::clearState() {
 	Ui::AbstractButton::setDisabled(true);
-	update();
+	QWidget::update();
 	Ui::RpWidget::hide();
 }
 
@@ -1130,7 +1169,6 @@ VoiceRecordBar::VoiceRecordBar(
 , _show(std::move(descriptor.show))
 , _send(std::move(descriptor.send))
 , _lock(std::make_unique<RecordLock>(_outerContainer, _st.lock))
-, _ttlButton(std::make_unique<TTLButton>(_outerContainer, _st))
 , _level(std::make_unique<VoiceRecordButton>(_outerContainer, _st))
 , _cancel(std::make_unique<CancelButton>(this, _st, descriptor.recorderHeight))
 , _startTimer([=] { startRecording(); })
@@ -1209,6 +1247,9 @@ void VoiceRecordBar::updateLockGeometry() {
 void VoiceRecordBar::updateTTLGeometry(
 		TTLAnimationType type,
 		float64 progress) {
+	if (!_ttlButton) {
+		return;
+	}
 	const auto parent = parentWidget();
 	const auto me = Ui::MapFrom(_outerContainer, parent, geometry());
 	const auto anyTop = me.y() - st::historyRecordLockPosition.y();
@@ -1358,6 +1399,7 @@ void VoiceRecordBar::init() {
 				}
 				updateTTLGeometry(TTLAnimationType::TopBottom, 1. - value);
 			};
+			_showListenAnimation.stop();
 			_showListenAnimation.start(std::move(callback), 0., to, duration);
 		}, lifetime());
 
@@ -1367,6 +1409,11 @@ void VoiceRecordBar::init() {
 	_lock->locks(
 	) | rpl::start_with_next([=] {
 		if (_hasTTLFilter && _hasTTLFilter()) {
+			if (!_ttlButton) {
+				_ttlButton = std::make_unique<TTLButton>(
+					_outerContainer,
+					_st);
+			}
 			_ttlButton->show();
 		}
 		updateTTLGeometry(TTLAnimationType::RightTopStatic, 0);
@@ -1489,12 +1536,17 @@ void VoiceRecordBar::setTTLFilter(FilterCallback &&callback) {
 }
 
 void VoiceRecordBar::initLockGeometry() {
-	rpl::combine(
-		_lock->heightValue(),
-		geometryValue(),
-		static_cast<Ui::RpWidget*>(parentWidget())->geometryValue()
+	const auto parent = static_cast<Ui::RpWidget*>(parentWidget());
+	rpl::merge(
+		_lock->heightValue() | rpl::to_empty,
+		geometryValue() | rpl::to_empty,
+		parent->geometryValue() | rpl::to_empty
 	) | rpl::start_with_next([=] {
 		updateLockGeometry();
+	}, lifetime());
+	parent->geometryValue(
+	) | rpl::start_with_next([=] {
+		updateTTLGeometry(TTLAnimationType::RightLeft, 1.);
 	}, lifetime());
 }
 
@@ -1594,10 +1646,12 @@ void VoiceRecordBar::stop(bool send) {
 	if (isHidden() && !send) {
 		return;
 	}
+	const auto ttlBeforeHide = peekTTLState();
 	auto disappearanceCallback = [=] {
 		hide();
 
-		stopRecording(send ? StopType::Send : StopType::Cancel);
+		const auto type = send ? StopType::Send : StopType::Cancel;
+		stopRecording(type, ttlBeforeHide);
 	};
 	_lockShowing = false;
 	visibilityAnimate(false, std::move(disappearanceCallback));
@@ -1615,6 +1669,8 @@ void VoiceRecordBar::finish() {
 
 	_listen = nullptr;
 
+	[[maybe_unused]] const auto s = takeTTLState();
+
 	_sendActionUpdates.fire({ Api::SendProgressType::RecordVoice, -1 });
 }
 
@@ -1625,7 +1681,7 @@ void VoiceRecordBar::hideFast() {
 	[[maybe_unused]] const auto s = takeTTLState();
 }
 
-void VoiceRecordBar::stopRecording(StopType type) {
+void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 	using namespace ::Media::Capture;
 	if (type == StopType::Cancel) {
 		instance()->stop(crl::guard(this, [=](Result &&data) {
@@ -1645,9 +1701,9 @@ void VoiceRecordBar::stopRecording(StopType type) {
 		const auto duration = Duration(data.samples);
 		if (type == StopType::Send) {
 			const auto options = Api::SendOptions{
-				.ttlSeconds = takeTTLState()
+				.ttlSeconds = (ttlBeforeHide
 					? std::numeric_limits<int>::max()
-					: 0
+					: 0),
 			};
 			_sendVoiceRequests.fire({
 				data.bytes,
@@ -1820,6 +1876,10 @@ bool VoiceRecordBar::isRecordingByAnotherBar() const {
 	return !isRecording() && ::Media::Capture::instance()->started();
 }
 
+bool VoiceRecordBar::isTTLButtonShown() const {
+	return _ttlButton && !_ttlButton->isHidden();
+}
+
 bool VoiceRecordBar::hasDuration() const {
 	return _recordingSamples > 0;
 }
@@ -1851,7 +1911,14 @@ void VoiceRecordBar::computeAndSetLockProgress(QPoint globalPos) {
 	_lock->requestPaintProgress(Progress(localPos.y(), higher - lower));
 }
 
+bool VoiceRecordBar::peekTTLState() const {
+	return _ttlButton && !_ttlButton->isDisabled();
+}
+
 bool VoiceRecordBar::takeTTLState() const {
+	if (!_ttlButton) {
+		return false;
+	}
 	const auto hasTtl = !_ttlButton->isDisabled();
 	_ttlButton->clearState();
 	return hasTtl;

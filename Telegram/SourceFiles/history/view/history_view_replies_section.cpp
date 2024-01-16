@@ -1850,7 +1850,8 @@ bool RepliesWidget::cornerButtonsIgnoreVisibility() {
 }
 
 std::optional<bool> RepliesWidget::cornerButtonsDownShown() {
-	if (_composeControls->isLockPresent()) {
+	if (_composeControls->isLockPresent()
+		|| _composeControls->isTTLButtonShown()) {
 		return false;
 	}
 	const auto top = _scroll->scrollTop() + st::historyToDownShownAfter;
@@ -1863,7 +1864,9 @@ std::optional<bool> RepliesWidget::cornerButtonsDownShown() {
 }
 
 bool RepliesWidget::cornerButtonsUnreadMayBeShown() {
-	return _loaded && !_composeControls->isLockPresent();
+	return _loaded
+		&& !_composeControls->isLockPresent()
+		&& !_composeControls->isTTLButtonShown();
 }
 
 bool RepliesWidget::cornerButtonsHas(CornerButtonType type) {

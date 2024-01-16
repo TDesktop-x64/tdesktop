@@ -1990,6 +1990,7 @@ bool Message::hasFromPhoto() const {
 	case Context::AdminLog:
 		return true;
 	case Context::History:
+	case Context::TTLViewer:
 	case Context::Pinned:
 	case Context::Replies:
 	case Context::SavedSublist: {
@@ -2923,8 +2924,12 @@ bool Message::isSignedAuthorElided() const {
 bool Message::embedReactionsInBottomInfo() const {
 	const auto item = data();
 	const auto user = item->history()->peer->asUser();
-	if (!user || user->isPremium() || user->session().premium()) {
+	if (!user
+		|| user->isPremium()
+		|| user->isSelf()
+		|| user->session().premium()) {
 		// Only in messages of a non premium user with a non premium user.
+		// In saved messages we use reactions for tags, we don't embed them.
 		return false;
 	}
 	auto seenMy = false;
@@ -2967,8 +2972,14 @@ void Message::refreshReactions() {
 	if (!_reactions) {
 		const auto handlerFactory = [=](ReactionId id) {
 			const auto weak = base::make_weak(this);
-			return std::make_shared<LambdaClickHandler>([=] {
+			return std::make_shared<LambdaClickHandler>([=](
+					ClickContext context) {
 				if (const auto strong = weak.get()) {
+					if (strong->data()->reactionsAreTags()) {
+						const auto tag = Data::SearchTagToQuery(id);
+						HashtagClickHandler(tag).onClick(context);
+						return;
+					}
 					strong->data()->toggleReaction(
 						id,
 						HistoryItem::ReactionSource::Existing);
@@ -3166,6 +3177,7 @@ bool Message::hasFromName() const {
 	case Context::AdminLog:
 		return true;
 	case Context::History:
+	case Context::TTLViewer:
 	case Context::Pinned:
 	case Context::Replies:
 	case Context::SavedSublist: {
@@ -3198,7 +3210,7 @@ bool Message::hasFromName() const {
 	case Context::ContactPreview:
 		return false;
 	}
-	Unexpected("Context in Message::hasFromPhoto.");
+	Unexpected("Context in Message::hasFromName.");
 }
 
 bool Message::displayFromName() const {

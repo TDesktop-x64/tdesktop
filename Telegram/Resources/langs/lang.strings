@@ -1719,6 +1719,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_ttl_voice_expired" = "Voice message expired";
 "lng_ttl_round_sent" = "You sent a self-destructing video message.";
 "lng_ttl_round_expired" = "Round message expired";
+"lng_ttl_voice_tooltip_in" = "This voice message can only be played once.";
+"lng_ttl_voice_tooltip_out" = "This message will disappear once **{user}** plays it once.";
+"lng_ttl_voice_close_in" = "Delete and close";
+"lng_ttl_round_tooltip_in" = "This video message can only be played once.";
+"lng_ttl_round_tooltip_out" = "This message will disappear once **{user}** plays it once.";
 
 "lng_profile_migrate_button" = "Upgrade to supergroup";
 "lng_profile_convert_title" = "Convert to supergroup";
@@ -2495,6 +2500,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_record_listen_cancel_sure" = "Are you sure you want to discard your recorded voice message?";
 "lng_record_lock_discard" = "Discard";
 "lng_record_hold_tip" = "Please hold the mouse button pressed to record a voice message.";
+"lng_record_once_first_tooltip" = "Tap to set this message to **Play Once**.";
+"lng_record_once_active_tooltip" = "The recipients will be able to listen to it only once.";
 "lng_will_be_notified" = "Members will be notified when you post";
 "lng_wont_be_notified" = "Members will not be notified when you post";
 "lng_willbe_history" = "Please select a chat to start messaging";
@@ -2757,7 +2764,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_context_seen_reacted#other" = "{count} Reacted";
 "lng_context_seen_reacted_none" = "Nobody Reacted";
 "lng_context_seen_reacted_all" = "Show All Reactions";
-"lng_context_set_as_quick" = "Set As Quick";
+"lng_context_set_as_quick" = "Set as Quick";
+"lng_context_filter_by_tag" = "Filter by Tag";
+"lng_context_remove_tag" = "Remove Tag";
 "lng_context_delete_from_disk" = "Delete from disk";
 "lng_context_delete_all_files" = "Delete all files";
 "lng_context_save_custom_sound" = "Save for notifications";
@@ -4358,6 +4367,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_stories_views#one" = "{count} view";
 "lng_stories_views#other" = "{count} views";
 "lng_stories_no_views" = "No views";
+"lng_stories_view_reactions" = "View reactions";
 "lng_stories_unsupported" = "This story is not supported\nby your version of Telegram.";
 "lng_stories_cant_reply" = "You can't reply to this story.";
 "lng_stories_about_silent" = "This video has no sound.";

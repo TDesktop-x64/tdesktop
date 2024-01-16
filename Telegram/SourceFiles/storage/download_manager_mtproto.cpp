@@ -804,8 +804,8 @@ void DownloadMtprotoTask::placeSentRequest(
 		dcId(),
 		requestData.sessionIndex,
 		cNetDownloadChunkSize());
-	const auto [i, ok1] = _sentRequests.emplace(requestId, requestData);
-	const auto [j, ok2] = _requestByOffset.emplace(
+	const auto &[i, ok1] = _sentRequests.emplace(requestId, requestData);
+	const auto &[j, ok2] = _requestByOffset.emplace(
 		requestData.offset,
 		requestId);
 

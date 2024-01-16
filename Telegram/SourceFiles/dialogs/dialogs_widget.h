@@ -117,7 +117,7 @@ public:
 
 	void scrollToEntry(const RowDescriptor &entry);
 
-	void searchMessages(const QString &query, Key inChat = {}, PeerData *from = nullptr);
+	void searchMessages(QString query, Key inChat = {}, PeerData *from = nullptr);
 	void searchTopics();
 	void searchMore();
 

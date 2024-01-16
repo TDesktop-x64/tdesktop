@@ -1948,7 +1948,7 @@ void Widget::showMainMenu() {
 }
 
 void Widget::searchMessages(
-		const QString &query,
+		QString query,
 		Key inChat,
 		PeerData *from) {
 	if (_childList) {

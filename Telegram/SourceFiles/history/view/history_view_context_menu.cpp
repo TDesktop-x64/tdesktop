@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_attached_stickers.h"
 #include "api/api_common.h"
 #include "api/api_editing.h"
+#include "api/api_global_privacy.h"
 #include "api/api_polls.h"
 #include "api/api_report.h"
 #include "api/api_ringtones.h"
@@ -44,6 +45,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "menu/menu_item_download_files.h"
 #include "menu/menu_send.h"
 #include "ui/boxes/confirm_box.h"
+#include "ui/boxes/show_or_premium_box.h"
 #include "boxes/delete_messages_box.h"
 #include "boxes/report_messages_box.h"
 #include "boxes/sticker_set_box.h"
@@ -68,6 +70,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/click_handler_types.h"
 #include "base/platform/base_platform_info.h"
 #include "base/call_delayed.h"
+#include "settings/settings_premium.h"
 #include "window/window_peer_menu.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
@@ -1486,6 +1489,21 @@ void AddWhoReactedAction(
 		not_null<Window::SessionController*> controller) {
 	const auto whoReadIds = std::make_shared<Api::WhoReadList>();
 	const auto weak = Ui::MakeWeak(menu.get());
+	const auto user = item->history()->peer;
+	const auto showOrPremium = [=] {
+		if (const auto strong = weak.data()) {
+			strong->hideMenu();
+		}
+		const auto type = Ui::ShowOrPremium::ReadTime;
+		const auto name = user->shortName();
+		auto box = Box(Ui::ShowOrPremiumBox, type, name, [=] {
+			const auto api = &controller->session().api();
+			api->globalPrivacy().updateHideReadTime({});
+		}, [=] {
+			Settings::ShowPremium(controller, u"revtime_hidden"_q);
+		});
+		controller->show(std::move(box));
+	};
 	const auto participantChosen = [=](uint64 id) {
 		if (const auto strong = weak.data()) {
 			strong->hideMenu();
@@ -1505,14 +1523,21 @@ void AddWhoReactedAction(
 				whoReadIds));
 		}
 	};
-	menu->addAction(Ui::WhoReactedContextAction(
-		menu.get(),
-		Api::WhoReacted(item, context, st::defaultWhoRead, whoReadIds),
-		Data::ReactedMenuFactory(&controller->session()),
-		participantChosen,
-		showAllChosen));
+	if (item->history()->peer->isUser()) {
+		menu->addAction(Ui::WhenReadContextAction(
+			menu.get(),
+			Api::WhoReacted(item, context, st::defaultWhoRead, whoReadIds),
+			showOrPremium));
+	} else {
+		menu->addAction(Ui::WhoReactedContextAction(
+			menu.get(),
+			Api::WhoReacted(item, context, st::defaultWhoRead, whoReadIds),
+			Data::ReactedMenuFactory(&controller->session()),
+			participantChosen,
+			showAllChosen));
 	if (!menu->empty()) {
 		menu->addSeparator();
+	}
 	}
 }
 
@@ -1617,7 +1642,7 @@ void ShowWhoReactedMenu(
 		context,
 		st::defaultWhoRead
 	) | rpl::filter([=](const Ui::WhoReadContent &content) {
-		return !content.unknown;
+		return content.state != Ui::WhoReadState::Unknown;
 	}) | rpl::start_with_next([=, &lifetime](Ui::WhoReadContent &&content) {
 		const auto creating = !*menu;
 		const auto refillTop = [=] {

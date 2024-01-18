@@ -629,7 +629,7 @@ QSize Message::performCountOptimalSize() {
 	refreshInfoSkipBlock();
 
 	const auto media = this->media();
-	const auto botTop = item->isFakeBotAbout()
+	const auto botTop = item->isFakeAboutView()
 		? Get<FakeBotAboutTop>()
 		: nullptr;
 	if (botTop) {
@@ -3269,7 +3269,7 @@ bool Message::drawBubble() const {
 	const auto item = data();
 	if (isHidden()) {
 		return false;
-	} else if (logEntryOriginal() || item->isFakeBotAbout()) {
+	} else if (logEntryOriginal() || item->isFakeAboutView()) {
 		return true;
 	}
 	const auto media = this->media();
@@ -3766,7 +3766,7 @@ QRect Message::innerGeometry() const {
 
 QRect Message::countGeometry() const {
 	const auto item = data();
-	const auto centeredView = item->isFakeBotAbout()
+	const auto centeredView = item->isFakeAboutView()
 		|| (context() == Context::Replies && item->isDiscussionPost());
 	const auto media = this->media();
 	const auto mediaWidth = (media && media->isDisplayed())
@@ -3833,7 +3833,7 @@ Ui::BubbleRounding Message::countMessageRounding() const {
 	const auto skipTail = smallBottom
 		|| (media && media->skipBubbleTail())
 		|| (keyboard != nullptr)
-		|| item->isFakeBotAbout()
+		|| item->isFakeAboutView()
 		|| (context() == Context::Replies && item->isDiscussionPost());
 	const auto right = hasRightLayout();
 	using Corner = Ui::BubbleCornerRounding;
@@ -3881,7 +3881,7 @@ int Message::resizeContentGetHeight(int newWidth) {
 	}
 
 	const auto item = data();
-	const auto botTop = item->isFakeBotAbout()
+	const auto botTop = item->isFakeAboutView()
 		? Get<FakeBotAboutTop>()
 		: nullptr;
 	const auto media = this->media();
@@ -3889,7 +3889,7 @@ int Message::resizeContentGetHeight(int newWidth) {
 	const auto bubble = drawBubble();
 
 	// This code duplicates countGeometry() but also resizes media.
-	const auto centeredView = item->isFakeBotAbout()
+	const auto centeredView = item->isFakeAboutView()
 		|| (context() == Context::Replies && item->isDiscussionPost());
 	auto contentWidth = newWidth
 		- st::msgMargin.left()

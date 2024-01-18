@@ -1734,7 +1734,7 @@ void TopBarWidget::updateOnlineDisplay() {
 			auto online = 0;
 			auto onlyMe = true;
 			for (const auto &user : chat->participants) {
-				if (user->onlineTill > now) {
+				if (user->lastseen().isOnline(now)) {
 					++online;
 					if (onlyMe && user != self) onlyMe = false;
 				}

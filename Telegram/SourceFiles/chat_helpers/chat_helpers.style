@@ -208,6 +208,8 @@ ComposeControls {
 	files: ComposeFiles;
 	premium: PremiumLimits;
 	boxField: InputField;
+	restrictionLabel: FlatLabel;
+	premiumRequired: ComposePremiumRequired;
 }
 
 ReportBox {
@@ -249,6 +251,13 @@ defaultWhoRead: WhoRead {
 	iconPosition: point(15px, 7px);
 	itemPadding: margins(44px, 9px, 17px, 7px);
 }
+whenReadStyle: TextStyle(defaultTextStyle) {
+	font: font(12px);
+}
+whenReadPadding: margins(34px, 3px, 17px, 4px);
+whenReadIconPosition: point(8px, 0px);
+whenReadSkip: 3px;
+whenReadShowPadding: margins(6px, 0px, 6px, 2px);
 
 switchPmButton: RoundButton(defaultBoxButton) {
 	width: 320px;
@@ -1211,6 +1220,11 @@ defaultComposeFiles: ComposeFiles {
 	nameFg: historyFileNameInFg;
 	statusFg: mediaInFg;
 }
+defaultRestrictionLabel: FlatLabel(defaultFlatLabel) {
+	minWidth: 12px;
+	textFg: placeholderFg;
+	align: align(top);
+}
 defaultComposeControls: ComposeControls {
 	bg: historyComposeAreaBg;
 	radius: 0px;
@@ -1227,6 +1241,7 @@ defaultComposeControls: ComposeControls {
 	files: defaultComposeFiles;
 	premium: defaultPremiumLimits;
 	boxField: defaultInputField;
+	restrictionLabel: defaultRestrictionLabel;
 }
 
 moreChatsBarHeight: 48px;

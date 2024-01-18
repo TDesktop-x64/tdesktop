@@ -1865,7 +1865,7 @@ QPointer<Ui::BoxContent> ShowOldForwardMessagesBox(
 		}
 
 		[[nodiscard]] Data::ForwardOptions forwardOptionsData() const {
-			return (_forwardOptions.hasCaptions
+			return (_forwardOptions.captionsCount
 					&& _forwardOptions.dropCaptions)
 				? Data::ForwardOptions::NoNamesAndCaptions
 				: _forwardOptions.dropNames
@@ -2071,7 +2071,6 @@ QPointer<Ui::BoxContent> ShowOldForwardMessagesBox(
 			};
 			Ui::FillForwardOptions(
 				std::move(createView),
-				msgIds.size(),
 				state->box->forwardOptions(),
 				[=](Ui::ForwardOptions o) {
 					state->box->setForwardOptions(o);
@@ -2318,9 +2317,9 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 		.filterCallback = std::move(filterCallback),
 		.title = no_quote ? tr::lng_title_forward_as_copy() : tr::lng_title_multiple_forward(),
 		.forwardOptions = {
-			.messagesCount = int(data->msgIds.size()),
+			.sendersCount = ItemsForwardSendersCount(itemsList),
+			.captionsCount = ItemsForwardCaptionsCount(itemsList),
 			.show = !hasOnlyForcedForwardedInfo,
-			.hasCaptions = hasCaptions,
 		},
 	}));
 	return weak->data();

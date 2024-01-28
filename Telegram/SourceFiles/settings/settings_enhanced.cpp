@@ -277,6 +277,20 @@ namespace Settings {
 
 		AddButtonWithIcon(
 				inner,
+				tr::lng_settings_disable_global_search(),
+				st::settingsButtonNoIcon
+		)->toggleOn(
+				rpl::single(GetEnhancedBool("disable_global_search"))
+		)->toggledChanges(
+		) | rpl::filter([=](bool toggled) {
+			return (toggled != GetEnhancedBool("disable_global_search"));
+		}) | rpl::start_with_next([=](bool toggled) {
+			SetEnhancedValue("disable_global_search", toggled);
+			EnhancedSettings::Write();
+		}, container->lifetime());
+
+		AddButtonWithIcon(
+				inner,
 				tr::lng_settings_show_group_sender_avatar(),
 				st::settingsButtonNoIcon
 		)->toggleOn(

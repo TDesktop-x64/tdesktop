@@ -1919,7 +1919,8 @@ bool Widget::searchMessages(bool searchCache) {
 }
 
 bool Widget::searchForPeersRequired(const QString &query) const {
-	return !_searchInChat
+	return !GetEnhancedBool("disable_global_search")
+		&& !_searchInChat
 		&& !_searchFromAuthor
 		&& _searchTags.empty()
 		&& !_openedForum

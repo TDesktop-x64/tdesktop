@@ -4684,6 +4684,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_disable_link_warning" = "Disable open link warning";
 "lng_settings_hide_messages" = "Hide messages from blocked user";
 "lng_settings_disable_premium_animation" = "Disable Premium Animation";
+"lng_settings_disable_global_search" = "Disable global search";
 "lng_settings_show_group_sender_avatar" = "Show sender's avatar in groups";
 "lng_settings_show_seconds" = "Time with seconds";
 "lng_settings_hide_counter" = "Hide online users counter";

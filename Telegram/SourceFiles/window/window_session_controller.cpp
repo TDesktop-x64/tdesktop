@@ -985,7 +985,7 @@ void SessionNavigation::searchInChat(Dialogs::Key inChat) {
 void SessionNavigation::searchMessages(
 		const QString &query,
 		Dialogs::Key inChat) {
-	parentController()->content()->searchMessages(query, inChat);
+	parentController()->content()->searchMessages(query, inChat, nullptr);
 }
 
 auto SessionNavigation::showToast(Ui::Toast::Config &&config)

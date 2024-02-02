@@ -1297,7 +1297,7 @@ void EditTagBox(
 	}, warning->lifetime());
 	warning->setAttribute(Qt::WA_TransparentForMouseEvents);
 
-	box->addButton(tr::lng_settings_save(), [=] {
+	const auto save = [=] {
 		const auto text = field->getLastText();
 		if (text.size() > kTagNameLimit) {
 			field->showError();
@@ -1308,7 +1308,12 @@ void EditTagBox(
 		if (const auto strong = weak.data()) {
 			strong->closeBox();
 		}
-	});
+	};
+
+	field->submits(
+	) | rpl::start_with_next(save, field->lifetime());
+
+	box->addButton(tr::lng_settings_save(), save);
 	box->addButton(tr::lng_cancel(), [=] {
 		box->closeBox();
 	});
@@ -1675,6 +1680,37 @@ void AddWhoReactedAction(
 	}
 }
 
+void AddEditTagAction(
+		not_null<Ui::PopupMenu*> menu,
+		const Data::ReactionId &id,
+		not_null<Window::SessionController*> controller) {
+	const auto owner = &controller->session().data();
+	const auto editLabel = owner->reactions().myTagTitle(id).isEmpty()
+		? tr::lng_context_tag_add_name(tr::now)
+		: tr::lng_context_tag_edit_name(tr::now);
+	menu->addAction(editLabel, [=] {
+		controller->show(Box(EditTagBox, controller, id));
+	}, &st::menuIconTagRename);
+}
+
+void AddTagPackAction(
+		not_null<Ui::PopupMenu*> menu,
+		const Data::ReactionId &id,
+		not_null<Window::SessionController*> controller) {
+	if (const auto custom = id.custom()) {
+		const auto owner = &controller->session().data();
+		if (const auto set = owner->document(custom)->sticker()) {
+			if (set->set.id) {
+				AddEmojiPacksAction(
+					menu,
+					{ set->set },
+					EmojiPacksSource::Tag,
+					controller);
+			}
+		}
+	}
+}
+
 void ShowTagMenu(
 		not_null<base::unique_qptr<Ui::PopupMenu>*> menu,
 		QPoint position,
@@ -1697,12 +1733,7 @@ void ShowTagMenu(
 		});
 	}, &st::menuIconTagFilter);
 
-	const auto editLabel = owner->reactions().myTagTitle(id).isEmpty()
-		? tr::lng_context_tag_add_name(tr::now)
-		: tr::lng_context_tag_edit_name(tr::now);
-	(*menu)->addAction(editLabel, [=] {
-		controller->show(Box(EditTagBox, controller, id));
-	}, &st::menuIconTagRename);
+	AddEditTagAction(menu->get(), id, controller);
 
 	const auto removeTag = [=] {
 		if (const auto item = owner->message(itemId)) {
@@ -1724,17 +1755,24 @@ void ShowTagMenu(
 		&st::menuIconTagRemoveAttention,
 		&st::menuIconTagRemoveAttention));
 
-	if (const auto custom = id.custom()) {
-		if (const auto set = owner->document(custom)->sticker()) {
-			if (set->set.id) {
-				AddEmojiPacksAction(
-					menu->get(),
-					{ set->set },
-					EmojiPacksSource::Reaction,
-					controller);
-			}
-		}
-	}
+	AddTagPackAction(menu->get(), id, controller);
+
+	(*menu)->popup(position);
+}
+
+void ShowTagInListMenu(
+		not_null<base::unique_qptr<Ui::PopupMenu>*> menu,
+		QPoint position,
+		not_null<QWidget*> context,
+		const Data::ReactionId &id,
+		not_null<Window::SessionController*> controller) {
+	*menu = base::make_unique_q<Ui::PopupMenu>(
+		context,
+		st::popupMenuExpandedSeparator);
+
+	AddEditTagAction(menu->get(), id, controller);
+	AddTagPackAction(menu->get(), id, controller);
+
 	(*menu)->popup(position);
 }
 
@@ -1897,6 +1935,12 @@ void AddEmojiPacksAction(
 					lt_name,
 					TextWithEntities{ name },
 					Ui::Text::RichLangValue);
+		case EmojiPacksSource::Tag:
+			return tr::lng_context_animated_tag(
+				tr::now,
+				lt_name,
+				TextWithEntities{ name },
+				Ui::Text::RichLangValue);
 		case EmojiPacksSource::Reaction:
 			if (!name.text.isEmpty()) {
 				return tr::lng_context_animated_reaction(

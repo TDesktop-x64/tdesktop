@@ -71,7 +71,6 @@ ComposeIcons {
 	menuSpoilerOff: icon;
 
 	stripBubble: icon;
-	stripPremiumLocked: icon;
 	stripExpandPanel: icon;
 	stripExpandDropdown: icon;
 }
@@ -123,6 +122,8 @@ EmojiPan {
 	removeSet: IconButton;
 	boxLabel: FlatLabel;
 	icons: ComposeIcons;
+	about: FlatLabel;
+	aboutPadding: margins;
 	autocompleteBottomSkip: pixels;
 }
 
@@ -609,10 +610,6 @@ defaultComposeIcons: ComposeIcons {
 		{ "chat/reactions_bubble_shadow", windowShadowFg },
 		{ "chat/reactions_bubble", windowBg },
 	};
-	stripPremiumLocked: icon{
-		{ "chat/reactions_premium_bg", historyPeerArchiveUserpicBg },
-		{ "chat/reactions_premium_star", historyPeerUserpicFg },
-	};
 	stripExpandPanel: icon{
 		{ "chat/reactions_round_big", windowBgRipple },
 		{ "chat/reactions_expand_panel", windowSubTextFg },
@@ -621,6 +618,14 @@ defaultComposeIcons: ComposeIcons {
 		{ "chat/reactions_round_small", windowBgRipple },
 		{ "chat/reactions_expand_panel", windowSubTextFg },
 	};
+}
+defaultEmojiPanAbout: FlatLabel(defaultFlatLabel) {
+	minWidth: 10px;
+	align: align(top);
+	textFg: windowSubTextFg;
+	style: TextStyle(defaultTextStyle) {
+		font: font(11px);
+	}
 }
 defaultEmojiPan: EmojiPan {
 	margin: margins(7px, 0px, 7px, 0px);
@@ -663,6 +668,8 @@ defaultEmojiPan: EmojiPan {
 	removeSet: stickerPanRemoveSet;
 	boxLabel: boxLabel;
 	icons: defaultComposeIcons;
+	about: defaultEmojiPanAbout;
+	aboutPadding: margins(12px, 2px, 12px, 2px);
 	autocompleteBottomSkip: 0px;
 }
 statusEmojiPan: EmojiPan(defaultEmojiPan) {
@@ -1122,6 +1129,7 @@ historyRecordLockBodyShadow: icon {{ "voice_lock/record_lock_body_shadow", histo
 historyRecordLockBody: icon {{ "voice_lock/record_lock_body", historyToDownBg }};
 historyRecordLockMargin: margins(4px, 4px, 4px, 4px);
 historyRecordLockArrow: icon {{ "voice_lock/voice_arrow", historyToDownFg }};
+historyRecordLockInput: icon {{ "voice_lock/input_mic_s", historyToDownFg }};
 historyRecordLockRippleMargin: margins(6px, 6px, 6px, 6px);
 
 historyRecordDelete: IconButton(historyAttach) {
@@ -1306,3 +1314,22 @@ ttlMediaButton: RoundButton(defaultActiveButton) {
 	textTop: 6px;
 }
 ttlMediaButtonBottomSkip: 14px;
+
+editTagAbout: FlatLabel(defaultFlatLabel) {
+	minWidth: 256px;
+}
+editTagField: InputField(defaultInputField) {
+	textBg: transparent;
+	textMargins: margins(24px, 10px, 32px, 0px);
+
+	placeholderFg: placeholderFg;
+	placeholderFgActive: placeholderFgActive;
+	placeholderFgError: placeholderFgActive;
+	placeholderMargins: margins(2px, 0px, 2px, 0px);
+	placeholderScale: 0.;
+
+	heightMin: 32px;
+}
+editTagLimit: FlatLabel(defaultFlatLabel) {
+	textFg: windowSubTextFg;
+}

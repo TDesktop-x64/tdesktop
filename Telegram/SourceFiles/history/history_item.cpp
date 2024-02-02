@@ -808,7 +808,7 @@ HistoryItem::HistoryItem(
 : id(id)
 , _history(history)
 , _from(from ? history->owner().peer(from) : history->peer)
-, _flags(FinalizeMessageFlags(flags))
+, _flags(FinalizeMessageFlags(history, flags))
 , _date(date) {
 	if (isHistoryEntry() && IsClientMsgId(id)) {
 		_history->registerClientSideMessage(this);
@@ -962,6 +962,17 @@ void HistoryItem::updateServiceDependent(bool force) {
 			}
 		}
 	}
+
+	// Record resolve state for upcoming on-demand resolving.
+	if (dependent->msg || !dependent->msgId || force) {
+		dependent->pendingResolve = false;
+	} else {
+		dependent->pendingResolve = true;
+		dependent->requestedResolve = false;
+	}
+
+	// updateDependentServiceText may call UpdateComponents!
+	// So the `dependent` pointer becomes invalid.
 	if (dependent->msg) {
 		updateDependentServiceText();
 	} else if (force) {
@@ -973,12 +984,6 @@ void HistoryItem::updateServiceDependent(bool force) {
 	}
 	if (force && gotDependencyItem) {
 		Core::App().notifications().checkDelayed();
-	}
-	if (dependent->msg || !dependent->msgId || force) {
-		dependent->pendingResolve = false;
-	} else {
-		dependent->pendingResolve = true;
-		dependent->requestedResolve = false;
 	}
 }
 
@@ -2527,8 +2532,7 @@ const std::vector<Data::MessageReaction> &HistoryItem::reactions() const {
 }
 
 bool HistoryItem::reactionsAreTags() const {
-	// Disable reactions as tags for now.
-	return false;// _flags & MessageFlag::ReactionsAreTags;
+	return _flags & MessageFlag::ReactionsAreTags;
 }
 
 auto HistoryItem::recentReactions() const

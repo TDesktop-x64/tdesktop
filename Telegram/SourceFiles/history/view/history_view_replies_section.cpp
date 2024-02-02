@@ -68,7 +68,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/mime_type.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
-#include "mainwidget.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
 #include "data/data_chat.h"
@@ -2588,6 +2587,12 @@ void RepliesWidget::listSendBotCommand(
 	finishSending();
 }
 
+void RepliesWidget::listSearch(
+		const QString &query,
+		const FullMsgId &context) {
+	controller()->searchMessages(query, _history);
+}
+
 void RepliesWidget::listHandleViaClick(not_null<UserData*> bot) {
 	_composeControls->setText({ '@' + bot->username() + ' ' });
 }
@@ -2753,7 +2758,7 @@ void RepliesWidget::setupShortcuts() {
 
 void RepliesWidget::searchInTopic() {
 	if (_topic) {
-		controller()->content()->searchInChat(_topic);
+		controller()->searchInChat(_topic);
 	}
 }
 

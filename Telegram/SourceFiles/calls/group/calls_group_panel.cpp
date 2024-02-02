@@ -54,8 +54,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/power_save_blocker.h"
 #include "apiwrap.h" // api().kick.
 #include "api/api_chat_participants.h" // api().kick.
+#include "webrtc/webrtc_environment.h"
 #include "webrtc/webrtc_video_track.h"
-#include "webrtc/webrtc_media_devices.h" // UniqueDesktopCaptureSource.
 #include "webrtc/webrtc_audio_input_tester.h"
 #include "styles/style_calls.h"
 #include "styles/style_layers.h"
@@ -1384,9 +1384,10 @@ void Panel::chooseShareScreenSource() {
 		return;
 	}
 	const auto choose = [=] {
-		if (!Webrtc::DesktopCaptureAllowed()) {
+		const auto env = &Core::App().mediaDevices();
+		if (!env->desktopCaptureAllowed()) {
 			screenSharingPrivacyRequest();
-		} else if (const auto source = Webrtc::UniqueDesktopCaptureSource()) {
+		} else if (const auto source = env->uniqueDesktopCaptureSource()) {
 			if (_call->isSharingScreen()) {
 				_call->toggleScreenSharing(std::nullopt);
 			} else {
@@ -2013,7 +2014,8 @@ void Panel::trackControlOver(not_null<Ui::RpWidget*> control, bool over) {
 }
 
 void Panel::showStickedTooltip() {
-	static const auto kHasCamera = !Webrtc::GetVideoInputList().empty();
+	static const auto kHasCamera = !Core::App().mediaDevices().defaultId(
+		Webrtc::DeviceType::Camera).isEmpty();
 	const auto callReady = (_call->state() == State::Joined
 		|| _call->state() == State::Connecting);
 	if (!(_stickedTooltipsShown & StickedTooltip::Camera)

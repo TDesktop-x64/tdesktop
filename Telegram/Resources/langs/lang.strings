@@ -433,7 +433,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_username_invalid" = "This username is invalid.";
 "lng_username_occupied" = "This username is already occupied.";
 "lng_username_too_short" = "This username is too short.";
-"lng_username_purchase_available" = "Sorry, this link is occupied by someone. But it's available for purchase through\nofficial {link}.";
+"lng_username_purchase_available" = "**This username is already taken.** However, it is currently available for purchase. {link}";
+"lng_username_purchase_available_link" = "Learn more...";
 "lng_username_bad_symbols" = "Only a-z, 0-9, and underscores allowed.";
 "lng_username_available" = "This username is available.";
 "lng_username_not_found" = "User @{user} not found.";
@@ -629,6 +630,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_call_open_system_prefs" = "Open system sound preferences";
 "lng_settings_call_accept_calls" = "Accept calls from this device";
 "lng_settings_call_device_default" = "Same as the System";
+
+"lng_settings_section_devices" = "Speakers and Camera";
+"lng_settings_devices_calls" = "Calls and video chats";
+"lng_settings_devices_calls_same" = "Use the same devices for calls";
+"lng_settings_devices_inactive" = "Unavailable";
 
 "lng_settings_language" = "Language";
 "lng_settings_default_scale" = "Default interface scale";
@@ -1499,6 +1505,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_report_messages_none" = "Select Messages";
 "lng_report_messages_count#one" = "Report {count} Message";
 "lng_report_messages_count#other" = "Report {count} Messages";
+"lng_report_reaction" = "Report reaction";
+"lng_report_and_ban" = "Ban and report";
+"lng_report_reaction_title" = "Report reaction";
+"lng_report_reaction_about" = "Are you sure you want to report reactions from this user?";
+"lng_report_and_ban_button" = "Ban user";
 "lng_report_details_about" = "Please enter any additional details relevant to your report.";
 "lng_report_details" = "Additional Details";
 "lng_report_reason_spam" = "Spam";
@@ -2028,6 +2039,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_premium_summary_about_emoji_status" = "Add any of thousands emoji next to your name to display current activity.";
 "lng_premium_summary_subtitle_infinite_reactions" = "Infinite Reactions";
 "lng_premium_summary_about_infinite_reactions" = "React with thousands of emoji — with multiple reactions per message.";
+"lng_premium_summary_subtitle_tags_for_messages" = "Tags for Messages";
+"lng_premium_summary_about_tags_for_messages" = "Organize your Saved Messages with tags for quicker access.";
 "lng_premium_summary_subtitle_premium_stickers" = "Premium Stickers";
 "lng_premium_summary_about_premium_stickers" = "Exclusive enlarged stickers featuring additional effects, updated monthly.";
 "lng_premium_summary_subtitle_animated_emoji" = "Animated Emoji";
@@ -2448,6 +2461,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_in_dlg_contact" = "Contact";
 "lng_in_dlg_audio" = "Voice message";
 "lng_in_dlg_video_message" = "Video message";
+"lng_in_dlg_voice_message_ttl" = "One-time Voice Message";
+"lng_in_dlg_video_message_ttl" = "One-time Video Message";
 "lng_in_dlg_file" = "File";
 "lng_in_dlg_sticker" = "Sticker";
 "lng_in_dlg_sticker_emoji" = "{emoji} Sticker";
@@ -2801,6 +2816,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_context_seen_reacted_all" = "Show All Reactions";
 "lng_context_set_as_quick" = "Set as Quick";
 "lng_context_filter_by_tag" = "Filter by Tag";
+"lng_context_tag_add_name" = "Add Name";
+"lng_context_tag_edit_name" = "Edit Name";
 "lng_context_remove_tag" = "Remove Tag";
 "lng_context_delete_from_disk" = "Delete from disk";
 "lng_context_delete_all_files" = "Delete all files";
@@ -2809,6 +2826,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_context_translate_selected" = "Translate Selected Text";
 "lng_context_read_hidden" = "read";
 "lng_context_read_show" = "show when";
+
+"lng_add_tag_about" = "Tag this message with an emoji for quick search.";
+"lng_subscribe_tag_about" = "Organize your Saved Messages with tags. {link}";
+"lng_subscribe_tag_link" = "Learn More...";
+"lng_edit_tag_about" = "You can label your emoji tag with a text name.";
+"lng_edit_tag_name" = "Name";
+"lng_add_tag_button" = "Add tags";
+"lng_add_tag_phrase" = "to messages {arrow}";
+"lng_add_tag_phrase_long" = "to your Saved Messages {arrow}";
+"lng_unlock_tags" = "Unlock";
 
 "lng_context_animated_emoji" = "This message contains emoji from **{name} pack**.";
 "lng_context_animated_emoji_many#one" = "This message contains emoji from **{count} pack**.";
@@ -3626,7 +3653,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_restricted_send_non_premium_more" = "Learn more...";
 
 "lng_send_non_premium_text" = "Subscribe to **Premium**\n to message {user}.";
-"lng_send_non_premium_go" = "Go Premium";
+"lng_send_non_premium_go" = "Get Premium";
 "lng_send_non_premium_story" = "Replies restricted";
 "lng_send_non_premium_unlock" = "unlock";
 "lng_send_non_premium_message_toast" = "**{user}** only accepts messages from contacts and {link} subscribers.";
@@ -4468,6 +4495,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_stories_channel_archive_done_many#one" = "{count} story is hidden from the channel page.";
 "lng_stories_channel_archive_done_many#other" = "{count} stories are hidden from the channel page.";
 "lng_stories_save_promo" = "Subscribe to {link} to download other people's unprotected stories to disk.";
+"lng_stories_reaction_as_message" = "Send reaction as a private message";
 
 "lng_stealth_mode_menu_item" = "Stealth Mode";
 "lng_stealth_mode_title" = "Stealth Mode";

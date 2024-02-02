@@ -29,6 +29,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/media/history_view_media.h"
 #include "history/view/media/history_view_web_page.h"
 #include "history/view/reactions/history_view_reactions_list.h"
+#include "info/info_memento.h"
+#include "info/profile/info_profile_widget.h"
 #include "main/main_session.h"
 #include "main/session/send_as_peers.h"
 #include "ui/widgets/popup_menu.h"
@@ -46,6 +48,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "menu/menu_send.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/boxes/show_or_premium_box.h"
+#include "ui/widgets/fields/input_field.h"
+#include "ui/power_saving.h"
 #include "boxes/delete_messages_box.h"
 #include "boxes/report_messages_box.h"
 #include "boxes/sticker_set_box.h"
@@ -92,6 +96,7 @@ namespace HistoryView {
 namespace {
 
 constexpr auto kRescheduleLimit = 20;
+constexpr auto kTagNameLimit = 12;
 
 bool HasEditMessageAction(
 		const ContextMenuRequest &request,
@@ -1203,6 +1208,134 @@ void AddCopyLinkAction(
 		&st::menuIconCopy);
 }
 
+void EditTagBox(
+		not_null<Ui::GenericBox*> box,
+		not_null<Window::SessionController*> controller,
+		const Data::ReactionId &id) {
+	const auto owner = &controller->session().data();
+	const auto title = owner->reactions().myTagTitle(id);
+	box->setTitle(title.isEmpty()
+		? tr::lng_context_tag_add_name()
+		: tr::lng_context_tag_edit_name());
+	box->addRow(object_ptr<Ui::FlatLabel>(
+		box,
+		tr::lng_edit_tag_about(),
+		st::editTagAbout));
+	const auto field = box->addRow(object_ptr<Ui::InputField>(
+		box,
+		st::editTagField,
+		tr::lng_edit_tag_name(),
+		title));
+	field->setMaxLength(kTagNameLimit * 2);
+	box->setFocusCallback([=] {
+		field->setFocusFast();
+	});
+
+	struct State {
+		std::unique_ptr<Ui::Text::CustomEmoji> custom;
+		QImage image;
+		rpl::variable<int> length;
+	};
+	const auto state = field->lifetime().make_state<State>();
+	state->length = rpl::single(
+		int(title.size())
+	) | rpl::then(field->changes() | rpl::map([=] {
+		return int(field->getLastText().size());
+	}));
+
+	if (const auto customId = id.custom()) {
+		state->custom = owner->customEmojiManager().create(
+			customId,
+			[=] { field->update(); });
+	} else {
+		owner->reactions().preloadImageFor(id);
+	}
+	field->paintRequest() | rpl::start_with_next([=](QRect clip) {
+		auto p = QPainter(field);
+		const auto top = st::editTagField.textMargins.top();
+		if (const auto custom = state->custom.get()) {
+			const auto inactive = !field->window()->isActiveWindow();
+			custom->paint(p, {
+				.textColor = st::windowFg->c,
+				.now = crl::now(),
+				.position = QPoint(0, top),
+				.paused = inactive || On(PowerSaving::kEmojiChat),
+			});
+		} else {
+			if (state->image.isNull()) {
+				state->image = owner->reactions().resolveImageFor(
+					id,
+					::Data::Reactions::ImageSize::InlineList);
+			}
+			if (!state->image.isNull()) {
+				const auto size = st::reactionInlineSize;
+				const auto skip = (size - st::reactionInlineImage) / 2;
+				p.drawImage(skip, top + skip, state->image);
+			}
+		}
+	}, field->lifetime());
+	const auto warning = Ui::CreateChild<Ui::FlatLabel>(
+		field,
+		state->length.value() | rpl::map([](int count) {
+			return (count > kTagNameLimit / 2)
+				? QString::number(kTagNameLimit - count)
+				: QString();
+			}),
+		st::editTagLimit);
+	state->length.value() | rpl::map(
+		rpl::mappers::_1 > kTagNameLimit
+	) | rpl::start_with_next([=](bool exceeded) {
+		warning->setTextColorOverride(exceeded
+			? st::attentionButtonFg->c
+			: std::optional<QColor>());
+	}, warning->lifetime());
+	rpl::combine(
+		field->sizeValue(),
+		warning->sizeValue()
+	) | rpl::start_with_next([=] {
+		warning->moveToRight(0, st::editTagField.textMargins.top());
+	}, warning->lifetime());
+	warning->setAttribute(Qt::WA_TransparentForMouseEvents);
+
+	box->addButton(tr::lng_settings_save(), [=] {
+		const auto text = field->getLastText();
+		if (text.size() > kTagNameLimit) {
+			field->showError();
+			return;
+		}
+		const auto weak = Ui::MakeWeak(box);
+		controller->session().data().reactions().renameTag(id, text);
+		if (const auto strong = weak.data()) {
+			strong->closeBox();
+		}
+	});
+	box->addButton(tr::lng_cancel(), [=] {
+		box->closeBox();
+	});
+}
+
+void ShowWhoReadInfo(
+		not_null<Window::SessionController*> controller,
+		FullMsgId itemId,
+		Ui::WhoReadParticipant who) {
+	const auto peer = controller->session().data().peer(itemId.peer);
+	const auto participant = peer->owner().peer(PeerId(who.id));
+	const auto migrated = participant->migrateFrom();
+	const auto origin = who.dateReacted
+		? Info::Profile::Origin{
+			Info::Profile::GroupReactionOrigin{ peer, itemId.msg },
+		}
+		: Info::Profile::Origin();
+	auto memento = std::make_shared<Info::Memento>(
+		std::vector<std::shared_ptr<Info::ContentMemento>>{
+		std::make_shared<Info::Profile::Memento>(
+			participant,
+			migrated ? migrated->id : PeerId(),
+			origin),
+	});
+	controller->showSection(std::move(memento));
+}
+
 } // namespace
 
 ContextMenuRequest::ContextMenuRequest(
@@ -1504,11 +1637,12 @@ void AddWhoReactedAction(
 		});
 		controller->show(std::move(box));
 	};
-	const auto participantChosen = [=](uint64 id) {
+	const auto itemId = item->fullId();
+	const auto participantChosen = [=](Ui::WhoReadParticipant who) {
 		if (const auto strong = weak.data()) {
 			strong->hideMenu();
 		}
-		controller->showPeerInfo(PeerId(id));
+		ShowWhoReadInfo(controller, itemId, who);
 	};
 	const auto showAllChosen = [=, itemId = item->fullId()]{
 		// Pressing on an item that has a submenu doesn't hide it :(
@@ -1561,7 +1695,14 @@ void ShowTagMenu(
 				.sessionWindow = controller,
 			}),
 		});
-	}, &st::menuIconFave);
+	}, &st::menuIconTagFilter);
+
+	const auto editLabel = owner->reactions().myTagTitle(id).isEmpty()
+		? tr::lng_context_tag_add_name(tr::now)
+		: tr::lng_context_tag_edit_name(tr::now);
+	(*menu)->addAction(editLabel, [=] {
+		controller->show(Box(EditTagBox, controller, id));
+	}, &st::menuIconTagRename);
 
 	const auto removeTag = [=] {
 		if (const auto item = owner->message(itemId)) {
@@ -1580,8 +1721,8 @@ void ShowTagMenu(
 			(*menu)->menu(),
 			tr::lng_context_remove_tag(tr::now),
 			removeTag),
-		&st::menuIconDisableAttention,
-		&st::menuIconDisableAttention));
+		&st::menuIconTagRemoveAttention,
+		&st::menuIconTagRemoveAttention));
 
 	if (const auto custom = id.custom()) {
 		if (const auto set = owner->document(custom)->sticker()) {
@@ -1613,8 +1754,9 @@ void ShowWhoReactedMenu(
 	struct State {
 		int addedToBottom = 0;
 	};
-	const auto participantChosen = [=](uint64 id) {
-		controller->showPeerInfo(PeerId(id));
+	const auto itemId = item->fullId();
+	const auto participantChosen = [=](Ui::WhoReadParticipant who) {
+		ShowWhoReadInfo(controller, itemId, who);
 	};
 	const auto showAllChosen = [=, itemId = item->fullId()]{
 		if (const auto item = controller->session().data().message(itemId)) {

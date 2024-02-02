@@ -1,3 +1,27 @@
+4.14.12 (25.01.24)
+
+- Tags in Saved Messages.
+- Audio output device selection for music and videos.
+- Audio input device selection for voice messages recording.
+- Default device changes should be applied instantly. (Windows / macOS)
+
+4.14.11 beta (25.01.24)
+
+- Fix crash when accepting calls.
+- Fix possible crash in loopback audio on Windows.
+
+4.14.10 beta (25.01.24)
+
+- Allow choosing audio device for music and video files.
+- Allow choosing microphone device for voice recording.
+- Allow pause and resume voice messages recording.
+- Track audio device changes on Windows and macOS.
+
+4.14.9 (19.01.24)
+
+- Fix two possible crashes in messages history and group search.
+- Fix local online status turning off. (once again)
+
 4.14.8 (18.01.24)
 
 - Fix initial position and size of secondary windows.

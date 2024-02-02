@@ -29,6 +29,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "media/player/media_player_instance.h"
 #include "ui/controls/send_button.h"
 #include "ui/effects/animation_value.h"
+#include "ui/effects/animation_value_f.h"
 #include "ui/effects/ripple_animation.h"
 #include "ui/text/format_values.h"
 #include "ui/text/text_utilities.h"
@@ -83,16 +84,14 @@ enum class FilterType {
 	const int duration = kPrecision
 		* (float64(samples) / ::Media::Player::kDefaultFrequency);
 	const auto durationString = Ui::FormatDurationText(duration / kPrecision);
-	const auto decimalPart = duration % kPrecision;
-	return QString("%1%2%3")
-		.arg(durationString, QLocale().decimalPoint())
-		.arg(decimalPart);
+	const auto decimalPart = QString::number(duration % kPrecision);
+	return durationString + QLocale().decimalPoint() + decimalPart;
 }
 
 [[nodiscard]] std::unique_ptr<VoiceData> ProcessCaptureResult(
-		const ::Media::Capture::Result &data) {
+		const VoiceWaveform &waveform) {
 	auto voiceData = std::make_unique<VoiceData>();
-	voiceData->waveform = data.waveform;
+	voiceData->waveform = waveform;
 	voiceData->wavemax = voiceData->waveform.empty()
 		? uchar(0)
 		: *ranges::max_element(voiceData->waveform);
@@ -426,12 +425,11 @@ public:
 		not_null<Ui::RpWidget*> parent,
 		const style::RecordBar &st,
 		not_null<Main::Session*> session,
-		::Media::Capture::Result &&data,
+		::Media::Capture::Result *data,
 		const style::font &font);
 
 	void requestPaintProgress(float64 progress);
 	rpl::producer<> stopRequests() const;
-	::Media::Capture::Result *data() const;
 
 	void playPause();
 
@@ -455,7 +453,7 @@ private:
 	const not_null<DocumentData*> _document;
 	const std::unique_ptr<VoiceData> _voiceData;
 	const std::shared_ptr<Data::DocumentMedia> _mediaView;
-	const std::unique_ptr<::Media::Capture::Result> _data;
+	const not_null<::Media::Capture::Result*> _data;
 	const base::unique_qptr<Ui::IconButton> _delete;
 	const style::font &_durationFont;
 	const QString _duration;
@@ -485,15 +483,15 @@ ListenWrap::ListenWrap(
 	not_null<Ui::RpWidget*> parent,
 	const style::RecordBar &st,
 	not_null<Main::Session*> session,
-	::Media::Capture::Result &&data,
+	::Media::Capture::Result *data,
 	const style::font &font)
 : _parent(parent)
 , _st(st)
 , _session(session)
 , _document(DummyDocument(&session->data()))
-, _voiceData(ProcessCaptureResult(data))
+, _voiceData(ProcessCaptureResult(data->waveform))
 , _mediaView(_document->createMediaView())
-, _data(std::make_unique<::Media::Capture::Result>(std::move(data)))
+, _data(data)
 , _delete(base::make_unique_q<Ui::IconButton>(parent, _st.remove))
 , _durationFont(font)
 , _duration(Ui::FormatDurationText(
@@ -576,6 +574,8 @@ void ListenWrap::init() {
 
 			if (!_isShowAnimation) {
 				p.setOpacity(progress);
+			} else {
+				p.fillRect(bgRect, _st.bg);
 			}
 			p.setPen(Qt::NoPen);
 			p.setBrush(_st.cancelActive);
@@ -816,10 +816,6 @@ rpl::producer<> ListenWrap::stopRequests() const {
 	return _delete->clicks() | rpl::to_empty;
 }
 
-::Media::Capture::Result *ListenWrap::data() const {
-	return _data.get();
-}
-
 rpl::lifetime &ListenWrap::lifetime() {
 	return _lifetime;
 }
@@ -832,6 +828,7 @@ public:
 
 	void requestPaintProgress(float64 progress);
 	void requestPaintLockToStopProgress(float64 progress);
+	void requestPaintPauseToInputProgress(float64 progress);
 	void setVisibleTopPart(int part);
 
 	[[nodiscard]] rpl::producer<> locks() const;
@@ -858,6 +855,7 @@ private:
 	Ui::Animations::Simple _lockEnderAnimation;
 
 	float64 _lockToStopProgress = 0.;
+	float64 _pauseToInputProgress = 0.;
 	rpl::variable<float64> _progress = 0.;
 	int _visibleTopPart = -1;
 
@@ -894,6 +892,7 @@ void RecordLock::init() {
 			setAttribute(Qt::WA_TransparentForMouseEvents, true);
 			_lockEnderAnimation.stop();
 			_lockToStopProgress = 0.;
+			_pauseToInputProgress = 0.;
 			_progress = 0.;
 		}
 	}, lifetime());
@@ -960,15 +959,31 @@ void RecordLock::drawProgress(QPainter &p) {
 		const auto lockTranslation = QPoint(
 			(inner.width() - size.width()) / 2,
 			(_st.originTop.height() * 2 - size.height()) / 2);
-		const auto xRadius = anim::interpolate(2, 3, _lockToStopProgress);
+		const auto xRadius = anim::interpolateF(2, 3, _lockToStopProgress);
 
+		const auto pauseLineOffset = blockRectWidth / 2
+			+ st::historyRecordLockIconLineWidth;
 		if (_lockToStopProgress == 1.) {
 			// Paint the block.
 			auto hq = PainterHighQualityEnabler(p);
 			p.translate(inner.topLeft() + lockTranslation);
 			p.setPen(Qt::NoPen);
 			p.setBrush(_st.fg);
-			p.drawRoundedRect(blockRect, xRadius, 3);
+			if (_pauseToInputProgress > 0.) {
+				p.setOpacity(_pauseToInputProgress);
+				st::historyRecordLockInput.paintInCenter(
+					p,
+					blockRect.toRect());
+				p.setOpacity(1. - _pauseToInputProgress);
+			}
+			p.drawRoundedRect(
+				blockRect - QMargins(0, 0, pauseLineOffset, 0),
+				xRadius,
+				3);
+			p.drawRoundedRect(
+				blockRect - QMargins(pauseLineOffset, 0, 0, 0),
+				xRadius,
+				3);
 		} else {
 			// Paint an animation frame.
 			auto frame = QImage(
@@ -984,7 +999,20 @@ void RecordLock::drawProgress(QPainter &p) {
 			q.setBrush(_arcPen.brush());
 
 			q.translate(lockTranslation);
-			q.drawRoundedRect(blockRect, xRadius, 3);
+			{
+				const auto offset = anim::interpolateF(
+					0,
+					pauseLineOffset,
+					_lockToStopProgress);
+				q.drawRoundedRect(
+					blockRect - QMarginsF(0, 0, offset, 0),
+					xRadius,
+					3);
+				q.drawRoundedRect(
+					blockRect - QMarginsF(offset, 0, 0, 0),
+					xRadius,
+					3);
+			}
 
 			const auto offsetTranslate = _lockToStopProgress *
 				(lineHeight + arcHeight + _arcPen.width() * 2);
@@ -996,7 +1024,12 @@ void RecordLock::drawProgress(QPainter &p) {
 				q.rotate(kLockArcAngle * progress);
 			}
 
-			q.setPen(_arcPen);
+			const auto lockProgress = 1. - _lockToStopProgress;
+			{
+				auto arcPen = _arcPen;
+				arcPen.setWidthF(_arcPen.widthF() * lockProgress);
+				q.setPen(arcPen);
+			}
 			const auto rLine = QLineF(0, 0, 0, -lineHeight);
 			q.drawLine(rLine);
 
@@ -1008,7 +1041,6 @@ void RecordLock::drawProgress(QPainter &p) {
 				0,
 				arc::kHalfLength);
 
-			const auto lockProgress = 1. - _lockToStopProgress;
 			if (progress == 1. && lockProgress < 1.) {
 				q.drawLine(
 					-arcWidth,
@@ -1055,6 +1087,11 @@ void RecordLock::requestPaintLockToStopProgress(float64 progress) {
 			st::historyRecordLockTopShadow.width(),
 			st::historyRecordLockTopShadow.width());
 	}
+	update();
+}
+
+void RecordLock::requestPaintPauseToInputProgress(float64 progress) {
+	_pauseToInputProgress = progress;
 	update();
 }
 
@@ -1258,6 +1295,7 @@ void VoiceRecordBar::updateTTLGeometry(
 	const auto parent = parentWidget();
 	const auto me = Ui::MapFrom(_outerContainer, parent, geometry());
 	const auto anyTop = me.y() - st::historyRecordLockPosition.y();
+	const auto ttlFrom = anyTop - _ttlButton->height() * 2;
 	if (type == TTLAnimationType::RightLeft) {
 		const auto finalRight = _outerContainer->width()
 			- rect::right(me)
@@ -1265,17 +1303,17 @@ void VoiceRecordBar::updateTTLGeometry(
 
 		const auto from = -_ttlButton->width();
 		const auto right = anim::interpolate(from, finalRight, progress);
-		_ttlButton->moveToRight(right, _ttlButton->y());
+		_ttlButton->moveToRight(right, ttlFrom);
+#if 0
 	} else if (type == TTLAnimationType::TopBottom) {
 		const auto ttlFrom = anyTop - _ttlButton->height() * 2;
 		const auto ttlTo = anyTop - _lock->height();
 		_ttlButton->moveToLeft(
 			_ttlButton->x(),
 			anim::interpolate(ttlFrom, ttlTo, 1. - progress));
+#endif
 	} else if (type == TTLAnimationType::RightTopStatic) {
-		_ttlButton->moveToRight(
-			-_ttlButton->width(),
-			anyTop - _ttlButton->height() * 2);
+		_ttlButton->moveToRight(-_ttlButton->width(), ttlFrom);
 	}
 }
 
@@ -1381,48 +1419,7 @@ void VoiceRecordBar::init() {
 		_showLockAnimation.start(std::move(callback), from, to, duration);
 	}, lifetime());
 
-	_lock->setClickedCallback([=] {
-		if (!_lock->isStopState()) {
-			return;
-		}
-
-		::Media::Capture::instance()->startedChanges(
-		) | rpl::filter([=](bool capturing) {
-			return !capturing && _listen;
-		}) | rpl::take(1) | rpl::start_with_next([=] {
-			_lockShowing = false;
-
-			const auto to = 1.;
-			const auto &duration = st::historyRecordVoiceShowDuration;
-			auto callback = [=](float64 value) {
-				_listen->requestPaintProgress(value);
-				const auto reverseValue = to - value;
-				_level->requestPaintProgress(reverseValue);
-				update();
-				if (to == value) {
-					_recordingLifetime.destroy();
-				}
-				updateTTLGeometry(TTLAnimationType::TopBottom, 1. - value);
-			};
-			_showListenAnimation.stop();
-			_showListenAnimation.start(std::move(callback), 0., to, duration);
-		}, lifetime());
-
-		stopRecording(StopType::Listen);
-	});
-
-	_lock->locks(
-	) | rpl::start_with_next([=] {
-		if (_hasTTLFilter && _hasTTLFilter()) {
-			if (!_ttlButton) {
-				_ttlButton = std::make_unique<TTLButton>(
-					_outerContainer,
-					_st);
-			}
-			_ttlButton->show();
-		}
-		updateTTLGeometry(TTLAnimationType::RightTopStatic, 0);
-
+	const auto setLevelAsSend = [=] {
 		_level->setType(VoiceRecordButton::Type::Send);
 
 		_level->clicks(
@@ -1437,6 +1434,69 @@ void VoiceRecordBar::init() {
 		) | rpl::start_with_next([=](bool enter) {
 			_inField = enter;
 		}, _recordingLifetime);
+	};
+
+	const auto paintShowListenCallback = [=](float64 value) {
+		_listen->requestPaintProgress(value);
+		_level->requestPaintProgress(1. - value);
+		_lock->requestPaintPauseToInputProgress(value);
+		update();
+	};
+
+	_lock->setClickedCallback([=] {
+		if (isListenState()) {
+			startRecording();
+			_showListenAnimation.stop();
+			_showListenAnimation.start([=](float64 value) {
+				_listen->requestPaintProgress(1.);
+				paintShowListenCallback(value);
+				if (!value) {
+					_listen = nullptr;
+				}
+			}, 1., 0., st::historyRecordVoiceShowDuration * 2);
+			setLevelAsSend();
+
+			return;
+		}
+		if (!_lock->isStopState()) {
+			return;
+		}
+
+		stopRecording(StopType::Listen);
+	});
+
+	_paused.value() | rpl::distinct_until_changed(
+	) | rpl::start_with_next([=](bool paused) {
+		if (!paused) {
+			return;
+		}
+		// _lockShowing = false;
+
+		const auto to = 1.;
+		const auto &duration = st::historyRecordVoiceShowDuration;
+		auto callback = [=](float64 value) {
+			paintShowListenCallback(value);
+			if (to == value) {
+				_recordingLifetime.destroy();
+			}
+		};
+		_showListenAnimation.stop();
+		_showListenAnimation.start(std::move(callback), 0., to, duration);
+	}, lifetime());
+
+	_lock->locks(
+	) | rpl::start_with_next([=] {
+		if (_hasTTLFilter && _hasTTLFilter()) {
+			if (!_ttlButton) {
+				_ttlButton = std::make_unique<TTLButton>(
+					_outerContainer,
+					_st);
+			}
+			_ttlButton->show();
+		}
+		updateTTLGeometry(TTLAnimationType::RightTopStatic, 0);
+
+		setLevelAsSend();
 
 		const auto &duration = st::historyRecordVoiceShowDuration;
 		const auto from = 0.;
@@ -1589,7 +1649,12 @@ void VoiceRecordBar::startRecording() {
 		startRedCircleAnimation();
 
 		_recording = true;
-		instance()->start();
+		if (_paused.current()) {
+			_paused = false;
+			instance()->pause(false, nullptr);
+		} else {
+			instance()->start();
+		}
 		instance()->updated(
 		) | rpl::start_with_next_error([=](const Update &update) {
 			_recordingTipRequired = (update.samples < kMinSamples);
@@ -1658,7 +1723,7 @@ void VoiceRecordBar::stop(bool send) {
 		const auto type = send ? StopType::Send : StopType::Cancel;
 		stopRecording(type, ttlBeforeHide);
 	};
-	_lockShowing = false;
+	// _lockShowing = false;
 	visibilityAnimate(false, std::move(disappearanceCallback));
 }
 
@@ -1668,6 +1733,7 @@ void VoiceRecordBar::finish() {
 	_inField = false;
 	_redCircleProgress = 0.;
 	_recordingSamples = 0;
+	_paused = false;
 
 	_showAnimation.stop();
 	_lockToStopAnimation.stop();
@@ -1677,6 +1743,8 @@ void VoiceRecordBar::finish() {
 	[[maybe_unused]] const auto s = takeTTLState();
 
 	_sendActionUpdates.fire({ Api::SendProgressType::RecordVoice, -1 });
+
+	_data = {};
 }
 
 void VoiceRecordBar::hideFast() {
@@ -1692,42 +1760,52 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 		instance()->stop(crl::guard(this, [=](Result &&data) {
 			_cancelRequests.fire({});
 		}));
-		return;
-	}
-	instance()->stop(crl::guard(this, [=](Result &&data) {
-		if (data.bytes.isEmpty()) {
-			// Close everything.
-			stop(false);
-			return;
-		}
+	} else if (type == StopType::Listen) {
+		instance()->pause(true, crl::guard(this, [=](Result &&data) {
+			if (data.bytes.isEmpty()) {
+				// Close everything.
+				stop(false);
+				return;
+			}
+			_paused = true;
+			_data = std::move(data);
 
-		window()->raise();
-		window()->activateWindow();
-		const auto duration = Duration(data.samples);
-		if (type == StopType::Send) {
+			window()->raise();
+			window()->activateWindow();
+			_listen = std::make_unique<ListenWrap>(
+				this,
+				_st,
+				&_show->session(),
+				&_data,
+				_cancelFont);
+			_listenChanges.fire({});
+
+			// _lockShowing = false;
+		}));
+	} else if (type == StopType::Send) {
+		instance()->stop(crl::guard(this, [=](Result &&data) {
+			if (data.bytes.isEmpty()) {
+				// Close everything.
+				stop(false);
+				return;
+			}
+			_data = std::move(data);
+
+			window()->raise();
+			window()->activateWindow();
 			const auto options = Api::SendOptions{
 				.ttlSeconds = (ttlBeforeHide
 					? std::numeric_limits<int>::max()
 					: 0),
 			};
 			_sendVoiceRequests.fire({
-				data.bytes,
-				data.waveform,
-				duration,
+				_data.bytes,
+				_data.waveform,
+				Duration(_data.samples),
 				options,
 			});
-		} else if (type == StopType::Listen) {
-			_listen = std::make_unique<ListenWrap>(
-				this,
-				_st,
-				&_show->session(),
-				std::move(data),
-				_cancelFont);
-			_listenChanges.fire({});
-
-			_lockShowing = false;
-		}
-	}));
+		}));
+	}
 }
 
 void VoiceRecordBar::drawDuration(QPainter &p) {
@@ -1784,14 +1862,13 @@ void VoiceRecordBar::drawMessage(QPainter &p, float64 recordActive) {
 
 void VoiceRecordBar::requestToSendWithOptions(Api::SendOptions options) {
 	if (isListenState()) {
-		const auto data = _listen->data();
 		if (takeTTLState()) {
 			options.ttlSeconds = std::numeric_limits<int>::max();
 		}
 		_sendVoiceRequests.fire({
-			data->bytes,
-			data->waveform,
-			Duration(data->samples),
+			_data.bytes,
+			_data.waveform,
+			Duration(_data.samples),
 			options,
 		});
 	}
@@ -1810,7 +1887,7 @@ rpl::producer<> VoiceRecordBar::cancelRequests() const {
 }
 
 bool VoiceRecordBar::isRecording() const {
-	return _recording.current();
+	return _recording.current() && !_paused.current();
 }
 
 bool VoiceRecordBar::isRecordingLocked() const {
@@ -1906,7 +1983,11 @@ float64 VoiceRecordBar::showAnimationRatio() const {
 }
 
 float64 VoiceRecordBar::showListenAnimationRatio() const {
-	return _showListenAnimation.value(_listen ? 1. : 0.);
+	const auto value = _showListenAnimation.value(_listen ? 1. : 0.);
+	if (_paused.current()) {
+		return value * value;
+	}
+	return value;
 }
 
 void VoiceRecordBar::computeAndSetLockProgress(QPoint globalPos) {

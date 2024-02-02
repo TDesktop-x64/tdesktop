@@ -344,6 +344,14 @@ HistoryWidget::HistoryWidget(
 	) | rpl::start_with_next([=] {
 		fieldChanged();
 	}, _field->lifetime());
+#ifdef Q_OS_MAC
+	// Removed an ability to insert text from the menu bar
+	// when the field is hidden.
+	_field->shownValue(
+	) | rpl::start_with_next([=](bool shown) {
+		_field->setEnabled(shown);
+	}, _field->lifetime());
+#endif // Q_OS_MAC
 	connect(
 		controller->widget()->windowHandle(),
 		&QWindow::visibleChanged,
@@ -863,7 +871,9 @@ HistoryWidget::HistoryWidget(
 	}, _topBar->lifetime());
 	_topBar->searchRequest(
 	) | rpl::start_with_next([=] {
-		searchInChat();
+		if (_history) {
+			controller->searchInChat(_history);
+		}
 	}, _topBar->lifetime());
 
 	session().api().sendActions(
@@ -1855,7 +1865,7 @@ void HistoryWidget::setupShortcuts() {
 	}) | rpl::start_with_next([=](not_null<Shortcuts::Request*> request) {
 		using Command = Shortcuts::Command;
 		request->check(Command::Search, 1) && request->handle([=] {
-			searchInChat();
+			controller()->searchInChat(_history);
 			return true;
 		});
 		if (session().supportMode()) {
@@ -1965,6 +1975,10 @@ bool HistoryWidget::applyDraft(FieldHistoryAction fieldHistoryAction) {
 	} else if (!readyToForward()) {
 		const auto draft = _history->localDraft({});
 		_processingReplyTo = draft ? draft->reply : FullReplyTo();
+		if (_processingReplyTo) {
+			_processingReplyItem = session().data().message(
+				_processingReplyTo.messageId);
+		}
 		processReply();
 	}
 
@@ -4845,24 +4859,31 @@ bool HistoryWidget::updateCmdStartShown() {
 	return commandsChanged || buttonChanged || textChanged;
 }
 
-void HistoryWidget::searchInChat() {
-	if (_history) {
-		controller()->content()->searchInChat(_history);
+bool HistoryWidget::searchInChatEmbedded(Dialogs::Key chat, QString query) {
+	const auto peer = chat.peer();
+	if (!peer || peer != controller()->singlePeer()) {
+		return false;
+	} else if (_peer != peer) {
+		const auto weak = Ui::MakeWeak(this);
+		controller()->showPeerHistory(peer);
+		if (!weak) {
+			return false;
+		}
 	}
+	if (_peer != peer) {
+		return false;
+	} else if (_composeSearch) {
+		_composeSearch->setQuery(query);
+		_composeSearch->setInnerFocus();
+		return true;
+	}
+	switchToSearch(query);
+	return true;
 }
 
-void HistoryWidget::searchInChatEmbedded(std::optional<QString> query) {
-	if (!_history) {
-		return;
-	} else if (_composeSearch) {
-		if (query) {
-			_composeSearch->setQuery(*query);
-		}
-		_composeSearch->setInnerFocus();
-		return;
-	}
+void HistoryWidget::switchToSearch(QString query) {
 	const auto search = crl::guard(_list, [=] {
-		if (!_history) {
+		if (!_peer) {
 			return;
 		}
 		const auto update = [=] {
@@ -4872,22 +4893,33 @@ void HistoryWidget::searchInChatEmbedded(std::optional<QString> query) {
 
 			updateControlsGeometry();
 		};
+		const auto from = (PeerData*)nullptr;
 		_composeSearch = std::make_unique<HistoryView::ComposeSearch>(
 			this,
 			controller(),
 			_history,
-			query.value_or(QString()));
+			from,
+			query);
 
 		update();
 		setInnerFocus();
+
+		_composeSearch->activations(
+		) | rpl::start_with_next([=](not_null<HistoryItem*> item) {
+			controller()->showPeerHistory(
+				item->history()->peer->id,
+				::Window::SectionShow::Way::ClearStack,
+				item->fullId().msg);
+		}, _composeSearch->lifetime());
+
 		_composeSearch->destroyRequests(
 		) | rpl::take(
 			1
 		) | rpl::start_with_next([=] {
 			_composeSearch = nullptr;
 
-		update();
-		setInnerFocus();
+			update();
+			setInnerFocus();
 		}, _composeSearch->lifetime());
 	});
 	if (!preventsClose(search)) {

@@ -18,8 +18,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "dialogs/dialogs_search_tags.h"
 #include "history/history.h"
 #include "history/history_item.h"
-#include "core/shortcuts.h"
 #include "core/application.h"
+#include "core/click_handler_types.h"
+#include "core/shortcuts.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/scroll_area.h"
@@ -1439,8 +1440,10 @@ void InnerWidget::mousePressEvent(QMouseEvent *e) {
 		});
 	} else if (_pressed) {
 		auto row = _pressed;
-		const auto updateCallback = [this, row] {
-			if (!_pinnedShiftAnimation.animating()) {
+		const auto weak = Ui::MakeWeak(this);
+		const auto updateCallback = [weak, row] {
+			const auto strong = weak.data();
+			if (!strong || !strong->_pinnedShiftAnimation.animating()) {
 				row->entry()->updateChatListEntry();
 			}
 		};
@@ -1790,7 +1793,11 @@ void InnerWidget::mousePressReleased(
 		}
 	}
 	if (auto activated = ClickHandler::unpressed()) {
-		ActivateClickHandler(window(), activated, ClickContext{ button });
+		ActivateClickHandler(window(), activated, ClickContext{
+			button,
+			QVariant::fromValue(ClickHandlerContext{
+				.sessionWindow = _controller,
+			}) });
 	}
 }
 
@@ -1864,6 +1871,9 @@ void InnerWidget::setSearchedPressed(int pressed) {
 }
 
 void InnerWidget::resizeEvent(QResizeEvent *e) {
+	if (_searchTags) {
+		_searchTags->resizeToWidth(width() - 2 * _searchTagsLeft);
+	}
 	resizeEmptyLabel();
 	moveCancelSearchButtons();
 }
@@ -2994,21 +3004,12 @@ void InnerWidget::searchInChat(
 
 		if (peer->isSelf()) {
 			const auto reactions = &peer->owner().reactions();
-			const auto list = [=] {
-				// Disable reactions as tags for now.
-				//return reactions->list(Data::Reactions::Type::MyTags);
-				return std::vector<Data::Reaction>();
-			};
 			_searchTags = std::make_unique<SearchTags>(
 				&peer->owner(),
-				rpl::single(
-					list()
-				) | rpl::then(
-					reactions->myTagsUpdates() | rpl::map(list)
-				),
+				reactions->myTagsValue(sublist),
 				tags);
 
-			_searchTags->selectedValue(
+			_searchTags->selectedChanges(
 			) | rpl::start_with_next([=](std::vector<Data::ReactionId> &&list) {
 				_searchTagsSelected = std::move(list);
 			}, _searchTags->lifetime());
@@ -3018,8 +3019,8 @@ void InnerWidget::searchInChat(
 				update(0, searchInChatOffset(), width(), height);
 			}, _searchTags->lifetime());
 
-			_searchTags->heightValue() | rpl::filter(
-				rpl::mappers::_1 > 0
+			_searchTags->heightValue() | rpl::skip(
+				1
 			) | rpl::start_with_next([=] {
 				refresh();
 				moveCancelSearchButtons();
@@ -3063,11 +3064,11 @@ void InnerWidget::searchInChat(
 		_searchInChat || !_filter.isEmpty());
 }
 
-auto InnerWidget::searchTagsValue() const
+auto InnerWidget::searchTagsChanges() const
 -> rpl::producer<std::vector<Data::ReactionId>> {
 	return _searchTags
-		? _searchTags->selectedValue()
-		: rpl::single(std::vector<Data::ReactionId>());
+		? _searchTags->selectedChanges()
+		: rpl::never<std::vector<Data::ReactionId>>();
 }
 
 void InnerWidget::refreshSearchInChatLabel() {

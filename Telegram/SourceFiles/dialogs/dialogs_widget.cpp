@@ -328,6 +328,8 @@ Widget::Widget(
 	) | rpl::start_with_next([=] {
 		setSearchInChat((_openedForum && !_searchInChat)
 			? Key(_openedForum->history())
+			: _searchInChat.sublist()
+			? Key(session().data().history(session().user()))
 			: _searchInChat, nullptr);
 		applyFilterUpdate(true);
 	}, lifetime());
@@ -1019,7 +1021,7 @@ void Widget::setupShortcuts() {
 		if (_openedForum && !controller()->activeChatCurrent()) {
 			request->check(Command::Search) && request->handle([=] {
 				const auto history = _openedForum->history();
-				controller()->content()->searchInChat(history);
+				controller()->searchInChat(history);
 				return true;
 			});
 		}
@@ -1966,11 +1968,12 @@ void Widget::searchMessages(
 		controller()->closeFolder();
 	}
 
-	auto tags = std::vector<Data::ReactionId>();
-	if (const auto tagId = Data::SearchTagFromQuery(query)) {
-		inChat = session().data().history(session().user());
+	auto tags = Data::SearchTagsFromQuery(query);
+	if (!tags.empty()) {
+		if (!inChat.sublist()) {
+			inChat = session().data().history(session().user());
+		}
 		query = QString();
-		tags.push_back(tagId);
 	}
 	const auto inChatChanged = [&] {
 		const auto inPeer = inChat.peer();
@@ -2695,7 +2698,7 @@ bool Widget::setSearchInChat(
 	}
 	if (searchInPeerUpdated) {
 		_searchInChat = chat;
-		controller()->searchInChat = _searchInChat;
+		controller()->setSearchInChat(_searchInChat);
 		updateJumpToDateVisibility();
 		updateStoriesVisibility();
 	}
@@ -2709,7 +2712,7 @@ bool Widget::setSearchInChat(
 	}
 	_searchTags = std::move(tags);
 	_inner->searchInChat(_searchInChat, _searchFromAuthor, _searchTags);
-	_searchTagsLifetime = _inner->searchTagsValue(
+	_searchTagsLifetime = _inner->searchTagsChanges(
 	) | rpl::start_with_next([=](std::vector<Data::ReactionId> &&list) {
 		if (_searchTags != list) {
 			clearSearchCache();
@@ -3046,7 +3049,7 @@ void Widget::updateControlsGeometry() {
 		}
 		const auto scrollTop = forumReportTop
 			+ (_forumReportBar ? _forumReportBar->bar().height() : 0);
-		const auto scrollHeight = height() - scrollTop;
+		const auto scrollHeight = height() - scrollTop - bottomSkip;
 		const auto wasScrollHeight = _scroll->height();
 		_scroll->setGeometry(0, scrollTop, scrollWidth, scrollHeight);
 		if (scrollHeight != wasScrollHeight) {

@@ -399,14 +399,6 @@ ListWidget::ListWidget(
 		reactionChosen(reaction);
 	}, lifetime());
 
-	_reactionsManager->premiumPromoChosen(
-	) | rpl::start_with_next([=] {
-		_reactionsManager->updateButton({});
-		ShowPremiumPreviewBox(
-			_controller,
-			PremiumPreview::InfiniteReactions);
-	}, lifetime());
-
 	Reactions::SetupManagerList(
 		_reactionsManager.get(),
 		_reactionsItem.value());
@@ -1732,6 +1724,12 @@ void ListWidget::elementSendBotCommand(
 	_delegate->listSendBotCommand(command, context);
 }
 
+void ListWidget::elementSearchInList(
+		const QString &query,
+		const FullMsgId &context) {
+	_delegate->listSearch(query, context);
+}
+
 void ListWidget::elementHandleViaClick(not_null<UserData*> bot) {
 	_delegate->listHandleViaClick(bot);
 }
@@ -2642,9 +2640,7 @@ void ListWidget::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			desiredPosition,
 			reactItem,
 			[=](ChosenReaction reaction) { reactionChosen(reaction); },
-			[=](FullMsgId context) { ShowPremiumPreviewBox(
-				_controller,
-				PremiumPreview::InfiniteReactions); },
+			ItemReactionsAbout(reactItem),
 			_controller->cachedReactionIconFactory().createMethod())
 		: AttachSelectorResult::Skipped;
 	if (attached == AttachSelectorResult::Failed) {

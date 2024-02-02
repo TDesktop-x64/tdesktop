@@ -732,9 +732,6 @@ void Document::draw(
 				auto hq = PainterHighQualityEnabler(p);
 				p.setBrush(stm->msgFileBg);
 				p.drawEllipse(inner);
-				if (hasTtlBadge) {
-					p.drawEllipse(ttlRect);
-				}
 			}
 		}
 
@@ -806,6 +803,9 @@ void Document::draw(
 			if (hasTtlBadge) {
 				{
 					auto hq = PainterHighQualityEnabler(q);
+					p.setBrush(stm->msgFileBg);
+					q.setPen(Qt::NoPen);
+					p.drawEllipse(ttlRect);
 					auto pen = stm->msgBg->p;
 					pen.setWidthF(style::ConvertScaleExact(kPenWidth));
 					q.setPen(pen);

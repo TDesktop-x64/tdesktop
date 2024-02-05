@@ -1,3 +1,7 @@
+1.1.13 (05.02.24)
+
+- No changelog
+
 1.1.12 (02.02.24)
 
 - [New] Disable global search

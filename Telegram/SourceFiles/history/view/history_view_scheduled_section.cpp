@@ -53,6 +53,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_user.h"
 #include "data/data_message_reactions.h"
 #include "data/data_peer_values.h"
+#include "data/data_premium_limits.h"
 #include "storage/storage_media_prepare.h"
 #include "storage/storage_account.h"
 #include "storage/localimageloader.h"
@@ -415,8 +416,7 @@ bool ScheduledWidget::confirmSendingFiles(
 		controller(),
 		std::move(list),
 		_composeControls->getTextWithAppliedMarkdown(),
-		DefaultLimitsForPeer(_history->peer),
-		DefaultCheckForPeer(controller(), _history->peer),
+		_history->peer,
 		(CanScheduleUntilOnline(_history->peer)
 			? Api::SendType::ScheduledToUser
 			: Api::SendType::Scheduled),
@@ -649,18 +649,14 @@ void ScheduledWidget::edit(
 	if (*saveEditMsgRequestId) {
 		return;
 	}
-	const auto textWithTags = _composeControls->getTextWithAppliedMarkdown();
 	const auto webpage = _composeControls->webPageDraft();
-	const auto prepareFlags = Ui::ItemTextOptions(
-		_history,
-		session().user()).flags;
 	auto sending = TextWithEntities();
-	auto left = TextWithEntities {
-		textWithTags.text,
-		TextUtilities::ConvertTextTagsToEntities(textWithTags.tags) };
-	TextUtilities::PrepareForSending(left, prepareFlags);
+	auto left = _composeControls->prepareTextForEditMsg();
 
-	if (!TextUtilities::CutPart(sending, left, MaxMessageSize)
+	const auto originalLeftSize = left.text.size();
+	const auto maxCaptionSize = Data::PremiumLimits(
+		&session()).captionLengthCurrent();
+	if (!TextUtilities::CutPart(sending, left, maxCaptionSize)
 		&& (!item
 			|| !item->media()
 			|| !item->media()->allowsEditCaption())) {
@@ -671,7 +667,7 @@ void ScheduledWidget::edit(
 		}
 		return;
 	} else if (!left.text.isEmpty()) {
-		const auto remove = left.text.size();
+		const auto remove = originalLeftSize - maxCaptionSize;
 		controller()->showToast(
 			tr::lng_edit_limit_reached(tr::now, lt_count, remove));
 		return;

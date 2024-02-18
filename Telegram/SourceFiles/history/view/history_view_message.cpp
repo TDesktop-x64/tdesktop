@@ -3292,8 +3292,10 @@ bool Message::displayForwardedFrom() const {
 		if (forwarded->story) {
 			return true;
 		} else if (item->showForwardsFromSender(forwarded)) {
-			return forwarded->savedFromSender
-				&& (forwarded->savedFromSender != forwarded->originalSender);
+			return forwarded->savedFromHiddenSenderInfo
+				|| (forwarded->savedFromSender
+					&& (forwarded->savedFromSender
+						!= forwarded->originalSender));
 		}
 		if (const auto sender = item->discussionPostOriginalSender()) {
 			if (sender == forwarded->originalSender) {

@@ -247,10 +247,12 @@ object_ptr<Ui::RpWidget> InnerWidget::setupSharedMedia(
 	};
 
 	const auto user = _peer->asUser();
-	if (user && !GetEnhancedBool("hide_stories")) {
-		addStoriesButton(_peer, st::infoIconMediaStories);
+	if (!_topic) {
+		if (user && !GetEnhancedBool("hide_stories")) {
+			addStoriesButton(_peer, st::infoIconMediaStories);
+		}
+		addSavedSublistButton(_peer, st::infoIconMediaSaved);
 	}
-	addSavedSublistButton(_peer, st::infoIconMediaSaved);
 	addMediaButton(MediaType::Photo, st::infoIconMediaPhoto);
 	addMediaButton(MediaType::Video, st::infoIconMediaVideo);
 	addMediaButton(MediaType::File, st::infoIconMediaFile);

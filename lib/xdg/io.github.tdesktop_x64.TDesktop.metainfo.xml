@@ -75,5 +75,7 @@
     <launchable type="desktop-id">io.github.tdesktop_x64.TDesktop.desktop</launchable>
     <provides>
         <binary>telegram-desktop</binary>
+        <dbus type="session">io.github.tdesktop_x64.TDesktop</dbus>
+        <mediatype>x-scheme-handler/tg</mediatype>
     </provides>
 </component>

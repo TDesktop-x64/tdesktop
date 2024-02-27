@@ -275,7 +275,8 @@ private:
 		int requestTime;
 		int memberCount;
 	};
-    QMap<QString, reqData> lastChatRequest;
+	QMap<QString, reqData> lastChatRequest;
+	mutable QMutex reqMutex;
 };
 
 } // namespace HistoryView

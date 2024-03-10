@@ -71,7 +71,7 @@ QString NetBoostBox::BoostLabel(int boost) {
 
 void NetBoostBox::save() {
 	const auto changeBoost = [=](Fn<void()> &&close) {
-		SetNetworkBoost(_boostGroup->value());
+		SetNetworkBoost(_boostGroup->current());
 		EnhancedSettings::Write();
 		Core::Restart();
 	};
@@ -128,7 +128,7 @@ QString AlwaysDeleteBox::DeleteLabel(int boost) {
 }
 
 void AlwaysDeleteBox::save() {
-	SetEnhancedValue("always_delete_for", _optionGroup->value());
+	SetEnhancedValue("always_delete_for", _optionGroup->current());
 	EnhancedSettings::Write();
 	closeBox();
 }
@@ -228,7 +228,7 @@ QString BitrateController::BitrateLabel(int boost) {
 }
 
 void BitrateController::save() {
-	SetEnhancedValue("bitrate", _bitrateGroup->value());
+	SetEnhancedValue("bitrate", _bitrateGroup->current());
 	EnhancedSettings::Write();
 	Ui::Toast::Show(tr::lng_bitrate_controller_hint(tr::now));
 	closeBox();

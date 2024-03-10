@@ -37,6 +37,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/abstract_box.h"
 #include "passport/passport_form_controller.h"
 #include "lang/lang_keys.h" // tr::lng_deleted(tr::now) in user name
+#include "data/business/data_business_chatbots.h"
+#include "data/business/data_business_info.h"
+#include "data/business/data_shortcut_messages.h"
 #include "data/stickers/data_stickers.h"
 #include "data/notify/data_notify_settings.h"
 #include "data/data_bot_app.h"
@@ -239,10 +242,8 @@ Session::Session(not_null<Main::Session*> session)
 	_session->local().cacheBigFilePath(),
 	_session->local().cacheBigFileSettings()))
 , _groupFreeTranscribeLevel(session->account().appConfig().value(
-) | rpl::map([=] {
-	return session->account().appConfig().get<int>(
-		u"group_transcribe_level_min"_q,
-		6);
+) | rpl::map([limits = Data::LevelLimits(session)] {
+	return limits.groupTranscribeLevelMin();
 }))
 , _chatsList(
 	session,
@@ -256,21 +257,24 @@ Session::Session(not_null<Main::Session*> session)
 , _watchForOfflineTimer([=] { checkLocalUsersWentOffline(); })
 , _groups(this)
 , _chatsFilters(std::make_unique<ChatFilters>(this))
-, _scheduledMessages(std::make_unique<ScheduledMessages>(this))
 , _cloudThemes(std::make_unique<CloudThemes>(session))
 , _sendActionManager(std::make_unique<SendActionManager>())
 , _streaming(std::make_unique<Streaming>(this))
 , _mediaRotation(std::make_unique<MediaRotation>())
 , _histories(std::make_unique<Histories>(this))
 , _stickers(std::make_unique<Stickers>(this))
-, _sponsoredMessages(std::make_unique<SponsoredMessages>(this))
 , _reactions(std::make_unique<Reactions>(this))
 , _emojiStatuses(std::make_unique<EmojiStatuses>(this))
 , _forumIcons(std::make_unique<ForumIcons>(this))
 , _notifySettings(std::make_unique<NotifySettings>(this))
 , _customEmojiManager(std::make_unique<CustomEmojiManager>(this))
 , _stories(std::make_unique<Stories>(this))
-, _savedMessages(std::make_unique<SavedMessages>(this)) {
+, _savedMessages(std::make_unique<SavedMessages>(this))
+, _chatbots(std::make_unique<Chatbots>(this))
+, _businessInfo(std::make_unique<BusinessInfo>(this))
+, _scheduledMessages(std::make_unique<ScheduledMessages>(this))
+, _shortcutMessages(std::make_unique<ShortcutMessages>(this))
+, _sponsoredMessages(std::make_unique<SponsoredMessages>(this)) {
 	_cache->open(_session->local().cacheKey());
 	_bigFileCache->open(_session->local().cacheBigFileKey());
 
@@ -396,6 +400,7 @@ void Session::clear() {
 
 	_histories->unloadAll();
 	_scheduledMessages = nullptr;
+	_shortcutMessages = nullptr;
 	_sponsoredMessages = nullptr;
 	_dependentMessages.clear();
 	base::take(_messages);
@@ -2199,8 +2204,7 @@ rpl::producer<int> Session::maxPinnedChatsLimitValue(
 	// because it slices the list to that limit. We don't want to slice
 	// premium-ly added chats from the pinned list because of sync issues.
 	return _session->account().appConfig().value(
-	) | rpl::map([=] {
-		const auto limits = Data::PremiumLimits(_session);
+	) | rpl::map([folder, limits = Data::PremiumLimits(_session)] {
 		return folder
 			? limits.dialogsFolderPinnedPremium()
 			: limits.dialogsPinnedPremium();
@@ -2214,8 +2218,7 @@ rpl::producer<int> Session::maxPinnedChatsLimitValue(
 	// because it slices the list to that limit. We don't want to slice
 	// premium-ly added chats from the pinned list because of sync issues.
 	return _session->account().appConfig().value(
-	) | rpl::map([=] {
-		const auto limits = Data::PremiumLimits(_session);
+	) | rpl::map([limits = Data::PremiumLimits(_session)] {
 		return limits.dialogFiltersChatsPremium();
 	});
 }
@@ -2223,8 +2226,7 @@ rpl::producer<int> Session::maxPinnedChatsLimitValue(
 rpl::producer<int> Session::maxPinnedChatsLimitValue(
 		not_null<Data::Forum*> forum) const {
 	return _session->account().appConfig().value(
-	) | rpl::map([=] {
-		const auto limits = Data::PremiumLimits(_session);
+	) | rpl::map([limits = Data::PremiumLimits(_session)] {
 		return limits.topicsPinnedCurrent();
 	});
 }
@@ -2236,8 +2238,7 @@ rpl::producer<int> Session::maxPinnedChatsLimitValue(
 	// because it slices the list to that limit. We don't want to slice
 	// premium-ly added chats from the pinned list because of sync issues.
 	return _session->account().appConfig().value(
-	) | rpl::map([=] {
-		const auto limits = Data::PremiumLimits(_session);
+	) | rpl::map([limits = Data::PremiumLimits(_session)] {
 		return limits.savedSublistsPinnedPremium();
 	});
 }
@@ -4488,7 +4489,8 @@ void Session::insertCheckedServiceNotification(
 				MTPlong(),
 				MTPMessageReactions(),
 				MTPVector<MTPRestrictionReason>(),
-				MTPint()), // ttl_period
+				MTPint(), // ttl_period
+				MTPint()), // quick_reply_shortcut_id
 			localFlags,
 			NewMessageType::Unread);
 	}

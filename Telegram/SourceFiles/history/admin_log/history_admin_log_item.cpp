@@ -137,7 +137,8 @@ MTPMessage PrepareLogMessage(const MTPMessage &message, TimeId newDate) {
 			MTP_long(0), // grouped_id
 			MTPMessageReactions(),
 			MTPVector<MTPRestrictionReason>(),
-			MTPint()); // ttl_period
+			MTPint(), // ttl_period
+			MTPint()); // quick_reply_shortcut_id
 	});
 }
 
@@ -807,13 +808,12 @@ void GenerateItems(
 		auto message = PreparedServiceText{ text };
 		message.links.push_back(fromLink);
 		addPart(
-			history->makeMessage(
-				history->nextNonHistoryEntryId(),
-				MessageFlag::AdminLogEntry,
-				date,
-				std::move(message),
-				peerToUser(from->id),
-				photo),
+			history->makeMessage({
+				.id = history->nextNonHistoryEntryId(),
+				.flags = MessageFlag::AdminLogEntry,
+				.from = from->id,
+				.date = date,
+			}, std::move(message), photo),
 			0,
 			realId);
 	};
@@ -832,23 +832,11 @@ void GenerateItems(
 	};
 
 	const auto makeSimpleTextMessage = [&](TextWithEntities &&text) {
-		const auto bodyFlags = MessageFlag::HasFromId
-			| MessageFlag::AdminLogEntry;
-		const auto bodyReplyTo = FullReplyTo();
-		const auto bodyViaBotId = UserId();
-		const auto bodyGroupedId = uint64();
-		return history->makeMessage(
-			history->nextNonHistoryEntryId(),
-			bodyFlags,
-			bodyReplyTo,
-			bodyViaBotId,
-			date,
-			peerToUser(from->id),
-			QString(),
-			std::move(text),
-			MTP_messageMediaEmpty(),
-			HistoryMessageMarkupData(),
-			bodyGroupedId);
+		return history->makeMessage({
+			.id = history->nextNonHistoryEntryId(),
+			.flags = MessageFlag::HasFromId | MessageFlag::AdminLogEntry,
+			.from = from->id,
+		}, std::move(text), MTP_messageMediaEmpty());
 	};
 
 	const auto addSimpleTextMessage = [&](TextWithEntities &&text) {
@@ -1151,12 +1139,12 @@ void GenerateItems(
 			auto message = PreparedServiceText{ text };
 			message.links.push_back(fromLink);
 			message.links.push_back(setLink);
-			addPart(history->makeMessage(
-				history->nextNonHistoryEntryId(),
-				MessageFlag::AdminLogEntry,
-				date,
-				std::move(message),
-				peerToUser(from->id)));
+			addPart(history->makeMessage({
+				.id = history->nextNonHistoryEntryId(),
+				.flags = MessageFlag::AdminLogEntry,
+				.from = from->id,
+				.date = date,
+			}, std::move(message)));
 		}
 	};
 
@@ -1195,12 +1183,12 @@ void GenerateItems(
 			auto message = PreparedServiceText{ text };
 			message.links.push_back(fromLink);
 			message.links.push_back(setLink);
-			addPart(history->makeMessage(
-				history->nextNonHistoryEntryId(),
-				MessageFlag::AdminLogEntry,
-				date,
-				std::move(message),
-				peerToUser(from->id)));
+			addPart(history->makeMessage({
+				.id = history->nextNonHistoryEntryId(),
+				.flags = MessageFlag::AdminLogEntry,
+				.from = from->id,
+				.date = date,
+			}, std::move(message)));
 		}
 	};
 
@@ -1276,12 +1264,12 @@ void GenerateItems(
 			auto message = PreparedServiceText{ text };
 			message.links.push_back(fromLink);
 			message.links.push_back(chatLink);
-			addPart(history->makeMessage(
-				history->nextNonHistoryEntryId(),
-				MessageFlag::AdminLogEntry,
-				date,
-				std::move(message),
-				peerToUser(from->id)));
+			addPart(history->makeMessage({
+				.id = history->nextNonHistoryEntryId(),
+				.flags = MessageFlag::AdminLogEntry,
+				.from = from->id,
+				.date = date,
+			}, std::move(message)));
 		}
 	};
 
@@ -1372,12 +1360,12 @@ void GenerateItems(
 		auto message = PreparedServiceText{ text };
 		message.links.push_back(fromLink);
 		message.links.push_back(link);
-		addPart(history->makeMessage(
-			history->nextNonHistoryEntryId(),
-			MessageFlag::AdminLogEntry,
-			date,
-			std::move(message),
-			peerToUser(from->id)));
+		addPart(history->makeMessage({
+			.id = history->nextNonHistoryEntryId(),
+			.flags = MessageFlag::AdminLogEntry,
+			.from = from->id,
+			.date = date,
+		}, std::move(message)));
 	};
 
 	const auto createParticipantMute = [&](const LogMute &data) {
@@ -1447,13 +1435,12 @@ void GenerateItems(
 		if (additional) {
 			message.links.push_back(std::move(additional));
 		}
-		addPart(history->makeMessage(
-			history->nextNonHistoryEntryId(),
-			MessageFlag::AdminLogEntry,
-			date,
-			std::move(message),
-			peerToUser(from->id),
-			nullptr));
+		addPart(history->makeMessage({
+			.id = history->nextNonHistoryEntryId(),
+			.flags = MessageFlag::AdminLogEntry,
+			.from = from->id,
+			.date = date,
+		}, std::move(message)));
 	};
 
 	const auto createParticipantJoinByInvite = [&](

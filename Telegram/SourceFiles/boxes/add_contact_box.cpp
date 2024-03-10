@@ -1019,7 +1019,7 @@ void SetupChannelBox::prepare() {
 		cancel);
 
 	connect(_link, &Ui::MaskedInputField::changed, [=] { handleChange(); });
-	_link->setVisible(_privacyGroup->value() == Privacy::Public);
+	_link->setVisible(_privacyGroup->current() == Privacy::Public);
 
 	_privacyGroup->setChangedCallback([=](Privacy value) {
 		privacyChanged(value);
@@ -1064,7 +1064,7 @@ void SetupChannelBox::updateMaxHeight() {
 			: 0)
 		+ st::newGroupPadding.bottom();
 	if (!_channel->isMegagroup()
-		|| _privacyGroup->value() == Privacy::Public) {
+		|| _privacyGroup->current() == Privacy::Public) {
 		newHeight += st::newGroupLinkPadding.top()
 			+ _link->height()
 			+ st::newGroupLinkPadding.bottom();
@@ -1265,7 +1265,7 @@ void SetupChannelBox::save() {
 	};
 	if (_saveRequestId) {
 		return;
-	} else if (_privacyGroup->value() == Privacy::Private) {
+	} else if (_privacyGroup->current() == Privacy::Private) {
 		closeBox();
 	} else {
 		const auto link = _link->text().trimmed();

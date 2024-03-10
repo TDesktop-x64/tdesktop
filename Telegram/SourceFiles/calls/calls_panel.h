@@ -107,7 +107,7 @@ private:
 	void initLayout();
 	void initGeometry();
 
-	void handleClose();
+	[[nodiscard]] bool handleClose() const;
 
 	void updateControlsGeometry();
 	void updateHangupGeometry();

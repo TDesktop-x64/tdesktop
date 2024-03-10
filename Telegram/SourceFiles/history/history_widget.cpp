@@ -20,6 +20,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/share_box.h"
 #include "boxes/edit_caption_box.h"
 #include "boxes/premium_limits_box.h"
+#include "boxes/premium_preview_box.h"
 #include "boxes/peers/edit_peer_permissions_box.h" // ShowAboutGigagroup.
 #include "boxes/peers/edit_peer_requests_box.h"
 #include "core/file_utilities.h"
@@ -52,6 +53,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/qt/qt_key_modifiers.h"
 #include "base/unixtime.h"
 #include "base/call_delayed.h"
+#include "data/business/data_shortcut_messages.h"
 #include "data/notify/data_notify_settings.h"
 #include "data/data_changes.h"
 #include "data/data_drafts.h"
@@ -121,6 +123,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "mainwidget.h"
 #include "mainwindow.h"
+#include "settings/business/settings_quick_replies.h"
 #include "storage/localimageloader.h"
 #include "storage/storage_account.h"
 #include "storage/file_upload.h"
@@ -383,6 +386,11 @@ HistoryWidget::HistoryWidget(
 		checkFieldAutocomplete();
 	}, Qt::QueuedConnection);
 
+	controller->session().data().shortcutMessages().shortcutsChanged(
+	) | rpl::start_with_next([=] {
+		checkFieldAutocomplete();
+	}, lifetime());
+
 	_fieldBarCancel->hide();
 
 	_topBar->hide();
@@ -438,7 +446,27 @@ HistoryWidget::HistoryWidget(
 
 	_fieldAutocomplete->botCommandChosen(
 	) | rpl::start_with_next([=](FieldAutocomplete::BotCommandChosen data) {
-		insertHashtagOrBotCommand(data.command, data.method);
+		using Method = FieldAutocomplete::ChooseMethod;
+		const auto messages = &data.user->owner().shortcutMessages();
+		const auto shortcut = data.user->isSelf();
+		const auto command = data.command.mid(1);
+		const auto byTab = (data.method == Method::ByTab);
+		const auto shortcutId = (_peer && shortcut && !byTab)
+			? messages->lookupShortcutId(command)
+			: BusinessShortcutId();
+		if (shortcut && command.isEmpty()) {
+			controller->showSettings(Settings::QuickRepliesId());
+		} else if (!shortcutId) {
+			insertHashtagOrBotCommand(data.command, data.method);
+		} else if (!_peer->session().premium()) {
+			ShowPremiumPreviewToBuy(
+				controller,
+				PremiumFeature::QuickReplies);
+		} else {
+			session().api().sendShortcutMessages(_peer, shortcutId);
+			session().api().finishForwarding(prepareSendAction({}));
+			setFieldText(_field->getTextWithTagsPart(_field->textCursor().position()));
+		}
 	}, lifetime());
 
 	_fieldAutocomplete->setModerateKeyActivateCallback([=](int key) {
@@ -1433,9 +1461,14 @@ AutocompleteQuery HistoryWidget::parseMentionHashtagBotCommandQuery() const {
 	} else if (result.query[0] == '@'
 		&& cRecentInlineBots().isEmpty()) {
 		session().local().readRecentHashtagsAndBots();
-	} else if (result.query[0] == '/'
-		&& ((_peer->isUser() && !_peer->asUser()->isBot()) || _editMsgId)) {
-		return AutocompleteQuery();
+	} else if (result.query[0] == '/') {
+		if (_editMsgId) {
+			return {};
+		} else if (_peer->isUser()
+			&& !_peer->asUser()->isBot()
+			&& _peer->owner().shortcutMessages().shortcuts().list.empty()) {
+			return {};
+		}
 	}
 	return result;
 }
@@ -1976,6 +2009,7 @@ bool HistoryWidget::applyDraft(FieldHistoryAction fieldHistoryAction) {
 	updateControlsVisibility();
 	updateControlsGeometry();
 	refreshTopBarActiveChat();
+	checkCharsLimitation();
 	if (_editMsgId) {
 		updateReplyEditTexts();
 		if (!_replyEditMsg) {
@@ -3919,17 +3953,12 @@ void HistoryWidget::saveEditMsg() {
 		return;
 	}
 	const auto webPageDraft = _preview->draft();
-	auto left = prepareTextForEditMsg();
-	auto sending = TextWithEntities();
+	const auto sending = prepareTextForEditMsg();
 
-	const auto originalLeftSize = left.text.size();
 	const auto hasMediaWithCaption = item
 		&& item->media()
 		&& item->media()->allowsEditCaption();
-	const auto maxCaptionSize = !hasMediaWithCaption
-		? MaxMessageSize
-		: Data::PremiumLimits(&session()).captionLengthCurrent();
-	if (!TextUtilities::CutPart(sending, left, maxCaptionSize)
+	if (sending.text.isEmpty()
 		&& (webPageDraft.removed
 			|| webPageDraft.url.isEmpty()
 			|| !webPageDraft.manual)
@@ -3938,11 +3967,22 @@ void HistoryWidget::saveEditMsg() {
 		controller()->show(
 			Box<DeleteMessagesBox>(item, suggestModerateActions));
 		return;
-	} else if (!left.text.isEmpty()) {
-		const auto remove = originalLeftSize - maxCaptionSize;
-		controller()->showToast(
-			tr::lng_edit_limit_reached(tr::now, lt_count, remove));
-		return;
+	} else {
+		const auto maxCaptionSize = !hasMediaWithCaption
+			? MaxMessageSize
+			: Data::PremiumLimits(&session()).captionLengthCurrent();
+		const auto remove = Ui::FieldCharacterCount(_field) - maxCaptionSize;
+		if (remove > 0) {
+			controller()->showToast(
+				tr::lng_edit_limit_reached(tr::now, lt_count, remove));
+#ifndef _DEBUG
+			return;
+#else
+			if (!base::IsCtrlPressed()) {
+				return;
+			}
+#endif
+		}
 	}
 
 	const auto weak = Ui::MakeWeak(this);
@@ -7450,13 +7490,16 @@ void HistoryWidget::checkCharsLimitation() {
 		return;
 	}
 	const auto item = session().data().message(_history->peer, _editMsgId);
-	if (!item || !item->media() || !item->media()->allowsEditCaption()) {
+	if (!item) {
 		_charsLimitation = nullptr;
 		return;
 	}
-	const auto limits = Data::PremiumLimits(&session());
-	const auto left = prepareTextForEditMsg();
-	const auto remove = left.text.size() - limits.captionLengthCurrent();
+	const auto hasMediaWithCaption = item->media()
+		&& item->media()->allowsEditCaption();
+	const auto maxCaptionSize = !hasMediaWithCaption
+		? MaxMessageSize
+		: Data::PremiumLimits(&session()).captionLengthCurrent();
+	const auto remove = Ui::FieldCharacterCount(_field) - maxCaptionSize;
 	if (remove > 0) {
 		if (!_charsLimitation) {
 			_charsLimitation = base::make_unique_q<CharactersLimitLabel>(

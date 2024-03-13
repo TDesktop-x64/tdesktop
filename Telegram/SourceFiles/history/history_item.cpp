@@ -401,7 +401,7 @@ HistoryItem::HistoryItem(
 			setMedia(*media);
 			if (_media && _media->webpage()) {
 				if (isBlocked) {
-					_media->webpage()->applyChanges(WebPageType::Article, "", "", "", "", TextWithEntities(), FullStoryId(), nullptr, nullptr,  WebPageCollage(), 0, 0, "", 0);
+					_media->webpage()->applyChanges(WebPageType::Article, "", "", "", "", TextWithEntities(), FullStoryId(), nullptr, nullptr,  WebPageCollage(), nullptr, 0, 0, "", 0);
 				}
 			}
 		}

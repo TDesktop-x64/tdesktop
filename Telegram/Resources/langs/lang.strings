@@ -4573,6 +4573,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_view_button_external_link" = "Open link";
 "lng_view_button_boost" = "Boost";
 "lng_view_button_giftcode" = "Open";
+"lng_view_button_iv" = "Instant View";
 
 "lng_sponsored_hide_ads" = "Hide";
 "lng_sponsored_title" = "What are sponsored messages?";
@@ -4877,6 +4878,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 "lng_contact_add" = "Add";
 "lng_contact_send_message" = "message";
+
+"lng_iv_open_in_browser" = "Open in Browser";
+"lng_iv_share" = "Share";
 
 // Wnd specific
 

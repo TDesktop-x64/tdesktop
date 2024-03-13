@@ -30,8 +30,9 @@ include(cmake/lib_tgvoip.cmake)
 include(cmake/lib_tgcalls.cmake)
 include(cmake/lib_prisma.cmake)
 include(cmake/td_export.cmake)
-include(cmake/td_mtproto.cmake)
+include(cmake/td_iv.cmake)
 include(cmake/td_lang.cmake)
+include(cmake/td_mtproto.cmake)
 include(cmake/td_scheme.cmake)
 include(cmake/td_ui.cmake)
 include(cmake/generate_appdata_changelog.cmake)
@@ -62,8 +63,9 @@ PRIVATE
     desktop-app::external_minizip
 
     tdesktop::td_export
-    tdesktop::td_mtproto
+    tdesktop::td_iv
     tdesktop::td_lang
+    tdesktop::td_mtproto
     tdesktop::td_scheme
     tdesktop::td_ui
     desktop-app::lib_webrtc
@@ -999,6 +1001,8 @@ PRIVATE
     intro/intro_step.h
     intro/intro_widget.cpp
     intro/intro_widget.h
+    iv/iv_instance.cpp
+    iv/iv_instance.h
     lang/lang_cloud_manager.cpp
     lang/lang_cloud_manager.h
     lang/lang_instance.cpp
@@ -1575,6 +1579,7 @@ PRIVATE
     qrc/emoji_preview.qrc
     qrc/telegram/animations.qrc
     qrc/telegram/export.qrc
+    qrc/telegram/iv.qrc
     qrc/telegram/telegram.qrc
     qrc/telegram/sounds.qrc
     winrc/Telegram.rc
@@ -1690,6 +1695,7 @@ else()
 
     include(${cmake_helpers_loc}/external/glib/generate_dbus.cmake)
     generate_dbus(Telegram org.freedesktop.portal. XdpBackground ${third_party_loc}/xdg-desktop-portal/data/org.freedesktop.portal.Background.xml)
+    generate_dbus(Telegram org.freedesktop. XdgNotifications ${src_loc}/platform/linux/org.freedesktop.Notifications.xml)
 
     if (NOT DESKTOP_APP_DISABLE_X11_INTEGRATION)
         target_link_libraries(Telegram
@@ -1763,6 +1769,7 @@ set_target_properties(Telegram PROPERTIES
     XCODE_ATTRIBUTE_ALWAYS_SEARCH_USER_PATHS NO
     XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY libc++
     XCODE_ATTRIBUTE_OTHER_CODE_SIGN_FLAGS --deep
+    XCODE_ATTRIBUTE_CLANG_DEBUG_INFORMATION_LEVEL $<IF:$<CONFIG:Debug>,default,line-tables-only>
 )
 set(entitlement_sources
     "${CMAKE_CURRENT_SOURCE_DIR}/Telegram/Telegram.entitlements"

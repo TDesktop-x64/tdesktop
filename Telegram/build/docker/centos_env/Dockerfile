@@ -1,7 +1,7 @@
 {%- set GIT = "https://github.com" -%}
 {%- set GIT_FREEDESKTOP = GIT ~ "/gitlab-freedesktop-mirrors" -%}
-{%- set QT = "6.6.2" -%}
-{%- set QT_TAG = "v" ~ QT -%}
+{%- set QT = "6.7.0" -%}
+{%- set QT_TAG = "v" ~ QT ~ "-rc1" -%}
 {%- set QT_PREFIX = "/usr/local/desktop-app/Qt-" ~ QT -%}
 {%- set OPENSSL_VER = "1_1_1" -%}
 {%- set OPENSSL_PREFIX = "/usr/local/desktop-app/openssl-1.1.1" -%}
@@ -54,7 +54,7 @@ FROM builder AS patches
 RUN git init patches \
 	&& cd patches \
 	&& git remote add origin {{ GIT }}/desktop-app/patches.git \
-	&& git fetch --depth=1 origin 0edd8a93409ca24e215fc8ba1e98814893ad05cf \
+	&& git fetch --depth=1 origin cc0c2f83650bbd52064bb7bc7257c950822cce5b \
 	&& git reset --hard FETCH_HEAD \
 	&& rm -rf .git
 
@@ -785,7 +785,7 @@ RUN git clone -b {{ QT_TAG }} --depth=1 {{ GIT }}/qt/qt5.git qt_{{ QT }} \
 	&& rm -rf qt_{{ QT }}
 
 FROM builder AS breakpad
-RUN git clone -b v2023.01.27 --depth=1 https://chromium.googlesource.com/breakpad/breakpad.git \
+RUN git clone -b v2023.06.01 --depth=1 https://chromium.googlesource.com/breakpad/breakpad.git \
 	&& cd breakpad \
 	&& git clone -b v2022.10.12 --depth=1 https://chromium.googlesource.com/linux-syscall-support.git src/third_party/lss \
 	&& env -u CFLAGS -u CXXFLAGS ./configure \

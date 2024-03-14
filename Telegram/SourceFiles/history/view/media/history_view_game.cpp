@@ -379,9 +379,9 @@ TextState Game::textState(QPoint point, StateRequest request) const {
 		}
 	}
 	if (_parent->data()->isHistoryEntry()) {
-		if (!result.link && outer.contains(point)) {
-			result.link = _openl;
-		}
+		//if (!result.link && outer.contains(point)) {
+		//	result.link = _openl;
+		//}
 	}
 	_lastPoint = point - outer.topLeft();
 

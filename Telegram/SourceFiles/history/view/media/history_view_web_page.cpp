@@ -248,7 +248,7 @@ QSize WebPage::countOptimalSize() {
 
 	// Detect _openButtonWidth before counting paddings.
 	_openButton = Ui::Text::String();
-	if (HasButton(_data)) {
+/*	if (HasButton(_data)) {
 		const auto context = Core::MarkedTextContext{
 			.session = &_data->session(),
 			.customEmojiRepaint = [] {},
@@ -259,7 +259,8 @@ QSize WebPage::countOptimalSize() {
 			PageToPhrase(_data),
 			kMarkupTextOptions,
 			context);
-	} else if (_sponsoredData) {
+	} else */
+	if (_sponsoredData) {
 		if (!_sponsoredData->buttonText.isEmpty()) {
 			_openButton.setText(
 				st::semiboldTextStyle,
@@ -1076,6 +1077,9 @@ TextState WebPage::textState(QPoint point, StateRequest request) const {
 	//if ((!result.link || _sponsoredData) && outer.contains(point)) {
 	//	result.link = _openl;
 	//}
+	if (_data->iv) {
+		result.link = _openl;
+	}
 	_lastPoint = point - outer.topLeft();
 
 	result.symbol += symbolAdd;

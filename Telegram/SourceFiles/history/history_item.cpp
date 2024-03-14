@@ -4685,7 +4685,7 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 	auto prepareRequestedPeer = [&](
 			const MTPDmessageActionRequestedPeer &action) {
 		auto result = PreparedServiceText{};
-		result.links.push_back(fromLink());
+		result.links.push_back(history()->peer->createOpenLink());
 
 		const auto &list = action.vpeers().v;
 		for (auto i = 0, count = int(list.size()); i != count; ++i) {
@@ -4721,7 +4721,7 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 			lt_chat,
 			result.text,
 			lt_bot,
-			Ui::Text::Link(history()->peer->name(), 2),
+			Ui::Text::Link(history()->peer->name(), 1),
 			Ui::Text::WithEntities);
 		return result;
 	};

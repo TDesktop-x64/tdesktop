@@ -8,6 +8,11 @@ var IV = {
 		var target = e.target;
 		var context = '';
 		while (target) {
+			if (target.id == 'menu_page_blocker') {
+				IV.notify({ event: 'menu_page_blocker_click' });
+				IV.menuShown(false);
+				return;
+			}
 			if (target.tagName == 'AUDIO' || target.tagName == 'VIDEO') {
 				return;
 			}
@@ -122,12 +127,17 @@ var IV = {
 		}
 	},
 	toggleChannelJoined: function (id, joined) {
+		IV.channelsJoined['channel' + id] = joined;
+		IV.checkChannelButtons();
+	},
+	checkChannelButtons: function() {
 		const channels = document.getElementsByClassName('channel');
-		const full = 'channel' + id;
 		for (var i = 0; i < channels.length; ++i) {
 			const channel = channels[i];
-			if (String(channel.getAttribute('data-context')) === full) {
-				channel.classList.toggle('joined', joined);
+			const full = String(channel.getAttribute('data-context'));
+			const value = IV.channelsJoined[full];
+			if (value !== undefined) {
+				channel.classList.toggle('joined', value);
 			}
 		}
 	},
@@ -320,6 +330,7 @@ var IV = {
 							+ '" type="video/mp4" />'
 						+ '</video>';
 					var media = element.firstChild;
+					media.oncontextmenu = function () { return false; };
 					media.oncanplay = IV.checkVideos;
 					media.onloadeddata = IV.checkVideos;
 				}
@@ -413,6 +424,15 @@ var IV = {
 					&& toEl.hasAttribute('data-src')
 					&& (fromEl.getAttribute('data-src')
 						== toEl.getAttribute('data-src'))) {
+					return false;
+				} else if (fromEl.tagName == 'SECTION'
+					&& fromEl.classList.contains('channel')
+					&& fromEl.hasAttribute('data-context')
+					&& toEl.tagName == 'SECTION'
+					&& toEl.classList.contains('channel')
+					&& toEl.hasAttribute('data-context')
+					&& (String(fromEl.getAttribute('data-context'))
+						== String(toEl.getAttribute('data-context')))) {
 					return false;
 				} else if (fromEl.classList.contains('loaded')) {
 					toEl.classList.add('loaded');
@@ -568,6 +588,7 @@ var IV = {
 			} else {
 				IV.initMedia();
 			}
+			IV.checkChannelButtons();
 			if (scroll === undefined) {
 				IV.jumpToHash(hash, true);
 			} else {
@@ -599,11 +620,26 @@ var IV = {
 	back: function () {
         window.history.back();
 	},
+	menuShown: function (shown) {
+		var already = document.getElementById('menu_page_blocker');
+		if (already && shown) {
+			return;
+		} else if (already) {
+			document.body.removeChild(already);
+			return;
+		} else if (!shown) {
+			return;
+		}
+		var blocker = document.createElement('div');
+		blocker.id = 'menu_page_blocker';
+		document.body.appendChild(blocker);
+	},
 
 	videos: {},
 	videosPlaying: {},
 
 	cache: {},
+	channelsJoined: {},
 	index: 0,
 	position: 0
 };

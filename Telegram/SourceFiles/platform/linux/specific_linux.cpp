@@ -35,8 +35,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <kshell.h>
 #include <ksandbox.h>
 
-#include <glibmm.h>
-
 #include <xdgdbus/xdgdbus.hpp>
 #include <xdpbackground/xdpbackground.hpp>
 #include <xdprequest/xdprequest.hpp>
@@ -510,12 +508,12 @@ QString SingleInstanceLocalServerName(const QString &hash) {
 
 #if QT_VERSION < QT_VERSION_CHECK(6, 5, 0)
 std::optional<bool> IsDarkMode() {
-	const auto result = base::Platform::XDP::ReadSetting<uint>(
+	const auto result = base::Platform::XDP::ReadSetting(
 		"org.freedesktop.appearance",
 		"color-scheme");
 
 	return result.has_value()
-		? std::make_optional(*result == 1)
+		? std::make_optional(result->get_uint32() == 1)
 		: std::nullopt;
 }
 #endif // Qt < 6.5.0
@@ -689,8 +687,6 @@ void start() {
 
 	GLib::set_prgname(cExeName().toStdString());
 	GLib::set_application_name(AppName.data());
-
-	Glib::init();
 
 	Webview::WebKitGTK::SetSocketPath(u"%1/%2-%3-webview-%4"_q.arg(
 		QDir::tempPath(),

@@ -708,7 +708,7 @@ void Shown::streamMap(QString params, Webview::DataRequest request) {
 void Shown::sendEmbed(QByteArray hash, Webview::DataRequest request) {
 	const auto i = _embeds.find(hash);
 	if (i != end(_embeds)) {
-		requestDone(std::move(request), i->second, "text/html");
+		requestDone(std::move(request), i->second, "text/html; charset=utf-8");
 	} else {
 		requestFail(std::move(request));
 	}
@@ -833,6 +833,7 @@ void Instance::show(
 			break;
 		case Type::OpenLinkExternal:
 			QDesktopServices::openUrl(event.url);
+			closeAll();
 			break;
 		case Type::OpenMedia:
 			if (const auto window = Core::App().activeWindow()) {

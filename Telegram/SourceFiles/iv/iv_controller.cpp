@@ -76,7 +76,7 @@ namespace {
 		{ "toast-fg", &st::toastFg },
 	};
 	static const auto phrases = base::flat_map<QByteArray, tr::phrase<>>{
-		{ "group-call-join", tr::lng_group_call_join },
+		{ "iv-join-channel", tr::lng_iv_join_channel },
 	};
 	static const auto serialize = [](const style::color *color) {
 		const auto qt = (*color)->c;
@@ -161,7 +161,7 @@ namespace {
 	return R"(<!DOCTYPE html>
 <html)"_q
 	+ classAttribute
-	+ R"("" style=")"
+	+ R"( style=")"
 	+ EscapeForAttribute(ComputeStyles())
 	+ R"(">
 	<head>
@@ -244,14 +244,20 @@ void Controller::updateTitleGeometry(int newWidth) const {
 
 void Controller::initControls() {
 	_subtitleWrap = std::make_unique<Ui::RpWidget>(_window.get());
+	_subtitleText = _index.value() | rpl::filter(
+		rpl::mappers::_1 >= 0
+	) | rpl::map([=](int index) {
+		return _pages[index].name;
+	});
 	_subtitle = std::make_unique<Ui::FlatLabel>(
 		_subtitleWrap.get(),
-		_index.value() | rpl::filter(
-			rpl::mappers::_1 >= 0
-		) | rpl::map([=](int index) {
-			return _pages[index].name;
-		}),
+		_subtitleText.value(),
 		st::ivSubtitle);
+	_subtitleText.value(
+	) | rpl::start_with_next([=](const QString &subtitle) {
+		const auto prefix = tr::lng_iv_window_title(tr::now);
+		_window->setWindowTitle(prefix + ' ' + QChar(0x2014) + ' ' + subtitle);
+	}, _subtitle->lifetime());
 	_subtitle->setAttribute(Qt::WA_TransparentForMouseEvents);
 
 	_menuToggle.create(_subtitleWrap.get(), st::ivMenuToggle);
@@ -429,6 +435,10 @@ void Controller::createWebview(const QString &dataPath) {
 				const auto url = object.value("url").toString();
 				const auto context = object.value("context").toString();
 				processLink(url, context);
+			} else if (event == "menu_page_blocker_click") {
+				if (_menu) {
+					_menu->hideMenu();
+				}
 			} else if (event == u"ready"_q) {
 				_ready = true;
 				auto script = QByteArray();
@@ -442,6 +452,9 @@ void Controller::createWebview(const QString &dataPath) {
 				}
 				if (base::take(_reloadInitialWhenReady)) {
 					script += reloadScript(0);
+				}
+				if (_menu) {
+					script += "IV.menuShown(true);";
 				}
 				if (!script.isEmpty()) {
 					_webview->eval(script);
@@ -494,7 +507,7 @@ void Controller::createWebview(const QString &dataPath) {
 				|| index >= _pages.size()) {
 				return Webview::DataResult::Failed;
 			}
-			return finishWith(WrapPage(_pages[index]), "text/html");
+			return finishWith(WrapPage(_pages[index]), "text/html; charset=utf-8");
 		} else if (id.starts_with("page") && id.ends_with(".json")) {
 			auto index = 0;
 			const auto result = std::from_chars(
@@ -570,6 +583,11 @@ void Controller::showInWindow(const QString &dataPath, Prepared page) {
 }
 
 void Controller::activate() {
+	if (_window->isMinimized()) {
+		_window->showNormal();
+	} else if (_window->isHidden()) {
+		_window->show();
+	}
 	_window->raise();
 	_window->activateWindow();
 	_window->setFocus();
@@ -648,7 +666,7 @@ bool Controller::active() const {
 }
 
 void Controller::showJoinedTooltip() {
-	if (_webview) {
+	if (_webview && _ready) {
 		_webview->eval("IV.showTooltip('"
 			+ EscapeForScriptString(
 				tr::lng_action_you_joined(tr::now).toUtf8())
@@ -679,12 +697,22 @@ void Controller::showMenu() {
 	_menu = base::make_unique_q<Ui::PopupMenu>(
 		_window.get(),
 		st::popupMenuWithIcons);
+	if (_webview && _ready) {
+		_webview->eval("IV.menuShown(true);");
+	}
 	_menu->setDestroyedCallback(crl::guard(_window.get(), [
 			this,
 			weakButton = Ui::MakeWeak(_menuToggle.data()),
 			menu = _menu.get()] {
 		if (_menu == menu && weakButton) {
 			weakButton->setForceRippled(false);
+		}
+		if (const auto widget = _webview ? _webview->widget() : nullptr) {
+			InvokeQueued(widget, crl::guard(_window.get(), [=] {
+				if (_webview && _ready) {
+					_webview->eval("IV.menuShown(false);");
+				}
+			}));
 		}
 	}));
 	_menuToggle->setForceRippled(true);
@@ -734,9 +762,17 @@ void Controller::destroyShareMenu() {
 		setInnerFocus();
 	}
 	if (_shareWrap) {
-		_shareWrap->windowHandle()->setParent(nullptr);
+		if (_shareContainer) {
+			_shareWrap->windowHandle()->setParent(nullptr);
+		}
 		_shareWrap = nullptr;
 		_shareContainer = nullptr;
+	}
+	if (_shareHidesContent) {
+		_shareHidesContent = false;
+		if (const auto content = _webview ? _webview->widget() : nullptr) {
+			content->show();
+		}
 	}
 }
 
@@ -745,22 +781,34 @@ void Controller::showShareMenu() {
 	if (_shareWrap || index < 0 || index > _pages.size()) {
 		return;
 	}
+	_shareHidesContent = Platform::IsMac();
+	if (_shareHidesContent) {
+		if (const auto content = _webview ? _webview->widget() : nullptr) {
+			content->hide();
+		}
+	}
 
-	_shareWrap = std::make_unique<Ui::RpWidget>(nullptr);
+	_shareWrap = std::make_unique<Ui::RpWidget>(_shareHidesContent
+		? _window->window()
+		: nullptr);
 	const auto margins = QMargins(0, st::windowTitleHeight, 0, 0);
-	_shareWrap->setGeometry(_window->geometry().marginsRemoved(margins));
-	_shareWrap->setWindowFlag(Qt::FramelessWindowHint);
-	_shareWrap->setAttribute(Qt::WA_TranslucentBackground);
-	_shareWrap->setAttribute(Qt::WA_NoSystemBackground);
-	_shareWrap->createWinId();
+	if (!_shareHidesContent) {
+		_shareWrap->setGeometry(_window->geometry().marginsRemoved(margins));
+		_shareWrap->setWindowFlag(Qt::FramelessWindowHint);
+		_shareWrap->setAttribute(Qt::WA_TranslucentBackground);
+		_shareWrap->setAttribute(Qt::WA_NoSystemBackground);
+		_shareWrap->createWinId();
 
-	_shareContainer.reset(QWidget::createWindowContainer(
-		_shareWrap->windowHandle(),
-		_window.get(),
-		Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint));
+		_shareContainer.reset(QWidget::createWindowContainer(
+			_shareWrap->windowHandle(),
+			_window.get(),
+			Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint));
+	}
 	_window->sizeValue() | rpl::start_with_next([=](QSize size) {
-		_shareContainer->setGeometry(QRect(QPoint(), size).marginsRemoved(
-			margins));
+		const auto widget = _shareHidesContent
+			? _shareWrap.get()
+			: _shareContainer.get();
+		widget->setGeometry(QRect(QPoint(), size).marginsRemoved(margins));
 	}, _shareWrap->lifetime());
 
 	auto result = _showShareBox({
@@ -775,7 +823,12 @@ void Controller::showShareMenu() {
 	}, _shareWrap->lifetime());
 
 	Ui::ForceFullRepaintSync(_shareWrap.get());
-	_shareContainer->show();
+
+	if (_shareHidesContent) {
+		_shareWrap->show();
+	} else {
+		_shareContainer->show();
+	}
 	activate();
 }
 

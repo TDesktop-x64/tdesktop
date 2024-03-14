@@ -103,7 +103,7 @@ elif (win64):
 elif (mac):
     environment.update({
         'SPECIAL_TARGET': 'mac',
-        'MAKE_THREADS_CNT': '-j32',
+        'MAKE_THREADS_CNT': '-j16',
         'MACOSX_DEPLOYMENT_TARGET': '10.13',
         'UNGUARDED': '-Werror=unguarded-availability-new',
         'MIN_VER': '-mmacosx-version-min=10.13',

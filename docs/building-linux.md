@@ -12,7 +12,7 @@ You will require **api_id** and **api_hash** to access the Telegram API servers.
 
 Install [poetry](https://python-poetry.org), go to ***BuildPath*** and run
 
-    git clone --recursive https://github.com/telegramdesktop/tdesktop.git
+    git clone --recursive https://github.com/TDesktop-x64/tdesktop.git
     ./tdesktop/Telegram/build/prepare/linux.sh
 
 ### Building the project

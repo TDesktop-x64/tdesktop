@@ -2426,6 +2426,11 @@ SelectedItems ListWidget::getSelectedItems() const {
 	return collectSelectedItems();
 }
 
+const TextSelection &ListWidget::getSelectedTextRange(
+		not_null<HistoryItem*> item) const {
+	return _selectedTextRange;
+}
+
 int ListWidget::findItemIndexByY(int y) const {
 	Expects(!_items.empty());
 

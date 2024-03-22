@@ -700,7 +700,7 @@ mac:
 """)
 
 stage('dav1d', """
-    git clone -b 1.2.1 --depth 1 https://code.videolan.org/videolan/dav1d.git
+    git clone -b 1.4.1 --depth 1 https://code.videolan.org/videolan/dav1d.git
     cd dav1d
 win:
     if "%X8664%" equ "x64" (
@@ -778,7 +778,7 @@ mac:
 """)
 
 stage('libavif', """
-    git clone -b v0.11.1 --depth 1 https://github.com/AOMediaCodec/libavif.git
+    git clone -b v1.0.4 --depth 1 https://github.com/AOMediaCodec/libavif.git
     cd libavif
 win:
     cmake . ^
@@ -808,7 +808,7 @@ mac:
 """)
 
 stage('libde265', """
-    git clone --depth 1 -b v1.0.12 https://github.com/strukturag/libde265.git
+    git clone --depth 1 -b v1.0.15 https://github.com/strukturag/libde265.git
     cd libde265
 win:
     cmake . ^
@@ -884,7 +884,7 @@ mac:
 """)
 
 stage('libheif', """
-    git clone --depth 1 -b v1.16.2 https://github.com/strukturag/libheif.git
+    git clone --depth 1 -b v1.17.6 https://github.com/strukturag/libheif.git
     cd libheif
 win:
     %THIRDPARTY_DIR%\\msys64\\usr\\bin\\sed.exe -i 's/LIBHEIF_EXPORTS/LIBDE265_STATIC_BUILD/g' libheif/CMakeLists.txt
@@ -898,6 +898,7 @@ win:
         -DCMAKE_C_FLAGS_RELEASE="/MT /O2 /Ob2 /DNDEBUG" ^
         -DCMAKE_CXX_FLAGS_RELEASE="/MT /O2 /Ob2 /DNDEBUG" ^
         -DBUILD_SHARED_LIBS=OFF ^
+        -DBUILD_TESTING=OFF ^
         -DENABLE_PLUGIN_LOADING=OFF ^
         -DWITH_LIBDE265=ON ^
         -DWITH_SvtEnc=OFF ^
@@ -916,6 +917,7 @@ mac:
         -D CMAKE_OSX_DEPLOYMENT_TARGET:STRING=$MACOSX_DEPLOYMENT_TARGET \\
         -D CMAKE_INSTALL_PREFIX:STRING=$USED_PREFIX \\
         -D BUILD_SHARED_LIBS=OFF \\
+        -D BUILD_TESTING=OFF \\
         -D ENABLE_PLUGIN_LOADING=OFF \\
         -D WITH_AOM_ENCODER=OFF \\
         -D WITH_AOM_DECODER=OFF \\

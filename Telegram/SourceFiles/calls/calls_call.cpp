@@ -22,6 +22,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mtproto/mtproto_config.h"
 #include "core/application.h"
 #include "core/core_settings.h"
+#include "window/window_controller.h"
 #include "media/audio/media_audio_track.h"
 #include "base/platform/base_platform_info.h"
 #include "calls/calls_panel.h"
@@ -420,6 +421,14 @@ void Call::actuallyAnswer() {
 	}).send();
 }
 
+void Call::captureMuteChanged(bool mute) {
+	setMuted(mute);
+}
+
+rpl::producer<Webrtc::DeviceResolvedId> Call::captureMuteDeviceId() {
+	return _captureDeviceId.value();
+}
+
 void Call::setMuted(bool mute) {
 	_muted = mute;
 	if (_instance) {
@@ -698,11 +707,15 @@ bool Call::handleUpdate(const MTPPhoneCall &call) {
 			}
 		}
 		if (data.is_need_rating() && _id && _accessHash) {
+			const auto window = Core::App().windowFor(_user);
 			const auto session = &_user->session();
 			const auto callId = _id;
 			const auto callAccessHash = _accessHash;
-			const auto box = Ui::show(Box<Ui::RateCallBox>(
-				Core::App().settings().sendSubmitWay()));
+			auto owned = Box<Ui::RateCallBox>(
+				Core::App().settings().sendSubmitWay());
+			const auto box = window
+				? window->show(std::move(owned))
+				: Ui::show(std::move(owned));
 			const auto sender = box->lifetime().make_state<MTP::Sender>(
 				&session->mtp());
 			box->sends(
@@ -1033,6 +1046,20 @@ void Call::createAndStartController(const MTPDphoneCall &call) {
 
 	raw->setIncomingVideoOutput(_videoIncoming->sink());
 	raw->setAudioOutputDuckingEnabled(settings.callAudioDuckingEnabled());
+
+	_state.value() | rpl::start_with_next([=](State state) {
+		const auto track = (state != State::FailedHangingUp)
+			&& (state != State::Failed)
+			&& (state != State::HangingUp)
+			&& (state != State::Ended)
+			&& (state != State::EndedByOtherDevice)
+			&& (state != State::Busy);
+		Core::App().mediaDevices().setCaptureMuteTracker(this, track);
+	}, _instanceLifetime);
+
+	_muted.value() | rpl::start_with_next([=](bool muted) {
+		Core::App().mediaDevices().setCaptureMuted(muted);
+	}, _instanceLifetime);
 }
 
 void Call::handleControllerStateChange(tgcalls::State state) {
@@ -1355,7 +1382,11 @@ void Call::handleRequestError(const QString &error) {
 			_user->name())
 		: QString();
 	if (!inform.isEmpty()) {
-		Ui::show(Ui::MakeInformBox(inform));
+		if (const auto window = Core::App().windowFor(_user)) {
+			window->show(Ui::MakeInformBox(inform));
+		} else {
+			Ui::show(Ui::MakeInformBox(inform));
+		}
 	}
 	finish(FinishType::Failed);
 }
@@ -1369,12 +1400,19 @@ void Call::handleControllerError(const QString &error) {
 		? tr::lng_call_error_audio_io(tr::now)
 		: QString();
 	if (!inform.isEmpty()) {
-		Ui::show(Ui::MakeInformBox(inform));
+		if (const auto window = Core::App().windowFor(_user)) {
+			window->show(Ui::MakeInformBox(inform));
+		} else {
+			Ui::show(Ui::MakeInformBox(inform));
+		}
 	}
 	finish(FinishType::Failed);
 }
 
 void Call::destroyController() {
+	_instanceLifetime.destroy();
+	Core::App().mediaDevices().setCaptureMuteTracker(this, false);
+
 	if (_instance) {
 		_instance->stop([](tgcalls::FinalState) {
 		});

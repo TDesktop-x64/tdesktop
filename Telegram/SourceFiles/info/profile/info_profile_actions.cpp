@@ -129,7 +129,10 @@ base::options::toggle ShowPeerIdBelowAbout({
 		//		show.toastParent(),
 		//		tr::lng_username_copied(tr::now));
 		//}
-		if (!link.isEmpty()) {
+		if (peer->isForum()) {
+			QGuiApplication::clipboard()->setText(link);
+			Ui::Toast::Show(tr::lng_username_copied(tr::now));
+		} else if (!link.isEmpty()) {
 			const auto last = link.lastIndexOf('/');
 			const auto mention = '@' + link.mid(last + 1);
 			QGuiApplication::clipboard()->setText(mention);

@@ -28,7 +28,7 @@ You will require **api_id** and **api_hash** to access the Telegram API servers.
 
 Open **x64 Native Tools Command Prompt for VS 2022.bat**, go to ***BuildPath*** and run
 
-    git clone --recursive https://github.com/telegramdesktop/tdesktop.git
+    git clone --recursive https://github.com/TDesktop-x64/tdesktop.git
     tdesktop\Telegram\build\prepare\win.bat
 
 ## Build the project

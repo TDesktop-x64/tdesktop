@@ -215,6 +215,9 @@ void Stories::apply(const MTPStoriesStealthMode &stealthMode) {
 }
 
 void Stories::apply(not_null<PeerData*> peer, const MTPPeerStories *data) {
+	if (GetEnhancedBool("hide_stories")) {
+		return;
+	}
 	if (!data) {
 		applyDeletedFromSources(peer->id, StorySourcesList::NotHidden);
 		applyDeletedFromSources(peer->id, StorySourcesList::Hidden);

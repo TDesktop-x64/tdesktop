@@ -23,7 +23,8 @@ set(style_files
     calls/calls.style
     export/view/export.style
     info/info.style
-    info/boosts/giveaway/giveaway.style
+    info/channel_statistics/boosts/giveaway/giveaway.style
+    info/channel_statistics/earn/channel_earn.style
     info/userpic/info_userpic_builder.style
     intro/intro.style
     iv/iv.style
@@ -63,6 +64,11 @@ PRIVATE
     calls/group/ui/desktop_capture_choose_source.cpp
     calls/group/ui/desktop_capture_choose_source.h
 
+    chat_helpers/field_characters_count_manager.cpp
+    chat_helpers/field_characters_count_manager.h
+    chat_helpers/stickers_emoji_image_loader.cpp
+    chat_helpers/stickers_emoji_image_loader.h
+
     core/file_location.cpp
     core/file_location.h
     core/mime_type.cpp
@@ -71,6 +77,9 @@ PRIVATE
     countries/countries_instance.cpp
     countries/countries_instance.h
 
+    data/data_birthday.cpp
+    data/data_birthday.h
+    data/data_channel_earn.h
     data/data_statistics_chart.cpp
     data/data_statistics_chart.h
     data/data_subscription_option.h
@@ -115,12 +124,15 @@ PRIVATE
     info/userpic/info_userpic_emoji_builder_layer.cpp
     info/userpic/info_userpic_emoji_builder_layer.h
 
-    info/boosts/giveaway/boost_badge.cpp
-    info/boosts/giveaway/boost_badge.h
-    info/boosts/giveaway/giveaway_type_row.cpp
-    info/boosts/giveaway/giveaway_type_row.h
-    info/boosts/giveaway/select_countries_box.cpp
-    info/boosts/giveaway/select_countries_box.h
+    info/channel_statistics/boosts/giveaway/boost_badge.cpp
+    info/channel_statistics/boosts/giveaway/boost_badge.h
+    info/channel_statistics/boosts/giveaway/giveaway_type_row.cpp
+    info/channel_statistics/boosts/giveaway/giveaway_type_row.h
+    info/channel_statistics/boosts/giveaway/select_countries_box.cpp
+    info/channel_statistics/boosts/giveaway/select_countries_box.h
+
+    info/channel_statistics/earn/earn_format.cpp
+    info/channel_statistics/earn/earn_format.h
 
     intro/intro_code_input.cpp
     intro/intro_code_input.h
@@ -234,6 +246,8 @@ PRIVATE
     ui/boxes/confirm_phone_box.h
     ui/boxes/country_select_box.cpp
     ui/boxes/country_select_box.h
+    ui/boxes/edit_birthday_box.cpp
+    ui/boxes/edit_birthday_box.h
     ui/boxes/edit_invite_link.cpp
     ui/boxes/edit_invite_link.h
     ui/boxes/rate_call_box.cpp
@@ -398,6 +412,9 @@ PRIVATE
     ui/widgets/fields/special_fields.h
     ui/widgets/fields/time_part_input_with_placeholder.cpp
     ui/widgets/fields/time_part_input_with_placeholder.h
+
+    window/window_slide_animation.cpp
+    window/window_slide_animation.h
 
     ui/ui_pch.h
 )

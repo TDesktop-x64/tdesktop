@@ -58,6 +58,8 @@ enum class Command {
 	FolderNext,
 	FolderPrevious,
 
+	ShowScheduled,
+
 	ShowArchive,
 	ShowContacts,
 
@@ -66,6 +68,7 @@ enum class Command {
 	ScheduleMessage,
 
 	ReadChat,
+	ArchiveChat,
 
 	MediaViewerFullscreen,
 

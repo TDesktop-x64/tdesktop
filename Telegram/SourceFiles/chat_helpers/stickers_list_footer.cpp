@@ -19,7 +19,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_session.h"
 #include "data/data_document.h"
 #include "data/data_document_media.h"
-#include "main/main_account.h"
 #include "main/main_app_config.h"
 #include "main/main_session.h"
 #include "lang/lang_keys.h"
@@ -113,7 +112,7 @@ std::optional<EmojiSection> SetIdEmojiSection(uint64 id) {
 
 rpl::producer<std::vector<GifSection>> GifSectionsValue(
 		not_null<Main::Session*> session) {
-	const auto config = &session->account().appConfig();
+	const auto config = &session->appConfig();
 	return config->value(
 	) | rpl::map([=] {
 		return config->get<std::vector<QString>>(
@@ -1182,7 +1181,7 @@ void StickersListFooter::validateIconLottieAnimation(
 	if (icon.lottie
 		|| !icon.sticker
 		|| !HasLottieThumbnail(
-			icon.set ? icon.set->flags : Data::StickersSetFlags(),
+			icon.set ? icon.set->thumbnailType() : StickerType(),
 			icon.thumbnailMedia.get(),
 			icon.stickerMedia.get())) {
 		return;
@@ -1191,7 +1190,7 @@ void StickersListFooter::validateIconLottieAnimation(
 		icon.thumbnailMedia.get(),
 		icon.stickerMedia.get(),
 		StickerLottieSize::StickersFooter,
-		QSize(icon.pixw, icon.pixh) * cIntRetinaFactor(),
+		QSize(icon.pixw, icon.pixh) * style::DevicePixelRatio(),
 		_renderer());
 	if (!player) {
 		return;
@@ -1211,7 +1210,7 @@ void StickersListFooter::validateIconWebmAnimation(
 	if (icon.webm
 		|| !icon.sticker
 		|| !HasWebmThumbnail(
-			icon.set ? icon.set->flags : Data::StickersSetFlags(),
+			icon.set ? icon.set->thumbnailType() : StickerType(),
 			icon.thumbnailMedia.get(),
 			icon.stickerMedia.get())) {
 		return;
@@ -1357,10 +1356,11 @@ void StickersListFooter::paintSetIconToCache(
 			});
 		} else if (icon.lottie && icon.lottie->ready()) {
 			const auto frame = icon.lottie->frame();
-			const auto size = frame.size() / cIntRetinaFactor();
+			const auto size = frame.size() / style::DevicePixelRatio();
 			if (icon.savedFrame.isNull()) {
 				icon.savedFrame = frame;
-				icon.savedFrame.setDevicePixelRatio(cRetinaFactor());
+				icon.savedFrame.setDevicePixelRatio(
+					style::DevicePixelRatio());
 			}
 			p.drawImage(
 				QRect(
@@ -1378,7 +1378,8 @@ void StickersListFooter::paintSetIconToCache(
 				paused ? 0 : now);
 			if (icon.savedFrame.isNull()) {
 				icon.savedFrame = frame;
-				icon.savedFrame.setDevicePixelRatio(cRetinaFactor());
+				icon.savedFrame.setDevicePixelRatio(
+					style::DevicePixelRatio());
 			}
 			p.drawImage(x, y, frame);
 		} else if (!icon.savedFrame.isNull()) {

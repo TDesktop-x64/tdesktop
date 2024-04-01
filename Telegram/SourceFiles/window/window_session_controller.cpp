@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "window/window_session_controller.h"
 
+#include "api/api_text_entities.h"
 #include "boxes/add_contact_box.h"
 #include "boxes/peers/add_bot_to_chat_box.h"
 #include "boxes/peers/edit_peer_info_box.h"
@@ -26,6 +27,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "media/player/media_player_instance.h"
 #include "media/view/media_view_open_common.h"
 #include "data/data_document_resolver.h"
+#include "data/data_download_manager.h"
 #include "data/data_session.h"
 #include "data/data_file_origin.h"
 #include "data/data_folder.h"
@@ -62,7 +64,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/boxes/calendar_box.h"
 #include "ui/boxes/confirm_box.h"
 #include "mainwidget.h"
-#include "main/main_account.h"
+#include "main/main_app_config.h"
 #include "main/main_domain.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
@@ -73,6 +75,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_blocked_peers.h"
 #include "support/support_helper.h"
 #include "storage/file_upload.h"
+#include "storage/download_manager_mtproto.h"
 #include "window/themes/window_theme.h"
 #include "window/window_peer_menu.h"
 #include "window/window_session_controller_link_info.h"
@@ -88,20 +91,6 @@ namespace {
 
 constexpr auto kCustomThemesInMemory = 5;
 constexpr auto kMaxChatEntryHistorySize = 50;
-
-[[nodiscard]] Ui::ChatThemeBubblesData PrepareBubblesData(
-		const Data::CloudTheme &theme,
-		Data::CloudThemeType type) {
-	const auto i = theme.settings.find(type);
-	return {
-		.colors = (i != end(theme.settings)
-			? i->second.outgoingMessagesColors
-			: std::vector<QColor>()),
-		.accent = (i != end(theme.settings)
-			? i->second.outgoingAccentColor
-			: std::optional<QColor>()),
-	};
-}
 
 class MainWindowShow final : public ChatHelpers::Show {
 public:
@@ -142,6 +131,29 @@ private:
 	const base::weak_ptr<SessionController> _window;
 
 };
+
+[[nodiscard]] Ui::ChatThemeBubblesData PrepareBubblesData(
+		const Data::CloudTheme &theme,
+		Data::CloudThemeType type) {
+	const auto i = theme.settings.find(type);
+	return {
+		.colors = (i != end(theme.settings)
+			? i->second.outgoingMessagesColors
+			: std::vector<QColor>()),
+		.accent = (i != end(theme.settings)
+			? i->second.outgoingAccentColor
+			: std::optional<QColor>()),
+	};
+}
+
+[[nodiscard]] bool DownloadingDocument(not_null<DocumentData*> document) {
+	for (const auto id : Core::App().downloadManager().loadingList()) {
+		if (id->object.document == document.get()) {
+			return true;
+		}
+	}
+	return false;
+}
 
 MainWindowShow::MainWindowShow(not_null<SessionController*> controller)
 : _window(base::make_weak(controller)) {
@@ -307,6 +319,13 @@ void SessionNavigation::showPeerByLink(const PeerByLinkInfo &info) {
 		resolvePhone(info.phone, [=](not_null<PeerData*> peer) {
 			showPeerByLinkResolved(peer, info);
 		});
+	} else if (!info.chatLinkSlug.isEmpty()) {
+		resolveChatLink(info.chatLinkSlug, [=](
+				not_null<PeerData*> peer,
+				TextWithEntities draft) {
+			Data::SetChatLinkDraft(peer, draft);
+			showPeerByLinkResolved(peer, info);
+		});
 	} else if (const auto name = std::get_if<QString>(&info.usernameOrId)) {
 		resolveUsername(*name, [=](not_null<PeerData*> peer) {
 			if (info.startAutoSubmit) {
@@ -348,6 +367,33 @@ void SessionNavigation::resolvePhone(
 					lt_phone,
 					Ui::FormatPhone(phone))),
 				Ui::LayerOption::CloseOther);
+		}
+	}).send();
+}
+
+void SessionNavigation::resolveChatLink(
+		const QString &slug,
+		Fn<void(not_null<PeerData*> peer, TextWithEntities draft)> done) {
+	_api.request(base::take(_resolveRequestId)).cancel();
+	_resolveRequestId = _api.request(MTPaccount_ResolveBusinessChatLink(
+		MTP_string(slug)
+	)).done([=](const MTPaccount_ResolvedBusinessChatLinks &result) {
+		_resolveRequestId = 0;
+		parentController()->hideLayer();
+		const auto &data = result.data();
+		_session->data().processUsers(data.vusers());
+		_session->data().processChats(data.vchats());
+
+		using namespace Api;
+		const auto peerId = peerFromMTP(data.vpeer());
+		done(_session->data().peer(peerId), {
+			qs(data.vmessage()),
+			EntitiesFromMTP(_session, data.ventities().value_or_empty())
+		});
+	}).fail([=](const MTP::Error &error) {
+		_resolveRequestId = 0;
+		if (error.code() == 400) {
+			showToast(tr::lng_confirm_phone_link_invalid(tr::now));
 		}
 	}).send();
 }
@@ -1157,12 +1203,66 @@ SessionController::SessionController(
 		}));
 	}, _lifetime);
 
+	session->downloader().nonPremiumDelays(
+	) | rpl::start_with_next([=](DocumentId id) {
+		checkNonPremiumLimitToastDownload(id);
+	}, _lifetime);
+
+	session->uploader().nonPremiumDelays(
+	) | rpl::start_with_next([=](FullMsgId id) {
+		checkNonPremiumLimitToastUpload(id);
+	}, _lifetime);
+
 	session->addWindow(this);
 
 	crl::on_main(this, [=] {
 		activateFirstChatsFilter();
 		setupPremiumToast();
 	});
+}
+
+bool SessionController::skipNonPremiumLimitToast(bool download) const {
+	if (session().premium()) {
+		return true;
+	}
+	const auto now = base::unixtime::now();
+	const auto last = download
+		? session().settings().lastNonPremiumLimitDownload()
+		: session().settings().lastNonPremiumLimitUpload();
+	const auto delay = session().appConfig().get<int>(
+		u"upload_premium_speedup_notify_period"_q,
+		3600);
+	return (last && now < last + delay && now > last - delay);
+}
+
+void SessionController::checkNonPremiumLimitToastDownload(DocumentId id) {
+	if (skipNonPremiumLimitToast(true)) {
+		return;
+	}
+	const auto document = session().data().document(id);
+	const auto visible = session().data().queryDocumentVisibility(document)
+		|| DownloadingDocument(document);
+	if (!visible) {
+		return;
+	}
+	content()->showNonPremiumLimitToast(true);
+	const auto now = base::unixtime::now();
+	session().settings().setLastNonPremiumLimitDownload(now);
+	session().saveSettingsDelayed();
+}
+
+void SessionController::checkNonPremiumLimitToastUpload(FullMsgId id) {
+	if (skipNonPremiumLimitToast(false)) {
+		return;
+	} else if (const auto item = session().data().message(id)) {
+		if (!session().data().queryItemVisibility(item)) {
+			return;
+		}
+		content()->showNonPremiumLimitToast(false);
+		const auto now = base::unixtime::now();
+		session().settings().setLastNonPremiumLimitUpload(now);
+		session().saveSettingsDelayed();
+	}
 }
 
 void SessionController::suggestArchiveAndMute() {
@@ -1244,6 +1344,12 @@ void SessionController::showGiftPremiumBox(UserData *user) {
 
 void SessionController::showGiftPremiumsBox(const QString &ref) {
 	_giftPremiumValidator.showChoosePeerBox(ref);
+}
+
+void SessionController::showGiftPremiumsBox(
+		not_null<UserData*> user,
+		const QString &ref) {
+	_giftPremiumValidator.showChosenPeerBox(user, ref);
 }
 
 void SessionController::init() {

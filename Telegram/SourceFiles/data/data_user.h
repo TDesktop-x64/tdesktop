@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "data/data_birthday.h"
 #include "data/data_peer.h"
 #include "data/data_chat_participant_status.h"
 #include "data/data_lastseen_status.h"
@@ -21,13 +22,6 @@ struct BusinessDetails;
 struct BotInfo {
 	BotInfo();
 
-	bool inited = false;
-	bool readsAllHistory = false;
-	bool cantJoinGroups = false;
-	bool supportsAttachMenu = false;
-	bool canEditInformation = false;
-	int version = 0;
-	int descriptionVersion = 0;
 	QString description;
 	QString inlinePlaceholder;
 	std::vector<Data::BotCommand> commands;
@@ -43,6 +37,15 @@ struct BotInfo {
 
 	ChatAdminRights groupAdminRights;
 	ChatAdminRights channelAdminRights;
+
+	int version = 0;
+	int descriptionVersion = 0;
+	bool inited : 1 = false;
+	bool readsAllHistory : 1 = false;
+	bool cantJoinGroups : 1 = false;
+	bool supportsAttachMenu : 1 = false;
+	bool canEditInformation : 1 = false;
+	bool supportsBusiness : 1 = false;
 };
 
 enum class UserDataFlag : uint32 {
@@ -179,6 +182,10 @@ public:
 	bool hasCalls() const;
 	void setCallsStatus(CallsStatus callsStatus);
 
+	[[nodiscard]] Data::Birthday birthday() const;
+	void setBirthday(Data::Birthday value);
+	void setBirthday(const tl::conditional<MTPBirthday> &value);
+
 	std::unique_ptr<BotInfo> botInfo;
 
 	void setUnavailableReasons(
@@ -200,12 +207,20 @@ public:
 	[[nodiscard]] const Data::BusinessDetails &businessDetails() const;
 	void setBusinessDetails(Data::BusinessDetails details);
 
+	[[nodiscard]] ChannelId personalChannelId() const;
+	[[nodiscard]] MsgId personalChannelMessageId() const;
+	void setPersonalChannel(ChannelId channelId, MsgId messageId);
+
 private:
 	auto unavailableReasons() const
 		-> const std::vector<Data::UnavailableReason> & override;
 
 	Flags _flags;
 	Data::LastseenStatus _lastseen;
+	Data::Birthday _birthday;
+	int _commonChatsCount = 0;
+	ContactStatus _contactStatus = ContactStatus::Unknown;
+	CallsStatus _callsStatus = CallsStatus::Unknown;
 
 	Data::UsernamesInfo _username;
 
@@ -213,9 +228,9 @@ private:
 	std::vector<Data::UnavailableReason> _unavailableReasons;
 	QString _phone;
 	QString _privateForwardName;
-	ContactStatus _contactStatus = ContactStatus::Unknown;
-	CallsStatus _callsStatus = CallsStatus::Unknown;
-	int _commonChatsCount = 0;
+
+	ChannelId _personalChannelId = 0;
+	MsgId _personalChannelMessageId = 0;
 
 	uint64 _accessHash = 0;
 	static constexpr auto kInaccessibleAccessHashOld

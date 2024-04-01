@@ -380,7 +380,7 @@ void SetupSections(
 	} else {
 		const auto enabled = [=] {
 			const auto result = account->appConfig().get<bool>(
-				"dialog_filters_enabled",
+				u"dialog_filters_enabled"_q,
 				false);
 			if (result) {
 				preload();
@@ -449,10 +449,7 @@ void SetupPremium(
 	button->addClickHandler([=] {
 		showOther(BusinessId());
 	});
-	constexpr auto kNewExpiresAt = int(1711958400);
-	if (base::unixtime::now() < kNewExpiresAt) {
-		Ui::NewBadge::AddToRight(button);
-	}
+	Ui::NewBadge::AddToRight(button);
 
 	if (controller->session().premiumCanBuy()) {
 		const auto button = AddButtonWithIcon(

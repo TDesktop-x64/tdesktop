@@ -52,11 +52,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_account.h"
 #include "main/main_domain.h"
 #include "mtproto/mtproto_config.h"
+#include "data/data_chat.h"
 #include "data/data_document_media.h"
 #include "data/data_folder.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
 #include "data/data_changes.h"
+#include "data/data_channel.h"
 #include "data/data_stories.h"
 #include "mainwidget.h"
 #include "styles/style_chat.h" // popupMenuExpandedSeparator
@@ -108,6 +110,123 @@ public:
 	}
 
 };
+
+not_null<Ui::SettingsButton*> AddMyChannelsBox(
+		not_null<Ui::SettingsButton*> button,
+		not_null<SessionController*> controller,
+		bool chats) {
+	button->setAcceptBoth(true);
+
+	const auto myChannelsBox = [=](not_null<Ui::GenericBox*> box) {
+		box->setTitle(tr::lng_notification_channels());
+
+		const auto st = box->lifetime().make_state<style::UserpicButton>(
+			st::defaultUserpicButton);
+		st->photoSize = st::defaultPeerListItem.photoSize;
+		st->size = QSize(st->photoSize, st->photoSize);
+
+		class Button final : public Ui::SettingsButton {
+		public:
+			using Ui::SettingsButton::SettingsButton;
+
+			void setPeer(not_null<PeerData*> p) {
+				const auto c = p->asChannel();
+				const auto g = p->asChat();
+				_text.setText(st::defaultPeerListItem.nameStyle, p->name());
+				const auto count = c ? c->membersCount() : g->count;
+				_status.setText(
+					st::defaultTextStyle,
+					!p->userName().isEmpty()
+						? ('@' + p->userName())
+						: count
+						? tr::lng_chat_status_subscribers(
+							tr::now,
+							lt_count,
+							count)
+						: QString());
+			}
+
+			int resizeGetHeight(int) override {
+				return st::defaultPeerListItem.height;
+			}
+
+			void paintEvent(QPaintEvent *e) override {
+				Ui::SettingsButton::paintEvent(e);
+				auto p = Painter(this);
+				const auto &st = st::defaultPeerListItem;
+				const auto availableWidth = width()
+					- st::boxRowPadding.right()
+					- st.namePosition.x();
+				p.setPen(st.nameFg);
+				auto context = Ui::Text::PaintContext{
+					.position = st.namePosition,
+					.outerWidth = availableWidth,
+					.availableWidth = availableWidth,
+					.elisionLines = 1,
+				};
+				_text.draw(p, context);
+				p.setPen(st.statusFg);
+				context.position = st.statusPosition;
+				_status.draw(p, context);
+			}
+
+		private:
+			Ui::Text::String _text;
+			Ui::Text::String _status;
+
+		};
+
+		const auto add = [&](not_null<PeerData*> peer) {
+			const auto row = box->addRow(
+				object_ptr<Button>(box, rpl::single(QString())),
+				{});
+			row->setPeer(peer);
+			row->setClickedCallback([=] {
+				controller->showPeerHistory(peer);
+			});
+			using Button = Ui::UserpicButton;
+			const auto userpic = Ui::CreateChild<Button>(row, peer, *st);
+			userpic->move(st::defaultPeerListItem.photoPosition);
+			userpic->setAttribute(Qt::WA_TransparentForMouseEvents);
+		};
+
+		const auto &data = controller->session().data();
+		if (chats) {
+			data.enumerateGroups([&](not_null<PeerData*> peer) {
+				const auto c = peer->asChannel();
+				const auto g = peer->asChat();
+				if ((c && c->amCreator()) || (g && g->amCreator())) {
+					add(peer);
+				}
+			});
+		} else {
+			data.enumerateBroadcasts([&](not_null<ChannelData*> channel) {
+				if (channel->amCreator()) {
+					add(channel);
+				}
+			});
+		}
+	};
+
+	using Menu = base::unique_qptr<Ui::PopupMenu>;
+	const auto menu = button->lifetime().make_state<Menu>();
+	button->addClickHandler([=](Qt::MouseButton which) {
+		if (which != Qt::RightButton) {
+			return;
+		}
+
+		(*menu) = base::make_unique_q<Ui::PopupMenu>(
+			button,
+			st::defaultPopupMenu);
+		(*menu)->addAction(
+			chats ? u"My Groups"_q : u"My Channels"_q,
+			[=] { controller->uiShow()->showBox(Box(myChannelsBox)); },
+			nullptr);
+		(*menu)->popup(QCursor::pos());
+	});
+
+	return button;
+}
 
 [[nodiscard]] bool CanCheckSpecialEvent() {
 	static const auto result = [] {
@@ -854,23 +973,22 @@ void MainMenu::setupMenu() {
 			std::move(descriptor));
 	};
 	if (!_controller->session().supportMode()) {
-		addAction(
+		AddMyChannelsBox(addAction(
 			tr::lng_create_group_title(),
 			{ &st::menuIconGroups }
-		)->setClickedCallback([=] {
-			controller->showNewGroup();
+		), controller, true)->addClickHandler([=](Qt::MouseButton which) {
+			if (which == Qt::LeftButton) {
+				controller->showNewGroup();
+			}
 		});
-		addAction(
-			tr::lng_create_supergroup_title(),
-			{ &st::menuIconGroups }
-		)->setClickedCallback([=] {
-			controller->showNewSupergroup();
-		});
-		addAction(
+
+		AddMyChannelsBox(addAction(
 			tr::lng_create_channel_title(),
 			{ &st::menuIconChannel }
-		)->setClickedCallback([=] {
-			controller->showNewChannel();
+		), controller, false)->addClickHandler([=](Qt::MouseButton which) {
+			if (which == Qt::LeftButton) {
+				controller->showNewChannel();
+			}
 		});
 
 		if (!GetEnhancedBool("hide_stories")) {

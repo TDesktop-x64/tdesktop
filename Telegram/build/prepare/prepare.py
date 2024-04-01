@@ -59,6 +59,7 @@ for arg in sys.argv[1:]:
         options.append(arg)
     elif arg == 'run':
         customRunCommand = True
+
 buildQt5 = not 'skip-qt5' in options if win else 'build-qt5' in options
 buildQt6 = 'build-qt6' in options if win else not 'skip-qt6' in options
 
@@ -578,9 +579,9 @@ mac:
     cmake --install build
 """)
 
-stage('openssl', """
-    git clone -b OpenSSL_1_1_1-stable https://github.com/openssl/openssl openssl
-    cd openssl
+stage('openssl3', """
+    git clone -b openssl-3.2.1 https://github.com/openssl/openssl openssl3
+    cd openssl3
 win32:
     perl Configure no-shared no-tests debug-VC-WIN32
     %THIRDPARTY_DIR%\\msys64\\usr\\bin\\sed.exe -i 's/\/W3 \/wd4090 \/nologo \/Od/\/W3 \/wd4090 \/nologo \/Od \/FS \/MP/g' makefile
@@ -1411,7 +1412,7 @@ if buildQt5:
     stage('qt_5_15_13', """
     git clone -b v5.15.13-lts-lgpl https://github.com/qt/qt5.git qt_5_15_13
     cd qt_5_15_13
-    perl init-repository --module-subset=qtbase,qtimageformats,qtsvg
+    git submodule update --init --recursive qtbase qtimageformats qtsvg
 depends:patches/qtbase_5.15.13/*.patch
     cd qtbase
 win:
@@ -1426,7 +1427,7 @@ win:
     SET ANGLE_DIR=%LIBS_DIR%\\tg_angle
     SET ANGLE_LIBS_DIR=%ANGLE_DIR%\\out
     SET MOZJPEG_DIR=%LIBS_DIR%\\mozjpeg
-    SET OPENSSL_DIR=%LIBS_DIR%\\openssl
+    SET OPENSSL_DIR=%LIBS_DIR%\\openssl3
     SET OPENSSL_LIBS_DIR=%OPENSSL_DIR%\\out
     SET ZLIB_LIBS_DIR=%LIBS_DIR%\\zlib
     SET WEBP_DIR=%LIBS_DIR%\\libwebp
@@ -1497,7 +1498,7 @@ if buildQt6:
 mac:
     git clone -b v6.2.7-lts-lgpl https://github.com/qt/qt5.git qt_6_2_7
     cd qt_6_2_7
-    perl init-repository --module-subset=qtbase,qtimageformats,qtsvg
+    git submodule update --init --recursive qtbase qtimageformats qtsvg
 depends:patches/qtbase_6.2.7/*.patch
     cd qtbase
     find ../../patches/qtbase_6.2.7 -type f -print0 | sort -z | xargs -0 git apply -v
@@ -1540,7 +1541,7 @@ stage('tg_owt', """
 win:
     SET MOZJPEG_PATH=$LIBS_DIR/mozjpeg
     SET OPUS_PATH=$USED_PREFIX/include/opus
-    SET OPENSSL_PATH=$LIBS_DIR/openssl/include
+    SET OPENSSL_PATH=$LIBS_DIR/openssl3/include
     SET LIBVPX_PATH=$USED_PREFIX/include
     SET FFMPEG_PATH=$LIBS_DIR/ffmpeg
     mkdir out
@@ -1586,7 +1587,7 @@ mac:
         -DTG_OWT_BUILD_AUDIO_BACKENDS=OFF \
         -DTG_OWT_SPECIAL_TARGET=$SPECIAL_TARGET \
         -DTG_OWT_LIBJPEG_INCLUDE_PATH=$MOZJPEG_PATH \
-        -DTG_OWT_OPENSSL_INCLUDE_PATH=$LIBS_DIR/openssl/include \
+        -DTG_OWT_OPENSSL_INCLUDE_PATH=$LIBS_DIR/openssl3/include \
         -DTG_OWT_OPUS_INCLUDE_PATH=$OPUS_PATH \
         -DTG_OWT_LIBVPX_INCLUDE_PATH=$LIBVPX_PATH \
         -DTG_OWT_FFMPEG_INCLUDE_PATH=$FFMPEG_PATH ../..
@@ -1600,7 +1601,7 @@ mac:
         -DTG_OWT_BUILD_AUDIO_BACKENDS=OFF \
         -DTG_OWT_SPECIAL_TARGET=$SPECIAL_TARGET \
         -DTG_OWT_LIBJPEG_INCLUDE_PATH=$MOZJPEG_PATH \
-        -DTG_OWT_OPENSSL_INCLUDE_PATH=$LIBS_DIR/openssl/include \
+        -DTG_OWT_OPENSSL_INCLUDE_PATH=$LIBS_DIR/openssl3/include \
         -DTG_OWT_OPUS_INCLUDE_PATH=$OPUS_PATH \
         -DTG_OWT_LIBVPX_INCLUDE_PATH=$LIBVPX_PATH \
         -DTG_OWT_FFMPEG_INCLUDE_PATH=$FFMPEG_PATH ../..
@@ -1616,7 +1617,7 @@ release:
         -DCMAKE_OSX_ARCHITECTURES=x86_64 \
         -DTG_OWT_SPECIAL_TARGET=$SPECIAL_TARGET \
         -DTG_OWT_LIBJPEG_INCLUDE_PATH=$MOZJPEG_PATH \
-        -DTG_OWT_OPENSSL_INCLUDE_PATH=$LIBS_DIR/openssl/include \
+        -DTG_OWT_OPENSSL_INCLUDE_PATH=$LIBS_DIR/openssl3/include \
         -DTG_OWT_OPUS_INCLUDE_PATH=$OPUS_PATH \
         -DTG_OWT_LIBVPX_INCLUDE_PATH=$LIBVPX_PATH \
         -DTG_OWT_FFMPEG_INCLUDE_PATH=$FFMPEG_PATH ../..
@@ -1629,7 +1630,7 @@ release:
         -DCMAKE_OSX_ARCHITECTURES=arm64 \
         -DTG_OWT_SPECIAL_TARGET=$SPECIAL_TARGET \
         -DTG_OWT_LIBJPEG_INCLUDE_PATH=$MOZJPEG_PATH \
-        -DTG_OWT_OPENSSL_INCLUDE_PATH=$LIBS_DIR/openssl/include \
+        -DTG_OWT_OPENSSL_INCLUDE_PATH=$LIBS_DIR/openssl3/include \
         -DTG_OWT_OPUS_INCLUDE_PATH=$OPUS_PATH \
         -DTG_OWT_LIBVPX_INCLUDE_PATH=$LIBVPX_PATH \
         -DTG_OWT_FFMPEG_INCLUDE_PATH=$FFMPEG_PATH ../..

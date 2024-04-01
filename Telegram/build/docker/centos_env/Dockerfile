@@ -1,10 +1,7 @@
 {%- set GIT = "https://github.com" -%}
 {%- set GIT_FREEDESKTOP = GIT ~ "/gitlab-freedesktop-mirrors" -%}
 {%- set QT = "6.7.0" -%}
-{%- set QT_TAG = "v" ~ QT ~ "-rc1" -%}
-{%- set QT_PREFIX = "/usr/local/desktop-app/Qt-" ~ QT -%}
-{%- set OPENSSL_VER = "1_1_1" -%}
-{%- set OPENSSL_PREFIX = "/usr/local/desktop-app/openssl-1.1.1" -%}
+{%- set QT_TAG = "v" ~ QT ~ "-rc2" -%}
 {%- set CMAKE_VER = "3.27.6" -%}
 {%- set CMAKE_FILE = "cmake-" ~ CMAKE_VER ~ "-Linux-x86_64.sh" -%}
 {%- set CFLAGS_DEBUG = "-g -pipe -fPIC -fstack-protector-all -fstack-clash-protection -fcf-protection -D_GLIBCXX_ASSERTIONS" -%}
@@ -23,7 +20,7 @@ RUN dnf -y install epel-release \
 	&& dnf config-manager --set-enabled powertools \
 	&& dnf -y install autoconf automake libtool pkgconfig make patch git \
 		python3.11-pip python3.11-devel gperf flex bison clang lld yasm \
-		file which perl-open perl-XML-Parser xorg-x11-util-macros \
+		file which perl-open perl-XML-Parser perl-IPC-Cmd xorg-x11-util-macros \
 		gcc-toolset-12-gcc gcc-toolset-12-gcc-c++ gcc-toolset-12-binutils \
 		libffi-devel fontconfig-devel freetype-devel libX11-devel \
 		alsa-lib-devel pulseaudio-libs-devel mesa-libGL-devel mesa-libEGL-devel \
@@ -54,7 +51,7 @@ FROM builder AS patches
 RUN git init patches \
 	&& cd patches \
 	&& git remote add origin {{ GIT }}/desktop-app/patches.git \
-	&& git fetch --depth=1 origin 75140a10eefcecaad7b3f3aa4586b880a39007ff \
+	&& git fetch --depth=1 origin 7b8f30b787691a325d17e20ddd455e87738e7432 \
 	&& git reset --hard FETCH_HEAD \
 	&& rm -rf .git
 
@@ -661,18 +658,16 @@ RUN git clone -b 1.23.1 --depth=1 {{ GIT }}/kcat/openal-soft.git \
 	&& rm -rf openal-soft
 
 FROM builder AS openssl
-ENV opensslDir openssl_{{ OPENSSL_VER }}
-RUN git clone -b OpenSSL_{{ OPENSSL_VER }}-stable --depth=1 {{ GIT }}/openssl/openssl.git $opensslDir \
-	&& cd $opensslDir \
+RUN git clone -b openssl-3.2.1 --depth=1 {{ GIT }}/openssl/openssl.git \
+	&& cd openssl \
 	&& ./config \
-		--prefix="{{ OPENSSL_PREFIX }}" \
 		--openssldir=/etc/ssl \
 		no-tests \
 		no-dso \
 	&& make -j$(nproc) \
 	&& make DESTDIR="{{ LibrariesPath }}/openssl-cache" install_sw \
 	&& cd .. \
-	&& rm -rf $opensslDir
+	&& rm -rf openssl
 
 FROM builder AS xkbcommon
 COPY --link --from=xcb {{ LibrariesPath }}/xcb-cache /
@@ -733,17 +728,15 @@ COPY --link --from=openssl {{ LibrariesPath }}/openssl-cache /
 COPY --link --from=xkbcommon {{ LibrariesPath }}/xkbcommon-cache /
 COPY --link --from=libwebp {{ LibrariesPath }}/libwebp-cache /
 
-ENV OPENSSL_ROOT_DIR {{ OPENSSL_PREFIX }}
-
-RUN git clone -b {{ QT_TAG }} --depth=1 {{ GIT }}/qt/qt5.git qt_{{ QT }} \
-	&& cd qt_{{ QT }} \
+RUN git clone -b {{ QT_TAG }} --depth=1 {{ GIT }}/qt/qt5.git \
+	&& cd qt5 \
 	&& git submodule update --init --recursive --depth=1 qtbase qtdeclarative qtwayland qtimageformats qtsvg qtshadertools \
 	&& cd qtbase \
 	&& find ../../patches/qtbase_{{ QT }} -type f -print0 | sort -z | xargs -r0 git apply \
 	&& cd ../qtwayland \
 	&& find ../../patches/qtwayland_{{ QT }} -type f -print0 | sort -z | xargs -r0 git apply \
 	&& cd .. \
-	&& ./configure -prefix "{{ QT_PREFIX }}" \
+	&& ./configure \
 		CMAKE_BUILD_TYPE=None \
 		-opensource \
 		-confirm-license \
@@ -762,7 +755,7 @@ RUN git clone -b {{ QT_TAG }} --depth=1 {{ GIT }}/qt/qt5.git qt_{{ QT }} \
 	&& cmake --build . --parallel \
 	&& DESTDIR="{{ LibrariesPath }}/qt-cache" cmake --install . \
 	&& cd .. \
-	&& rm -rf qt_{{ QT }}
+	&& rm -rf qt5
 
 FROM builder AS breakpad
 RUN git clone -b v2023.06.01 --depth=1 https://chromium.googlesource.com/breakpad/breakpad.git \
@@ -798,7 +791,7 @@ RUN git init tg_owt \
 		-DCMAKE_CXX_FLAGS_DEBUG="{{ CFLAGS_DEBUG }}" \
 		-DTG_OWT_SPECIAL_TARGET=linux \
 		-DTG_OWT_LIBJPEG_INCLUDE_PATH=/usr/local/include \
-		-DTG_OWT_OPENSSL_INCLUDE_PATH={{ OPENSSL_PREFIX }}/include \
+		-DTG_OWT_OPENSSL_INCLUDE_PATH=/usr/local/include \
 		-DTG_OWT_OPUS_INCLUDE_PATH=/usr/local/include/opus \
 		-DTG_OWT_LIBVPX_INCLUDE_PATH=/usr/local/include \
 		-DTG_OWT_FFMPEG_INCLUDE_PATH=/usr/local/include
@@ -866,7 +859,6 @@ COPY --link --from=webrtc_debug {{ LibrariesPath }}/tg_owt/out/Debug tg_owt/out/
 
 WORKDIR ../tdesktop
 ENV QT {{ QT }}
-ENV OPENSSL_ROOT_DIR {{ OPENSSL_PREFIX }}
 ENV BOOST_INCLUDEDIR /usr/include/boost1.78
 ENV BOOST_LIBRARYDIR /usr/lib64/boost1.78
 

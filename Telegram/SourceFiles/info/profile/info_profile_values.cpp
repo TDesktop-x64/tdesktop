@@ -347,6 +347,25 @@ rpl::producer<bool> CanAddContactValue(not_null<UserData*> user) {
 	) | rpl::map(!_1);
 }
 
+rpl::producer<Data::Birthday> BirthdayValue(not_null<UserData*> user) {
+	return user->session().changes().peerFlagsValue(
+		user,
+		UpdateFlag::Birthday
+	) | rpl::map([=] {
+		return user->birthday();
+	});
+}
+
+rpl::producer<ChannelData*> PersonalChannelValue(not_null<UserData*> user) {
+	return user->session().changes().peerFlagsValue(
+		user,
+		UpdateFlag::PersonalChannel
+	) | rpl::map([=] {
+		const auto channelId = user->personalChannelId();
+		return channelId ? user->owner().channel(channelId).get() : nullptr;
+	});
+}
+
 rpl::producer<bool> AmInChannelValue(not_null<ChannelData*> channel) {
 	return channel->session().changes().peerFlagsValue(
 		channel,
@@ -628,6 +647,51 @@ rpl::producer<DocumentId> EmojiStatusIdValue(not_null<PeerData*> peer) {
 		peer,
 		Data::PeerUpdate::Flag::EmojiStatus
 	) | rpl::map([=] { return peer->emojiStatusId(); });
+}
+
+rpl::producer<QString> BirthdayLabelText(
+		rpl::producer<Data::Birthday> birthday) {
+	return std::move(birthday) | rpl::map([](Data::Birthday value) {
+		return rpl::conditional(
+			Data::IsBirthdayTodayValue(value),
+			tr::lng_info_birthday_today_label(),
+			tr::lng_info_birthday_label());
+	}) | rpl::flatten_latest();
+}
+
+rpl::producer<QString> BirthdayValueText(
+		rpl::producer<Data::Birthday> birthday) {
+	return std::move(
+		birthday
+	) | rpl::map([](Data::Birthday value) -> rpl::producer<QString> {
+		if (!value) {
+			return rpl::single(QString());
+		}
+		return Data::IsBirthdayTodayValue(
+			value
+		) | rpl::map([=](bool today) {
+			auto text = Data::BirthdayText(value);
+			if (const auto age = Data::BirthdayAge(value)) {
+				text = (today
+					? tr::lng_info_birthday_today_years
+					: tr::lng_info_birthday_years)(
+						tr::now,
+						lt_count,
+						age,
+						lt_date,
+						text);
+			}
+			if (today) {
+				text = tr::lng_info_birthday_today(
+					tr::now,
+					lt_emoji,
+					Data::BirthdayCake(),
+					lt_date,
+					text);
+			}
+			return text;
+		});
+	}) | rpl::flatten_latest();
 }
 
 } // namespace Profile

@@ -17,6 +17,7 @@ struct ChannelLocation;
 namespace Data {
 class ForumTopic;
 class Thread;
+class Birthday;
 } // namespace Data
 
 namespace Main {
@@ -84,6 +85,10 @@ rpl::producer<not_null<PeerData*>> MigratedOrMeValue(
 	not_null<UserData*> user);
 [[nodiscard]] rpl::producer<bool> CanAddContactValue(
 	not_null<UserData*> user);
+[[nodiscard]] rpl::producer<Data::Birthday> BirthdayValue(
+	not_null<UserData*> user);
+[[nodiscard]] rpl::producer<ChannelData*> PersonalChannelValue(
+	not_null<UserData*> user);
 [[nodiscard]] rpl::producer<bool> AmInChannelValue(
 	not_null<ChannelData*> channel);
 [[nodiscard]] rpl::producer<int> MembersCountValue(not_null<PeerData*> peer);
@@ -118,5 +123,10 @@ enum class BadgeType;
 [[nodiscard]] rpl::producer<BadgeType> BadgeValue(not_null<PeerData*> peer);
 [[nodiscard]] rpl::producer<DocumentId> EmojiStatusIdValue(
 	not_null<PeerData*> peer);
+
+[[nodiscard]] rpl::producer<QString> BirthdayLabelText(
+	rpl::producer<Data::Birthday> birthday);
+[[nodiscard]] rpl::producer<QString> BirthdayValueText(
+	rpl::producer<Data::Birthday> birthday);
 
 } // namespace Info::Profile

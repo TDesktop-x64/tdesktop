@@ -146,6 +146,7 @@ struct HistoryItem::CreateConfig {
 	ReplyFields reply;
 
 	UserId viaBotId = 0;
+	UserId viaBusinessBotId = 0;
 	int viewsCount = -1;
 	int forwardsCount = -1;
 	int boostsApplied = 0;
@@ -1599,6 +1600,11 @@ void HistoryItem::setRealShortcutId(BusinessShortcutId id) {
 	_shortcutId = id;
 }
 
+void HistoryItem::setCustomServiceLink(ClickHandlerPtr link) {
+	AddComponents(HistoryServiceCustomLink::Bit());
+	Get<HistoryServiceCustomLink>()->link = std::move(link);
+}
+
 void HistoryItem::destroy() {
 	_history->destroyMessage(this);
 }
@@ -1749,6 +1755,7 @@ void HistoryItem::setStoryFields(not_null<Data::Story*> story) {
 }
 
 void HistoryItem::applyEdition(const MTPDmessageService &message) {
+	const auto wasSublist = savedSublist();
 	if (message.vaction().type() == mtpc_messageActionHistoryClear) {
 		const auto wasGrouped = history()->owner().groups().isGrouped(this);
 		setReplyMarkup({});
@@ -1779,6 +1786,11 @@ void HistoryItem::applyEdition(const MTPDmessageService &message) {
 		applyServiceDateEdition(message);
 		finishEdition(-1);
 		_flags &= ~MessageFlag::DisplayFromChecked;
+	}
+	const auto nowSublist = savedSublist();
+	if (wasSublist && nowSublist != wasSublist) {
+		wasSublist->removeOne(this);
+		nowSublist->applyMaybeLast(this);
 	}
 }
 
@@ -2622,8 +2634,8 @@ QString HistoryItem::originalPostAuthor() const {
 	if (const auto forwarded = Get<HistoryMessageForwarded>()) {
 		return forwarded->originalPostAuthor;
 	} else if (const auto msgsigned = Get<HistoryMessageSigned>()) {
-		if (!msgsigned->isAnonymousRank) {
-			return msgsigned->postAuthor;
+		if (!msgsigned->isAnonymousRank && !msgsigned->viaBusinessBot) {
+			return msgsigned->author;
 		}
 	}
 	return QString();
@@ -2695,7 +2707,9 @@ void HistoryItem::setForwardsCount(int count) {
 
 void HistoryItem::setPostAuthor(const QString &postAuthor) {
 	auto msgsigned = Get<HistoryMessageSigned>();
-	if (postAuthor.isEmpty()) {
+	if (msgsigned && msgsigned->viaBusinessBot) {
+		return;
+	} else if (postAuthor.isEmpty()) {
 		if (!msgsigned) {
 			return;
 		}
@@ -2706,10 +2720,10 @@ void HistoryItem::setPostAuthor(const QString &postAuthor) {
 	if (!msgsigned) {
 		AddComponents(HistoryMessageSigned::Bit());
 		msgsigned = Get<HistoryMessageSigned>();
-	} else if (msgsigned->postAuthor == postAuthor) {
+	} else if (msgsigned->author == postAuthor) {
 		return;
 	}
-	msgsigned->postAuthor = postAuthor;
+	msgsigned->author = postAuthor;
 	msgsigned->isAnonymousRank = !isDiscussionPost()
 		&& this->author()->isMegagroup();
 	history()->owner().requestItemResize(this);
@@ -3148,6 +3162,13 @@ bool HistoryItem::isEmpty() const {
 Data::SavedSublist *HistoryItem::savedSublist() const {
 	if (const auto saved = Get<HistoryMessageSaved>()) {
 		return saved->sublist;
+	} else if (_history->peer->isSelf()) {
+		const auto sublist = _history->owner().savedMessages().sublist(
+			_history->peer);
+		const auto that = const_cast<HistoryItem*>(this);
+		that->AddComponents(HistoryMessageSaved::Bit());
+		that->Get<HistoryMessageSaved>()->sublist = sublist;
+		return sublist;
 	}
 	return nullptr;
 }
@@ -3310,7 +3331,7 @@ void HistoryItem::createComponents(CreateConfig &&config) {
 	if (config.viewsCount >= 0 || !config.replies.isNull) {
 		mask |= HistoryMessageViews::Bit();
 	}
-	if (!config.postAuthor.isEmpty()) {
+	if (!config.postAuthor.isEmpty() || config.viaBusinessBotId) {
 		mask |= HistoryMessageSigned::Bit();
 	} else if (_history->peer->isMegagroup() // Discussion posts signatures.
 		&& config.savedFromPeer
@@ -3383,11 +3404,17 @@ void HistoryItem::createComponents(CreateConfig &&config) {
 		edited->date = config.editDate;
 	}
 	if (const auto msgsigned = Get<HistoryMessageSigned>()) {
-		msgsigned->postAuthor = config.postAuthor.isEmpty()
-			? config.originalPostAuthor
-			: config.postAuthor;
-		msgsigned->isAnonymousRank = !isDiscussionPost()
-			&& author()->isMegagroup();
+		if (config.viaBusinessBotId) {
+			msgsigned->viaBusinessBot = _history->owner().user(
+				config.viaBusinessBotId);
+			msgsigned->author = msgsigned->viaBusinessBot->name();
+		} else {
+			msgsigned->author = config.postAuthor.isEmpty()
+				? config.originalPostAuthor
+				: config.postAuthor;
+			msgsigned->isAnonymousRank = !isDiscussionPost()
+				&& author()->isMegagroup();
+		}
 	}
 	setupForwardedComponent(config);
 	if (const auto markup = Get<HistoryMessageReplyMarkup>()) {
@@ -3674,6 +3701,7 @@ void HistoryItem::createComponents(const MTPDmessage &data, bool blocked) {
 		config.reply = ReplyFieldsFromMTP(this, *reply);
 	}
 	config.viaBotId = data.vvia_bot_id().value_or_empty();
+	config.viaBusinessBotId = data.vvia_business_bot_id().value_or_empty();
 	config.viewsCount = data.vviews().value_or(-1);
 	config.forwardsCount = data.vforwards().value_or(-1);
 	config.replies = isScheduled()
@@ -4883,6 +4911,7 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 		prepareGiveawayLaunch,
 		prepareGiveawayResults,
 		prepareBoostApply,
+		PrepareEmptyText<MTPDmessageActionRequestedPeerSentMe>,
 		PrepareErrorText<MTPDmessageActionEmpty>));
 
 	// Additional information.

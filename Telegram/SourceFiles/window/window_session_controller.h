@@ -260,6 +260,9 @@ private:
 	void resolvePhone(
 		const QString &phone,
 		Fn<void(not_null<PeerData*>)> done);
+	void resolveChatLink(
+		const QString &slug,
+		Fn<void(not_null<PeerData*> peer, TextWithEntities draft)> done);
 	void resolveUsername(
 		const QString &username,
 		Fn<void(not_null<PeerData*>)> done);
@@ -391,6 +394,9 @@ public:
 	void showEditPeerBox(PeerData *peer);
 	void showGiftPremiumBox(UserData *user);
 	void showGiftPremiumsBox(const QString &ref);
+
+	// Single user gift as if was selected in multiple recipients chooser.
+	void showGiftPremiumsBox(not_null<UserData*> user, const QString &ref);
 
 	void enableGifPauseReason(GifPauseReason reason);
 	void disableGifPauseReason(GifPauseReason reason);
@@ -648,6 +654,10 @@ private:
 	[[nodiscard]] Ui::ChatThemeBackgroundData backgroundData(
 		CachedTheme &theme,
 		bool generateGradient = true) const;
+
+	[[nodiscard]] bool skipNonPremiumLimitToast(bool download) const;
+	void checkNonPremiumLimitToastDownload(DocumentId id);
+	void checkNonPremiumLimitToastUpload(FullMsgId id);
 
 	const not_null<Controller*> _window;
 	const std::unique_ptr<ChatHelpers::EmojiInteractions> _emojiInteractions;

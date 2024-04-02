@@ -495,7 +495,7 @@ void AddMsgsFromUserAction(
 		const auto msgSigned = item->Get<HistoryMessageSigned>();
 		if (msgSigned) {
 			menu->addAction(tr::lng_context_show_messages_from(tr::now), [=] {
-				App::searchByHashtag(msgSigned->postAuthor, peer, item->from());
+				App::searchByHashtag(msgSigned->author, peer, item->from());
 			}, &st::menuIconInfo);
 		} else {
 			menu->addAction(tr::lng_context_show_messages_from(tr::now), [=] {

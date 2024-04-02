@@ -983,6 +983,15 @@ void MainMenu::setupMenu() {
 		});
 
 		AddMyChannelsBox(addAction(
+			tr::lng_create_supergroup_title(),
+			{ &st::menuIconGroups }
+		), controller, true)->addClickHandler([=](Qt::MouseButton which) {
+			if (which == Qt::LeftButton) {
+				controller->showNewChannel();
+			}
+		});
+
+		AddMyChannelsBox(addAction(
 			tr::lng_create_channel_title(),
 			{ &st::menuIconChannel }
 		), controller, false)->addClickHandler([=](Qt::MouseButton which) {

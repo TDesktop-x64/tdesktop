@@ -114,21 +114,13 @@ Uploader::File::File(const std::shared_ptr<FileLoadResult> &file)
 
 void Uploader::File::setDocSize(int64 size) {
 	docSize = size;
-	if (GetEnhancedInt("net_speed_boost") == 3) {
-		setPartSize(kDocumentUploadPartSize4);
-	} else if (GetEnhancedInt("net_speed_boost") == 2) {
-		setPartSize(kDocumentUploadPartSize3);
-	} else if (GetEnhancedInt("net_speed_boost") == 1) {
-		setPartSize(kDocumentUploadPartSize2);
-	} else {
-		constexpr auto limit0 = 1024 * 1024;
-		constexpr auto limit1 = 32 * limit0;
-		if (docSize >= limit0 || !setPartSize(kDocumentUploadPartSize0)) {
-			if (docSize > limit1 || !setPartSize(kDocumentUploadPartSize1)) {
-				if (!setPartSize(kDocumentUploadPartSize2)) {
-					if (!setPartSize(kDocumentUploadPartSize3)) {
-						setPartSize(kDocumentUploadPartSize4);
-					}
+	constexpr auto limit0 = 1024 * 1024;
+	constexpr auto limit1 = 32 * limit0;
+	if (docSize >= limit0 || !setPartSize(kDocumentUploadPartSize0)) {
+		if (docSize > limit1 || !setPartSize(kDocumentUploadPartSize1)) {
+			if (!setPartSize(kDocumentUploadPartSize2)) {
+				if (!setPartSize(kDocumentUploadPartSize3)) {
+					setPartSize(kDocumentUploadPartSize4);
 				}
 			}
 		}
@@ -383,7 +375,7 @@ void Uploader::currentFailed() {
 	dcMap.clear();
 	uploadingId = FullMsgId();
 	sentSize = 0;
-	for (int i = 0; i < cNetUploadSessionsCount(); ++i) {
+	for (int i = 0; i < MTP::kUploadSessionsCount; ++i) {
 		sentSizes[i] = 0;
 	}
 
@@ -410,13 +402,13 @@ void Uploader::notifyFailed(FullMsgId id, const File &file) {
 }
 
 void Uploader::stopSessions() {
-	for (int i = 0; i < cNetUploadSessionsCount(); ++i) {
+	for (int i = 0; i < MTP::kUploadSessionsCount; ++i) {
 		_api->instance().stopSession(MTP::uploadDcId(i));
 	}
 }
 
 void Uploader::sendNext() {
-	if (sentSize >= (cNetUploadSessionsCount() * 512 * 1024) || _pausedId.msg) {
+	if (sentSize >= kMaxUploadFileParallelSize || _pausedId.msg) {
 		return;
 	}
 
@@ -441,7 +433,7 @@ void Uploader::sendNext() {
 	auto &uploadingData = i->second;
 
 	auto todc = 0;
-	for (auto dc = 1; dc != cNetUploadSessionsCount(); ++dc) {
+	for (auto dc = 1; dc != MTP::kUploadSessionsCount; ++dc) {
 		if (sentSizes[dc] < sentSizes[todc]) {
 			todc = dc;
 		}
@@ -634,7 +626,7 @@ void Uploader::sendNext() {
 
 		parts.erase(part);
 	}
-	_nextTimer.callOnce(crl::time(cNetUploadRequestInterval()));
+	_nextTimer.callOnce(kUploadRequestInterval);
 }
 
 void Uploader::cancel(const FullMsgId &msgId) {
@@ -691,7 +683,7 @@ void Uploader::clear() {
 	cancelRequests();
 	dcMap.clear();
 	sentSize = 0;
-	for (int i = 0; i < cNetUploadSessionsCount(); ++i) {
+	for (int i = 0; i < MTP::kUploadSessionsCount; ++i) {
 		_api->instance().stopSession(MTP::uploadDcId(i));
 		sentSizes[i] = 0;
 	}

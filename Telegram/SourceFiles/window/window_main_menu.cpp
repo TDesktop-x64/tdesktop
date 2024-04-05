@@ -996,7 +996,7 @@ void MainMenu::setupMenu() {
 			{ &st::menuIconGroups }
 		), controller, true)->addClickHandler([=](Qt::MouseButton which) {
 			if (which == Qt::LeftButton) {
-				controller->showNewChannel();
+				controller->showNewSupergroup();
 			}
 		});
 

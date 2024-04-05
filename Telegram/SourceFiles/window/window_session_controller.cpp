@@ -2535,9 +2535,7 @@ void SessionController::showNewGroup() {
 }
 
 void SessionController::showNewSupergroup() {
-	_window->show(
-		Box<GroupInfoBox>(this, GroupInfoBox::Type::Megagroup),
-		Ui::LayerOption::KeepOther);
+	_window->show(Box<GroupInfoBox>(this, GroupInfoBox::Type::Megagroup));
 }
 
 void SessionController::showNewChannel() {

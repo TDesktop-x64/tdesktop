@@ -503,7 +503,7 @@ auto GenerateParticipantString(
 			data,
 		});
 	}
-	const auto username = peer->userName();
+	const auto username = peer->username();
 	if (username.isEmpty()) {
 		return name;
 	}

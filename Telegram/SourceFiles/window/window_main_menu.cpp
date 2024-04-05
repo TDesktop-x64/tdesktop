@@ -118,7 +118,9 @@ not_null<Ui::SettingsButton*> AddMyChannelsBox(
 	button->setAcceptBoth(true);
 
 	const auto myChannelsBox = [=](not_null<Ui::GenericBox*> box) {
-		box->setTitle(tr::lng_notification_channels());
+		box->setTitle(chats
+			? tr::lng_notification_groups()
+			: tr::lng_notification_channels());
 
 		const auto st = box->lifetime().make_state<style::UserpicButton>(
 			st::defaultUserpicButton);
@@ -136,8 +138,8 @@ not_null<Ui::SettingsButton*> AddMyChannelsBox(
 				const auto count = c ? c->membersCount() : g->count;
 				_status.setText(
 					st::defaultTextStyle,
-					!p->userName().isEmpty()
-						? ('@' + p->userName())
+					!p->username().isEmpty()
+						? ('@' + p->username())
 						: count
 						? tr::lng_chat_status_subscribers(
 							tr::now,
@@ -192,10 +194,16 @@ not_null<Ui::SettingsButton*> AddMyChannelsBox(
 
 		const auto &data = controller->session().data();
 		if (chats) {
+			auto ids = std::vector<PeerId>();
 			data.enumerateGroups([&](not_null<PeerData*> peer) {
+				peer = peer->migrateToOrMe();
 				const auto c = peer->asChannel();
 				const auto g = peer->asChat();
+				if (ranges::contains(ids, peer->id)) {
+					return;
+				}
 				if ((c && c->amCreator()) || (g && g->amCreator())) {
+					ids.push_back(peer->id);
 					add(peer);
 				}
 			});
@@ -219,7 +227,8 @@ not_null<Ui::SettingsButton*> AddMyChannelsBox(
 			button,
 			st::defaultPopupMenu);
 		(*menu)->addAction(
-			chats ? u"My Groups"_q : u"My Channels"_q,
+			(chats ? tr::lng_menu_my_groups : tr::lng_menu_my_channels)(
+				tr::now),
 			[=] { controller->uiShow()->showBox(Box(myChannelsBox)); },
 			nullptr);
 		(*menu)->popup(QCursor::pos());

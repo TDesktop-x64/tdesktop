@@ -1244,7 +1244,7 @@ PeerData *Session::peerByUsername(const QString &username) const {
 	const auto uname = username.trimmed();
 	for (const auto &[peerId, peer] : _peers) {
 		if (peer->isLoaded()
-			&& !peer->userName().compare(uname, Qt::CaseInsensitive)) {
+			&& !peer->username().compare(uname, Qt::CaseInsensitive)) {
 			return peer.get();
 		}
 	}

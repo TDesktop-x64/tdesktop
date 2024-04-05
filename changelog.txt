@@ -1,3 +1,21 @@
+4.16.3 beta (05.04.24)
+
+- Improve media upload speed.
+- Update FFmpeg to 6.1.1.
+
+4.16.2 (04.04.24)
+
+- Use IV by default for Telegraph and some Telegram links.
+- Support IV links in bot web-apps.
+- Some bug fixes.
+
+4.16.1 (02.04.24)
+
+- Show information about Fragment phone numbers and usernames.
+- Fix jump to original story from a story repost.
+- Fix old image display in viewer in some cases.
+- Fix several crashes.
+
 4.16 (01.04.24)
 
 - Instant View on Windows 10+ and macOS.

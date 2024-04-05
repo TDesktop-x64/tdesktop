@@ -77,7 +77,7 @@ void ShowMenu(not_null<Ui::GenericBox*> box, const QString &text) {
 [[nodiscard]] ClickHandlerPtr LearnMoreCurrencyLink(
 		not_null<Window::SessionController*> controller,
 		not_null<Ui::GenericBox*> box) {
-	const auto url = u"https://telegram.org/blog/monetization-for-channels"_q;
+	const auto url = tr::lng_channel_earn_learn_coin_link(tr::now);
 
 	using Resolver = HistoryView::Controls::WebpageResolver;
 	const auto resolver = box->lifetime().make_state<Resolver>(
@@ -217,7 +217,18 @@ void AddRecipient(not_null<Ui::GenericBox*> box, const TextWithEntities &t) {
 }
 #endif
 
-[[nodiscard]] QImage IconCurrency(
+[[nodiscard]] QString FormatDate(const QDateTime &date) {
+	return tr::lng_group_call_starts_short_date(
+		tr::now,
+		lt_date,
+		langDayOfMonth(date.date()),
+		lt_time,
+		QLocale().toString(date.time(), QLocale::ShortFormat));
+}
+
+} // namespace
+
+QImage IconCurrency(
 		const style::FlatLabel &label,
 		const QColor &c) {
 	const auto s = Size(label.style.font->ascent);
@@ -233,17 +244,6 @@ void AddRecipient(not_null<Ui::GenericBox*> box, const TextWithEntities &t) {
 	}
 	return image;
 }
-
-[[nodiscard]] QString FormatDate(const QDateTime &date) {
-	return tr::lng_group_call_starts_short_date(
-		tr::now,
-		lt_date,
-		langDayOfMonth(date.date()),
-		lt_time,
-		QLocale().toString(date.time(), QLocale::ShortFormat));
-}
-
-} // namespace
 
 InnerWidget::InnerWidget(
 	QWidget *parent,
@@ -372,6 +372,7 @@ void InnerWidget::fill() {
 					widget->paintRequest(
 					) | rpl::start_with_next([=] {
 						auto p = Painter(widget);
+						auto hq = PainterHighQualityEnabler(p);
 						p.setPen(Qt::NoPen);
 						p.setBrush(st::activeButtonBg);
 						p.drawEllipse(rect);

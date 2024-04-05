@@ -19,6 +19,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_menu_set_status" = "Set Emoji Status";
 "lng_menu_change_status" = "Change Emoji Status";
 "lng_menu_my_stories" = "My Stories";
+"lng_menu_my_groups" = "My Groups";
+"lng_menu_my_channels" = "My Channels";
 
 "lng_disable_notifications_from_tray" = "Disable notifications";
 "lng_enable_notifications_from_tray" = "Enable notifications";
@@ -468,6 +470,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_bot_usernames_description" = "Drag and drop links to change the order in which they will be displayed on the bot info page.";
 
 "lng_bio_placeholder" = "Bio";
+
+"lng_collectible_username_title" = "{username} is a collectible username that belongs to";
+"lng_collectible_username_info" = "This username was bought on **Fragment** on {date} for {price}";
+"lng_collectible_username_copy" = "Copy Link";
+"lng_collectible_phone_title" = "{phone} is a collectible phone number that belongs to";
+"lng_collectible_phone_info" = "This phone number was bought on **Fragment** on {date} for {price}";
+"lng_collectible_phone_copy" = "Copy Phone Number";
+"lng_collectible_learn_more" = "Learn More";
 
 "lng_settings_section_info" = "My info";
 
@@ -1058,6 +1068,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_faq_button" = "Go to FAQ";
 "lng_settings_ask_ok" = "Ask a Volunteer";
 "lng_settings_faq" = "Telegram FAQ";
+"lng_settings_faq_link" = "https://telegram.org/faq#general-questions";
 "lng_settings_features" = "Telegram Features";
 "lng_settings_logout" = "Log Out";
 "lng_sure_logout" = "Are you sure you want to log out?";
@@ -5052,6 +5063,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_channel_earn_learn_coin_title" = "What is {emoji} TON?";
 "lng_channel_earn_learn_coin_about" = "TON is a blockchain platform and cryptocurrency that Telegram uses for its high speed and low commissions on transactions. {link}";
 "lng_channel_earn_learn_close" = "Got it";
+"lng_channel_earn_learn_coin_link" = "https://telegram.org/blog/monetization-for-channels";
 "lng_channel_earn_chart_top_hours" = "Ad impressions";
 "lng_channel_earn_chart_revenue" = "Ad revenue";
 "lng_channel_earn_chart_overriden_detail_currency" = "Revenue in TON";

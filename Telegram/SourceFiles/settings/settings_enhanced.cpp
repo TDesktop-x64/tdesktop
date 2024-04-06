@@ -54,16 +54,16 @@ namespace Settings {
 		AddSkip(inner);
 		AddSubsectionTitle(inner, tr::lng_settings_network());
 
-		auto uploadBoostBtn = AddButtonWithLabel(
-				inner,
-				tr::lng_settings_net_upload_speed_boost(),
-				rpl::single(NetBoostBox::BoostLabel(GetEnhancedInt("net_speed_boost"))),
-				st::settingsButtonNoIcon
-		);
-		uploadBoostBtn->setColorOverride(QColor(255, 0, 0));
-		uploadBoostBtn->addClickHandler([=] {
-			Ui::show(Box<NetBoostBox>());
-		});
+		//auto uploadBoostBtn = AddButtonWithLabel(
+		//		inner,
+		//		tr::lng_settings_net_upload_speed_boost(),
+		//		rpl::single(NetBoostBox::BoostLabel(GetEnhancedInt("net_speed_boost"))),
+		//		st::settingsButtonNoIcon
+		//);
+		//uploadBoostBtn->setColorOverride(QColor(255, 0, 0));
+		//uploadBoostBtn->addClickHandler([=] {
+		//	Ui::show(Box<NetBoostBox>());
+		//});
 
 		auto donwloadBoostBtn = AddButtonWithIcon(
 				inner,

@@ -1,3 +1,8 @@
+1.1.17 (10.04.24)
+
+- [Fix] create new supergroup
+- [Remove] upload speed boost
+
 1.1.16 (03.04.24)
 
 - [Improve] hide stories

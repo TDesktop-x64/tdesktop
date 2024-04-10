@@ -259,7 +259,7 @@ QSize WebPage::countOptimalSize() {
 
 	// Detect _openButtonWidth before counting paddings.
 	_openButton = Ui::Text::String();
-/*	if (HasButton(_data)) {
+	if (_data->iv != nullptr && HasButton(_data)) {
 		const auto context = Core::MarkedTextContext{
 			.session = &_data->session(),
 			.customEmojiRepaint = [] {},
@@ -270,8 +270,7 @@ QSize WebPage::countOptimalSize() {
 			PageToPhrase(_data),
 			kMarkupTextOptions,
 			context);
-	} else */
-	if (_sponsoredData) {
+	} else if (_sponsoredData) {
 		if (!_sponsoredData->buttonText.isEmpty()) {
 			_openButton.setText(
 				st::semiboldTextStyle,

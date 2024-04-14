@@ -244,7 +244,7 @@ void FiltersMenu::refresh() {
 
 	// Fix active chat folder when hide all chats is enabled.
 	if (GetEnhancedBool("hide_all_chats")) {
-		const auto lookup_id = filters->lookupId(premium() ? 0 : 1);
+		const auto lookup_id = filters->lookupId(0);
 		_session->setActiveChatsFilter(lookup_id);
 	}
 }

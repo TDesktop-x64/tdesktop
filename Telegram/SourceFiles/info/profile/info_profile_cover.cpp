@@ -339,10 +339,10 @@ Cover::Cover(
 	: nullptr)
 , _name(this, _st.name)
 , _status(this, _st.status)
-, _showLastSeen(this, tr::lng_status_lastseen_when(), _st.showLastSeen)
 , _id(
 	this,
 	_st.status)
+, _showLastSeen(this, tr::lng_status_lastseen_when(), _st.showLastSeen)
 , _refreshStatusTimer([this] { refreshStatusText(); }) {
 	_peer->updateFull();
 

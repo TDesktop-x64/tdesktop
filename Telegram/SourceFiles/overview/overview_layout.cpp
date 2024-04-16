@@ -1518,9 +1518,7 @@ bool Document::iconAnimated() const {
 }
 
 bool Document::withThumb() const {
-	return !songLayout()
-		&& _data->hasThumbnail()
-		&& !Data::IsExecutableName(_data->filename());
+	return !songLayout() && _data->hasThumbnail();
 }
 
 bool Document::updateStatusText() {

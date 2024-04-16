@@ -936,8 +936,8 @@ void Application::handleAppDeactivated() {
 }
 
 rpl::producer<bool> Application::appDeactivatedValue() const {
-	const auto &app =
-		static_cast<QGuiApplication*>(QCoreApplication::instance());
+	const auto &app
+		= static_cast<QGuiApplication*>(QCoreApplication::instance());
 	return rpl::single(
 		app->applicationState()
 	) | rpl::then(

@@ -131,13 +131,21 @@ Uploader::Entry::Entry(
 
 void Uploader::Entry::setDocSize(int64 size) {
 	docSize = size;
-	constexpr auto limit0 = 1024 * 1024;
-	constexpr auto limit1 = 32 * limit0;
-	if (docSize >= limit0 || !setPartSize(kDocumentUploadPartSize0)) {
-		if (docSize > limit1 || !setPartSize(kDocumentUploadPartSize1)) {
-			if (!setPartSize(kDocumentUploadPartSize2)) {
-				if (!setPartSize(kDocumentUploadPartSize3)) {
-					setPartSize(kDocumentUploadPartSize4);
+	if (GetEnhancedInt("net_speed_boost") == 3) {
+		setPartSize(kDocumentUploadPartSize4);
+	} else if (GetEnhancedInt("net_speed_boost") == 2) {
+		setPartSize(kDocumentUploadPartSize3);
+	} else if (GetEnhancedInt("net_speed_boost") == 1) {
+		setPartSize(kDocumentUploadPartSize2);
+	} else {
+		constexpr auto limit0 = 1024 * 1024;
+		constexpr auto limit1 = 32 * limit0;
+		if (docSize >= limit0 || !setPartSize(kDocumentUploadPartSize0)) {
+			if (docSize > limit1 || !setPartSize(kDocumentUploadPartSize1)) {
+				if (!setPartSize(kDocumentUploadPartSize2)) {
+					if (!setPartSize(kDocumentUploadPartSize3)) {
+						setPartSize(kDocumentUploadPartSize4);
+					}
 				}
 			}
 		}

@@ -345,6 +345,7 @@ private:
 	void setMaybeSupportsStreaming(bool supports);
 	void setLoadedInMediaCacheLocation();
 	void setFileName(const QString &remoteFileName);
+	bool enforceNameType(Core::NameType nameType);
 
 	void finishLoad();
 	void handleLoaderUpdates();

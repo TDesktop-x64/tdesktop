@@ -186,7 +186,7 @@ maxStickerSize: 256px;
 maxAnimatedEmojiSize: 112px;
 maxGifSize: 320px;
 maxVideoMessageSize: 240px;
-maxSignatureSize: 144px;
+maxSignatureSize: 262px;
 maxWallPaperWidth: 160px;
 maxWallPaperHeight: 240px;
 historyThemeSize: size(272px, 176px);

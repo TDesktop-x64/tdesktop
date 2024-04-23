@@ -3180,7 +3180,9 @@ void MarkAsReadThread(not_null<Data::Thread*> thread) {
 }
 
 void AddSeparatorAndShiftUp(const PeerMenuCallback &addAction) {
-	addAction({ .isSeparator = true });
+	addAction({
+		.separatorSt = &st::popupMenuExpandedSeparator.menu.separator,
+	});
 
 	const auto &st = st::popupMenuExpandedSeparator.menu;
 	const auto shift = st::popupMenuExpandedSeparator.scrollPadding.top()

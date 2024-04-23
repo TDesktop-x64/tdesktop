@@ -252,8 +252,6 @@ Application::~Application() {
 
 void Application::run() {
 	EnhancedSettings::Start();
-	style::internal::StartFonts();
-
 	ThirdParty::start();
 
 	// Depends on OpenSSL on macOS, so on ThirdParty::start().
@@ -261,6 +259,10 @@ void Application::run() {
 	_notifications = std::make_unique<Window::Notifications::System>();
 
 	startLocalStorage();
+
+	style::SetCustomFont(settings().customFontFamily());
+	style::internal::StartFonts();
+
 	ValidateScale();
 
 	refreshGlobalProxy(); // Depends on app settings being read.

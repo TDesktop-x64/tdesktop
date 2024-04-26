@@ -2151,7 +2151,7 @@ void Widget::searchMessages(
 	}
 	if (inChat && from) {
 		setSearchInChat(inChat, from);
-		applyFilterUpdate(true);
+		applySearchUpdate(true);
 	}
 }
 

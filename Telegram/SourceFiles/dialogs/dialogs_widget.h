@@ -133,6 +133,7 @@ public:
 	QRect floatPlayerAvailableRect() override;
 
 	bool cancelSearch();
+	bool cancelSearchByMouseBack();
 
 	~Widget();
 
@@ -250,6 +251,7 @@ private:
 	void processSearchFocusChange();
 
 	void setupShortcuts(not_null<Window::SessionController *> controller);
+	[[nodiscard]] bool redirectKeyToSearch(QKeyEvent *e) const;
 
 	MTP::Sender _api;
 

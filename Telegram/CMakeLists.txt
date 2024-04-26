@@ -275,6 +275,8 @@ PRIVATE
     boxes/max_invite_box.h
     boxes/enhanced_options_box.cpp
     boxes/enhanced_options_box.h
+    boxes/moderate_messages_box.cpp
+    boxes/moderate_messages_box.h
     boxes/peer_list_box.cpp
     boxes/peer_list_box.h
     boxes/peer_list_controllers.cpp

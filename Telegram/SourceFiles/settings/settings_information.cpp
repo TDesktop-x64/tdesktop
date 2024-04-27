@@ -984,9 +984,7 @@ void AccountsList::rebuild() {
 					_closeRequests.fire({});
 					return;
 				}
-				const auto newWindow = (modifiers & Qt::ControlModifier)
-					&& base::options::lookup<bool>(
-						Dialogs::kOptionCtrlClickChatNewWindow).value();
+				const auto newWindow = (modifiers & Qt::ControlModifier);
 				auto activate = [=, guard = _accountSwitchGuard.make_guard()]{
 					if (guard) {
 						_reorder->finishReordering();

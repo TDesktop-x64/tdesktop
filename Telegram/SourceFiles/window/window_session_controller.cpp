@@ -2516,7 +2516,7 @@ void SessionController::setActiveChatsFilter(
 		closeForum();
 		closeFolder();
 	}
-	if (adaptive().isOneColumn()) {
+	if (!GetEnhancedBool("hide_all_chats") && adaptive().isOneColumn()) {
 		clearSectionStack(params);
 	}
 }

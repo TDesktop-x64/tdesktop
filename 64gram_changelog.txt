@@ -1,3 +1,7 @@
+1.1.20 (03.05.24)
+
+- [Fix] account can't open in new window
+
 1.1.19 (20.04.24)
 
 - [It's back] upload speed boost

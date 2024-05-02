@@ -227,7 +227,8 @@ std::unique_ptr<Data::Media> HistoryItem::CreateMedia(
 		return media.vgeo().match([&](const MTPDgeoPoint &point) -> Result {
 			return std::make_unique<Data::MediaLocation>(
 				item,
-				Data::LocationPoint(point));
+				Data::LocationPoint(point),
+				media.vperiod().v);
 		}, [](const MTPDgeoPointEmpty &) -> Result {
 			return nullptr;
 		});

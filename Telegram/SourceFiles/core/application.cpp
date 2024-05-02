@@ -242,7 +242,7 @@ Application::~Application() {
 	_mediaControlsManager = nullptr;
 
 	Media::Player::finish(_audio.get());
-	style::stopManager();
+	style::StopManager();
 
 	EnhancedSettings::Finish();
 	Instance = nullptr;
@@ -281,7 +281,7 @@ void Application::run() {
 	_translator = std::make_unique<Lang::Translator>();
 	QCoreApplication::instance()->installTranslator(_translator.get());
 
-	style::startManager(cScale());
+	style::StartManager(cScale());
 	Ui::InitTextOptions();
 	Ui::StartCachedCorners();
 	Ui::Emoji::Init();

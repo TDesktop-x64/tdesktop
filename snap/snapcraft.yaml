@@ -193,7 +193,7 @@ parts:
       - dpkg-dev
       - gtk-update-icon-cache
       - libglib2.0-bin
-      - libgtk-3-0
+      - libgtk-3-0t64
     stage-packages:
       - libc-bin
       - libgdk-pixbuf-2.0-0
@@ -211,7 +211,7 @@ parts:
           update-icon-caches "$theme"
         fi
       done
-      GTK_PATH=$PWD/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/gtk-3.0 /usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/libgtk-3-0/gtk-query-immodules-3.0 > usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/gtk-3.0/3.0.0/immodules/immodules.cache
+      GTK_PATH=$PWD/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/gtk-3.0 /usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/libgtk-3-0t64/gtk-query-immodules-3.0 > usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/gtk-3.0/3.0.0/immodules/immodules.cache
     after:
       - telegram
 
@@ -328,7 +328,7 @@ parts:
       - libfreetype6
       - libglib2.0-0
       - libglx0
-      - libgtk-3-0
+      - libgtk-3-0t64
       - libharfbuzz0b
       - libice6
       - libicu74
@@ -473,7 +473,7 @@ parts:
       - libopenh264-7
       - libopus0
       - libssl3
-      - libvpx8
+      - libvpx9
       - libx11-6
       - libxcomposite1
       - libxdamage1

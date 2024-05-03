@@ -1,3 +1,7 @@
+1.1.21 (04.05.24)
+
+- [Remove] stickerset preview
+
 1.1.20 (03.05.24)
 
 - [Fix] account can't open in new window

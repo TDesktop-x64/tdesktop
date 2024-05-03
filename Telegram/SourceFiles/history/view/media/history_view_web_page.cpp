@@ -221,8 +221,8 @@ constexpr auto kStickerSetLines = 3;
 			&& (webpage->photo || webpage->document))
 		|| ((type == WebPageType::WallPaper)
 			&& webpage->document
-			&& webpage->document->isWallPaper())
-		|| (type == WebPageType::StickerSet);
+			&& webpage->document->isWallPaper());
+		//|| (type == WebPageType::StickerSet);
 }
 
 } // namespace
@@ -296,23 +296,23 @@ QSize WebPage::countOptimalSize() {
 	}
 	const auto lineHeight = UnitedLineHeight();
 
-	if (_data->stickerSet && !_stickerSet) {
-		_stickerSet = std::make_unique<StickerSet>();
-		for (const auto &sticker : _data->stickerSet->items) {
-			if (!sticker->sticker()) {
-				continue;
-			}
-			_stickerSet->views.push_back(
-				std::make_unique<Sticker>(_parent, sticker, true));
-		}
-		const auto side = std::ceil(std::sqrt(_stickerSet->views.size()));
-		const auto box = lineHeight * kStickerSetLines;
-		const auto single = box / side;
-		for (const auto &view : _stickerSet->views) {
-			view->setWebpagePart();
-			view->initSize(single);
-		}
-	}
+	//if (_data->stickerSet && !_stickerSet) {
+	//	_stickerSet = std::make_unique<StickerSet>();
+	//	for (const auto &sticker : _data->stickerSet->items) {
+	//		if (!sticker->sticker()) {
+	//			continue;
+	//		}
+	//		_stickerSet->views.push_back(
+	//			std::make_unique<Sticker>(_parent, sticker, true));
+	//	}
+	//	const auto side = std::ceil(std::sqrt(_stickerSet->views.size()));
+	//	const auto box = lineHeight * kStickerSetLines;
+	//	const auto single = box / side;
+	//	for (const auto &view : _stickerSet->views) {
+	//		view->setWebpagePart();
+	//		view->initSize(single);
+	//	}
+	//}
 
 	if (!_openl && (!_data->url.isEmpty() || _sponsoredData)) {
 		const auto original = _parent->data()->originalText();
@@ -539,7 +539,7 @@ QSize WebPage::countCurrentSize(int newWidth) {
 	const auto innerWidth = newWidth - rect::m::sum::h(padding);
 	auto newHeight = 0;
 
-	const auto specialRightPix = (_sponsoredData || _stickerSet);
+	const auto specialRightPix = _sponsoredData ? true : false;
 	const auto lineHeight = UnitedLineHeight();
 	const auto linesMax = (specialRightPix || isLogEntryOriginal())
 		? kMaxOriginalEntryLines
@@ -550,9 +550,7 @@ QSize WebPage::countCurrentSize(int newWidth) {
 	if (asArticle() || specialRightPix) {
 		constexpr auto kSponsoredUserpicLines = 2;
 		_pixh = lineHeight
-			* (_stickerSet
-				? kStickerSetLines
-				: specialRightPix
+			* (specialRightPix
 				? kSponsoredUserpicLines
 				: linesMax);
 		do {
@@ -674,7 +672,7 @@ void WebPage::ensurePhotoMediaCreated() const {
 
 bool WebPage::hasHeavyPart() const {
 	return _photoMedia
-		|| (_stickerSet)
+		/*|| (_stickerSet)*/
 		|| (_attach ? _attach->hasHeavyPart() : false);
 }
 
@@ -755,7 +753,7 @@ void WebPage::draw(Painter &p, const PaintContext &context) const {
 	}
 
 	auto lineHeight = UnitedLineHeight();
-	if (_stickerSet) {
+/*	if (_stickerSet) {
 		const auto viewsCount = _stickerSet->views.size();
 		const auto box = _pixh;
 		const auto topLeft = QPoint(inner.left() + paintw - box, tshift);
@@ -777,7 +775,8 @@ void WebPage::draw(Painter &p, const PaintContext &context) const {
 			}
 		}
 		paintw -= box;
-	} else if (asArticle()) {
+	} else*/
+	if (asArticle()) {
 		ensurePhotoMediaCreated();
 
 		auto pix = QPixmap();

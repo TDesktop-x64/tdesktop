@@ -420,7 +420,7 @@ void PaintRow(
 		|| (supportMode
 			&& entry->session().supportHelper().isOccupiedBySomeone(history))) {
 		if (!promoted) {
-			const auto dateString = Ui::FormatDialogsDate(date);
+			const auto dateString = Ui::FormatDialogsDate(date, GetEnhancedBool("show_seconds"));
 			PaintRowTopRight(p, dateString, rectForName, context);
 		}
 
@@ -543,7 +543,7 @@ void PaintRow(
 		}
 	} else if (!item->isEmpty()) {
 		if ((thread || sublist) && !promoted) {
-			const auto dateString = Ui::FormatDialogsDate(date);
+			const auto dateString = Ui::FormatDialogsDate(date, GetEnhancedBool("show_seconds"));
 			PaintRowTopRight(p, dateString, rectForName, context);
 		}
 

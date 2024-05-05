@@ -1,3 +1,7 @@
+1.1.22 (05.05.24)
+
+- [Fix] show message seconds
+
 1.1.21 (04.05.24)
 
 - [Remove] stickerset preview

@@ -324,6 +324,7 @@ namespace EnhancedSettings {
 		settings.insert(qsl("hide_counter"), false);
 		settings.insert(qsl("translate_to_tc"), false);
 		settings.insert(qsl("hide_stories"), false);
+		settings.insert(qsl("recent_display_limit"), 20);
 
 		auto document = QJsonDocument();
 		document.setObject(settings);
@@ -376,6 +377,7 @@ namespace EnhancedSettings {
 		settings.insert(qsl("hide_counter"), GetEnhancedBool("hide_counter"));
 		settings.insert(qsl("translate_to_tc"), GetEnhancedBool("translate_to_tc"));
 		settings.insert(qsl("hide_stories"), GetEnhancedBool("hide_stories"));
+		settings.insert(qsl("recent_display_limit"), GetEnhancedInt("recent_display_limit"));
 
 		auto document = QJsonDocument();
 		document.setObject(settings);

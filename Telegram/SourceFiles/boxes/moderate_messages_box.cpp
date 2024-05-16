@@ -524,6 +524,10 @@ void CreateModerateMessagesBox(
 				not_null<ChannelData*> c) {
 			p->session().api().deleteAllFromParticipant(c, p);
 		});
+
+		if (GetEnhancedInt("always_delete_for") == 1 || GetEnhancedInt("always_delete_for") == 3) {
+			deleteAll->setChecked(true);
+		}
 	}
 	if (allCanBan) {
 		auto ownedWrap = object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(

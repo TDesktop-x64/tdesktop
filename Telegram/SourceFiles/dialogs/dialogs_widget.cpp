@@ -357,6 +357,14 @@ Widget::Widget(
 		Ui::PostponeCall(this, [=] { listScrollUpdated(); });
 	}, lifetime());
 
+	setAttribute(Qt::WA_InputMethodEnabled);
+	controller->widget()->imeCompositionStarts(
+	) | rpl::filter([=] {
+		return redirectImeToSearch();
+	}) | rpl::start_with_next([=] {
+		_search->setFocusFast();
+	}, lifetime());
+
 	_search->changes(
 	) | rpl::start_with_next([=] {
 		applySearchUpdate();
@@ -1036,7 +1044,9 @@ void Widget::setupShortcuts() {
 					const auto history = forum->history();
 					controller()->searchInChat(history);
 					return true;
-				} else if (!_openedFolder && _search->isVisible()) {
+				} else if (!_openedFolder
+					&& !_childList
+					&& _search->isVisible()) {
 					_search->setFocus();
 					return true;
 				}
@@ -3287,6 +3297,10 @@ void Widget::keyPressEvent(QKeyEvent *e) {
 		//} else {
 		//	e->ignore();
 		//}
+	} else if (e->key() == Qt::Key_Backspace
+		&& _searchHasFocus
+		&& !_searchInChat) {
+		escape();
 	} else if (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) {
 		submit();
 	} else if (_suggestions
@@ -3327,11 +3341,17 @@ void Widget::keyPressEvent(QKeyEvent *e) {
 	}
 }
 
+bool Widget::redirectToSearchPossible() const {
+	return !_openedFolder
+		&& !_openedForum
+		&& !_childList
+		&& _search->isVisible()
+		&& !_search->hasFocus()
+		&& hasFocus();
+}
+
 bool Widget::redirectKeyToSearch(QKeyEvent *e) const {
-	if (_openedFolder
-		|| _openedForum
-		|| !_search->isVisible()
-		|| _search->hasFocus()) {
+	if (!redirectToSearchPossible()) {
 		return false;
 	}
 	const auto character = !(e->modifiers() & ~Qt::ShiftModifier)
@@ -3350,6 +3370,10 @@ bool Widget::redirectKeyToSearch(QKeyEvent *e) const {
 		: QClipboard::Clipboard;
 	const auto data = QGuiApplication::clipboard()->mimeData(pasteMode);
 	return data && data->hasText();
+}
+
+bool Widget::redirectImeToSearch() const {
+	return redirectToSearchPossible();
 }
 
 void Widget::paintEvent(QPaintEvent *e) {

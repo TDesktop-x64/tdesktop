@@ -748,7 +748,8 @@ void RepliesWidget::setupComposeControls() {
 	_composeControls->editRequests(
 	) | rpl::start_with_next([=](auto data) {
 		if (const auto item = session().data().message(data.fullId)) {
-			edit(item, data.options, saveEditMsgRequestId);
+			const auto spoiler = data.spoilerMediaOverride;
+			edit(item, data.options, saveEditMsgRequestId, spoiler);
 		}
 	}, lifetime());
 
@@ -1219,7 +1220,8 @@ void RepliesWidget::send(Api::SendOptions options) {
 void RepliesWidget::edit(
 		not_null<HistoryItem*> item,
 		Api::SendOptions options,
-		mtpRequestId *const saveEditMsgRequestId) {
+		mtpRequestId *const saveEditMsgRequestId,
+		std::optional<bool> spoilerMediaOverride) {
 	if (*saveEditMsgRequestId) {
 		return;
 	}
@@ -1287,7 +1289,8 @@ void RepliesWidget::edit(
 		webpage,
 		options,
 		crl::guard(this, done),
-		crl::guard(this, fail));
+		crl::guard(this, fail),
+		spoilerMediaOverride);
 
 	_composeControls->hidePanelsAnimated();
 	doSetInnerFocus();

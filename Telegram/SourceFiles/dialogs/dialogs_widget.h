@@ -251,7 +251,9 @@ private:
 	void processSearchFocusChange();
 
 	void setupShortcuts(not_null<Window::SessionController *> controller);
+	[[nodiscard]] bool redirectToSearchPossible() const;
 	[[nodiscard]] bool redirectKeyToSearch(QKeyEvent *e) const;
+	[[nodiscard]] bool redirectImeToSearch() const;
 
 	MTP::Sender _api;
 

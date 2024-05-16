@@ -77,62 +77,62 @@ EntitiesInText EntitiesFromMTP(
 		}, [&](const MTPDmessageEntityMention &d) {
 			result.push_back({
 				EntityType::Mention,
-				d.voffset().v,
+				d.voffset().v + length,
 				d.vlength().v,
 			});
 		}, [&](const MTPDmessageEntityHashtag &d) {
 			result.push_back({
 				EntityType::Hashtag,
-				d.voffset().v,
+				d.voffset().v + length,
 				d.vlength().v,
 			});
 		}, [&](const MTPDmessageEntityBotCommand &d) {
 			result.push_back({
 				EntityType::BotCommand,
-				d.voffset().v,
+				d.voffset().v + length,
 				d.vlength().v,
 			});
 		}, [&](const MTPDmessageEntityUrl &d) {
 			result.push_back({
 				EntityType::Url,
-				d.voffset().v,
+				d.voffset().v + length,
 				d.vlength().v,
 			});
 		}, [&](const MTPDmessageEntityEmail &d) {
 			result.push_back({
 				EntityType::Email,
-				d.voffset().v,
+				d.voffset().v + length,
 				d.vlength().v,
 			});
 		}, [&](const MTPDmessageEntityBold &d) {
 			result.push_back({
 				EntityType::Bold,
-				d.voffset().v,
+				d.voffset().v + length,
 				d.vlength().v,
 			});
 		}, [&](const MTPDmessageEntityItalic &d) {
 			result.push_back({
 				EntityType::Italic,
-				d.voffset().v,
+				d.voffset().v + length,
 				d.vlength().v,
 			});
 		}, [&](const MTPDmessageEntityCode &d) {
 			result.push_back({
 				EntityType::Code,
-				d.voffset().v,
+				d.voffset().v + length,
 				d.vlength().v,
 			});
 		}, [&](const MTPDmessageEntityPre &d) {
 			result.push_back({
 				EntityType::Pre,
-				d.voffset().v,
+				d.voffset().v + length,
 				d.vlength().v,
 				qs(d.vlanguage()),
 			});
 		}, [&](const MTPDmessageEntityTextUrl &d) {
 			result.push_back({
 				EntityType::CustomUrl,
-				d.voffset().v,
+				d.voffset().v + length,
 				d.vlength().v,
 				qs(d.vurl()),
 			});
@@ -149,7 +149,7 @@ EntitiesInText EntitiesFromMTP(
 			});
 			result.push_back({
 				EntityType::MentionName,
-				d.voffset().v,
+				d.voffset().v + length,
 				d.vlength().v,
 				data,
 			});
@@ -176,7 +176,7 @@ EntitiesInText EntitiesFromMTP(
 			if (!data.isEmpty()) {
 				result.push_back({
 					EntityType::MentionName,
-					d.voffset().v,
+					d.voffset().v + length,
 					d.vlength().v,
 					data,
 				});
@@ -186,19 +186,19 @@ EntitiesInText EntitiesFromMTP(
 		}, [&](const MTPDmessageEntityCashtag &d) {
 			result.push_back({
 				EntityType::Cashtag,
-				d.voffset().v,
+				d.voffset().v + length,
 				d.vlength().v,
 			});
 		}, [&](const MTPDmessageEntityUnderline &d) {
 			result.push_back({
 				EntityType::Underline,
-				d.voffset().v,
+				d.voffset().v + length,
 				d.vlength().v,
 			});
 		}, [&](const MTPDmessageEntityStrike &d) {
 			result.push_back({
 				EntityType::StrikeOut,
-				d.voffset().v,
+				d.voffset().v + length,
 				d.vlength().v,
 			});
 		}, [&](const MTPDmessageEntityBankCard &d) {
@@ -206,20 +206,20 @@ EntitiesInText EntitiesFromMTP(
 		}, [&](const MTPDmessageEntitySpoiler &d) {
 			result.push_back({
 				EntityType::Spoiler,
-				d.voffset().v,
+				d.voffset().v + length,
 				d.vlength().v,
 			});
 		}, [&](const MTPDmessageEntityCustomEmoji &d) {
 			result.push_back({
 				EntityType::CustomEmoji,
-				d.voffset().v,
+				d.voffset().v + length,
 				d.vlength().v,
 				CustomEmojiEntityData(d),
 			});
 		}, [&](const MTPDmessageEntityBlockquote &d) {
 			result.push_back({
 				EntityType::Blockquote,
-				d.voffset().v,
+				d.voffset().v + length,
 				d.vlength().v,
 			});
 		});

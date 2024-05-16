@@ -233,3 +233,53 @@ void BitrateController::save() {
 	Ui::Toast::Show(tr::lng_bitrate_controller_hint(tr::now));
 	closeBox();
 }
+
+RecentDisplayLimitController::RecentDisplayLimitController(QWidget *parent) {
+}
+
+void RecentDisplayLimitController::prepare() {
+	setTitle(tr::lng_settings_recent_display_limit());
+
+	addButton(tr::lng_settings_save(), [=] { save(); });
+	addButton(tr::lng_cancel(), [=] { closeBox(); });
+
+	auto y = st::boxOptionListPadding.top();
+
+	_optionGroup = std::make_shared<Ui::RadiobuttonGroup>(GetEnhancedInt("recent_display_limit"));
+
+	for (int i = 0; i <= 5; i++) {
+		const auto button = Ui::CreateChild<Ui::Radiobutton>(
+				this,
+				_optionGroup,
+				i,
+				Label(i),
+				st::autolockButton);
+		button->moveToLeft(st::boxPadding.left(), y);
+		y += button->heightNoMargins() + st::boxOptionListSkip;
+	}
+	showChildren();
+	setDimensions(st::boxWidth, y);
+}
+
+QString RecentDisplayLimitController::Label(int limit) {
+	switch (limit) {
+		case 1:
+			return QString("40");
+		case 2:
+			return QString("60");
+		case 3:
+			return QString("80");
+		case 4:
+			return QString("100");
+		case 5:
+			return QString("120");
+		default:
+			return tr::lng_settings_recent_display_limit_default(tr::now);
+	}
+}
+
+void RecentDisplayLimitController::save() {
+	SetEnhancedValue("recent_display_limit", _optionGroup->current());
+	EnhancedSettings::Write();
+	closeBox();
+}

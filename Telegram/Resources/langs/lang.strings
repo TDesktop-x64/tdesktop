@@ -5275,6 +5275,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_skip_message" = "Skip to next unread chat";
 "lng_settings_skip_message_desc" = "Note: Allow ALT+↑/↓ shortcut to skip to next unread chat";
 
+"lng_settings_recent_display_limit" = "Recent sticker display limit";
+"lng_settings_recent_display_limit_default" = "Default (20)";
+
 "lng_settings_always_delete_for" = "Always select delete for";
 "lng_settings_delete_disabled" = "Disabled";
 "lng_settings_delete_for_group" = "Group";

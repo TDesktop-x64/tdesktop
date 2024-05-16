@@ -87,3 +87,19 @@ private:
 	std::shared_ptr<Ui::RadiobuttonGroup> _bitrateGroup;
 
 };
+
+class RecentDisplayLimitController : public Ui::BoxContent {
+public:
+	RecentDisplayLimitController(QWidget *parent);
+
+	static QString Label(int limit);
+
+protected:
+	void prepare() override;
+
+private:
+	void save();
+
+	std::shared_ptr<Ui::RadiobuttonGroup> _optionGroup;
+
+};

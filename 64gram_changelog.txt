@@ -1,3 +1,8 @@
+1.1.23 (25.05.24)
+
+- [New] recent sticker display limit 
+- [Fix] always delete for option
+
 1.1.22 (05.05.24)
 
 - [Fix] show message seconds

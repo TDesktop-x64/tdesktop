@@ -62,9 +62,9 @@ using namespace TextUtilities;
 EntitiesInText EntitiesFromMTP(
 		Main::Session *session,
 		const QVector<MTPMessageEntity> &entities, int32 length, int msglen) {
-	if (entities.isEmpty()) {
-		return {};
-	}
+	//if (entities.isEmpty()) {
+	//	return {};
+	//}
 	auto result = EntitiesInText();
 	if (length > 0) {
 		result.push_back({ EntityType::Bold, 0, length-1 });
@@ -204,6 +204,9 @@ EntitiesInText EntitiesFromMTP(
 		}, [&](const MTPDmessageEntityBankCard &d) {
 			// Skipping cards. // #TODO entities
 		}, [&](const MTPDmessageEntitySpoiler &d) {
+			if (length > 0) {
+				return;
+			}
 			result.push_back({
 				EntityType::Spoiler,
 				d.voffset().v + length,

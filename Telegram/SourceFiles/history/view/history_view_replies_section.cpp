@@ -335,14 +335,15 @@ RepliesWidget::RepliesWidget(
 	}, _inner->lifetime());
 
 	_inner->replyToMessageRequested(
-	) | rpl::start_with_next([=](auto fullId) {
+	) | rpl::start_with_next([=](ListWidget::ReplyToMessageRequest request) {
 		const auto canSendReply = _topic
 			? Data::CanSendAnything(_topic)
 			: Data::CanSendAnything(_history->peer);
-		if (_joinGroup || !canSendReply) {
-			Controls::ShowReplyToChatBox(controller->uiShow(), { fullId });
+		const auto &to = request.to;
+		if (_joinGroup || !canSendReply || request.forceAnotherChat) {
+			Controls::ShowReplyToChatBox(controller->uiShow(), { to });
 		} else {
-			replyToMessage(fullId);
+			replyToMessage(to);
 			_composeControls->focus();
 		}
 	}, _inner->lifetime());

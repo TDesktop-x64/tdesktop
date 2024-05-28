@@ -18,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_transcribes.h"
 #include "api/api_who_reacted.h"
 #include "api/api_toggling_media.h" // Api::ToggleFavedSticker
+#include "base/qt/qt_key_modifiers.h"
 #include "base/unixtime.h"
 #include "history/view/history_view_list_widget.h"
 #include "history/view/history_view_cursor_state.h"
@@ -853,15 +854,11 @@ bool AddReplyToMessageAction(
 	text.replace('&', u"&&"_q);
 	const auto itemId = item->fullId();
 	menu->addAction(text, [=] {
-		if (!item) {
-			return;
-		} else {
-			list->replyToMessageRequestNotify({
-				.messageId = itemId,
-				.quote = quote.text,
-				.quoteOffset = quote.offset,
-			});
-		}
+		list->replyToMessageRequestNotify({
+			.messageId = itemId,
+			.quote = quote.text,
+			.quoteOffset = quote.offset,
+		}, base::IsCtrlPressed());
 	}, &st::menuIconReply);
 	return true;
 }
@@ -1291,7 +1288,7 @@ void EditTagBox(
 		}
 	}, field->lifetime());
 
-	AddLengthLimitLabel(field, kTagNameLimit);
+	Ui::AddLengthLimitLabel(field, kTagNameLimit);
 
 	const auto save = [=] {
 		const auto text = field->getLastText();
@@ -2047,42 +2044,6 @@ bool ItemHasTtl(HistoryItem *item) {
 	return (item && item->media())
 		? (item->media()->ttlSeconds() > 0)
 		: false;
-}
-
-void AddLengthLimitLabel(not_null<Ui::InputField*> field, int limit) {
-	struct State {
-		rpl::variable<int> length;
-	};
-	const auto state = field->lifetime().make_state<State>();
-	state->length = rpl::single(
-		rpl::empty
-	) | rpl::then(field->changes()) | rpl::map([=] {
-		return int(field->getLastText().size());
-	});
-	auto warningText = state->length.value() | rpl::map([=](int count) {
-		const auto threshold = std::min(limit / 2, 9);
-		const auto left = limit - count;
-		return (left < threshold) ? QString::number(left) : QString();
-	});
-	const auto warning = Ui::CreateChild<Ui::FlatLabel>(
-		field.get(),
-		std::move(warningText),
-		st::editTagLimit);
-	state->length.value() | rpl::map(
-		rpl::mappers::_1 > limit
-	) | rpl::start_with_next([=](bool exceeded) {
-		warning->setTextColorOverride(exceeded
-			? st::attentionButtonFg->c
-			: std::optional<QColor>());
-	}, warning->lifetime());
-	rpl::combine(
-		field->sizeValue(),
-		warning->sizeValue()
-	) | rpl::start_with_next([=] {
-		warning->moveToRight(0, 0);
-	}, warning->lifetime());
-	warning->setAttribute(Qt::WA_TransparentForMouseEvents);
-
 }
 
 } // namespace HistoryView

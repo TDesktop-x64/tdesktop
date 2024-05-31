@@ -64,6 +64,7 @@ struct ChatThemeBackground;
 struct ChatThemeBackgroundData;
 class MessageSendingAnimationController;
 struct BoostCounters;
+struct ChatPaintContextArgs;
 } // namespace Ui
 
 namespace Data {
@@ -87,6 +88,7 @@ using GifPauseReasons = ChatHelpers::PauseReasons;
 class SectionMemento;
 class Controller;
 class FiltersMenu;
+class ChatPreviewManager;
 
 struct PeerByLinkInfo;
 
@@ -588,22 +590,10 @@ public:
 		PeerId peerId,
 		std::optional<Data::StorySourcesList> list = std::nullopt);
 
-	struct PaintContextArgs {
-		not_null<Ui::ChatTheme*> theme;
-		QRect clip;
-		QPoint visibleAreaPositionGlobal;
-		int visibleAreaTop = 0;
-		int visibleAreaWidth = 0;
-	};
 	[[nodiscard]] Ui::ChatPaintContext preparePaintContext(
-		PaintContextArgs &&args);
+		Ui::ChatPaintContextArgs &&args);
 	[[nodiscard]] not_null<const Ui::ChatStyle*> chatStyle() const {
 		return _chatStyle.get();
-	}
-
-	[[nodiscard]] auto cachedReactionIconFactory() const
-	-> HistoryView::Reactions::CachedIconFactory & {
-		return *_cachedReactionIconFactory;
 	}
 
 	[[nodiscard]] QString authedName() const {
@@ -612,6 +602,18 @@ public:
 
 	void setPremiumRef(const QString &ref);
 	[[nodiscard]] QString premiumRef() const;
+
+	bool showChatPreview(
+		Dialogs::RowDescriptor row,
+		Fn<void(bool shown)> callback = nullptr,
+		QPointer<QWidget> parentOverride = nullptr,
+		std::optional<QPoint> positionOverride = {});
+	bool scheduleChatPreview(
+		Dialogs::RowDescriptor row,
+		Fn<void(bool shown)> callback = nullptr,
+		QPointer<QWidget> parentOverride = nullptr,
+		std::optional<QPoint> positionOverride = {});
+	void cancelScheduledPreview();
 
 	[[nodiscard]] bool contentOverlapped(QWidget *w, QPaintEvent *e) const;
 
@@ -669,6 +671,7 @@ private:
 
 	const not_null<Controller*> _window;
 	const std::unique_ptr<ChatHelpers::EmojiInteractions> _emojiInteractions;
+	const std::unique_ptr<ChatPreviewManager> _chatPreviewManager;
 	const bool _isPrimary = false;
 
 	mutable std::shared_ptr<ChatHelpers::Show> _cachedShow;
@@ -720,9 +723,6 @@ private:
 	std::weak_ptr<Ui::ChatTheme> _chatStyleTheme;
 	std::deque<std::shared_ptr<Ui::ChatTheme>> _lastUsedCustomChatThemes;
 	rpl::variable<PeerThemeOverride> _peerThemeOverride;
-
-	using ReactionIconFactory = HistoryView::Reactions::CachedIconFactory;
-	std::unique_ptr<ReactionIconFactory> _cachedReactionIconFactory;
 
 	base::has_weak_ptr _storyOpenGuard;
 

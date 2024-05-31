@@ -182,7 +182,11 @@ EntitiesInText EntitiesFromMTP(
 				});
 			}
 		}, [&](const MTPDmessageEntityPhone &d) {
-			// Skipping phones.
+			result.push_back({
+				EntityType::Phone,
+				d.voffset().v,
+				d.vlength().v,
+			});
 		}, [&](const MTPDmessageEntityCashtag &d) {
 			result.push_back({
 				EntityType::Cashtag,
@@ -224,6 +228,7 @@ EntitiesInText EntitiesFromMTP(
 				EntityType::Blockquote,
 				d.voffset().v + length,
 				d.vlength().v,
+				d.is_collapsed() ? u"1"_q : QString(),
 			});
 		});
 	}
@@ -272,6 +277,9 @@ MTPVector<MTPMessageEntity> EntitiesToMTP(
 		case EntityType::Email: {
 			v.push_back(MTP_messageEntityEmail(offset, length));
 		} break;
+		case EntityType::Phone: {
+			v.push_back(MTP_messageEntityPhone(offset, length));
+		} break;
 		case EntityType::Hashtag: {
 			v.push_back(MTP_messageEntityHashtag(offset, length));
 		} break;
@@ -318,7 +326,13 @@ MTPVector<MTPMessageEntity> EntitiesToMTP(
 					MTP_string(entity.data())));
 		} break;
 		case EntityType::Blockquote: {
-			v.push_back(MTP_messageEntityBlockquote(offset, length));
+			using Flag = MTPDmessageEntityBlockquote::Flag;
+			const auto collapsed = !entity.data().isEmpty();
+			v.push_back(
+				MTP_messageEntityBlockquote(
+					MTP_flags(collapsed ? Flag::f_collapsed : Flag()),
+					offset,
+					length));
 		} break;
 		case EntityType::Spoiler: {
 			v.push_back(MTP_messageEntitySpoiler(offset, length));

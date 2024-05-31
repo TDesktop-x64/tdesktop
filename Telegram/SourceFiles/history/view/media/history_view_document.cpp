@@ -301,9 +301,7 @@ Document::Document(
 		_transcribedRound = entry.shown;
 	}
 
-	auto caption = createCaption();
-
-	createComponents(!caption.isEmpty());
+	createComponents();
 	if (const auto named = Get<HistoryDocumentNamed>()) {
 		fillNamedFromData(named);
 		_tooltipFilename.setTooltipText(named->name);
@@ -347,10 +345,6 @@ Document::Document(
 	}
 
 	setStatusSize(Ui::FileStatusSizeReady);
-
-	if (const auto captioned = Get<HistoryDocumentCaptioned>()) {
-		captioned->caption = std::move(caption);
-	}
 }
 
 Document::~Document() {
@@ -375,7 +369,7 @@ bool Document::dataLoaded() const {
 	return _dataMedia->loaded();
 }
 
-void Document::createComponents(bool caption) {
+void Document::createComponents() {
 	uint64 mask = 0;
 	if (_data->isVoiceMessage() || _transcribedRound) {
 		mask |= HistoryDocumentVoice::Bit();
@@ -385,9 +379,6 @@ void Document::createComponents(bool caption) {
 			_data->loadThumbnail(_realParent->fullId());
 			mask |= HistoryDocumentThumbed::Bit();
 		}
-	}
-	if (caption) {
-		mask |= HistoryDocumentCaptioned::Bit();
 	}
 	UpdateComponents(mask);
 	if (const auto thumbed = Get<HistoryDocumentThumbed>()) {
@@ -422,18 +413,6 @@ void Document::fillNamedFromData(not_null<HistoryDocumentNamed*> named) {
 }
 
 QSize Document::countOptimalSize() {
-	auto captioned = Get<HistoryDocumentCaptioned>();
-	if (_parent->media() != this && !_realParent->groupId()) {
-		if (captioned) {
-			RemoveComponents(HistoryDocumentCaptioned::Bit());
-			captioned = nullptr;
-		}
-	} else if (captioned && captioned->caption.hasSkipBlock()) {
-		captioned->caption.updateSkipBlock(
-			_parent->skipBlockWidth(),
-			_parent->skipBlockHeight());
-	}
-
 	auto hasTranscribe = false;
 	const auto voice = Get<HistoryDocumentVoice>();
 	if (voice) {
@@ -482,7 +461,7 @@ QSize Document::countOptimalSize() {
 					st::messageTextStyle,
 					text);
 				hasTranscribe = true;
-				if (const auto skipBlockWidth = captioned
+				if (const auto skipBlockWidth = _parent->hasVisibleText()
 					? 0
 					: _parent->skipBlockWidth()) {
 					voice->transcribeText.updateSkipBlock(
@@ -529,7 +508,7 @@ QSize Document::countOptimalSize() {
 	}
 
 	auto minHeight = st.padding.top() + st.thumbSize + st.padding.bottom();
-	if (!captioned && !hasTranscribe && _parent->bottomInfoIsWide()) {
+	if (isBubbleBottom() && !hasTranscribe && _parent->bottomInfoIsWide()) {
 		minHeight += st::msgDateFont->height - st::msgDateDelta.y();
 	}
 	if (!isBubbleTop()) {
@@ -541,17 +520,6 @@ QSize Document::countOptimalSize() {
 			- st::msgPadding.left()
 			- st::msgPadding.right();
 		minHeight += voice->transcribeText.countHeight(captionw);
-		if (captioned) {
-			minHeight += st::mediaCaptionSkip;
-		} else if (isBubbleBottom()) {
-			minHeight += st::msgPadding.bottom();
-		}
-	}
-	if (captioned) {
-		auto captionw = maxWidth
-			- st::msgPadding.left()
-			- st::msgPadding.right();
-		minHeight += captioned->caption.countHeight(captionw);
 		if (isBubbleBottom()) {
 			minHeight += st::msgPadding.bottom();
 		}
@@ -1526,10 +1494,36 @@ QMargins Document::bubbleMargins() const {
 	return QMargins(padding.left(), padding.top(), padding.right(), padding.bottom());
 }
 
-QSize Document::sizeForGroupingOptimal(int maxWidth) const {
+void Document::refreshCaption(bool last) {
+	const auto now = Get<HistoryDocumentCaptioned>();
+	auto caption = createCaption();
+	if (!caption.isEmpty()) {
+		if (now) {
+			return;
+		}
+		AddComponents(HistoryDocumentCaptioned::Bit());
+		auto captioned = Get<HistoryDocumentCaptioned>();
+		captioned->caption = std::move(caption);
+		const auto skip = last ? _parent->skipBlockWidth() : 0;
+		if (skip) {
+			captioned->caption.updateSkipBlock(
+				_parent->skipBlockWidth(),
+				_parent->skipBlockHeight());
+		} else {
+			captioned->caption.removeSkipBlock();
+		}
+	} else if (now) {
+		RemoveComponents(HistoryDocumentCaptioned::Bit());
+	}
+}
+
+QSize Document::sizeForGroupingOptimal(int maxWidth, bool last) const {
 	const auto thumbed = Get<HistoryDocumentThumbed>();
 	const auto &st = (thumbed ? st::msgFileThumbLayoutGrouped : st::msgFileLayoutGrouped);
 	auto height = st.padding.top() + st.thumbSize + st.padding.bottom();
+
+	const_cast<Document*>(this)->refreshCaption(last);
+
 	if (const auto captioned = Get<HistoryDocumentCaptioned>()) {
 		auto captionw = maxWidth
 			- st::msgPadding.left()
@@ -1652,24 +1646,7 @@ void Document::refreshParentId(not_null<HistoryItem*> realParent) {
 }
 
 void Document::parentTextUpdated() {
-	auto caption = (_parent->media() == this || _realParent->groupId())
-		? createCaption()
-		: Ui::Text::String();
-	if (!caption.isEmpty()) {
-		AddComponents(HistoryDocumentCaptioned::Bit());
-		auto captioned = Get<HistoryDocumentCaptioned>();
-		captioned->caption = std::move(caption);
-	} else {
-		RemoveComponents(HistoryDocumentCaptioned::Bit());
-	}
-	history()->owner().requestViewResize(_parent);
-}
-
-TextWithEntities Document::getCaption() const {
-	if (const auto captioned = Get<HistoryDocumentCaptioned>()) {
-		return captioned->caption.toTextWithEntities();
-	}
-	return TextWithEntities();
+	RemoveComponents(HistoryDocumentCaptioned::Bit());
 }
 
 void Document::hideSpoilers() {
@@ -1678,7 +1655,7 @@ void Document::hideSpoilers() {
 	}
 }
 
-Ui::Text::String Document::createCaption() {
+Ui::Text::String Document::createCaption() const {
 	return File::createCaption(_realParent);
 }
 

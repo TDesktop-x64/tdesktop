@@ -348,8 +348,8 @@ public:
 	rpl::producer<bool> adjustShadowLeft() const override {
 		return rpl::single(false);
 	}
-	SendMenu::Type sendMenuType() const override {
-		return SendMenu::Type::SilentOnly;
+	SendMenu::Details sendMenuDetails() const override {
+		return { SendMenu::Type::SilentOnly };
 	}
 
 	bool showMediaPreview(
@@ -415,7 +415,6 @@ OverlayWidget::OverlayWidget()
 , _widget(_surface->rpWidget())
 , _fullscreen(Core::App().settings().mediaViewPosition().maximized == 2)
 , _windowed(Core::App().settings().mediaViewPosition().maximized == 0)
-, _cachedReactionIconFactory(std::make_unique<ReactionIconFactory>())
 , _layerBg(std::make_unique<Ui::LayerManager>(_body))
 , _docDownload(_body, tr::lng_media_download(tr::now), st::mediaviewFileLink)
 , _docSaveAs(_body, tr::lng_mediaview_save_as(tr::now), st::mediaviewFileLink)
@@ -4306,11 +4305,6 @@ std::shared_ptr<ChatHelpers::Show> OverlayWidget::uiShow() {
 auto OverlayWidget::storiesStickerOrEmojiChosen()
 -> rpl::producer<ChatHelpers::FileChosen> {
 	return _storiesStickerOrEmojiChosen.events();
-}
-
-auto OverlayWidget::storiesCachedReactionIconFactory()
--> HistoryView::Reactions::CachedIconFactory & {
-	return *_cachedReactionIconFactory;
 }
 
 void OverlayWidget::storiesJumpTo(

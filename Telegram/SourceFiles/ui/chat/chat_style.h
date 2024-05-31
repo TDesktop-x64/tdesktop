@@ -227,6 +227,14 @@ struct ChatPaintContext {
 
 };
 
+struct ChatPaintContextArgs {
+	not_null<ChatTheme*> theme;
+	QRect clip;
+	QPoint visibleAreaPositionGlobal;
+	int visibleAreaTop = 0;
+	int visibleAreaWidth = 0;
+};
+
 [[nodiscard]] int HistoryServiceMsgRadius();
 [[nodiscard]] int HistoryServiceMsgInvertedRadius();
 [[nodiscard]] int HistoryServiceMsgInvertedShrink();

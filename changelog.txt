@@ -1,3 +1,22 @@
+5.1 (31.05.24)
+
+- Send messages with effects.
+- Move photo or video captions above the media.
+- Chat preview on chat photo long press or Alt+Click.
+
+5.0.6 beta (30.05.24)
+
+- Fix chat preview with non-default themes.
+- Fix chat preview crash when scrolling up.
+- Jump to chat from preview only by Double-Click.
+- Show chat preview with Force Touch on macOS.
+
+5.0.5 beta (28.05.24)
+
+- Long press on chat userpic to show quick preview.
+- Alt+Click on chat to show quick preview.
+- Show author userpics in forwarded messages.
+
 5.0.4 (28.05.24)
 
 - Fix reply to last message by Ctrl+Up in topics.

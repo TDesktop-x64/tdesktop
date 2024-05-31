@@ -1297,8 +1297,8 @@ void TabbedSelector::scrollToY(int y) {
 	}
 }
 
-void TabbedSelector::showMenuWithType(SendMenu::Type type) {
-	_menu = currentTab()->widget()->fillContextMenu(type);
+void TabbedSelector::showMenuWithDetails(SendMenu::Details details) {
+	_menu = currentTab()->widget()->fillContextMenu(details);
 	if (_menu && !_menu->empty()) {
 		_menu->popup(QCursor::pos());
 	}
@@ -1460,9 +1460,7 @@ int TabbedSelector::Inner::resizeGetHeight(int newWidth) {
 }
 
 int TabbedSelector::Inner::minimalHeight() const {
-	return (_minimalHeight > 0)
-		? _minimalHeight
-		: defaultMinimalHeight();
+	return _minimalHeight.value_or(defaultMinimalHeight());
 }
 
 int TabbedSelector::Inner::defaultMinimalHeight() const {

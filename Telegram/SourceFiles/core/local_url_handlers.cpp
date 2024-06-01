@@ -352,6 +352,7 @@ bool ApplySocksProxy(
 		match->captured(1),
 		qthelp::UrlParamNameTransform::ToLower);
 	ProxiesBoxController::ShowApplyConfirmation(
+		controller,
 		MTP::ProxyData::Type::Socks5,
 		params);
 	if (controller) {
@@ -368,6 +369,7 @@ bool ApplyMtprotoProxy(
 		match->captured(1),
 		qthelp::UrlParamNameTransform::ToLower);
 	ProxiesBoxController::ShowApplyConfirmation(
+		controller,
 		MTP::ProxyData::Type::Mtproto,
 		params);
 	if (controller) {

@@ -403,6 +403,7 @@ private:
 	void sendWithModifiers(Qt::KeyboardModifiers modifiers);
 	void sendScheduled(Api::SendOptions initialOptions);
 	[[nodiscard]] SendMenu::Details sendButtonMenuDetails() const;
+	[[nodiscard]] SendMenu::Details sendButtonDefaultDetails() const;
 	void handlePendingHistoryUpdate();
 	void fullInfoUpdated();
 	void toggleTabbedSelectorMode();

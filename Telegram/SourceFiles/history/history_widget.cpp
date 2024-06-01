@@ -4261,7 +4261,7 @@ void HistoryWidget::sendScheduled(Api::SendOptions initialOptions) {
 		HistoryView::PrepareScheduleBox(
 			_list,
 			controller()->uiShow(),
-			sendMenuDetails(),
+			sendButtonDefaultDetails(),
 			[=](Api::SendOptions options) { send(options); },
 			initialOptions));
 }
@@ -4305,7 +4305,15 @@ SendMenu::Details HistoryWidget::sendButtonMenuDetails() const {
 	} else if (type != Type::Send) {
 		return {};
 	}
-	return sendMenuDetails();
+	return sendButtonDefaultDetails();
+}
+
+SendMenu::Details HistoryWidget::sendButtonDefaultDetails() const {
+	auto result = sendMenuDetails();
+	if (!HasSendText(_field) && !_previewDrawPreview) {
+		result.effectAllowed = false;
+	}
+	return result;
 }
 
 void HistoryWidget::unblockUser() {

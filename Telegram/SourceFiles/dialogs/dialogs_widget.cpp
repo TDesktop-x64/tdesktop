@@ -348,6 +348,7 @@ Widget::Widget(
 	}, lifetime());
 	_inner->cancelSearchRequests(
 	) | rpl::start_with_next([=] {
+		setInnerFocus(true);
 		applySearchState({});
 	}, lifetime());
 	_inner->chosenRow(

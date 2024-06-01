@@ -269,9 +269,6 @@ QSize Gif::countOptimalSize() {
 			accumulate_max(maxWidth, botTop->maxWidth);
 			minHeight += botTop->height;
 		}
-		if (isBubbleBottom()) {
-			minHeight += st::msgPadding.bottom();
-		}
 	} else if (isUnwrapped()) {
 		const auto item = _parent->data();
 		auto via = item->Get<HistoryMessageVia>();
@@ -764,7 +761,7 @@ void Gif::draw(Painter &p, const PaintContext &context) const {
 			}
 		}
 	}
-	if (!unwrapped && bubble) {
+	if (!unwrapped && bubble && !isBubbleBottom()) {
 		p.setPen(stm->historyTextFg);
 		auto top = painty + painth + st::mediaCaptionSkip;
 		if (botTop) {

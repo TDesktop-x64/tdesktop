@@ -2176,12 +2176,10 @@ QPointer<Ui::BoxContent> ShowOldForwardMessagesBox(
 		const auto type = sendMenuType();
 		const auto result = SendMenu::FillSendMenu(
 			state->menu.get(),
-			type,
-			SendMenu::DefaultSilentCallback(submit),
-			SendMenu::DefaultScheduleCallback(show, type, submit),
-			SendMenu::DefaultWhenOnlineCallback(submit));
-		const auto success = (result == SendMenu::FillMenuResult::Success);
-		if (showForwardOptions || success) {
+			show,
+			SendMenu::Details{ sendMenuType() },
+			SendMenu::DefaultCallback(show, crl::guard(parent, submit)));
+		if (showForwardOptions || !state->menu->empty()) {
 			state->menu->setForcedVerticalOrigin(
 				Ui::PopupMenu::VerticalOrigin::Bottom);
 			state->menu->popup(QCursor::pos());

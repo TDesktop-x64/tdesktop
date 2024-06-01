@@ -568,7 +568,7 @@ void History::destroyMessagesByTopic(MsgId topicRootId) {
 }
 
 void History::editHistoryMessages(PeerData* peer, bool isHide) {
-	for (const auto& message : _messages) {
+	for (const auto &message : _items) {
 		if (message->isRegular() && !message->isService() && message->from() == peer) {
 			if (isHide) {
 				hideMessage(message.get());

@@ -2231,7 +2231,6 @@ bool Widget::search(bool inCache) {
 bool Widget::searchForPeersRequired(const QString &query) const {
 	return !GetEnhancedBool("disable_global_search")
 		&& _searchState.filterChatsList()
-		&& !_searchInChat
 		&& !_openedForum
 		&& !query.isEmpty()
 		&& !IsHashtagSearchQuery(query);

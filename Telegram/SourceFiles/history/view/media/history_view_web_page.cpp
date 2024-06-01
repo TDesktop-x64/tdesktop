@@ -306,22 +306,22 @@ void WebPage::setupAdditionalData() {
 		raw->colorIndex = details.colorIndex;
 		raw->canReport = details.canReport ? 1 : 0;
 	} else if (_data->stickerSet) {
-		_additionalData = std::make_unique<AdditionalData>(StickerSetData());
-		const auto raw = stickerSetData();
-		for (const auto &sticker : _data->stickerSet->items) {
-			if (!sticker->sticker()) {
-				continue;
-			}
-			raw->views.push_back(
-				std::make_unique<Sticker>(_parent, sticker, true));
-		}
-		const auto side = std::ceil(std::sqrt(raw->views.size()));
-		const auto box = UnitedLineHeight() * kStickerSetLines;
-		const auto single = box / side;
-		for (const auto &view : raw->views) {
-			view->setWebpagePart();
-			view->initSize(single);
-		}
+		//_additionalData = std::make_unique<AdditionalData>(StickerSetData());
+		//const auto raw = stickerSetData();
+		//for (const auto &sticker : _data->stickerSet->items) {
+		//	if (!sticker->sticker()) {
+		//		continue;
+		//	}
+		//	raw->views.push_back(
+		//		std::make_unique<Sticker>(_parent, sticker, true));
+		//}
+		//const auto side = std::ceil(std::sqrt(raw->views.size()));
+		//const auto box = UnitedLineHeight() * kStickerSetLines;
+		//const auto single = box / side;
+		//for (const auto &view : raw->views) {
+		//	view->setWebpagePart();
+		//	view->initSize(single);
+		//}
 	} else if (_data->type == WebPageType::Factcheck) {
 		_additionalData = std::make_unique<AdditionalData>(FactcheckData());
 	}
@@ -1335,7 +1335,7 @@ TextState WebPage::textState(QPoint point, StateRequest request) const {
 	//if ((!result.link || _sponsoredData) && outer.contains(point)) {
 	//	result.link = _openl;
 	//}
-	if (_data->iv || _sponsoredData && outer.contains(point)) {
+	if (_data->iv || sponsored && outer.contains(point)) {
 		result.link = _openl;
 	}
 	if (const auto hint = hintData()) {

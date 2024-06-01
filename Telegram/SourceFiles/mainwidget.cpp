@@ -737,6 +737,7 @@ void MainWidget::searchMessages(const QString &query, Dialogs::Key inChat, PeerD
 			.inChat = ((tags.empty() || inChat.sublist())
 				? inChat
 				: session().data().history(session().user())),
+			.fromPeer = from ? from : nullptr,
 			.tags = tags,
 			.query = tags.empty() ? query : QString(),
 		};

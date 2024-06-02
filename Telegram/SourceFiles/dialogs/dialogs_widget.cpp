@@ -526,7 +526,7 @@ Widget::Widget(
 
 		setupMoreChatsBar();
 		setupDownloadBar();
-	setupShortcuts(controller);
+		setupShortcuts(controller);
 	}
 }
 

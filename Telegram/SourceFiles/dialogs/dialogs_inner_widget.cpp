@@ -3784,11 +3784,11 @@ bool InnerWidget::chooseRow(
 	const auto modifyChosenRow = [&](
 			ChosenRow row,
 			Qt::KeyboardModifiers modifiers) {
-			if (CtrlClickChatNewWindow.value()) {
-				row.newWindow = (modifiers & Qt::ControlModifier);
-				row.userpicClick = isUserpicPressOnWide();
-				return row;
-			}
+		if (CtrlClickChatNewWindow.value()) {
+			row.newWindow = (modifiers & Qt::ControlModifier);
+		}
+		row.userpicClick = isUserpicPressOnWide();
+		return row;
 	};
 	auto chosen = modifyChosenRow(computeChosenRow(), modifiers);
 	if (chosen.key) {

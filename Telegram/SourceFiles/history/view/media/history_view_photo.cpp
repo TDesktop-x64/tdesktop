@@ -218,7 +218,6 @@ QSize Photo::countCurrentSize(int newWidth) {
 		maxWidth());
 	newWidth = qMax(pix.width(), minWidth);
 	auto newHeight = qMax(pix.height(), st::minPhotoSize);
-	auto imageHeight = newHeight;
 	if (_parent->hasBubble()) {
 		auto captionMaxWidth = _parent->textualMaxWidth();
 		const auto botTop = _parent->Get<FakeBotAboutTop>();
@@ -227,9 +226,12 @@ QSize Photo::countCurrentSize(int newWidth) {
 		}
 		const auto maxWithCaption = qMin(st::msgMaxWidth, captionMaxWidth);
 		newWidth = qMin(qMax(newWidth, maxWithCaption), thumbMaxWidth);
-		imageHeight = newHeight = adjustHeightForLessCrop(
+		newHeight = adjustHeightForLessCrop(
 			dimensions,
 			{ newWidth, newHeight });
+	}
+	if (newWidth >= maxWidth()) {
+		newHeight = qMin(newHeight, minHeight());
 	}
 	const auto enlargeInner = st::historyPageEnlargeSize;
 	const auto enlargeOuter = 2 * st::historyPageEnlargeSkip + enlargeInner;
@@ -238,7 +240,7 @@ QSize Photo::countCurrentSize(int newWidth) {
 		&& _parent->data()->media()->webpage()
 		&& _parent->data()->media()->webpage()->suggestEnlargePhoto()
 		&& (newWidth >= enlargeOuter)
-		&& (imageHeight >= enlargeOuter);
+		&& (newHeight >= enlargeOuter);
 	_showEnlarge = showEnlarge ? 1 : 0;
 	return { newWidth, newHeight };
 }
@@ -366,7 +368,7 @@ void Photo::draw(Painter &p, const PaintContext &context) const {
 	}
 
 	// date
-	if (isBubbleBottom() && !inWebPage) {
+	if (!inWebPage && (!bubble || isBubbleBottom())) {
 		auto fullRight = paintx + paintw;
 		auto fullBottom = painty + painth;
 		if (needInfoDisplay()) {
@@ -623,7 +625,7 @@ TextState Photo::textState(QPoint point, StateRequest request) const {
 			result.cursor = CursorState::Enlarge;
 		}
 	}
-	if (isBubbleBottom() && _parent->media() == this) {
+	if (_parent->media() == this && (!_parent->hasBubble() || isBubbleBottom())) {
 		auto fullRight = paintx + paintw;
 		auto fullBottom = painty + painth;
 		const auto bottomInfoResult = _parent->bottomInfoTextState(

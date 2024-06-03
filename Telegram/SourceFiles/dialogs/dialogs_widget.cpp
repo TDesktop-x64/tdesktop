@@ -677,9 +677,12 @@ void Widget::setupMoreChatsBar() {
 	controller()->activeChatsFilter(
 	) | rpl::start_with_next([=](FilterId id) {
 		storiesToggleExplicitExpand(false);
-		if (!_searchState.inChat) {
-			cancelSearch();
-		}
+		const auto cancelled = cancelSearch(true);
+		const auto guard = gsl::finally([&] {
+			if (cancelled) {
+				controller()->content()->dialogsCancelled();
+			}
+		});
 
 		if (!id) {
 			_moreChatsBar = nullptr;
@@ -1420,7 +1423,7 @@ void Widget::changeOpenedFolder(Data::Folder *folder, anim::type animated) {
 		return;
 	}
 	changeOpenedSubsection([&] {
-		cancelSearch();
+		cancelSearch(true);
 		closeChildList(anim::type::instant);
 		controller()->closeForum();
 		_openedFolder = folder;
@@ -1474,7 +1477,7 @@ void Widget::changeOpenedForum(Data::Forum *forum, anim::type animated) {
 		return;
 	}
 	changeOpenedSubsection([&] {
-		cancelSearch();
+		cancelSearch(true);
 		closeChildList(anim::type::instant);
 		_openedForum = forum;
 		_searchState.tab = forum
@@ -2813,7 +2816,7 @@ void Widget::showForum(
 		changeOpenedForum(forum, params.animated);
 		return;
 	}
-	cancelSearch();
+	cancelSearch(true);
 	openChildList(forum, params);
 }
 
@@ -3458,7 +3461,8 @@ void Widget::keyPressEvent(QKeyEvent *e) {
 		//}
 	} else if ((e->key() == Qt::Key_Backspace || e->key() == Qt::Key_Tab)
 		&& _searchHasFocus
-		&& !_searchState.inChat) {
+		&& !_searchState.inChat
+		&& _searchState.query.isEmpty()) {
 		escape();
 	} else if (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) {
 		submit();
@@ -3688,17 +3692,18 @@ void Widget::setSearchQuery(const QString &query, int cursorPosition) {
 	}
 }
 
-bool Widget::cancelSearch() {
+bool Widget::cancelSearch(bool forceFullCancel) {
 	cancelSearchRequest();
 	auto updatedState = _searchState;
 	const auto clearingQuery = !updatedState.query.isEmpty();
-	auto clearingInChat = !clearingQuery
+	auto clearingInChat = (forceFullCancel || !clearingQuery)
 		&& (updatedState.inChat
 			|| updatedState.fromPeer
 			|| !updatedState.tags.empty());
 	if (clearingQuery) {
 		updatedState.query = QString();
-	} else if (clearingInChat) {
+	}
+	if (clearingInChat) {
 		if (updatedState.inChat && controller()->adaptive().isOneColumn()) {
 			if (const auto thread = updatedState.inChat.thread()) {
 				controller()->showThread(thread);
@@ -3716,7 +3721,7 @@ bool Widget::cancelSearch() {
 		setInnerFocus(true);
 		clearingInChat = true;
 	}
-	const auto clearSearchFocus = !updatedState.inChat
+	const auto clearSearchFocus = (forceFullCancel || !updatedState.inChat)
 		&& (_searchHasFocus || _searchSuggestionsLocked);
 	if (!updatedState.inChat && _suggestions) {
 		_suggestions->clearPersistance();

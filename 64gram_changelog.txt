@@ -1,3 +1,7 @@
+1.1.27 (06.06.24)
+
+- No changelog
+
 1.1.26 (02.06.24)
 
 - [Fix] modifyChosenRow nullptr issue

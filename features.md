@@ -4,7 +4,7 @@
 
 1. Show Chat ID
 2. Show admin titles in member list
-3. Upload Boost Setting
+3. Upload/Download Boost Setting
 4. Show chat restriction reason on profile page
 5. Ban members option in Recent Actions
 6. Always show discuss button if channel has discussion group
@@ -17,9 +17,9 @@
 13. Recent Actions/Admins list button in top bar
 14. Show service message time
 15. Show message ID in tooltip/message box
-16. Gif Shared Media section
+16. ~~Gif Shared Media section~~
 17. Don't share my phone number when add someone to contacts
-18. Multiple accounts up to 100
+18. Multiple accounts up to __10__
 19. Support multiple chat forward
 20. Support Forward Message without quote
 21. Quick Forward to Saved Messages
@@ -43,7 +43,7 @@
 39. [Auto unmute option](https://t.me/tg_x64/266)
 40. Voice chat bitrate option
 41. Show/Hide/View pinned message
-42. Pin to top (Windows only)
+42. ~~Pin to top (Windows only)~~
 43. Allow pin older message with notify
 44. Remove all proxies
 45. Hide "All chats" folder option
@@ -57,3 +57,5 @@
 53. Hide stories
 54. "Uncolored Quote" option
 55. Show sender's avatar in groups
+56. Disable global search
+57. Recent sticker display limit

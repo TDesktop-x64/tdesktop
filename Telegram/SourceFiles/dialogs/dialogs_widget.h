@@ -57,6 +57,7 @@ namespace Window {
 class SessionController;
 class ConnectionState;
 struct SectionShow;
+struct SeparateId;
 } // namespace Window
 
 namespace Dialogs::Stories {
@@ -74,10 +75,12 @@ class FakeRow;
 class Key;
 struct ChosenRow;
 class InnerWidget;
-enum class SearchRequestType;
+enum class SearchRequestType : uchar;
+enum class SearchRequestDelay : uchar;
 class Suggestions;
 class ChatSearchIn;
 enum class ChatSearchTab : uchar;
+enum class HashOrCashtag : uchar;
 
 class Widget final : public Window::AbstractSectionWidget {
 public:
@@ -156,8 +159,8 @@ private:
 	[[nodiscard]] QString currentSearchQuery() const;
 	[[nodiscard]] int currentSearchQueryCursorPosition() const;
 	void clearSearchField();
-	void searchRequested();
-	bool search(bool inCache = false);
+	void searchRequested(SearchRequestDelay delay);
+	bool search(bool inCache = false, SearchRequestDelay after = {});
 	void searchTopics();
 	void searchMore();
 
@@ -314,7 +317,7 @@ private:
 	object_ptr<Ui::JumpDownButton> _scrollToTop;
 	bool _scrollToTopIsShown = false;
 	bool _forumSearchRequested = false;
-	bool _searchingHashtag = false;
+	HashOrCashtag _searchHashOrCashtag = {};
 
 	Data::Folder *_openedFolder = nullptr;
 	Data::Forum *_openedForum = nullptr;

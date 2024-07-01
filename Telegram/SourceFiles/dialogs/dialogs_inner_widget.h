@@ -64,6 +64,7 @@ class IndexedList;
 class SearchTags;
 class SearchEmpty;
 class ChatSearchIn;
+enum class HashOrCashtag : uchar;
 
 struct ChosenRow {
 	Key key;
@@ -73,13 +74,19 @@ struct ChosenRow {
 	bool newWindow : 1 = false;
 };
 
-enum class SearchRequestType {
+enum class SearchRequestType : uchar {
 	FromStart,
 	FromOffset,
 	PeerFromStart,
 	PeerFromOffset,
 	MigratedFromStart,
 	MigratedFromOffset,
+};
+
+enum class SearchRequestDelay : uchar {
+	InCache,
+	Instant,
+	Delayed,
 };
 
 enum class WidgetState {
@@ -147,6 +154,7 @@ public:
 	}
 	[[nodiscard]] bool hasFilteredResults() const;
 
+	void searchRequested(bool loading);
 	void applySearchState(SearchState state);
 	[[nodiscard]] auto searchTagsChanges() const
 		-> rpl::producer<std::vector<Data::ReactionId>>;
@@ -170,7 +178,7 @@ public:
 	[[nodiscard]] rpl::producer<int> scrollByDeltaRequests() const;
 	[[nodiscard]] rpl::producer<Ui::ScrollToRequest> mustScrollTo() const;
 	[[nodiscard]] rpl::producer<Ui::ScrollToRequest> dialogMoved() const;
-	[[nodiscard]] rpl::producer<> searchMessages() const;
+	[[nodiscard]] rpl::producer<SearchRequestDelay> searchRequests() const;
 	[[nodiscard]] rpl::producer<QString> completeHashtagRequests() const;
 	[[nodiscard]] rpl::producer<> refreshHashtagsRequests() const;
 
@@ -246,7 +254,7 @@ private:
 	void repaintCollapsedFolderRow(not_null<Data::Folder*> folder);
 	void refreshWithCollapsedRows(bool toTop = false);
 	bool needCollapsedRowsRefresh() const;
-	bool chooseCollapsedRow();
+	bool chooseCollapsedRow(Qt::KeyboardModifiers modifiers);
 	void switchToFilter(FilterId filterId);
 	bool chooseHashtag();
 	ChosenRow computeChosenRow() const;
@@ -509,7 +517,7 @@ private:
 	Ui::DraggingScrollManager _draggingScroll;
 
 	SearchState _searchState;
-	bool _searchingHashtag = false;
+	HashOrCashtag _searchHashOrCashtag = {};
 	History *_searchInMigrated = nullptr;
 	PeerData *_searchFromShown = nullptr;
 	Ui::Text::String _searchFromUserText;
@@ -531,7 +539,7 @@ private:
 
 	rpl::event_stream<Ui::ScrollToRequest> _mustScrollTo;
 	rpl::event_stream<Ui::ScrollToRequest> _dialogMoved;
-	rpl::event_stream<> _searchMessages;
+	rpl::event_stream<SearchRequestDelay> _searchRequests;
 	rpl::event_stream<QString> _completeHashtagRequests;
 	rpl::event_stream<> _refreshHashtagsRequests;
 
@@ -549,6 +557,7 @@ private:
 
 	bool _savedSublists = false;
 	bool _searchLoading = false;
+	bool _searchWaiting = false;
 
 	base::unique_qptr<Ui::PopupMenu> _menu;
 

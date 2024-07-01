@@ -2102,44 +2102,45 @@ QPointer<Ui::BoxContent> ShowOldForwardMessagesBox(
 
 	{ // Chosen a single.
 		auto chosen = [show, draft = std::move(draft)](
-				not_null<Data::Thread*> thread) mutable {
-			const auto peer = thread->peer();
-			if (peer->isSelf()
-				&& !draft.ids.empty()
-				&& draft.ids.front().peer != peer->id) {
-				ForwardToSelf(show, draft);
-				return true;
-			}
-			auto controller = Core::App().windowFor(peer);
-			if (!controller) {
-				return false;
-			}
-			if (controller->maybeSession() != &peer->session()) {
-				controller = peer->isForum()
-					? Core::App().ensureSeparateWindowForAccount(
-						&peer->account())
-					: Core::App().ensureSeparateWindowForPeer(
-						peer,
-						ShowAtUnreadMsgId);
-				if (controller->maybeSession() != &peer->session()) {
+			not_null<Data::Thread*> thread) mutable {
+				const auto peer = thread->peer();
+				if (peer->isSelf()
+					&& !draft.ids.empty()
+					&& draft.ids.front().peer != peer->id) {
+					ForwardToSelf(show, draft);
+					return true;
+				}
+				const auto id = SeparateId(
+					(peer->isForum()
+						? SeparateType::Forum
+						: SeparateType::Chat),
+					thread);
+				auto controller = Core::App().windowFor(id);
+				if (!controller) {
 					return false;
 				}
-			}
-			const auto content = controller->sessionController()->content();
-			return content->setForwardDraft(thread, std::move(draft));
-		};
+				if (controller->maybeSession() != &peer->session()) {
+					controller = Core::App().ensureSeparateWindowFor(id);
+					if (controller->maybeSession() != &peer->session()) {
+						return false;
+					}
+				}
+				const auto content = controller->sessionController()->content();
+				return content->setForwardDraft(thread, std::move(draft));
+			};
 		auto callback = [=, chosen = std::move(chosen)](
-				Controller::Chosen thread) mutable {
-			const auto weak = Ui::MakeWeak(state->box);
-			if (!chosen(thread)) {
-				return;
-			} else if (const auto strong = weak.data()) {
-				strong->closeBox();
-			}
-			if (successCallback) {
-				successCallback();
-			}
-		};
+			Controller::Chosen thread) mutable {
+				const auto weak = Ui::MakeWeak(state->box);
+				if (!chosen(thread)) {
+					return;
+				}
+				else if (const auto strong = weak.data()) {
+					strong->closeBox();
+				}
+				if (successCallback) {
+					successCallback();
+				}
+			};
 		state->controller->singleChosen(
 		) | rpl::start_with_next(std::move(callback), state->box->lifetime());
 	}

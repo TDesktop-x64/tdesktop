@@ -1193,9 +1193,11 @@ void MainWidget::setInnerFocus() {
 			_mainSection->setInnerFocus();
 		} else if (!_hider && _thirdSection) {
 			_thirdSection->setInnerFocus();
-		} else {
-			Assert(_dialogs != nullptr);
+		} else if (_dialogs) {
 			_dialogs->setInnerFocus();
+		} else {
+			// Maybe we're just closing a child window, content is destroyed.
+			_history->setFocus();
 		}
 	} else if (_mainSection) {
 		_mainSection->setInnerFocus();
@@ -1294,8 +1296,9 @@ void MainWidget::showHistory(
 		}
 		const auto unavailable = peer->computeUnavailableReason();
 		if (!unavailable.isEmpty()) {
-			Assert(isPrimary()); // windows todo
-			if (params.activation != anim::activation::background) {
+			if (!isPrimary()) {
+				_controller->window().close();
+			} else if (params.activation != anim::activation::background) {
 				_controller->show(Ui::MakeInformBox(unavailable));
 				_controller->window().activate();
 			}
@@ -1951,10 +1954,9 @@ void MainWidget::showNonPremiumLimitToast(bool download) {
 	});
 }
 
-void MainWidget::showBackFromStack(
-		const SectionShow &params) {
+bool MainWidget::showBackFromStack(const SectionShow &params) {
 	if (preventsCloseSection([=] { showBackFromStack(params); }, params)) {
-		return;
+		return false;
 	}
 
 	if (_stack.empty()) {
@@ -1964,7 +1966,7 @@ void MainWidget::showBackFromStack(
 		crl::on_main(this, [=] {
 			_controller->widget()->setInnerFocus();
 		});
-		return;
+		return (_dialogs != nullptr);
 	}
 	auto item = std::move(_stack.back());
 	_stack.pop_back();
@@ -1996,6 +1998,7 @@ void MainWidget::showBackFromStack(
 				anim::activation::background));
 
 	}
+	return true;
 }
 
 void MainWidget::orderWidgets() {

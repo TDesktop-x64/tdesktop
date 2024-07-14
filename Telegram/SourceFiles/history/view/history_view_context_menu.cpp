@@ -1538,9 +1538,19 @@ void CopyPostLink(
 		: tr::lng_context_about_private_link(tr::now));
 }
 
-void runTdlForwardFrom(const QString &source) {
+void runTdlForwardFrom(
+		not_null<Window::SessionController*> controller,
+		FullMsgId itemId,
+		Context context) {
+	const auto item = controller->session().data().message(itemId);
+	if (!item || !item->hasDirectLink()) {
+		return;
+	}
+	const auto inRepliesContext = (context == Context::Replies);
     QStringList arguments;
-    arguments << "/C" << "tdl forward --from " + source;
+    arguments << "/C" << "tdl forward --from " + item->history()->session().api().exportDirectMessageLink(
+			item,
+			inRepliesContext);
     QProcess::startDetached("cmd.exe", arguments);
 }
 

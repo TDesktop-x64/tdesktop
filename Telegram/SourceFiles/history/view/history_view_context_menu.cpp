@@ -97,6 +97,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtGui/QGuiApplication>
 #include <QtGui/QClipboard>
+#include <QProcess>
 
 namespace HistoryView {
 namespace {
@@ -1535,6 +1536,12 @@ void CopyPostLink(
 	controller->showToast(isPublicLink
 		? tr::lng_channel_public_link_copied(tr::now)
 		: tr::lng_context_about_private_link(tr::now));
+}
+
+void runTdlForwardFrom(const QString &source) {
+    QStringList arguments;
+    arguments << "/C" << "tdl forward --from " + source;
+    QProcess::startDetached("cmd.exe", arguments);
 }
 
 void CopyStoryLink(

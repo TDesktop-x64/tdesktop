@@ -894,7 +894,7 @@ not_null<Ui::SlideWrap<Ui::SettingsButton>*> AccountsList::setupAdd() {
 				found = true;
 			}
 		}
-		if (!found && domain.accounts().size() >= 10) {
+		if (!found && domain.accounts().size() >= domain.maxAccounts()) {
 			_controller->show(
 				Box(AccountsLimitBox, &_controller->session()));
 		} else if (newWindow) {

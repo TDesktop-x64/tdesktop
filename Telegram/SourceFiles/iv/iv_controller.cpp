@@ -11,8 +11,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/invoke_queued.h"
 #include "base/qt_signal_producer.h"
 #include "base/qthelp_url.h"
+#include "core/file_utilities.h"
 #include "iv/iv_data.h"
 #include "lang/lang_keys.h"
+#include "ui/chat/attach/attach_bot_webview.h"
 #include "ui/platform/ui_platform_window_title.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/labels.h"
@@ -21,12 +23,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/wrap/fade_wrap.h"
 #include "ui/basic_click_handlers.h"
 #include "ui/painter.h"
+#include "ui/webview_helpers.h"
 #include "webview/webview_data_stream_memory.h"
 #include "webview/webview_embed.h"
 #include "webview/webview_interface.h"
 #include "styles/palette.h"
 #include "styles/style_iv.h"
 #include "styles/style_menu_icons.h"
+#include "styles/style_payments.h" // paymentsCriticalError
 #include "styles/style_widgets.h"
 #include "styles/style_window.h"
 
@@ -35,11 +39,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QJsonObject>
 #include <QtCore/QJsonValue>
 #include <QtCore/QFile>
+#include <QtGui/QGuiApplication>
 #include <QtGui/QPainter>
 #include <QtGui/QWindow>
 #include <charconv>
 
-#include "base/call_delayed.h"
+#include <ada.h>
 
 namespace Iv {
 namespace {
@@ -62,7 +67,7 @@ namespace {
 		{ "box-divider-bg", &st::boxDividerBg },
 		{ "box-divider-fg", &st::boxDividerFg },
 		{ "light-button-fg", &st::lightButtonFg },
-		{ "light-button-bg-over", &st::lightButtonBgOver },
+		//{ "light-button-bg-over", &st::lightButtonBgOver },
 		{ "menu-icon-fg", &st::menuIconFg },
 		{ "menu-icon-fg-over", &st::menuIconFgOver },
 		{ "menu-bg", &st::menuBg },
@@ -79,67 +84,12 @@ namespace {
 	static const auto phrases = base::flat_map<QByteArray, tr::phrase<>>{
 		{ "iv-join-channel", tr::lng_iv_join_channel },
 	};
-	static const auto serialize = [](const style::color *color) {
-		const auto qt = (*color)->c;
-		if (qt.alpha() == 255) {
-			return '#'
-				+ QByteArray::number(qt.red(), 16).right(2)
-				+ QByteArray::number(qt.green(), 16).right(2)
-				+ QByteArray::number(qt.blue(), 16).right(2);
-		}
-		return "rgba("
-			+ QByteArray::number(qt.red()) + ","
-			+ QByteArray::number(qt.green()) + ","
-			+ QByteArray::number(qt.blue()) + ","
-			+ QByteArray::number(qt.alpha() / 255.) + ")";
-	};
-	static const auto escape = [](tr::phrase<> phrase) {
-		const auto text = phrase(tr::now);
-
-		auto result = QByteArray();
-		for (auto i = 0; i != text.size(); ++i) {
-			uint ucs4 = text[i].unicode();
-			if (QChar::isHighSurrogate(ucs4) && i + 1 != text.size()) {
-				ushort low = text[i + 1].unicode();
-				if (QChar::isLowSurrogate(low)) {
-					ucs4 = QChar::surrogateToUcs4(ucs4, low);
-					++i;
-				}
-			}
-			if (ucs4 == '\'' || ucs4 == '\"' || ucs4 == '\\') {
-				result.append('\\').append(char(ucs4));
-			} else if (ucs4 < 32 || ucs4 > 127) {
-				result.append('\\' + QByteArray::number(ucs4, 16) + ' ');
-			} else {
-				result.append(char(ucs4));
-			}
-		}
-		return result;
-	};
-	auto result = QByteArray();
-	for (const auto &[name, phrase] : phrases) {
-		result += "--td-lng-" + name + ":'" + escape(phrase) + "'; ";
-	}
-	for (const auto &[name, color] : map) {
-		result += "--td-" + name + ':' + serialize(color) + ';';
-	}
-	return result;
-}
-
-[[nodiscard]] QByteArray EscapeForAttribute(QByteArray value) {
-	return value
-		.replace('&', "&amp;")
-		.replace('"', "&quot;")
-		.replace('\'', "&#039;")
-		.replace('<', "&lt;")
-		.replace('>', "&gt;");
-}
-
-[[nodiscard]] QByteArray EscapeForScriptString(QByteArray value) {
-	return value
-		.replace('\\', "\\\\")
-		.replace('"', "\\\"")
-		.replace('\'', "\\\'");
+	return Ui::ComputeStyles(map, phrases)
+		+ ';'
+		+ Ui::ComputeSemiTransparentOverStyle(
+			"light-button-bg-over",
+			st::lightButtonBgOver,
+			st::windowBg);
 }
 
 [[nodiscard]] QByteArray WrapPage(const Prepared &page) {
@@ -159,7 +109,7 @@ namespace {
 <html)"_q
 	+ classAttribute
 	+ R"( style=")"
-	+ EscapeForAttribute(ComputeStyles())
+	+ Ui::EscapeForAttribute(ComputeStyles())
 	+ R"(">
 	<head>
 		<meta charset="utf-8">
@@ -187,6 +137,67 @@ namespace {
 	return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();
 }
 
+[[nodiscard]] QString TonsiteToHttps(QString value) {
+	const auto ChangeHost = [](QString tonsite) {
+		const auto fake = "http://" + tonsite.toStdString();
+		const auto parsed = ada::parse<ada::url>(fake);
+		if (!parsed) {
+			return QString();
+		}
+		tonsite = QString::fromStdString(parsed->get_hostname());
+		tonsite = tonsite.replace('-', "-h");
+		tonsite = tonsite.replace('.', "-d");
+		return tonsite + ".magic.org";
+	};
+	const auto prefix = u"tonsite://"_q;
+	if (!value.toLower().startsWith(prefix)) {
+		return QString();
+	}
+	const auto part = value.mid(prefix.size());
+	const auto split = part.indexOf('/');
+	const auto host = ChangeHost((split < 0) ? part : part.left(split));
+	if (host.isEmpty()) {
+		return QString();
+	}
+	return "https://" + host + ((split < 0) ? u"/"_q : part.mid(split));
+}
+
+[[nodiscard]] QString HttpsToTonsite(QString value) {
+	const auto ChangeHost = [](QString https) {
+		const auto dot = https.indexOf('.');
+		if (dot < 0 || https.mid(dot).toLower() != u".magic.org"_q) {
+			return QString();
+		}
+		https = https.mid(0, dot);
+		https = https.replace("-d", ".");
+		https = https.replace("-h", "-");
+		auto parts = https.split('.');
+		for (auto &part : parts) {
+			if (part.startsWith(u"xn--"_q)) {
+				const auto utf8 = part.mid(4).toStdString();
+				auto out = std::u32string();
+				if (ada::idna::punycode_to_utf32(utf8, out)) {
+					part = QString::fromUcs4(out.data(), out.size());
+				}
+			}
+		}
+		return parts.join('.');
+	};
+	const auto prefix = u"https://"_q;
+	if (!value.toLower().startsWith(prefix)) {
+		return value;
+	}
+	const auto part = value.mid(prefix.size());
+	const auto split = part.indexOf('/');
+	const auto host = ChangeHost((split < 0) ? part : part.left(split));
+	if (host.isEmpty()) {
+		return value;
+	}
+	return "tonsite://"
+		+ host
+		+ ((split < 0) ? u"/"_q : part.mid(split));
+}
+
 } // namespace
 
 Controller::Controller(
@@ -194,7 +205,7 @@ Controller::Controller(
 	Fn<ShareBoxResult(ShareBoxDescriptor)> showShareBox)
 : _delegate(delegate)
 , _updateStyles([=] {
-	const auto str = EscapeForScriptString(ComputeStyles());
+	const auto str = Ui::EscapeForScriptString(ComputeStyles());
 	if (_webview) {
 		_webview->eval("IV.updateStyles('" + str + "');");
 	}
@@ -209,8 +220,9 @@ Controller::~Controller() {
 		_window->hide();
 	}
 	_ready = false;
-	_webview = nullptr;
+	base::take(_webview);
 	_back.destroy();
+	_forward.destroy();
 	_menu = nullptr;
 	_menuToggle.destroy();
 	_subtitle = nullptr;
@@ -228,15 +240,22 @@ void Controller::updateTitleGeometry(int newWidth) const {
 		QPainter(_subtitleWrap.get()).fillRect(clip, st::windowBg);
 	}, _subtitleWrap->lifetime());
 
-	const auto progress = _subtitleLeft.value(_back->toggled() ? 1. : 0.);
-	const auto left = anim::interpolate(
-		st::ivSubtitleLeft,
-		_back->width() + st::ivSubtitleSkip,
-		progress);
+	const auto progressBack = _subtitleBackShift.value(
+		_back->toggled() ? 1. : 0.);
+	const auto progressForward = _subtitleForwardShift.value(
+		_forward->toggled() ? 1. : 0.);
+	const auto backAdded = _back->width()
+		+ st::ivSubtitleSkip
+		- st::ivSubtitleLeft;
+	const auto forwardAdded = _forward->width();
+	const auto left = st::ivSubtitleLeft
+		+ anim::interpolate(0, backAdded, progressBack)
+		+ anim::interpolate(0, forwardAdded, progressForward);
 	_subtitle->resizeToWidth(newWidth - left - _menuToggle->width());
 	_subtitle->moveToLeft(left, st::ivSubtitleTop);
 
 	_back->moveToLeft(0, 0);
+	_forward->moveToLeft(_back->width() * progressBack, 0);
 	_menuToggle->moveToRight(0, 0);
 }
 
@@ -251,12 +270,17 @@ void Controller::initControls() {
 		_subtitleWrap.get(),
 		_subtitleText.value(),
 		st::ivSubtitle);
-	_subtitleText.value(
-	) | rpl::start_with_next([=](const QString &subtitle) {
+	_subtitle->setSelectable(true);
+
+	_windowTitleText = _subtitleText.value(
+	) | rpl::map([=](const QString &subtitle) {
 		const auto prefix = tr::lng_iv_window_title(tr::now);
-		_window->setWindowTitle(prefix + ' ' + QChar(0x2014) + ' ' + subtitle);
+		return prefix + ' ' + QChar(0x2014) + ' ' + subtitle;
+	});
+	_windowTitleText.value(
+	) | rpl::start_with_next([=](const QString &title) {
+		_window->setWindowTitle(title);
 	}, _subtitle->lifetime());
-	_subtitle->setAttribute(Qt::WA_TransparentForMouseEvents);
 
 	_menuToggle.create(_subtitleWrap.get(), st::ivMenuToggle);
 	_menuToggle->setClickedCallback([=] { showMenu(); });
@@ -266,15 +290,25 @@ void Controller::initControls() {
 		object_ptr<Ui::IconButton>(_subtitleWrap.get(), st::ivBack));
 	_back->entity()->setClickedCallback([=] {
 		if (_webview) {
-			_webview->eval("IV.back();");
+			_webview->eval("window.history.back();");
 		} else {
 			_back->hide(anim::type::normal);
+		}
+	});
+	_forward.create(
+		_subtitleWrap.get(),
+		object_ptr<Ui::IconButton>(_subtitleWrap.get(), st::ivForward));
+	_forward->entity()->setClickedCallback([=] {
+		if (_webview) {
+			_webview->eval("window.history.forward();");
+		} else {
+			_forward->hide(anim::type::normal);
 		}
 	});
 
 	_back->toggledValue(
 	) | rpl::start_with_next([=](bool toggled) {
-		_subtitleLeft.start(
+		_subtitleBackShift.start(
 			[=] { updateTitleGeometry(_window->body()->width()); },
 			toggled ? 0. : 1.,
 			toggled ? 1. : 0.,
@@ -282,7 +316,18 @@ void Controller::initControls() {
 	}, _back->lifetime());
 	_back->hide(anim::type::instant);
 
-	_subtitleLeft.stop();
+	_forward->toggledValue(
+	) | rpl::start_with_next([=](bool toggled) {
+		_subtitleForwardShift.start(
+			[=] { updateTitleGeometry(_window->body()->width()); },
+			toggled ? 0. : 1.,
+			toggled ? 1. : 0.,
+			st::fadeWrapDuration);
+	}, _forward->lifetime());
+	_forward->hide(anim::type::instant);
+
+	_subtitleBackShift.stop();
+	_subtitleForwardShift.stop();
 }
 
 void Controller::show(
@@ -309,6 +354,34 @@ void Controller::update(Prepared page) {
 	} else if (!index) {
 		_reloadInitialWhenReady = true;
 	}
+}
+
+bool Controller::IsGoodTonSiteUrl(const QString &uri) {
+	return !TonsiteToHttps(uri).isEmpty();
+}
+
+void Controller::showTonSite(
+		const Webview::StorageId &storageId,
+		QString uri) {
+	const auto url = TonsiteToHttps(uri);
+	Assert(!url.isEmpty());
+
+	if (!_webview) {
+		createWebview(storageId);
+	}
+	if (_webview && _webview->widget()) {
+		_webview->navigate(url);
+		activate();
+	}
+	_url = url;
+	_subtitleText = _url.value(
+	) | rpl::filter([=](const QString &url) {
+		return !url.isEmpty() && url != u"about:blank"_q;
+	}) | rpl::map([=](QString value) {
+		return HttpsToTonsite(value);
+	});
+	_windowTitleText = _subtitleText.value();
+	_menuToggle->hide();
 }
 
 QByteArray Controller::fillInChannelValuesScript(
@@ -343,10 +416,11 @@ void Controller::createWindow() {
 	const auto window = _window.get();
 
 	base::qt_signal_producer(
-		window->window()->windowHandle(),
-		&QWindow::activeChanged
-	) | rpl::filter([=] {
-		return _webview && window->window()->windowHandle()->isActive();
+		qApp,
+		&QGuiApplication::focusWindowChanged
+	) | rpl::filter([=](QWindow *focused) {
+		const auto handle = window->window()->windowHandle();
+		return _webview && handle && (focused == handle);
 	}) | rpl::start_with_next([=] {
 		setInnerFocus();
 	}, window->lifetime());
@@ -397,7 +471,7 @@ void Controller::createWebview(const Webview::StorageId &storageId) {
 
 	window->lifetime().add([=] {
 		_ready = false;
-		_webview = nullptr;
+		base::take(_webview);
 	});
 
 	window->events(
@@ -411,15 +485,41 @@ void Controller::createWebview(const Webview::StorageId &storageId) {
 			}
 		}
 	}, window->lifetime());
-	raw->widget()->show();
+
+	const auto widget = raw->widget();
+	if (!widget) {
+		base::take(_webview);
+		showWebviewError();
+		return;
+	}
+	widget->show();
+
+	QObject::connect(widget, &QObject::destroyed, [=] {
+		if (!_webview) {
+			// If we destroyed _webview ourselves,
+			// we don't show any message, nothing crashed.
+			return;
+		}
+		crl::on_main(window, [=] {
+			showWebviewError({ "Error: WebView has crashed." });
+		});
+		base::take(_webview);
+	});
 
 	_container->sizeValue(
 	) | rpl::start_with_next([=](QSize size) {
-		raw->widget()->setGeometry(QRect(QPoint(), size));
+		if (const auto widget = raw->widget()) {
+			widget->setGeometry(QRect(QPoint(), size));
+		}
 	}, _container->lifetime());
 
 	raw->setNavigationStartHandler([=](const QString &uri, bool newWindow) {
-		return true;
+		if (uri.startsWith(u"http://desktop-app-resource/"_q)
+			|| QUrl(uri).host().toLower().endsWith(u".magic.org"_q)) {
+			return true;
+		}
+		_events.fire({ .type = Event::Type::OpenLink, .url = uri });
+		return false;
 	});
 	raw->setNavigationDoneHandler([=](bool success) {
 	});
@@ -466,9 +566,7 @@ void Controller::createWebview(const Webview::StorageId &storageId) {
 			} else if (event == u"location_change"_q) {
 				_index = object.value("index").toInt();
 				_hash = object.value("hash").toString();
-				_back->toggle(
-					(object.value("position").toInt() > 0),
-					anim::type::normal);
+				_webview->refreshNavigationHistoryState();
 			}
 		});
 	});
@@ -511,7 +609,8 @@ void Controller::createWebview(const Webview::StorageId &storageId) {
 				|| index >= _pages.size()) {
 				return Webview::DataResult::Failed;
 			}
-			return finishWith(WrapPage(_pages[index]), "text/html; charset=utf-8");
+			return finishWith(
+				WrapPage(_pages[index]), "text/html; charset=utf-8");
 		} else if (id.starts_with("page") && id.ends_with(".json")) {
 			auto index = 0;
 			const auto result = std::from_chars(
@@ -549,7 +648,56 @@ void Controller::createWebview(const Webview::StorageId &storageId) {
 		return Webview::DataResult::Failed;
 	});
 
+	raw->navigationHistoryState(
+	) | rpl::start_with_next([=](Webview::NavigationHistoryState state) {
+		_back->toggle(
+			state.canGoBack || state.canGoForward,
+			anim::type::normal);
+		_forward->toggle(state.canGoForward, anim::type::normal);
+		_back->entity()->setDisabled(!state.canGoBack);
+		_back->entity()->setIconOverride(
+			state.canGoBack ? nullptr : &st::ivBackIconDisabled,
+			state.canGoBack ? nullptr : &st::ivBackIconDisabled);
+		_back->setAttribute(
+			Qt::WA_TransparentForMouseEvents,
+			!state.canGoBack);
+		_url = QString::fromStdString(state.url);
+	}, _webview->lifetime());
+
 	raw->init(R"()");
+}
+
+void Controller::showWebviewError() {
+	const auto available = Webview::Availability();
+	if (available.error != Webview::Available::Error::None) {
+		showWebviewError(Ui::BotWebView::ErrorText(available));
+	} else {
+		showWebviewError({ "Error: Could not initialize WebView." });
+	}
+}
+
+void Controller::showWebviewError(TextWithEntities text) {
+	auto error = Ui::CreateChild<Ui::PaddingWrap<Ui::FlatLabel>>(
+		_container,
+		object_ptr<Ui::FlatLabel>(
+			_container,
+			rpl::single(text),
+			st::paymentsCriticalError),
+		st::paymentsCriticalErrorPadding);
+	error->entity()->setClickHandlerFilter([=](
+			const ClickHandlerPtr &handler,
+			Qt::MouseButton) {
+		const auto entity = handler->getTextEntity();
+		if (entity.type != EntityType::CustomUrl) {
+			return true;
+		}
+		File::OpenUrl(entity.data);
+		return false;
+	});
+	error->show();
+	_container->sizeValue() | rpl::start_with_next([=](QSize size) {
+		error->setGeometry(0, 0, size.width(), size.height() * 2 / 3);
+	}, error->lifetime());
 }
 
 void Controller::showInWindow(
@@ -612,7 +760,7 @@ QByteArray Controller::navigateScript(int index, const QString &hash) {
 	return "IV.navigateTo("
 		+ QByteArray::number(index)
 		+ ", '"
-		+ EscapeForScriptString(qthelp::url_decode(hash).toUtf8())
+		+ Ui::EscapeForScriptString(qthelp::url_decode(hash).toUtf8())
 		+ "');";
 }
 
@@ -679,7 +827,7 @@ bool Controller::active() const {
 void Controller::showJoinedTooltip() {
 	if (_webview && _ready) {
 		_webview->eval("IV.showTooltip('"
-			+ EscapeForScriptString(
+			+ Ui::EscapeForScriptString(
 				tr::lng_action_you_joined(tr::now).toUtf8())
 			+ "');");
 	}

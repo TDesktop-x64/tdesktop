@@ -933,9 +933,6 @@ QSize Message::performCountOptimalSize() {
 					- st::msgPadding.left()
 					- st::msgPadding.right();
 				if (withVisibleText) {
-					if (botTop) {
-						minHeight += botTop->height;
-					}
 					if (maxWidth < textualWidth) {
 						minHeight -= text().minHeight();
 						minHeight += text().countHeight(innerWidth);
@@ -2415,10 +2412,10 @@ TextState Message::textState(
 			if (getStateForwardedInfo(point, trect, &result, request)) {
 				return result;
 			}
-			if (getStateReplyInfo(point, trect, &result)) {
+			if (getStateViaBotIdInfo(point, trect, &result)) {
 				return result;
 			}
-			if (getStateViaBotIdInfo(point, trect, &result)) {
+			if (getStateReplyInfo(point, trect, &result)) {
 				return result;
 			}
 		}

@@ -36,6 +36,7 @@ class ScheduledMessages;
 class SponsoredMessages;
 class TopPeers;
 class Factchecks;
+class LocationPickers;
 } // namespace Data
 
 namespace HistoryView::Reactions {
@@ -128,8 +129,14 @@ public:
 	[[nodiscard]] Data::TopPeers &topPeers() const {
 		return *_topPeers;
 	}
+	[[nodiscard]] Data::TopPeers &topBotApps() const {
+		return *_topBotApps;
+	}
 	[[nodiscard]] Data::Factchecks &factchecks() const {
 		return *_factchecks;
+	}
+	[[nodiscard]] Data::LocationPickers &locationPickers() const {
+		return *_locationPickers;
 	}
 	[[nodiscard]] Api::Updates &updates() const {
 		return *_updates;
@@ -258,7 +265,9 @@ private:
 	const std::unique_ptr<Data::ScheduledMessages> _scheduledMessages;
 	const std::unique_ptr<Data::SponsoredMessages> _sponsoredMessages;
 	const std::unique_ptr<Data::TopPeers> _topPeers;
+	const std::unique_ptr<Data::TopPeers> _topBotApps;
 	const std::unique_ptr<Data::Factchecks> _factchecks;
+	const std::unique_ptr<Data::LocationPickers> _locationPickers;
 
 	using ReactionIconFactory = HistoryView::Reactions::CachedIconFactory;
 	const std::unique_ptr<ReactionIconFactory> _cachedReactionIconFactory;

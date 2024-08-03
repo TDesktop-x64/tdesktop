@@ -16,6 +16,10 @@ namespace Data {
 struct CreditsHistoryEntry;
 } // namespace Data
 
+namespace Main {
+class SessionShow;
+} // namespace Main
+
 namespace Window {
 class SessionController;
 } // namespace Window
@@ -29,8 +33,9 @@ class VerticalLayout;
 namespace Settings {
 
 void FillCreditOptions(
-	not_null<Window::SessionController*> controller,
+	std::shared_ptr<Main::SessionShow> show,
 	not_null<Ui::VerticalLayout*> container,
+	not_null<PeerData*> peer,
 	int minCredits,
 	Fn<void()> paid);
 
@@ -54,6 +59,16 @@ void ReceiptCreditsBox(
 	not_null<Window::SessionController*> controller,
 	PeerData *premiumBot,
 	const Data::CreditsHistoryEntry &e);
+void GiftedCreditsBox(
+	not_null<Ui::GenericBox*> box,
+	not_null<Window::SessionController*> controller,
+	not_null<PeerData*> from,
+	not_null<PeerData*> to,
+	int count,
+	TimeId date);
+void ShowRefundInfoBox(
+	not_null<Window::SessionController*> controller,
+	FullMsgId refundItemId);
 
 [[nodiscard]] object_ptr<Ui::RpWidget> GenericEntryPhoto(
 	not_null<Ui::RpWidget*> parent,
@@ -74,7 +89,7 @@ void ReceiptCreditsBox(
 
 void SmallBalanceBox(
 	not_null<Ui::GenericBox*> box,
-	not_null<Window::SessionController*> controller,
+	std::shared_ptr<Main::SessionShow> show,
 	int creditsNeeded,
 	UserId botId,
 	Fn<void()> paid);

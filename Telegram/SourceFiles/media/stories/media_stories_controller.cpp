@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "media/stories/media_stories_controller.h"
 
+#include "base/platform/base_platform_info.h"
 #include "base/power_save_blocker.h"
 #include "base/qt_signal_producer.h"
 #include "base/unixtime.h"
@@ -126,6 +127,13 @@ struct SameDayRange {
 	return origin + QPoint(
 		int(base::SafeRound(acos * point.x() - asin * point.y())),
 		int(base::SafeRound(asin * point.x() + acos * point.y())));
+}
+
+[[nodiscard]] bool ResolveWeatherInCelsius() {
+	const auto saved = Core::App().settings().weatherInCelsius();
+	return saved.value_or(!ranges::contains(
+		std::array{ u"US"_q, u"BS"_q, u"KY"_q, u"LR"_q, u"BZ"_q },
+		Platform::SystemCountry().toUpper()));
 }
 
 } // namespace
@@ -284,7 +292,8 @@ Controller::Controller(not_null<Delegate*> delegate)
 , _slider(std::make_unique<Slider>(this))
 , _replyArea(std::make_unique<ReplyArea>(this))
 , _reactions(std::make_unique<Reactions>(this))
-, _recentViews(std::make_unique<RecentViews>(this)) {
+, _recentViews(std::make_unique<RecentViews>(this))
+, _weatherInCelsius(ResolveWeatherInCelsius()){
 	initLayout();
 
 	using namespace rpl::mappers;
@@ -536,8 +545,9 @@ void Controller::rebuildActiveAreas(const Layout &layout) const {
 			int(base::SafeRound(general.width() * scale.width())),
 			int(base::SafeRound(general.height() * scale.height()))
 		).translated(origin);
-		if (const auto reaction = area.reaction.get()) {
-			reaction->setAreaGeometry(area.geometry);
+		area.radius = scale.width() * area.radiusOriginal / 100.;
+		if (const auto view = area.view.get()) {
+			view->setAreaGeometry(area.geometry, area.radius);
 		}
 	}
 }
@@ -1050,6 +1060,9 @@ void Controller::updateAreas(Data::Story *story) {
 	const auto &urlAreas = story
 		? story->urlAreas()
 		: std::vector<Data::UrlArea>();
+	const auto &weatherAreas = story
+		? story->weatherAreas()
+		: std::vector<Data::WeatherArea>();
 	if (_locations != locations) {
 		_locations = locations;
 		_areas.clear();
@@ -1062,13 +1075,18 @@ void Controller::updateAreas(Data::Story *story) {
 		_urlAreas = urlAreas;
 		_areas.clear();
 	}
+	if (_weatherAreas != weatherAreas) {
+		_weatherAreas = weatherAreas;
+		_areas.clear();
+	}
 	const auto reactionsCount = int(suggestedReactions.size());
 	if (_suggestedReactions.size() == reactionsCount && !_areas.empty()) {
 		for (auto i = 0; i != reactionsCount; ++i) {
 			const auto count = suggestedReactions[i].count;
 			if (_suggestedReactions[i].count != count) {
 				_suggestedReactions[i].count = count;
-				_areas[i + _locations.size()].reaction->updateCount(count);
+				const auto view = _areas[i + _locations.size()].view.get();
+				view->updateReactionsCount(count);
 			}
 			if (_suggestedReactions[i] != suggestedReactions[i]) {
 				_suggestedReactions = suggestedReactions;
@@ -1206,7 +1224,8 @@ ClickHandlerPtr Controller::lookupAreaHandler(QPoint point) const {
 		|| (_locations.empty()
 			&& _suggestedReactions.empty()
 			&& _channelPosts.empty()
-			&& _urlAreas.empty())) {
+			&& _urlAreas.empty()
+			&& _weatherAreas.empty())) {
 		return nullptr;
 	} else if (_areas.empty()) {
 		const auto now = story();
@@ -1240,7 +1259,7 @@ ClickHandlerPtr Controller::lookupAreaHandler(QPoint point) const {
 						}
 					}
 				}),
-				.reaction = std::move(widget),
+				.view = std::move(widget),
 			});
 		}
 		if (const auto session = now ? &now->session() : nullptr) {
@@ -1261,25 +1280,40 @@ ClickHandlerPtr Controller::lookupAreaHandler(QPoint point) const {
 				.handler = std::make_shared<HiddenUrlClickHandler>(url.url),
 			});
 		}
+		for (const auto &weather : _weatherAreas) {
+			_areas.push_back({
+				.original = weather.area.geometry,
+				.radiusOriginal = weather.area.radius,
+				.rotation = weather.area.rotation,
+				.handler = std::make_shared<LambdaClickHandler>([=] {
+					toggleWeatherMode();
+				}),
+				.view = _reactions->makeWeatherAreaWidget(
+					weather,
+					_weatherInCelsius.value()),
+			});
+		}
 		rebuildActiveAreas(*layout);
 	}
 
-	const auto circleContains = [&](QRect circle) {
-		const auto radius = std::min(circle.width(), circle.height()) / 2;
-		const auto delta = circle.center() - point;
-		return QPoint::dotProduct(delta, delta) < (radius * radius);
-	};
 	for (const auto &area : _areas) {
 		const auto center = area.geometry.center();
 		const auto angle = -area.rotation;
-		const auto contains = area.reaction
-			? circleContains(area.geometry)
+		const auto contains = area.view
+			? area.view->contains(point)
 			: area.geometry.contains(Rotated(point, center, angle));
 		if (contains) {
 			return area.handler;
 		}
 	}
 	return nullptr;
+}
+
+void Controller::toggleWeatherMode() const {
+	const auto now = !_weatherInCelsius.current();
+	Core::App().settings().setWeatherInCelsius(now);
+	Core::App().saveSettingsDelayed();
+	_weatherInCelsius = now;
 }
 
 void Controller::maybeMarkAsRead(const Player::TrackState &state) {

@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/section_widget.h"
 
 #include "mainwidget.h"
+#include "mainwindow.h"
 #include "ui/ui_utility.h"
 #include "ui/chat/chat_theme.h"
 #include "ui/painter.h"
@@ -456,7 +457,11 @@ void SectionWidget::showFinished() {
 	showChildren();
 	showFinishedHook();
 
-	setInnerFocus();
+	if (isAncestorOf(window()->focusWidget())) {
+		setInnerFocus();
+	} else {
+		controller()->widget()->setInnerFocus();
+	}
 }
 
 rpl::producer<int> SectionWidget::desiredHeight() const {

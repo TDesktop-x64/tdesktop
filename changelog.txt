@@ -1,3 +1,36 @@
+5.3.2 (02.08.24)
+
+- Fix crash on launch in some Linux systems.
+
+5.3.1 (01.08.24)
+
+- Open normal links from tonsite-s in system browser.
+- Fix unicode tonsite:// links.
+- Fix crash on Linux X11.
+
+5.3 (31.07.24)
+
+- View recent and popular web apps in chats search.
+- Open several web apps in different windows.
+- Gift Telegram Stars to your friends.
+- Send location marks and venues.
+- Open tonsite:// links in webview.
+- Edit order of stickers in your packs.
+
+5.2.6 beta (29.07.24)
+
+- Fix launching on X11. (Linux)
+
+5.2.5 beta (27.07.24)
+
+- Fix media viewer context menu.
+- Fix blockquotes layout in messages.
+
+5.2.4 beta (24.07.24)
+
+- Allow opening several web apps.
+- Send location marks and venues.
+
 5.2.3 (07.07.24)
 
 - Fix crash in bot star stats page.

@@ -68,7 +68,7 @@ struct ContentLayout;
 class CaptionFullView;
 class RepostView;
 enum class ReactionsMode;
-class SuggestedReactionView;
+class StoryAreaView;
 struct RepostClickHandler;
 
 enum class HeaderLayout {
@@ -208,10 +208,12 @@ private:
 	};
 	struct ActiveArea {
 		QRectF original;
+		float64 radiusOriginal = 0.;
 		QRect geometry;
 		float64 rotation = 0.;
+		float64 radius = 0.;
 		ClickHandlerPtr handler;
-		std::unique_ptr<SuggestedReactionView> reaction;
+		std::unique_ptr<StoryAreaView> view;
 	};
 
 	void initLayout();
@@ -227,6 +229,7 @@ private:
 	void updatePlayingAllowed();
 	void setPlayingAllowed(bool allowed);
 	void rebuildActiveAreas(const Layout &layout) const;
+	void toggleWeatherMode() const;
 
 	void hideSiblings();
 	void showSiblings(not_null<Main::Session*> session);
@@ -303,7 +306,9 @@ private:
 	std::vector<Data::SuggestedReaction> _suggestedReactions;
 	std::vector<Data::ChannelPost> _channelPosts;
 	std::vector<Data::UrlArea> _urlAreas;
+	std::vector<Data::WeatherArea> _weatherAreas;
 	mutable std::vector<ActiveArea> _areas;
+	mutable rpl::variable<bool> _weatherInCelsius;
 
 	std::vector<CachedSource> _cachedSourcesList;
 	int _cachedSourceIndex = -1;

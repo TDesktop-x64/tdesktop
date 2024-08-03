@@ -23,6 +23,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/format_values.h"
 #include "ui/text/text_isolated_emoji.h"
 #include "ui/text/text_utilities.h"
+#include "settings/settings_credits_graphics.h" // ShowRefundInfoBox.
 #include "storage/file_upload.h"
 #include "storage/storage_shared_media.h"
 #include "main/main_account.h"
@@ -38,6 +39,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/click_handler_types.h"
 #include "base/unixtime.h"
 #include "base/timer_rpl.h"
+#include "boxes/send_credits_box.h"
 #include "api/api_text_entities.h"
 #include "api/api_updates.h"
 #include "data/components/scheduled_messages.h"
@@ -134,6 +136,17 @@ template <typename T>
 		not_null<HistoryItem*> original) {
 	fields.flags |= NewForwardedFlags(history->peer, fields.from, original);
 	return fields;
+}
+
+[[nodiscard]] TextWithEntities AmountAndStarCurrency(
+		not_null<Main::Session*> session,
+		int64 amount,
+		const QString &currency) {
+	if (currency == Ui::kCreditsCurrency) {
+		return Ui::CreditsEmojiSmall(session).append(
+			Lang::FormatCountDecimal(std::abs(amount)));
+	}
+	return { Ui::FillAmountAndCurrency(amount, currency) };
 }
 
 } // namespace
@@ -4013,7 +4026,10 @@ void HistoryItem::createServiceFromMtp(const MTPDmessageService &message) {
 		payment->recurringInit = data.is_recurring_init();
 		payment->recurringUsed = data.is_recurring_used();
 		payment->isCreditsCurrency = (currency == Ui::kCreditsCurrency);
-		payment->amount = Ui::FillAmountAndCurrency(amount, currency);
+		payment->amount = AmountAndStarCurrency(
+			&_history->session(),
+			amount,
+			currency);
 		payment->invoiceLink = std::make_shared<LambdaClickHandler>([=](
 				ClickContext context) {
 			using namespace Payments;
@@ -4085,6 +4101,22 @@ void HistoryItem::createServiceFromMtp(const MTPDmessageService &message) {
 		}
 	} else if (type == mtpc_messageActionGiveawayResults) {
 		UpdateComponents(HistoryServiceGiveawayResults::Bit());
+	} else if (type == mtpc_messageActionPaymentRefunded) {
+		const auto &data = action.c_messageActionPaymentRefunded();
+		UpdateComponents(HistoryServicePaymentRefund::Bit());
+		const auto refund = Get<HistoryServicePaymentRefund>();
+		refund->peer = _history->owner().peer(peerFromMTP(data.vpeer()));
+		refund->amount = data.vtotal_amount().v;
+		refund->currency = qs(data.vcurrency());
+		refund->transactionId = qs(data.vcharge().data().vid());
+		const auto id = fullId();
+		refund->link = std::make_shared<LambdaClickHandler>([=](
+				ClickContext context) {
+			const auto my = context.other.value<ClickHandlerContext>();
+			if (const auto window = my.sessionWindow.get()) {
+				Settings::ShowRefundInfoBox(window, id);
+			}
+		});
 	}
 	if (const auto replyTo = message.vreply_to()) {
 		replyTo->match([&](const MTPDmessageReplyHeader &data) {
@@ -4719,21 +4751,32 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 	auto prepareGiftPremium = [&](
 			const MTPDmessageActionGiftPremium &action) {
 		auto result = PreparedServiceText();
-		const auto isSelf = (_from->id == _from->session().userPeerId());
+		const auto session = &_history->session();
+		const auto isSelf = _from->isSelf();
 		const auto peer = isSelf ? _history->peer : _from;
-		_history->session().giftBoxStickersPacks().load();
+		session->giftBoxStickersPacks().load();
 		const auto amount = action.vamount().v;
 		const auto currency = qs(action.vcurrency());
-		result.links.push_back(peer->createOpenLink());
-		result.text = (isSelf
-			? tr::lng_action_gift_received_me
-			: tr::lng_action_gift_received)(
+		const auto cost = AmountAndStarCurrency(session, amount, currency);
+		const auto anonymous = _from->isServiceUser();
+		if (anonymous) {
+			result.text = tr::lng_action_gift_received_anonymous(
 				tr::now,
-				lt_user,
-				Ui::Text::Link(peer->name(), 1), // Link 1.
 				lt_cost,
-				{ Ui::FillAmountAndCurrency(amount, currency) },
+				cost,
 				Ui::Text::WithEntities);
+		} else {
+			result.links.push_back(peer->createOpenLink());
+			result.text = (isSelf
+				? tr::lng_action_gift_received_me
+				: tr::lng_action_gift_received)(
+					tr::now,
+					lt_user,
+					Ui::Text::Link(peer->name(), 1), // Link 1.
+					lt_cost,
+					cost,
+					Ui::Text::WithEntities);
+		}
 		return result;
 	};
 
@@ -4945,9 +4988,10 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 					lt_user,
 					Ui::Text::Link(peer->name(), 1), // Link 1.
 					lt_cost,
-					{ Ui::FillAmountAndCurrency(
+					AmountAndStarCurrency(
+						&_history->session(),
 						action.vamount().value_or_empty(),
-						qs(action.vcurrency().value_or_empty())) },
+						qs(action.vcurrency().value_or_empty())),
 					Ui::Text::WithEntities);
 
 		}
@@ -4997,6 +5041,48 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 			Ui::Text::WithEntities);
 		return result;
 	};
+	auto preparePaymentRefunded = [&](const MTPDmessageActionPaymentRefunded &action) {
+		auto result = PreparedServiceText();
+		const auto refund = Get<HistoryServicePaymentRefund>();
+		Assert(refund != nullptr);
+		Assert(refund->peer != nullptr);
+
+		const auto amount = refund->amount;
+		const auto currency = refund->currency;
+		result.links.push_back(refund->peer->createOpenLink());
+		result.text = tr::lng_action_payment_refunded(
+			tr::now,
+			lt_peer,
+			Ui::Text::Link(refund->peer->name(), 1), // Link 1.
+			lt_amount,
+			AmountAndStarCurrency(&_history->session(), amount, currency),
+			Ui::Text::WithEntities);
+		return result;
+	};
+
+	auto prepareGiftStars = [&](
+			const MTPDmessageActionGiftStars &action) {
+		auto result = PreparedServiceText();
+		const auto isSelf = (_from->id == _from->session().userPeerId());
+		const auto peer = isSelf ? _history->peer : _from;
+		_history->session().giftBoxStickersPacks().load();
+		const auto amount = action.vamount().v;
+		const auto currency = qs(action.vcurrency());
+		result.links.push_back(peer->createOpenLink());
+		result.text = (isSelf
+			? tr::lng_action_gift_received_me
+			: tr::lng_action_gift_received)(
+				tr::now,
+				lt_user,
+				Ui::Text::Link(peer->name(), 1), // Link 1.
+				lt_cost,
+				AmountAndStarCurrency(
+					&_history->session(),
+					amount,
+					currency),
+				Ui::Text::WithEntities);
+		return result;
+	};
 
 	setServiceText(action.match(
 		prepareChatAddUserText,
@@ -5040,6 +5126,8 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 		prepareGiveawayLaunch,
 		prepareGiveawayResults,
 		prepareBoostApply,
+		preparePaymentRefunded,
+		prepareGiftStars,
 		PrepareEmptyText<MTPDmessageActionRequestedPeerSentMe>,
 		PrepareErrorText<MTPDmessageActionEmpty>));
 
@@ -5092,6 +5180,7 @@ void HistoryItem::applyAction(const MTPMessageAction &action) {
 		_media = std::make_unique<Data::MediaGiftBox>(
 			this,
 			_from,
+			Data::GiftType::Premium,
 			data.vmonths().v);
 	}, [&](const MTPDmessageActionSuggestProfilePhoto &data) {
 		data.vphoto().match([&](const MTPDphoto &photo) {
@@ -5126,10 +5215,17 @@ void HistoryItem::applyAction(const MTPMessageAction &action) {
 				.channel = (boostedId
 					? history()->owner().channel(boostedId).get()
 					: nullptr),
-				.months = data.vmonths().v,
+				.count = data.vmonths().v,
+				.type = Data::GiftType::Premium,
 				.viaGiveaway = data.is_via_giveaway(),
 				.unclaimed = data.is_unclaimed(),
 			});
+	}, [&](const MTPDmessageActionGiftStars &data) {
+		_media = std::make_unique<Data::MediaGiftBox>(
+			this,
+			_from,
+			Data::GiftType::Stars,
+			data.vstars().v);
 	}, [](const auto &) {
 	});
 }
@@ -5402,7 +5498,7 @@ PreparedServiceText HistoryItem::preparePaymentSentText() {
 			result.text = tr::lng_action_payment_used_recurring(
 				tr::now,
 				lt_amount,
-				{ .text = payment->amount },
+				payment->amount,
 				Ui::Text::WithEntities);
 		} else {
 			result.text = (payment->recurringInit
@@ -5410,7 +5506,7 @@ PreparedServiceText HistoryItem::preparePaymentSentText() {
 				: tr::lng_action_payment_done)(
 					tr::now,
 					lt_amount,
-					{ .text = payment->amount },
+					payment->amount,
 					lt_user,
 					{ .text = _history->peer->name() },
 					Ui::Text::WithEntities);
@@ -5421,7 +5517,7 @@ PreparedServiceText HistoryItem::preparePaymentSentText() {
 			: tr::lng_action_payment_done_for)(
 				tr::now,
 				lt_amount,
-				{ .text = payment->amount },
+				payment->amount,
 				lt_user,
 				{ .text = _history->peer->name() },
 				lt_invoice,

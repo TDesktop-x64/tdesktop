@@ -1315,6 +1315,22 @@ auto HtmlWriter::Wrap::pushMessage(
 			+ " boosted the group "
 			+ QByteArray::number(data.boosts)
 			+ (data.boosts > 1 ? " times" : " time");
+	}, [&](const ActionPaymentRefunded &data) {
+		const auto amount = FormatMoneyAmount(data.amount, data.currency);
+		auto result = peers.wrapPeerName(data.peerId)
+			+ " refunded back "
+			+ amount;
+		return result;
+	}, [&](const ActionGiftStars &data) {
+		if (!data.stars || data.cost.isEmpty()) {
+			return serviceFrom + " sent you a gift.";
+		}
+		return serviceFrom
+			+ " sent you a gift for "
+			+ data.cost
+			+ ": "
+			+ QString::number(data.stars).toUtf8()
+			+ " Telegram Stars.";
 	}, [](v::null_t) { return QByteArray(); });
 
 	if (!serviceText.isEmpty()) {

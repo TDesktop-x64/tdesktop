@@ -53,6 +53,12 @@ std::optional<QString> OnlineTextSpecial(not_null<UserData*> user) {
 	} else if (user->isSupport()) {
 		return tr::lng_status_support(tr::now);
 	} else if (user->isBot()) {
+		if (const auto count = user->botInfo->activeUsers) {
+			return tr::lng_bot_status_users(
+				tr::now,
+				lt_count_decimal,
+				count);
+		}
 		auto seesAllMessages = (user->botInfo->readsAllHistory);
 		return seesAllMessages
 				? tr::lng_status_bot_reads_all(tr::now)
@@ -68,12 +74,14 @@ std::optional<QString> OnlineTextCommon(LastseenStatus status, TimeId now) {
 		return tr::lng_status_online(tr::now);
 	} else if (status.isLongAgo()) {
 		return tr::lng_status_offline(tr::now);
-	} else if (status.isRecently() || status.isHidden()) {
+	} else if (status.isRecently()) {
 		return tr::lng_status_recently(tr::now);
 	} else if (status.isWithinWeek()) {
 		return tr::lng_status_last_week(tr::now);
 	} else if (status.isWithinMonth()) {
 		return tr::lng_status_last_month(tr::now);
+	} else if (status.isHidden()) {
+		return tr::lng_status_recently(tr::now);
 	}
 	return std::nullopt;
 }

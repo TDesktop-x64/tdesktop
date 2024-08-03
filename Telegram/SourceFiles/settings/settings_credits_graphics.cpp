@@ -12,20 +12,25 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/timer_rpl.h"
 #include "base/unixtime.h"
 #include "boxes/gift_premium_box.h"
+#include "chat_helpers/stickers_gift_box_pack.h"
+#include "chat_helpers/stickers_lottie.h"
 #include "core/click_handler_types.h"
+#include "core/click_handler_types.h" // UrlClickHandler
 #include "core/ui_integration.h"
 #include "data/data_document.h"
+#include "data/data_document_media.h"
 #include "data/data_file_origin.h"
-#include "core/click_handler_types.h" // UrlClickHandler
 #include "data/data_photo_media.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
 #include "data/stickers/data_custom_emoji.h"
 #include "history/history.h"
 #include "history/history_item.h"
+#include "history/history_item_components.h" // HistoryServicePaymentRefund.
 #include "info/settings/info_settings_widget.h" // SectionCustomTopBarData.
 #include "info/statistics/info_statistics_list_controllers.h"
 #include "lang/lang_keys.h"
+#include "lottie/lottie_single_player.h"
 #include "main/main_app_config.h"
 #include "main/main_session.h"
 #include "payments/payments_checkout_process.h"
@@ -224,8 +229,9 @@ void AddViewMediaHandler(
 } // namespace
 
 void FillCreditOptions(
-		not_null<Window::SessionController*> controller,
+		std::shared_ptr<Main::SessionShow> show,
 		not_null<Ui::VerticalLayout*> container,
+		not_null<PeerData*> peer,
 		int minimumCredits,
 		Fn<void()> paid) {
 	const auto options = container->add(
@@ -301,13 +307,14 @@ void FillCreditOptions(
 			}, button->lifetime());
 			button->setClickedCallback([=] {
 				const auto invoice = Payments::InvoiceCredits{
-					.session = &controller->session(),
+					.session = &show->session(),
 					.randomId = UniqueIdFromOption(option),
 					.credits = option.credits,
 					.product = option.product,
 					.currency = option.currency,
 					.amount = option.amount,
 					.extended = option.extended,
+					.giftPeerId = PeerId(option.giftBarePeerId),
 				};
 
 				const auto weak = Ui::MakeWeak(button);
@@ -346,19 +353,18 @@ void FillCreditOptions(
 	};
 
 	using ApiOptions = Api::CreditsTopupOptions;
-	const auto apiCredits = content->lifetime().make_state<ApiOptions>(
-		controller->session().user());
+	const auto apiCredits = content->lifetime().make_state<ApiOptions>(peer);
 
-	if (controller->session().premiumPossible()) {
+	if (show->session().premiumPossible()) {
 		apiCredits->request(
 		) | rpl::start_with_error_done([=](const QString &error) {
-			controller->showToast(error);
+			show->showToast(error);
 		}, [=] {
 			fill(apiCredits->options());
 		}, content->lifetime());
 	}
 
-	controller->session().premiumPossibleValue(
+	show->session().premiumPossibleValue(
 	) | rpl::start_with_next([=](bool premiumPossible) {
 		if (!premiumPossible) {
 			fill({});
@@ -447,7 +453,7 @@ void ReceiptCreditsBox(
 	const auto &stUser = st::boostReplaceUserpic;
 	const auto session = &controller->session();
 	const auto peer = (e.peerType == Type::PremiumBot)
-		? premiumBot
+		? nullptr
 		: e.barePeerId
 		? session->data().peer(PeerId(e.barePeerId)).get()
 		: nullptr;
@@ -456,10 +462,66 @@ void ReceiptCreditsBox(
 			content,
 			GenericEntryPhoto(content, callback, stUser.photoSize)));
 		AddViewMediaHandler(thumb->entity(), controller, e);
-	} else if (peer) {
+	} else if (peer && !e.gift) {
 		content->add(object_ptr<Ui::CenterWrap<>>(
 			content,
 			object_ptr<Ui::UserpicButton>(content, peer, stUser)));
+	} else if (e.gift) {
+		struct State final {
+			DocumentData *sticker = nullptr;
+			std::shared_ptr<Data::DocumentMedia> media;
+			std::unique_ptr<Lottie::SinglePlayer> lottie;
+			rpl::lifetime downloadLifetime;
+		};
+		Ui::AddSkip(
+			content,
+			st::creditsHistoryEntryGiftStickerSpace);
+		const auto icon = Ui::CreateChild<Ui::RpWidget>(content);
+		icon->resize(Size(st::creditsHistoryEntryGiftStickerSize));
+		const auto state = icon->lifetime().make_state<State>();
+		auto &packs = session->giftBoxStickersPacks();
+		const auto document = packs.lookup(packs.monthsForStars(e.credits));
+		if (document && document->sticker()) {
+			state->sticker = document;
+			state->media = document->createMediaView();
+			state->media->thumbnailWanted(packs.origin());
+			state->media->automaticLoad(packs.origin(), nullptr);
+			rpl::single() | rpl::then(
+				session->downloaderTaskFinished()
+			) | rpl::filter([=] {
+				return state->media->loaded();
+			}) | rpl::start_with_next([=] {
+				state->lottie = ChatHelpers::LottiePlayerFromDocument(
+					state->media.get(),
+					ChatHelpers::StickerLottieSize::MessageHistory,
+					icon->size(),
+					Lottie::Quality::High);
+				state->lottie->updates() | rpl::start_with_next([=] {
+					icon->update();
+				}, icon->lifetime());
+				state->downloadLifetime.destroy();
+			}, state->downloadLifetime);
+		}
+		icon->paintRequest(
+		) | rpl::start_with_next([=] {
+			auto p = Painter(icon);
+			const auto &lottie = state->lottie;
+			const auto frame = (lottie && lottie->ready())
+				? lottie->frameInfo({ .box = icon->size() })
+				: Lottie::Animation::FrameInfo();
+			if (!frame.image.isNull()) {
+				p.drawImage(0, 0, frame.image);
+				if (lottie->frameIndex() < lottie->framesCount() - 1) {
+					lottie->markFrameShown();
+				}
+			}
+		}, icon->lifetime());
+		content->sizeValue(
+		) | rpl::start_with_next([=](const QSize &size) {
+			icon->move(
+				(size.width() - icon->width()) / 2,
+				st::creditsHistoryEntryGiftStickerSkip);
+		}, icon->lifetime());
 	} else {
 		const auto widget = content->add(
 			object_ptr<Ui::CenterWrap<>>(
@@ -479,7 +541,6 @@ void ReceiptCreditsBox(
 	Ui::AddSkip(content);
 	Ui::AddSkip(content);
 
-
 	box->addRow(object_ptr<Ui::CenterWrap<>>(
 		box,
 		object_ptr<Ui::FlatLabel>(
@@ -487,6 +548,8 @@ void ReceiptCreditsBox(
 			rpl::single(
 				!e.title.isEmpty()
 				? e.title
+				: e.gift
+				? tr::lng_credits_box_history_entry_gift_name(tr::now)
 				: peer
 				? peer->name()
 				: Ui::GenerateEntryName(e).text),
@@ -499,7 +562,7 @@ void ReceiptCreditsBox(
 		auto &lifetime = content->lifetime();
 		const auto text = lifetime.make_state<Ui::Text::String>(
 			st::semiboldTextStyle,
-			(e.in ? QChar('+') : kMinus)
+			(e.in ? u"+"_q : e.gift ? QString() : QString(kMinus))
 				+ Lang::FormatCountDecimal(std::abs(int64(e.credits))));
 		const auto roundedText = e.refunded
 			? tr::lng_channel_earn_history_return(tr::now)
@@ -539,6 +602,8 @@ void ReceiptCreditsBox(
 				? st::creditsStroke
 				: e.in
 				? st::boxTextFgGood
+				: e.gift
+				? st::windowBoldFg
 				: st::menuIconAttentionColor);
 			const auto x = (amount->width() - fullWidth) / 2;
 			text->draw(p, Ui::Text::PaintContext{
@@ -592,16 +657,47 @@ void ReceiptCreditsBox(
 			object_ptr<Ui::FlatLabel>(
 				box,
 				rpl::single(e.description),
-				st::defaultFlatLabel)));
+				st::creditsBoxAbout)));
+	}
+	if (e.gift) {
+		Ui::AddSkip(content);
+		const auto arrow = Ui::Text::SingleCustomEmoji(
+			session->data().customEmojiManager().registerInternalEmoji(
+				st::topicButtonArrow,
+				st::channelEarnLearnArrowMargins,
+				false));
+		auto link = tr::lng_credits_box_history_entry_gift_about_link(
+			lt_emoji,
+			rpl::single(arrow),
+			Ui::Text::RichLangValue
+		) | rpl::map([](TextWithEntities text) {
+			return Ui::Text::Link(
+				std::move(text),
+				tr::lng_credits_box_history_entry_gift_about_url(tr::now));
+		});
+		box->addRow(object_ptr<Ui::CenterWrap<>>(
+			box,
+			Ui::CreateLabelWithCustomEmoji(
+				box,
+				(!e.in && peer)
+					? tr::lng_credits_box_history_entry_gift_out_about(
+						lt_user,
+						rpl::single(TextWithEntities{ peer->shortName() }),
+						lt_link,
+						std::move(link),
+						Ui::Text::RichLangValue)
+					: tr::lng_credits_box_history_entry_gift_in_about(
+						lt_link,
+						std::move(link),
+						Ui::Text::RichLangValue),
+				{ .session = session },
+				st::creditsBoxAbout)));
 	}
 
 	Ui::AddSkip(content);
 	Ui::AddSkip(content);
 
-	AddCreditsHistoryEntryTable(
-		controller,
-		box->verticalLayout(),
-		e);
+	AddCreditsHistoryEntryTable(controller, content, e);
 
 	Ui::AddSkip(content);
 
@@ -612,14 +708,40 @@ void ReceiptCreditsBox(
 			tr::lng_credits_box_out_about(
 				lt_link,
 				tr::lng_payments_terms_link(
-				) | rpl::map([](const QString &t) {
-					using namespace Ui::Text;
-					return Link(t, u"https://telegram.org/tos"_q);
-				}),
+				) | Ui::Text::ToLink(
+					tr::lng_credits_box_out_about_link(tr::now)
+				),
 				Ui::Text::WithEntities),
 			st::creditsBoxAboutDivider)));
 
 	Ui::AddSkip(content);
+
+	if (e.peerType == Data::CreditsHistoryEntry::PeerType::PremiumBot) {
+		const auto widget = Ui::CreateChild<Ui::RpWidget>(content);
+		using ColoredMiniStars = Ui::Premium::ColoredMiniStars;
+		const auto stars = widget->lifetime().make_state<ColoredMiniStars>(
+			widget,
+			false,
+			Ui::Premium::MiniStars::Type::BiStars);
+		stars->setColorOverride(Ui::Premium::CreditsIconGradientStops());
+		widget->resize(
+			st::boxWidth - stUser.photoSize,
+			stUser.photoSize * 2);
+		content->sizeValue(
+		) | rpl::start_with_next([=](const QSize &size) {
+			widget->moveToLeft(stUser.photoSize / 2, 0);
+			const auto starsRect = Rect(widget->size());
+			stars->setPosition(starsRect.topLeft());
+			stars->setSize(starsRect.size());
+			widget->lower();
+		}, widget->lifetime());
+		widget->paintRequest(
+		) | rpl::start_with_next([=](const QRect &r) {
+			auto p = QPainter(widget);
+			p.fillRect(r, Qt::transparent);
+			stars->paint(p);
+		}, widget->lifetime());
+	}
 
 	const auto button = box->addButton(tr::lng_box_ok(), [=] {
 		box->closeBox();
@@ -631,6 +753,59 @@ void ReceiptCreditsBox(
 	}) | rpl::start_with_next([=] {
 		button->resizeToWidth(buttonWidth);
 	}, button->lifetime());
+}
+
+void GiftedCreditsBox(
+		not_null<Ui::GenericBox*> box,
+		not_null<Window::SessionController*> controller,
+		not_null<PeerData*> from,
+		not_null<PeerData*> to,
+		int count,
+		TimeId date) {
+	const auto received = to->isSelf();
+	const auto anonymous = from->isServiceUser();
+	const auto peer = received ? from : to;
+	using PeerType = Data::CreditsHistoryEntry::PeerType;
+	Settings::ReceiptCreditsBox(box, controller, nullptr, {
+		.id = QString(),
+		.title = (received
+			? tr::lng_credits_box_history_entry_gift_name
+			: tr::lng_credits_box_history_entry_gift_sent)(tr::now),
+		.date = base::unixtime::parse(date),
+		.credits = uint64(count),
+		.bareMsgId = uint64(),
+		.barePeerId = (anonymous ? uint64() : peer->id.value),
+		.peerType = (anonymous ? PeerType::Fragment : PeerType::Peer),
+		.in = received,
+		.gift = true,
+	});
+}
+
+void ShowRefundInfoBox(
+		not_null<Window::SessionController*> controller,
+		FullMsgId refundItemId) {
+	const auto owner = &controller->session().data();
+	const auto item = owner->message(refundItemId);
+	const auto refund = item
+		? item->Get<HistoryServicePaymentRefund>()
+		: nullptr;
+	if (!refund) {
+		return;
+	}
+	Assert(refund->peer != nullptr);
+	auto info = Data::CreditsHistoryEntry();
+	info.id = refund->transactionId;
+	info.date = base::unixtime::parse(item->date());
+	info.credits = refund->amount;
+	info.barePeerId = refund->peer->id.value;
+	info.peerType = Data::CreditsHistoryEntry::PeerType::Peer;
+	info.refunded = true;
+	info.in = true;
+	controller->show(Box(
+		::Settings::ReceiptCreditsBox,
+		controller,
+		nullptr, // premiumBot
+		info));
 }
 
 object_ptr<Ui::RpWidget> GenericEntryPhoto(
@@ -684,7 +859,7 @@ object_ptr<Ui::RpWidget> PaidMediaThumbnail(
 
 void SmallBalanceBox(
 		not_null<Ui::GenericBox*> box,
-		not_null<Window::SessionController*> controller,
+		std::shared_ptr<Main::SessionShow> show,
 		int creditsNeeded,
 		UserId botId,
 		Fn<void()> paid) {
@@ -695,21 +870,13 @@ void SmallBalanceBox(
 		paid();
 	};
 
-	const auto bot = controller->session().data().user(botId).get();
+	const auto bot = show->session().data().user(botId).get();
 
 	const auto content = [&]() -> Ui::Premium::TopBarAbstract* {
-		const auto weak = base::make_weak(controller);
-		const auto clickContextOther = [=] {
-			return QVariant::fromValue(ClickHandlerContext{
-				.sessionWindow = weak,
-				.botStartAutoSubmit = true,
-			});
-		};
 		return box->setPinnedToTopContent(object_ptr<Ui::Premium::TopBar>(
 			box,
 			st::creditsLowBalancePremiumCover,
 			Ui::Premium::TopBarDescriptor{
-				.clickContextOther = clickContextOther,
 				.title = tr::lng_credits_small_balance_title(
 					lt_count,
 					rpl::single(creditsNeeded) | tr::to_count()),
@@ -722,7 +889,12 @@ void SmallBalanceBox(
 			}));
 	}();
 
-	FillCreditOptions(controller, box->verticalLayout(), creditsNeeded, done);
+	FillCreditOptions(
+		show,
+		box->verticalLayout(),
+		show->session().user(),
+		creditsNeeded,
+		done);
 
 	content->setMaximumHeight(st::creditsLowBalancePremiumCoverHeight);
 	content->setMinimumHeight(st::infoLayerTopBarHeight);
@@ -741,12 +913,12 @@ void SmallBalanceBox(
 	{
 		const auto balance = AddBalanceWidget(
 			content,
-			controller->session().creditsValue(),
+			show->session().creditsValue(),
 			true);
 		const auto api = balance->lifetime().make_state<Api::CreditsStatus>(
-			controller->session().user());
+			show->session().user());
 		api->request({}, [=](Data::CreditsStatusSlice slice) {
-			controller->session().setCredits(slice.balance);
+			show->session().setCredits(slice.balance);
 		});
 		rpl::combine(
 			balance->sizeValue(),

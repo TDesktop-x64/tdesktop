@@ -76,6 +76,9 @@ public:
 		base::flat_map<QByteArray, rpl::producer<bool>> inChannelValues);
 	void update(Prepared page);
 
+	[[nodiscard]] static bool IsGoodTonSiteUrl(const QString &uri);
+	void showTonSite(const Webview::StorageId &storageId, QString uri);
+
 	[[nodiscard]] bool active() const;
 	void showJoinedTooltip();
 	void minimize();
@@ -121,15 +124,22 @@ private:
 	void showShareMenu();
 	void destroyShareMenu();
 
+	void showWebviewError();
+	void showWebviewError(TextWithEntities text);
+
 	const not_null<Delegate*> _delegate;
 
 	std::unique_ptr<Ui::RpWindow> _window;
 	std::unique_ptr<Ui::RpWidget> _subtitleWrap;
+	rpl::variable<QString> _url;
 	rpl::variable<QString> _subtitleText;
+	rpl::variable<QString> _windowTitleText;
 	std::unique_ptr<Ui::FlatLabel> _subtitle;
-	Ui::Animations::Simple _subtitleLeft;
+	Ui::Animations::Simple _subtitleBackShift;
+	Ui::Animations::Simple _subtitleForwardShift;
 	object_ptr<Ui::IconButton> _menuToggle = { nullptr };
 	object_ptr<Ui::FadeWrapScaled<Ui::IconButton>> _back = { nullptr };
+	object_ptr<Ui::FadeWrapScaled<Ui::IconButton>> _forward = { nullptr };
 	base::unique_qptr<Ui::PopupMenu> _menu;
 	Ui::RpWidget *_container = nullptr;
 	std::unique_ptr<Webview::Window> _webview;

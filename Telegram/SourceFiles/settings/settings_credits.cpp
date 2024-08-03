@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/settings_credits.h"
 
 #include "api/api_credits.h"
+#include "boxes/gift_credits_box.h"
 #include "boxes/gift_premium_box.h"
 #include "core/click_handler_types.h"
 #include "data/data_file_origin.h"
@@ -128,6 +129,7 @@ void Credits::setupHistory(not_null<Ui::VerticalLayout*> container) {
 			container,
 			object_ptr<Ui::VerticalLayout>(container)));
 	const auto content = history->entity();
+	const auto self = _controller->session().user();
 
 	Ui::AddSkip(content, st::settingsPremiumOptionsPadding.top());
 
@@ -231,7 +233,7 @@ void Credits::setupHistory(not_null<Ui::VerticalLayout*> container) {
 			fullSlice,
 			fullWrap->entity(),
 			entryClicked,
-			premiumBot,
+			self,
 			&_star,
 			true,
 			true);
@@ -240,7 +242,7 @@ void Credits::setupHistory(not_null<Ui::VerticalLayout*> container) {
 			inSlice,
 			inWrap->entity(),
 			entryClicked,
-			premiumBot,
+			self,
 			&_star,
 			true,
 			false);
@@ -249,7 +251,7 @@ void Credits::setupHistory(not_null<Ui::VerticalLayout*> container) {
 			outSlice,
 			outWrap->entity(),
 			std::move(entryClicked),
-			premiumBot,
+			self,
 			&_star,
 			false,
 			true);
@@ -263,7 +265,6 @@ void Credits::setupHistory(not_null<Ui::VerticalLayout*> container) {
 	const auto apiLifetime = content->lifetime().make_state<rpl::lifetime>();
 	{
 		using Api = Api::CreditsHistory;
-		const auto self = _controller->session().user();
 		const auto apiFull = apiLifetime->make_state<Api>(self, true, true);
 		const auto apiIn = apiLifetime->make_state<Api>(self, true, false);
 		const auto apiOut = apiLifetime->make_state<Api>(self, false, true);
@@ -289,7 +290,21 @@ void Credits::setupContent() {
 			Ui::StartFireworks(_parent);
 		}
 	};
-	FillCreditOptions(_controller, content, 0, paid);
+	const auto self = _controller->session().user();
+	FillCreditOptions(_controller->uiShow(), content, self, 0, paid);
+	{
+		Ui::AddSkip(content);
+		const auto giftButton = AddButtonWithIcon(
+			content,
+			tr::lng_credits_gift_button(),
+			st::settingsButtonLightNoIcon);
+		Ui::AddSkip(content);
+		Ui::AddDivider(content);
+		giftButton->setClickedCallback([=] {
+			Ui::ShowGiftCreditsBox(_controller, paid);
+		});
+	}
+
 	setupHistory(content);
 
 	Ui::ResizeFitChild(this, content);

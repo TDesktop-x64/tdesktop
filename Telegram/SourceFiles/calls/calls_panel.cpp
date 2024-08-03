@@ -225,7 +225,7 @@ void Panel::initWindow() {
 		}
 		const auto shown = _layerBg->topShownLayer();
 		return (!shown || !shown->geometry().contains(widgetPoint))
-			? (Flag::Move | Flag::FullScreen)
+			? (Flag::Move | Flag::Menu | Flag::FullScreen)
 			: Flag::None;
 	});
 
@@ -286,8 +286,8 @@ void Panel::initControls() {
 				_layerBg->showBox(std::move(box));
 			}
 		} else if (const auto source = env->uniqueDesktopCaptureSource()) {
-			if (_call->isSharingScreen()) {
-				_call->toggleScreenSharing(std::nullopt);
+			if (!chooseSourceActiveDeviceId().isEmpty()) {
+				chooseSourceStop();
 			} else {
 				chooseSourceAccepted(*source, false);
 			}

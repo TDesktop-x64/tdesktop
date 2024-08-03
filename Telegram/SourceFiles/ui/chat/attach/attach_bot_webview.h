@@ -20,6 +20,8 @@ namespace Ui {
 class BoxContent;
 class RpWidget;
 class SeparatePanel;
+enum class LayerOption;
+using LayerOptions = base::flags<LayerOption>;
 } // namespace Ui
 
 namespace Webview {
@@ -27,6 +29,8 @@ struct Available;
 } // namespace Webview
 
 namespace Ui::BotWebView {
+
+[[nodiscard]] TextWithEntities ErrorText(const Webview::Available &info);
 
 struct MainButtonArgs {
 	bool isActive = false;
@@ -40,6 +44,7 @@ enum class MenuButton {
 	OpenBot            = 0x01,
 	RemoveFromMenu     = 0x02,
 	RemoveFromMainMenu = 0x04,
+	ShareGame          = 0x08,
 };
 inline constexpr bool is_flag_type(MenuButton) { return true; }
 using MenuButtons = base::flags<MenuButton>;
@@ -67,6 +72,7 @@ public:
 	virtual void botAllowWriteAccess(Fn<void(bool allowed)> callback) = 0;
 	virtual void botSharePhone(Fn<void(bool shared)> callback) = 0;
 	virtual void botInvokeCustomMethod(CustomMethodRequest request) = 0;
+	virtual void botShareGameScore() = 0;
 	virtual void botClose() = 0;
 };
 
@@ -89,7 +95,13 @@ public:
 		rpl::producer<QString> bottomText);
 
 	void showBox(object_ptr<BoxContent> box);
+	void showBox(
+		object_ptr<BoxContent> box,
+		LayerOptions options,
+		anim::type animated);
+	void hideLayer(anim::type animated);
 	void showToast(TextWithEntities &&text);
+	not_null<QWidget*> toastParent() const;
 	void showCriticalError(const TextWithEntities &text);
 	void showWebviewError(
 		const QString &text,
@@ -122,6 +134,7 @@ private:
 	void openExternalLink(const QJsonObject &args);
 	void openInvoice(const QJsonObject &args);
 	void openPopup(const QJsonObject &args);
+	void openScanQrPopup(const QJsonObject &args);
 	void requestWriteAccess();
 	void replyRequestWriteAccess(bool allowed);
 	void requestPhone();

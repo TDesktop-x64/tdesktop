@@ -41,9 +41,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/painter.h"
 #include "window/window_session_controller.h"
 #include "apiwrap.h"
+#include "base/qt/qt_key_modifiers.h"
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_dialogs.h"
+#include "window/window_peer_menu.h"
 
 namespace HistoryView {
 namespace {
@@ -340,6 +342,10 @@ int KeyboardStyle::minButtonWidth(
 
 QString FastReplyText() {
 	return tr::lng_fast_reply(tr::now);
+}
+
+QString FastForwardText() {
+	return tr::lng_selected_forward(tr::now);
 }
 
 [[nodiscard]] ClickHandlerPtr MakeTopicButtonLink(
@@ -1627,8 +1633,10 @@ void Message::paintFromName(
 	}
 	const auto badgeWidth = _rightBadge.isEmpty() ? 0 : _rightBadge.maxWidth();
 	const auto replyWidth = [&] {
-		if (isUnderCursor() && displayFastReply()) {
-			return st::msgFont->width(FastReplyText());
+		if (isUnderCursor() && (displayFastReply() || displayFastForward())) {
+			return st::msgFont->width(displayFastForward()
+				? FastForwardText()
+				: FastReplyText());
 		}
 		return 0;
 	}();
@@ -1718,13 +1726,15 @@ void Message::paintFromName(
 	if (rightWidth) {
 		p.setPen(stm->msgDateFg);
 		if (replyWidth) {
-			p.setFont(ClickHandler::showAsActive(_fastReplyLink)
+			const auto activeLink = displayFastForward() ? _fastForwardLink : _fastReplyLink;
+			const auto text = displayFastForward() ? FastForwardText() : FastReplyText();
+			p.setFont(ClickHandler::showAsActive(activeLink)
 				? st::msgFont->underline()
 				: st::msgFont);
 			p.drawText(
 				trect.left() + trect.width() - rightWidth,
 				trect.top() + st::msgFont->ascent,
-				FastReplyText());
+				text);
 		} else {
 			const auto shift = QPoint(trect.width() - rightWidth, 0);
 			const auto pen = !_rightBadgeHasBoosts
@@ -2609,8 +2619,10 @@ bool Message::getStateFromName(
 		return false;
 	}
 	const auto replyWidth = [&] {
-		if (isUnderCursor() && displayFastReply()) {
-			return st::msgFont->width(FastReplyText());
+		if (isUnderCursor() && (displayFastReply() || displayFastForward())) {
+			return st::msgFont->width(displayFastForward()
+				? FastForwardText()
+				: FastReplyText());
 		}
 		return 0;
 	}();
@@ -2619,7 +2631,7 @@ bool Message::getStateFromName(
 		&& point.x() < trect.left() + trect.width() + st::msgPadding.right()
 		&& point.y() >= trect.top() - st::msgPadding.top()
 		&& point.y() < trect.top() + st::msgServiceFont->height) {
-		outResult->link = fastReplyLink();
+		outResult->link = displayFastForward() ? fastForwardLink() : fastReplyLink();
 		return true;
 	}
 	if (point.y() >= trect.top() && point.y() < trect.top() + st::msgNameFont->height) {
@@ -3432,6 +3444,9 @@ void Message::refreshDataIdHook() {
 	if (base::take(_fastReplyLink)) {
 		_fastReplyLink = fastReplyLink();
 	}
+	if (base::take(_fastForwardLink)) {
+		_fastForwardLink = fastForwardLink();
+	}
 	if (_viewButton) {
 		_viewButton = nullptr;
 		updateViewButtonExistence();
@@ -3721,6 +3736,15 @@ bool Message::displayFastReply() const {
 		&& !delegate()->elementInSelectionMode();
 }
 
+bool Message::displayFastForward() const {
+	const auto peer = data()->history()->peer;
+	return (peer->isChat() || peer->isMegagroup())
+		&& data()->isRegular()
+		&& data()->allowsForward()
+		&& base::IsCtrlPressed()
+		&& !delegate()->elementInSelectionMode();
+}
+
 bool Message::displayRightActionComments() const {
 	return !isPinnedContext()
 		&& (context() != Context::SavedSublist)
@@ -3990,6 +4014,18 @@ ClickHandlerPtr Message::fastReplyLink() const {
 		delegate()->elementReplyTo({ itemId });
 	});
 	return _fastReplyLink;
+}
+
+ClickHandlerPtr Message::fastForwardLink() const {
+	if (_fastForwardLink) {
+		return _fastForwardLink;
+	}
+	const auto itemId = data()->fullId();
+	_fastForwardLink = std::make_shared<LambdaClickHandler>([=](ClickContext context) {
+		const auto my = context.other.value<ClickHandlerContext>();
+		ShowForwardMessagesBox(my.sessionWindow.get(), { 1, itemId }, nullptr);
+	});
+	return _fastForwardLink;
 }
 
 bool Message::isPinnedContext() const {

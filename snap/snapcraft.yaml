@@ -156,6 +156,7 @@ parts:
       craftctl default
       rm -rf "$CRAFT_PART_INSTALL/usr/share/icons"
     after:
+      - ada
       - ffmpeg
       - libjxl
       - qt
@@ -208,6 +209,24 @@ parts:
       GTK_PATH=$PWD/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/gtk-3.0 /usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/libgtk-3-0t64/gtk-query-immodules-3.0 > usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/gtk-3.0/3.0.0/immodules/immodules.cache
     after:
       - telegram
+
+  ada:
+    source: https://github.com/ada-url/ada.git
+    source-depth: 1
+    source-tag: v2.9.0
+    plugin: cmake
+    build-environment:
+      - LDFLAGS: ${LDFLAGS:+$LDFLAGS} -s
+    cmake-generator: Ninja
+    cmake-parameters:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DCMAKE_INSTALL_PREFIX=/usr
+      - -DADA_TESTING=OFF
+      - -DADA_TOOLS=OFF
+    prime:
+      - -./usr/include
+      - -./usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/cmake
+      - -./usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/*.a
 
   ffmpeg:
     plugin: nil
@@ -488,21 +507,3 @@ parts:
     after:
       - ffmpeg
       - libjxl
-
-  ada:
-    source: https://github.com/ada-url/ada.git
-    source-depth: 1
-    source-tag: v2.9.0
-    plugin: cmake
-    build-environment:
-      - LDFLAGS: ${LDFLAGS:+$LDFLAGS} -s
-    cmake-generator: Ninja
-    cmake-parameters:
-      - -DCMAKE_BUILD_TYPE=Release
-      - -DCMAKE_INSTALL_PREFIX=/usr
-      - -DADA_TESTING=OFF
-      - -DADA_TOOLS=OFF
-    prime:
-      - -./usr/include
-      - -./usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/cmake
-      - -./usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/*.a

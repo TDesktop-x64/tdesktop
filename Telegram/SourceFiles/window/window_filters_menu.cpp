@@ -31,6 +31,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/storage_media_prepare.h"
 #include "api/api_chat_filters.h"
 #include "apiwrap.h"
+#include "mainwidget.h"
+#include "history/history.h"
 #include "styles/style_widgets.h"
 #include "styles/style_window.h"
 #include "styles/style_layers.h" // attentionBoxButton
@@ -399,6 +401,60 @@ base::unique_qptr<Ui::SideBarButton> FiltersMenu::prepareButton(
 			_popupMenu->popup(QCursor::pos());
 		}, raw->lifetime());
 	}
+
+	// -1 means the "Edit" button
+	if (id == -1 && GetEnhancedBool("replace_edit_button")) {
+		raw->setAcceptDrops(true);
+		raw->events(
+		) | rpl::filter([=](not_null<QEvent*> e) {
+			return ((e->type() == QEvent::ContextMenu) && (id >= 0))
+				|| e->type() == QEvent::DragEnter
+				|| e->type() == QEvent::DragMove
+				|| e->type() == QEvent::DragLeave
+				|| e->type() == QEvent::Drop;
+		}) | rpl::start_with_next([=](not_null<QEvent*> e) {
+			using namespace Storage;
+			if (e->type() == QEvent::DragEnter) {
+				const auto d = static_cast<QDragEnterEvent*>(e.get());
+				const auto data = d->mimeData();
+
+				if (data->hasFormat(u"application/x-td-forward"_q)) {
+					d->setDropAction(Qt::CopyAction);
+					d->accept();
+					// updateDragInScroll(_parent->geometry().contains(d->pos()));
+				} else if (ComputeMimeDataState(data) != MimeDataState::None) {
+					_drag.timer.callOnce(ChoosePeerByDragTimeout);
+					_drag.filterId = id;
+					d->setDropAction(Qt::CopyAction);
+					d->accept();
+				}
+			} else if (e->type() == QEvent::DragMove) {
+				_drag.timer.callOnce(ChoosePeerByDragTimeout);
+			} else if (e->type() == QEvent::DragLeave) {
+				_drag.filterId = FilterId(-1);
+				_drag.timer.cancel();
+			} else if (e->type() == QEvent::Drop) {
+				_drag.timer.cancel();
+
+				const auto d = static_cast<QDropEvent*>(e.get());
+				const auto data = d->mimeData();
+				const auto controller = _session->parentController();
+				const auto session = &controller->session();
+				const auto history = session->data().history(session->user()).get();
+
+				d->setDropAction(Qt::CopyAction);
+				d->accept();
+
+				controller->content()->filesOrForwardDrop(
+					history->asThread(),
+					data);
+
+				controller->widget()->raise();
+				controller->widget()->activateWindow();
+			}
+		}, raw->lifetime());
+	}
+
 	return button;
 }
 

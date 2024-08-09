@@ -71,10 +71,10 @@ private:
 
 [[nodiscard]] Ui::LocationPickerConfig ResolveBusinessMapsConfig(
 		not_null<Main::Session*> session) {
-	const auto &appConfig = session->appConfig();
-	auto map = appConfig.get<base::flat_map<QString, QString>>(
-		u"tdesktop_config_map"_q,
-		base::flat_map<QString, QString>());
+	//const auto &appConfig = session->appConfig();
+	//auto map = appConfig.get<base::flat_map<QString, QString>>(
+	//	u"tdesktop_config_map"_q,
+	//	base::flat_map<QString, QString>());
 	return {
 		.mapsToken = u"pk.eyJ1Ijoiam9obi1wcmVzdG9uIiwiYSI6ImNseW1ybmRpZTExMHcycnI1N21xdmN6encifQ.TKpKoHjKtFepjsMzVxKhyw"_q,
 		.geoToken = u"pk.eyJ1Ijoiam9obi1wcmVzdG9uIiwiYSI6ImNseW1ybnl1MDAwa3UybXNkZG81ampqZTEifQ.5YCJqZNNf8hSrTWIp53x8g"_q,

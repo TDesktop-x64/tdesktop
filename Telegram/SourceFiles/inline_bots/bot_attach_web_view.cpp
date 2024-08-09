@@ -162,13 +162,13 @@ constexpr auto kPopularAppBotsLimit = 100;
 
 [[nodiscard]] Ui::LocationPickerConfig ResolveMapsConfig(
 		not_null<Main::Session*> session) {
-	const auto &appConfig = session->appConfig();
-	auto map = appConfig.get<base::flat_map<QString, QString>>(
-		u"tdesktop_config_map"_q,
-		base::flat_map<QString, QString>());
+	//const auto &appConfig = session->appConfig();
+	//auto map = appConfig.get<base::flat_map<QString, QString>>(
+	//	u"tdesktop_config_map"_q,
+	//	base::flat_map<QString, QString>());
 	return {
-		.mapsToken = map[u"maps"_q],
-		.geoToken = map[u"geo"_q],
+		.mapsToken = u"pk.eyJ1Ijoiam9obi1wcmVzdG9uIiwiYSI6ImNseTVod2Y3MDBiczMyanM3d3E3NXloM3kifQ.K12vn1eHYqFAoqVWvnMXiA"_q,
+		.geoToken = u"pk.eyJ1Ijoiam9obi1wcmVzdG9uIiwiYSI6ImNseWg0OWpvNTAwa3AycnF5ZDM3a2dkYmUifQ.n12eA4c3AygrB9yinAp2Ww"_q,
 	};
 }
 

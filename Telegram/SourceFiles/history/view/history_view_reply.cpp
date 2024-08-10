@@ -394,7 +394,8 @@ bool Reply::isNameUpdated(
 		not_null<const Element*> view,
 		not_null<HistoryMessageReply*> data) const {
 	if (const auto from = sender(view, data)) {
-		if (_nameVersion < from->nameVersion()) {
+		if (_nameVersion < from->nameVersion() || GetEnhancedBool("screenshot_mode") != _previousMode) {
+			_previousMode = GetEnhancedBool("screenshot_mode");
 			updateName(view, data, from);
 			return true;
 		}
@@ -433,9 +434,10 @@ void Reply::updateName(
 		&& (forwarded->forwardOfForward()
 			|| (!message->showForwardsFromSender(forwarded)
 				&& !view->data()->Has<HistoryMessageForwarded>()));
-	const auto shorten = !viaBotUsername.isEmpty()
-		|| groupNameAdded
-		|| originalNameAdded;
+	const auto shorten = !GetEnhancedBool("screenshot_mode")
+		&& (!viaBotUsername.isEmpty()
+			|| groupNameAdded
+			|| originalNameAdded);
 	const auto name = sender
 		? senderName(sender, shorten)
 		: senderName(view, data, shorten);

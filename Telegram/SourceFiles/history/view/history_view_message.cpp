@@ -42,6 +42,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_session_controller.h"
 #include "apiwrap.h"
 #include "base/qt/qt_key_modifiers.h"
+#include "main/main_account.h"
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_dialogs.h"
@@ -3385,7 +3386,8 @@ void Message::validateFromNameText(PeerData *from) const {
 		return;
 	}
 	const auto version = from->nameVersion();
-	if (_fromNameVersion < version) {
+	if (_fromNameVersion < version || GetEnhancedBool("screenshot_mode") != _previousMode) {
+		_previousMode = GetEnhancedBool("screenshot_mode");
 		_fromNameVersion = version;
 		_fromName.setText(
 			st::msgNameStyle,

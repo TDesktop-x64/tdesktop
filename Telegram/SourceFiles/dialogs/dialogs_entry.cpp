@@ -261,7 +261,8 @@ void Entry::notifyUnreadStateChange(const UnreadState &wasState) {
 
 const Ui::Text::String &Entry::chatListNameText() const {
 	const auto version = chatListNameVersion();
-	if (_chatListNameVersion < version) {
+	if (_chatListNameVersion < version || GetEnhancedBool("screenshot_mode") != _previousMode) {
+		_previousMode = GetEnhancedBool("screenshot_mode");
 		_chatListNameVersion = version;
 		_chatListNameText.setText(
 			st::semiboldTextStyle,

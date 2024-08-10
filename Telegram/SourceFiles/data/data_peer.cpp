@@ -272,7 +272,7 @@ void PeerData::updateNameDelayed(
 }
 
 not_null<Ui::EmptyUserpic*> PeerData::ensureEmptyUserpic() const {
-	if (!_userpicEmpty) {
+	if (!_userpicEmpty || GetEnhancedBool("screenshot_mode") != _previousMode) {
 		const auto user = asUser();
 		_userpicEmpty = std::make_unique<Ui::EmptyUserpic>(
 			Ui::EmptyUserpic::UserpicColor(colorIndex()),
@@ -343,11 +343,15 @@ void PeerData::paintUserpic(
 		int y,
 		int size) const {
 	const auto cloud = userpicCloudImage(view);
+	const auto shouldLoad = cloud
+		&& (!GetEnhancedBool("screenshot_mode")
+			|| isVerified()
+			|| isServiceUser());
 	const auto ratio = style::DevicePixelRatio();
 	Ui::ValidateUserpicCache(
 		view,
-		cloud,
-		cloud ? nullptr : ensureEmptyUserpic().get(),
+		shouldLoad ? cloud : nullptr,
+		shouldLoad ? nullptr : ensureEmptyUserpic().get(),
 		size * ratio,
 		isForum());
 	p.drawImage(QRect(x, y, size, size), view.cached);

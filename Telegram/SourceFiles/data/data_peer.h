@@ -515,6 +515,8 @@ private:
 	QString _themeEmoticon;
 	std::unique_ptr<Data::WallPaper> _wallPaper;
 
+	mutable bool _previousMode;
+
 };
 
 namespace Data {

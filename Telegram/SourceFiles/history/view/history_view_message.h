@@ -306,6 +306,7 @@ private:
 	void refreshRightBadge();
 	void refreshReactions();
 	void validateFromNameText(PeerData *from) const;
+	void validateForwardedNameText(HistoryItem *item) const;
 
 	mutable std::unique_ptr<RightAction> _rightAction;
 	mutable ClickHandlerPtr _fastReplyLink;
@@ -317,6 +318,7 @@ private:
 
 	mutable Ui::Text::String _fromName;
 	mutable std::unique_ptr<FromNameStatus> _fromNameStatus;
+	mutable bool _previousMode = false;
 	Ui::Text::String _rightBadge;
 	mutable int _fromNameVersion = 0;
 	uint32 _bubbleWidthLimit : 29 = 0;

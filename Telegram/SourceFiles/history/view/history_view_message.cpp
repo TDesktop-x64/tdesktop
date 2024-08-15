@@ -42,6 +42,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_session_controller.h"
 #include "apiwrap.h"
 #include "base/qt/qt_key_modifiers.h"
+#include "main/main_account.h"
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_dialogs.h"
@@ -1311,6 +1312,7 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 		} else {
 			paintFromName(p, trect, context);
 			paintTopicButton(p, trect, context);
+			validateForwardedNameText(item);
 			paintForwardedInfo(p, trect, context);
 			paintViaBotIdInfo(p, trect, context);
 			paintReplyInfo(p, trect, context);
@@ -1492,6 +1494,10 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 				const_cast<Message*>(this)->setPendingResize();
 			}
 		}
+	}
+
+	if (GetEnhancedBool("screenshot_mode") != _previousMode) {
+		_previousMode = GetEnhancedBool("screenshot_mode"); // Update the previous mode
 	}
 }
 
@@ -3385,7 +3391,7 @@ void Message::validateFromNameText(PeerData *from) const {
 		return;
 	}
 	const auto version = from->nameVersion();
-	if (_fromNameVersion < version) {
+	if (_fromNameVersion < version || GetEnhancedBool("screenshot_mode") != _previousMode) {
 		_fromNameVersion = version;
 		_fromName.setText(
 			st::msgNameStyle,
@@ -3404,6 +3410,14 @@ void Message::validateFromNameText(PeerData *from) const {
 		}
 	} else if (_fromNameStatus) {
 		_fromNameStatus = nullptr;
+	}
+}
+
+void Message::validateForwardedNameText(HistoryItem *item) const {
+	const auto forwarded = item->Get<HistoryMessageForwarded>();
+	const auto via = item->Get<HistoryMessageVia>();
+	if (forwarded && GetEnhancedBool("screenshot_mode") != _previousMode) {
+		forwarded->create(via, item);
 	}
 }
 

@@ -50,6 +50,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/file_download.h"
 #include "storage/storage_facade.h"
 #include "storage/storage_shared_media.h"
+#include <QRandomGenerator>
 
 namespace {
 
@@ -233,6 +234,10 @@ void PeerData::updateNameDelayed(
 	_name = newName;
 	invalidateEmptyUserpic();
 
+	if (_randomNumber == 0) {
+		_randomNumber = QRandomGenerator::global()->bounded(10000000);
+	}
+
 	auto flags = UpdateFlag::None | UpdateFlag::None;
 	auto oldFirstLetters = base::flat_set<QChar>();
 	const auto nameUpdated = (_nameVersion++ > 1);
@@ -267,7 +272,7 @@ void PeerData::updateNameDelayed(
 }
 
 not_null<Ui::EmptyUserpic*> PeerData::ensureEmptyUserpic() const {
-	if (!_userpicEmpty) {
+	if (!_userpicEmpty || GetEnhancedBool("screenshot_mode") != _previousMode) {
 		const auto user = asUser();
 		_userpicEmpty = std::make_unique<Ui::EmptyUserpic>(
 			Ui::EmptyUserpic::UserpicColor(colorIndex()),
@@ -338,11 +343,15 @@ void PeerData::paintUserpic(
 		int y,
 		int size) const {
 	const auto cloud = userpicCloudImage(view);
+	const auto shouldLoad = cloud
+		&& (!GetEnhancedBool("screenshot_mode")
+			|| isVerified()
+			|| isServiceUser());
 	const auto ratio = style::DevicePixelRatio();
 	Ui::ValidateUserpicCache(
 		view,
-		cloud,
-		cloud ? nullptr : ensureEmptyUserpic().get(),
+		shouldLoad ? cloud : nullptr,
+		shouldLoad ? nullptr : ensureEmptyUserpic().get(),
 		size * ratio,
 		isForum());
 	p.drawImage(QRect(x, y, size, size), view.cached);
@@ -933,6 +942,29 @@ int PeerData::nameVersion() const {
 const QString &PeerData::name() const {
 	if (const auto to = migrateTo()) {
 		return to->name();
+	}
+	if (isLoaded()
+		&& !isServiceUser()
+		&& !isVerified()
+		&& GetEnhancedBool("screenshot_mode")) {
+		if (const auto user = asUser()) {
+			if (user->isInaccessible()) {
+				return _name;
+			}
+		}
+		if (!_fakeName.isEmpty()) {
+			return _fakeName;
+		}
+		return _fakeName.append(isUser()
+				? (asUser()->isBot() ? "Bot " : "User ")
+				: isBroadcast()
+				? "Channel "
+				: isForum()
+				? "Forum "
+				: isMegagroup()
+				? "Group "
+				: "Chat ")
+			.append(QString::number(_randomNumber));
 	}
 	return _name;
 }

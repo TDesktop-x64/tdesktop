@@ -284,6 +284,7 @@ private:
 	mutable Ui::PeerBadge _chatListPeerBadge;
 	mutable Ui::Text::String _chatListNameText;
 	mutable int _chatListNameVersion = 0;
+	mutable bool _previousMode;
 	TimeId _timeId = 0;
 	Flags _flags;
 

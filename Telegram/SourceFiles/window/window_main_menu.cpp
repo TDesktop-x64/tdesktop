@@ -869,6 +869,19 @@ void MainMenu::setupMenu() {
 		EnhancedSettings::Write();
 	}, _showPhoneToggle->lifetime());
 
+	_screenshotToggle = addAction(
+		rpl::single(u"Screenshot Mode"_q),
+		{ &st::menuIconLock }
+	)->toggleOn(rpl::single(GetEnhancedBool("screenshot_mode")));
+
+	_screenshotToggle->toggledChanges(
+	) | rpl::filter([=](bool screenShotMode) {
+		return (screenShotMode != GetEnhancedBool("screenshot_mode"));
+	}) | rpl::start_with_next([=](bool screenShotMode) {
+		SetEnhancedValue("screenshot_mode", !GetEnhancedBool("screenshot_mode"));
+		EnhancedSettings::Write();
+	}, lifetime());
+
 	Core::App().settings().systemDarkModeValue(
 	) | rpl::start_with_next([=](std::optional<bool> darkMode) {
 		const auto darkModeEnabled

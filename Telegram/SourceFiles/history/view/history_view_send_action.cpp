@@ -242,16 +242,16 @@ bool SendActionPainter::updateNeedsAnimating(crl::time now, bool force) {
 			newTypingString = tr::lng_users_typing(
 				tr::now,
 				lt_user,
-				begin(_typing)->first->firstName,
+				begin(_typing)->first->name(),
 				lt_second_user,
-				(end(_typing) - 1)->first->firstName);
+				(end(_typing) - 1)->first->name());
 		} else if (typingCount) {
 			newTypingString = _history->peer->isUser()
 				? tr::lng_typing(tr::now)
 				: tr::lng_user_typing(
 					tr::now,
 					lt_user,
-					begin(_typing)->first->firstName);
+					begin(_typing)->first->name());
 		} else if (!_sendActions.empty()) {
 			// Handles all actions except game playing.
 			using Type = Api::SendProgressType;
@@ -298,7 +298,7 @@ bool SendActionPainter::updateNeedsAnimating(crl::time now, bool force) {
 				const auto isNamed = !_history->peer->isUser();
 				newTypingString = sendActionString(
 					action.type,
-					isNamed ? user->firstName : QString());
+					isNamed ? user->name() : QString());
 				if (!newTypingString.isEmpty()) {
 					_sendActionAnimation.start(action.type);
 
@@ -344,16 +344,16 @@ bool SendActionPainter::updateNeedsAnimating(crl::time now, bool force) {
 					newTypingString = tr::lng_users_playing_game(
 						tr::now,
 						lt_user,
-						begin(_sendActions)->first->firstName,
+						begin(_sendActions)->first->name(),
 						lt_second_user,
-						(end(_sendActions) - 1)->first->firstName);
+						(end(_sendActions) - 1)->first->name());
 				} else {
 					newTypingString = _history->peer->isUser()
 						? tr::lng_playing_game(tr::now)
 						: tr::lng_user_playing_game(
 							tr::now,
 							lt_user,
-							begin(_sendActions)->first->firstName);
+							begin(_sendActions)->first->name());
 				}
 				_sendActionAnimation.start(Type::PlayGame);
 			}

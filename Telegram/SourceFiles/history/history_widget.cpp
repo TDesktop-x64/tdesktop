@@ -55,6 +55,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/unixtime.h"
 #include "base/call_delayed.h"
 #include "data/business/data_shortcut_messages.h"
+#include "data/components/credits.h"
 #include "data/components/scheduled_messages.h"
 #include "data/components/sponsored_messages.h"
 #include "data/notify/data_notify_settings.h"
@@ -103,6 +104,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_top_bar_widget.h"
 #include "history/view/history_view_contact_status.h"
 #include "history/view/history_view_context_menu.h"
+#include "history/view/history_view_paid_reaction_toast.h"
 #include "history/view/history_view_pinned_tracker.h"
 #include "history/view/history_view_pinned_section.h"
 #include "history/view/history_view_pinned_bar.h"
@@ -290,6 +292,13 @@ HistoryWidget::HistoryWidget(
 	})
 , _saveDraftTimer([=] { saveDraft(); })
 , _saveCloudDraftTimer([=] { saveCloudDraft(); })
+, _paidReactionToast(std::make_unique<HistoryView::PaidReactionToast>(
+	this,
+	&session().data(),
+	rpl::single(st::topBarHeight),
+	[=](not_null<const HistoryView::Element*> view) {
+		return _list && _list->itemTop(view) >= 0;
+	}))
 , _topShadow(this) {
 	setAcceptDrops(true);
 
@@ -824,6 +833,14 @@ HistoryWidget::HistoryWidget(
 			updateStickersByEmoji();
 			updateFieldPlaceholder();
 			_preview->checkNow(false);
+
+			const auto was = (_sendAs != nullptr);
+			refreshSendAsToggle();
+			if (was != (_sendAs != nullptr)) {
+				updateControlsVisibility();
+				updateControlsGeometry();
+				orderWidgets();
+			}
 		}
 		if (flags & PeerUpdateFlag::Migration) {
 			handlePeerMigration();
@@ -880,6 +897,11 @@ HistoryWidget::HistoryWidget(
 		}
 		if (flags & PeerUpdateFlag::FullInfo) {
 			fullInfoUpdated();
+			if (const auto channel = _peer ? _peer->asChannel() : nullptr) {
+				if (channel->allowedReactions().paidEnabled) {
+					session().credits().load();
+				}
+			}
 		}
 	}, lifetime());
 

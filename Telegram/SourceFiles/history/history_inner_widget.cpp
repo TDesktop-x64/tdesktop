@@ -28,6 +28,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_emoji_interactions.h"
 #include "history/history_item_components.h"
 #include "history/history_item_text.h"
+#include "payments/payments_reaction_process.h"
 #include "ui/toast/toast.h"
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "ui/widgets/menu/menu_multiline_action.h"
@@ -38,6 +39,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/text_options.h"
 #include "ui/text/text_entity.h"
 #include "ui/text/text_isolated_emoji.h"
+#include "ui/boxes/confirm_box.h"
 #include "ui/boxes/edit_factcheck_box.h"
 #include "ui/boxes/report_box.h"
 #include "ui/layers/generic_box.h"
@@ -497,6 +499,13 @@ void HistoryInner::reactionChosen(const ChosenReaction &reaction) {
 	const auto item = session().data().message(reaction.context);
 	if (!item) {
 		return;
+	} else if (reaction.id.paid()) {
+		Payments::ShowPaidReactionDetails(
+			_controller,
+			item,
+			viewByItem(item),
+			HistoryReactionSource::Selector);
+		return;
 	} else if (Window::ShowReactPremiumError(
 			_controller,
 			item,
@@ -506,7 +515,7 @@ void HistoryInner::reactionChosen(const ChosenReaction &reaction) {
 		}
 		return;
 	}
-	item->toggleReaction(reaction.id, HistoryItem::ReactionSource::Selector);
+	item->toggleReaction(reaction.id, HistoryReactionSource::Selector);
 	if (!ranges::contains(item->chosenReactions(), reaction.id)) {
 		return;
 	} else if (const auto view = viewByItem(item)) {
@@ -730,8 +739,8 @@ bool HistoryInner::canHaveFromUserpics() const {
 		&& !_peer->isRepliesChat()
 		&& !_isChatWide) {
 		return false;
-	} else if (_peer->isChannel() && !_peer->isMegagroup()) {
-		return false;
+	} else if (const auto channel = _peer->asBroadcast()) {
+		return channel->signatureProfiles();
 	}
 	return true;
 }
@@ -2046,7 +2055,7 @@ void HistoryInner::toggleFavoriteReaction(not_null<Element*> view) const {
 			view->animateReaction({ .id = favorite });
 		}
 	}
-	item->toggleReaction(favorite, HistoryItem::ReactionSource::Quick);
+	item->toggleReaction(favorite, HistoryReactionSource::Quick);
 }
 
 HistoryView::SelectedQuote HistoryInner::selectedQuote(

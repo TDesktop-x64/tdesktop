@@ -786,6 +786,7 @@ void GenerateItems(
 	using LogChangeProfilePeerColor = MTPDchannelAdminLogEventActionChangeProfilePeerColor;
 	using LogChangeWallpaper = MTPDchannelAdminLogEventActionChangeWallpaper;
 	using LogChangeEmojiStatus = MTPDchannelAdminLogEventActionChangeEmojiStatus;
+	using LogToggleSignatureProfiles = MTPDchannelAdminLogEventActionToggleSignatureProfiles;
 
 	const auto session = &history->session();
 	const auto id = event.vid().v;
@@ -2022,6 +2023,18 @@ void GenerateItems(
 		addSimpleServiceMessage(text);
 	};
 
+	const auto createToggleSignatureProfiles = [&](const LogToggleSignatureProfiles &action) {
+		const auto enabled = (action.vnew_value().type() == mtpc_boolTrue);
+		const auto text = (enabled
+			? tr::lng_admin_log_signature_profiles_enabled
+			: tr::lng_admin_log_signature_profiles_disabled)(
+				tr::now,
+				lt_from,
+				fromLinkText,
+				Ui::Text::WithEntities);
+		addSimpleServiceMessage(text);
+	};
+
 	action.match(
 		createChangeTitle,
 		createChangeAbout,
@@ -2070,7 +2083,8 @@ void GenerateItems(
 		createChangePeerColor,
 		createChangeProfilePeerColor,
 		createChangeWallpaper,
-		createChangeEmojiStatus);
+		createChangeEmojiStatus,
+		createToggleSignatureProfiles);
 }
 
 } // namespace AdminLog

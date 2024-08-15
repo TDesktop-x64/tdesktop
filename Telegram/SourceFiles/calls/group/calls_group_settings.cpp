@@ -665,9 +665,10 @@ void SettingsBox(
 			shareLink = [=] {
 				if (!copyLink() && !state->generatingLink) {
 					state->generatingLink = true;
-					peer->session().api().inviteLinks().create(
+					peer->session().api().inviteLinks().create({
 						peer,
-						crl::guard(layout, [=](auto&&) { copyLink(); }));
+						crl::guard(layout, [=](auto&&) { copyLink(); })
+					});
 				}
 			};
 		}

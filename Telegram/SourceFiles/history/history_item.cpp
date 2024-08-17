@@ -714,9 +714,7 @@ HistoryItem::HistoryItem(
 	.flags = (MessageFlag::Local
 		| MessageFlag::Sponsored
 		| (history->peer->isChannel() ? MessageFlag::Post : MessageFlag(0))),
-	.date = HistoryItem::NewMessageDate(injectedAfter
-		? injectedAfter->date()
-		: 0),
+	.date = NewMessageDate(injectedAfter ? injectedAfter->date() : 0),
 }) {
 	const auto webpage = history->peer->owner().webpage(
 		history->peer->owner().nextLocalMessageId().bare,
@@ -802,15 +800,6 @@ HistoryItem::~HistoryItem() {
 
 TimeId HistoryItem::date() const {
 	return _date;
-}
-
-TimeId HistoryItem::NewMessageDate(TimeId scheduled) {
-	return scheduled ? scheduled : base::unixtime::now();
-}
-
-TimeId HistoryItem::NewMessageDate(
-		const Api::SendOptions &options) {
-	return options.shortcutId ? 1 : NewMessageDate(options.scheduled);
 }
 
 HistoryServiceDependentData *HistoryItem::GetServiceDependentData() {
@@ -2584,7 +2573,7 @@ bool HistoryItem::canReact() const {
 
 void HistoryItem::addPaidReaction(int count, bool anonymous) {
 	Expects(count >= 0);
-	Expects(_history->peer->isBroadcast());
+	Expects(_history->peer->isBroadcast() || isDiscussionPost());
 
 	if (!_reactions) {
 		_reactions = std::make_unique<Data::MessageReactions>(this);

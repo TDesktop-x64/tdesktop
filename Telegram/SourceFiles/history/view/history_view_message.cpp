@@ -842,7 +842,7 @@ QSize Message::performCountOptimalSize() {
 		refreshReactions();
 	}
 	refreshRightBadge();
-	refreshInfoSkipBlock();
+	refreshInfoSkipBlock(textItem);
 
 	const auto botTop = item->isFakeAboutView()
 		? Get<FakeBotAboutTop>()
@@ -4293,27 +4293,34 @@ int Message::resizeContentGetHeight(int newWidth) {
 		return height();
 	}
 
+	const auto item = data();
+	const auto postShowingAuthor = item->isPostShowingAuthor() ? 1 : 0;
+	if (_postShowingAuthor != postShowingAuthor) {
+		_postShowingAuthor = postShowingAuthor;
+		_fromNameVersion = -1;
+		previousInBlocksChanged();
+
+		const auto size = _bottomInfo.currentSize();
+		_bottomInfo.update(BottomInfoDataFromMessage(this), newWidth);
+		if (size != _bottomInfo.currentSize()) {
+			// maxWidth may have changed, full recount required.
+			setPendingResize();
+			return resizeGetHeight(newWidth);
+		}
+	}
+
 	auto newHeight = minHeight();
 
 	if (const auto service = Get<ServicePreMessage>()) {
 		service->resizeToWidth(newWidth, delegate()->elementIsChatWide());
 	}
 
-	const auto item = data();
 	const auto botTop = item->isFakeAboutView()
 		? Get<FakeBotAboutTop>()
 		: nullptr;
 	const auto media = this->media();
 	const auto mediaDisplayed = media ? media->isDisplayed() : false;
 	const auto bubble = drawBubble();
-
-	const auto postShowingAuthor = item->isPostShowingAuthor() ? 1 : 0;
-	if (_postShowingAuthor != postShowingAuthor) {
-		_postShowingAuthor = postShowingAuthor;
-		_bottomInfo.update(BottomInfoDataFromMessage(this), newWidth);
-		_fromNameVersion = -1;
-		previousInBlocksChanged();
-	}
 
 	item->resolveDependent();
 
@@ -4539,17 +4546,16 @@ QSize Message::performCountCurrentSize(int newWidth) {
 	return { newWidth, newHeight };
 }
 
-void Message::refreshInfoSkipBlock() {
-	const auto item = data();
+void Message::refreshInfoSkipBlock(HistoryItem *textItem) {
 	const auto media = this->media();
 	const auto hasTextSkipBlock = [&] {
-		if (item->_text.empty()) {
+		if (!textItem || textItem->_text.empty()) {
 			if (const auto media = data()->media()) {
 				return media->storyExpired();
 			}
 			return false;
-		} else if (item->Has<HistoryMessageLogEntryOriginal>()
-			|| factcheckBlock()) {
+		} else if (factcheckBlock()
+			|| data()->Has<HistoryMessageLogEntryOriginal>()) {
 			return false;
 		} else if (media && media->isDisplayed() && !_invertMedia) {
 			return false;

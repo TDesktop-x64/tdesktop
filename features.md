@@ -59,3 +59,8 @@
 55. Show sender's avatar in groups
 56. Disable global search
 57. Recent sticker display limit
+58. Add quick forward when pressed ctrl
+59. Screenshot privacy mode
+60. Support to drag and drop in the filter menu
+61. Support sending and viewing location
+62. Sticker pack owner info

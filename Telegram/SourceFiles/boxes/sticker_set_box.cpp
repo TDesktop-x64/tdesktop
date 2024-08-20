@@ -61,6 +61,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_info.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_premium.h"
+#include "window/window_session_controller.h"
 
 #include <QtWidgets/QApplication>
 #include <QtGui/QClipboard>
@@ -734,6 +735,21 @@ void StickerSetBox::updateButtons() {
 					&st::menuIconManage);
 			});
 		}();
+        const auto author = [=] {
+            auto ownerId = _inner->setId() >> 32;
+            if (_inner->setId() >> 24 & 0xff) {
+                ownerId += 0x100000000;
+            }
+            const auto peer = _session->data().peerLoaded(static_cast<PeerId>(ownerId));
+            if (peer != nullptr) {
+                if (const auto window = _session->tryResolveWindow()) {
+                    window->showPeerInfo(peer);
+                }
+            } else {
+                QGuiApplication::clipboard()->setText(QString::number(ownerId));
+                showToast(tr::lng_code_copied(tr::now));
+            }
+        };
 		if (_inner->notInstalled()) {
 			if (!_session->premium()
 				&& _session->premiumPossible()
@@ -784,6 +800,10 @@ void StickerSetBox::updateButtons() {
 						[=] { share(); closeBox(); },
 						&st::menuIconShare);
 					(*menu)->popup(QCursor::pos());
+                    (*menu)->addAction(
+                            tr::lng_channel_admin_status_creator(tr::now),
+                            [=] { author(); },
+                            &st::menuIconProfile);
 					return true;
 				});
 			}
@@ -835,6 +855,10 @@ void StickerSetBox::updateButtons() {
 							archive,
 							&st::menuIconArchive);
 					}
+                    (*menu)->addAction(
+                            tr::lng_channel_admin_status_creator(tr::now),
+                            [=] { author(); },
+                            &st::menuIconProfile);
 					(*menu)->popup(QCursor::pos());
 					return true;
 				});

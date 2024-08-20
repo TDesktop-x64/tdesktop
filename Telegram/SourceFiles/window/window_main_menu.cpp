@@ -870,7 +870,7 @@ void MainMenu::setupMenu() {
 	}, _showPhoneToggle->lifetime());
 
 	_screenshotToggle = addAction(
-		rpl::single(u"Screenshot Mode"_q),
+		tr::lng_settings_screen_shot_mode(),
 		{ &st::menuIconLock }
 	)->toggleOn(rpl::single(GetEnhancedBool("screenshot_mode")));
 

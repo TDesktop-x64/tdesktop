@@ -9,9 +9,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "ui/effects/spoiler_mess.h"
 #include "ui/image/image_prepare.h"
-#include "ui/text/text_options.h"
 #include "ui/painter.h"
 #include "ui/power_saving.h"
+#include "ui/text/text_options.h"
+#include "ui/ui_utility.h"
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/palette.h"
@@ -438,12 +439,15 @@ void MessageBar::paint(Painter &p) {
 		if (_title.isEmpty()) {
 			// "Loading..." state.
 			p.setPen(st::historyComposeAreaFgService);
-			_text.drawLeftElided(
-				p,
-				body.x(),
-				body.y() + (body.height() - st::normalFont->height) / 2,
-				body.width(),
-				width);
+			_text.draw(p, {
+				.position = {
+					body.x(),
+					body.y() + (body.height() - st::normalFont->height) / 2,
+				},
+				.outerWidth = width,
+				.availableWidth = body.width(),
+				.elisionLines = 1,
+			});
 		} else {
 			p.setPen(_st.textFg);
 			_text.draw(p, {

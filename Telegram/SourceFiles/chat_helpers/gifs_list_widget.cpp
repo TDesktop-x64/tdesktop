@@ -24,12 +24,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mtproto/mtproto_config.h"
 #include "core/click_handler_types.h"
 #include "ui/controls/tabbed_search.h"
+#include "ui/layers/generic_box.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/fields/input_field.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/effects/ripple_animation.h"
 #include "ui/image/image.h"
 #include "ui/painter.h"
+#include "boxes/send_gif_with_caption_box.h"
 #include "boxes/stickers_box.h"
 #include "inline_bots/inline_bot_result.h"
 #include "storage/localstorage.h"
@@ -407,6 +409,22 @@ base::unique_qptr<Ui::PopupMenu> GifsListWidget::fillContextMenu(
 		SendMenu::DefaultCallback(_show, send),
 		icons);
 
+	if (!isInlineResult) {
+		auto done = crl::guard(this, [=](
+				Api::SendOptions options,
+				TextWithTags text) {
+			selectInlineResult(selected, options, true, std::move(text));
+		});
+		const auto show = _show;
+		menu->addAction(tr::lng_send_gif_with_caption(tr::now), [=] {
+			show->show(Box(
+				Ui::SendGifWithCaptionBox,
+				item->getDocument(),
+				copyDetails,
+				std::move(done)));
+		}, &st::menuIconEdit);
+	}
+
 	if (const auto item = _mosaic.maybeItemAt(_selected)) {
 		const auto document = item->getDocument()
 			? item->getDocument() // Saved GIF.
@@ -457,7 +475,8 @@ void GifsListWidget::mouseReleaseEvent(QMouseEvent *e) {
 void GifsListWidget::selectInlineResult(
 		int index,
 		Api::SendOptions options,
-		bool forceSend) {
+		bool forceSend,
+		TextWithTags caption) {
 	const auto item = _mosaic.maybeItemAt(index);
 	if (!item) {
 		return;
@@ -498,6 +517,7 @@ void GifsListWidget::selectInlineResult(
 				.document = document,
 				.options = options,
 				.messageSendingFrom = messageSendingFrom(),
+				.caption = std::move(caption),
 			});
 		} else if (!preview.usingThumbnail()) {
 			if (preview.loading()) {

@@ -13,9 +13,9 @@ class History;
 enum class SendMediaType;
 
 namespace Api {
+struct MessageToSend;
 struct SendAction;
 struct SendOptions;
-struct MessageToSend;
 } // namespace Api
 
 namespace Data {
@@ -118,10 +118,9 @@ private:
 		bool ctrlShiftEnter);
 	void finishSending(bool skipToast = false);
 
-	void sendExistingDocument(not_null<DocumentData*> document);
 	bool sendExistingDocument(
 		not_null<DocumentData*> document,
-		Api::SendOptions options,
+		Api::MessageToSend messageToSend,
 		std::optional<MsgId> localId);
 	void sendExistingPhoto(not_null<PhotoData*> photo);
 	bool sendExistingPhoto(

@@ -37,12 +37,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session_settings.h"
 #include "ui/chat/chat_theme.h"
 #include "ui/chat/chat_style.h"
+#include "ui/widgets/checkbox.h"
+#include "ui/widgets/expandable_peer_list.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/image/image.h"
 #include "ui/text/text_utilities.h"
 #include "ui/inactive_press.h"
 #include "ui/painter.h"
+#include "ui/vertical_list.h"
 #include "ui/effects/path_shift_gradient.h"
+#include "ui/ui_utility.h"
 #include "core/click_handler_types.h"
 #include "core/file_utilities.h"
 #include "lang/lang_keys.h"
@@ -60,6 +64,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_channel.h"
 #include "data/data_user.h"
 #include "styles/style_chat.h"
+#include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
 
 #include <QtWidgets/QApplication>
@@ -499,10 +504,83 @@ void InnerWidget::requestAdmins() {
 void InnerWidget::showFilter(Fn<void(FilterValue &&filter)> callback) {
 	if (_admins.empty()) {
 		_showFilterCallback = std::move(callback);
-	} else {
-		_controller->show(
-			Box<FilterBox>(_channel, _admins, _filter, std::move(callback)));
+		return;
 	}
+	const auto isChannel = !_channel->isMegagroup();
+	const auto filter = _filter;
+	const auto admins = _admins;
+	_controller->uiShow()->show(Box([=](not_null<Ui::GenericBox*> box) {
+		box->setTitle(tr::lng_manage_peer_recent_actions());
+		Ui::AddSubsectionTitle(
+			box->verticalLayout(),
+			tr::lng_admin_log_filter_actions_type_subtitle());
+		const auto collectFlags = FillFilterValueList(
+			box->verticalLayout(),
+			isChannel,
+			filter);
+		Ui::AddSkip(box->verticalLayout());
+		Ui::AddDivider(box->verticalLayout());
+		Ui::AddSkip(box->verticalLayout());
+		Ui::AddSubsectionTitle(
+			box->verticalLayout(),
+			tr::lng_admin_log_filter_actions_admins_subtitle());
+		Ui::AddSkip(box->verticalLayout());
+
+		auto checkedPeerId = std::vector<PeerId>();
+		{
+			checkedPeerId.reserve(admins.size());
+			for (const auto &user : admins) {
+				if (!filter.admins
+					|| ranges::contains(
+						(*filter.admins),
+						user->id,
+						&UserData::id)) {
+					checkedPeerId.push_back(user->id);
+				}
+			}
+		}
+
+		const auto checkbox = box->addRow(
+			object_ptr<Ui::Checkbox>(
+				box->verticalLayout(),
+				tr::lng_admin_log_filter_actions_admins_section(
+					tr::now,
+					Ui::Text::WithEntities),
+				checkedPeerId.size() == admins.size(),
+				st::defaultBoxCheckbox));
+		using Controller = Ui::ExpandablePeerListController;
+		using Data = Ui::ExpandablePeerListController::Data;
+		const auto controller = box->lifetime().make_state<Controller>(Data{
+			.participants = ranges::views::all(
+				admins
+			) | ranges::views::transform([](
+					not_null<UserData*> user) -> not_null<PeerData*> {
+				return not_null{ user };
+			}) | ranges::to_vector,
+			.checked = std::move(checkedPeerId),
+			.skipSingle = true,
+			.hideRightButton = true,
+			.checkTopOnAllInner = true,
+		});
+		Ui::AddExpandablePeerList(
+			checkbox,
+			controller,
+			box->verticalLayout());
+
+		box->addButton(tr::lng_settings_save(), [=] {
+			const auto peers = controller->collectRequests();
+			const auto users = ranges::views::all(
+				peers
+			) | ranges::views::transform([](not_null<PeerData*> p) {
+					return not_null{ p->asUser() };
+			}) | ranges::to_vector;
+			callback(FilterValue{
+				.flags = collectFlags(),
+				.admins = users,
+			});
+		});
+		box->addButton(tr::lng_cancel(), [box] { box->closeBox(); });
+	}));
 }
 
 void InnerWidget::clearAndRequestLog() {
@@ -517,7 +595,7 @@ void InnerWidget::clearAndRequestLog() {
 
 void InnerWidget::updateEmptyText() {
 	auto hasSearch = !_searchQuery.isEmpty();
-	auto hasFilter = (_filter.flags != 0) || !_filter.allUsers;
+	auto hasFilter = _filter.flags || _filter.admins;
 	auto text = Ui::Text::Semibold((hasSearch || hasFilter)
 		? tr::lng_admin_log_no_results_title(tr::now)
 		: tr::lng_admin_log_no_events_title(tr::now));
@@ -739,7 +817,7 @@ void InnerWidget::preloadMore(Direction direction) {
 		using Flag = MTPDchannelAdminLogEventsFilter::Flag;
 		using LocalFlag = FilterValue::Flag;
 		const auto empty = MTPDchannelAdminLogEventsFilter::Flags(0);
-		const auto f = _filter.flags;
+		const auto f = _filter.flags.value_or(LocalFlag());
 		return empty
 			| ((f & LocalFlag::Join) ? Flag::f_join : empty)
 			| ((f & LocalFlag::Leave) ? Flag::f_leave : empty)
@@ -763,10 +841,10 @@ void InnerWidget::preloadMore(Direction direction) {
 		flags |= MTPchannels_GetAdminLog::Flag::f_events_filter;
 	}
 	auto admins = QVector<MTPInputUser>(0);
-	if (!_filter.allUsers) {
-		if (!_filter.admins.empty()) {
-			admins.reserve(_filter.admins.size());
-			for (auto &admin : _filter.admins) {
+	if (_filter.admins) {
+		if (!_filter.admins->empty()) {
+			admins.reserve(_filter.admins->size());
+			for (const auto &admin : (*_filter.admins)) {
 				admins.push_back(admin->inputUser);
 			}
 		}

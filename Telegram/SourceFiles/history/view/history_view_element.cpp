@@ -445,8 +445,8 @@ void ServicePreMessage::paint(
 		.align = style::al_top,
 		.palette = &context.st->serviceTextPalette(),
 		.now = context.now,
-		//.selection = context.selection,
 		.fullWidthSelection = false,
+		//.selection = context.selection,
 	});
 
 	p.translate(0, -top);

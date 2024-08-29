@@ -126,6 +126,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/text.h"
 #include "ui/arc_angles.h"
 #include "ui/emoji_config.h"
+#include "ui/qt_object_factory.h"
+#include "ui/qt_weak_factory.h"
 
 #include "styles/palette.h"
 #include "styles/style_basic.h"

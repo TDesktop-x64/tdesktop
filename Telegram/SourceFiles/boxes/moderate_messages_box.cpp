@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "boxes/moderate_messages_box.h"
 
+#include "api/api_blocked_peers.h"
 #include "api/api_chat_participants.h"
 #include "api/api_messages_search.h"
 #include "apiwrap.h"
@@ -31,7 +32,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/boxes/confirm_box.h"
 #include "ui/controls/userpic_button.h"
 #include "ui/effects/ripple_animation.h"
-#include "ui/effects/toggle_arrow.h"
 #include "ui/layers/generic_box.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
@@ -39,14 +39,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/text_utilities.h"
 #include "ui/vertical_list.h"
 #include "ui/widgets/checkbox.h"
+#include "ui/widgets/expandable_peer_list.h"
+#include "ui/widgets/participants_check_view.h"
 #include "ui/wrap/slide_wrap.h"
+#include "ui/ui_utility.h"
 #include "styles/style_boxes.h"
 #include "styles/style_layers.h"
 #include "styles/style_window.h"
 
 namespace {
-
-using Participants = std::vector<not_null<PeerData*>>;
 
 struct ModerateOptions final {
 	bool allCanBan = false;
@@ -103,117 +104,14 @@ ModerateOptions CalculateModerateOptions(const HistoryItemsList &items) {
 	};
 }
 
-class Button final : public Ui::RippleButton {
-public:
-	Button(not_null<QWidget*> parent, int count);
-
-	void setChecked(bool checked);
-	[[nodiscard]] bool checked() const;
-
-	[[nodiscard]] static QSize ComputeSize(int);
-
-private:
-	void paintEvent(QPaintEvent *event) override;
-	QImage prepareRippleMask() const override;
-	QPoint prepareRippleStartPosition() const override;
-
-	const int _count;
-	const QString _text;
-	bool _checked = false;
-
-	Ui::Animations::Simple _animation;
-
-};
-
-Button::Button(not_null<QWidget*> parent, int count)
-: RippleButton(parent, st::defaultRippleAnimation)
-, _count(count)
-, _text(QString::number(std::abs(_count))) {
-}
-
-QSize Button::ComputeSize(int count) {
-	return QSize(
-		st::moderateBoxExpandHeight
-			+ st::moderateBoxExpand.width()
-			+ st::moderateBoxExpandInnerSkip * 4
-			+ st::moderateBoxExpandFont->width(
-				QString::number(std::abs(count)))
-			+ st::moderateBoxExpandToggleSize,
-		st::moderateBoxExpandHeight);
-}
-
-void Button::setChecked(bool checked) {
-	if (_checked == checked) {
-		return;
-	}
-	_checked = checked;
-	_animation.stop();
-	_animation.start(
-		[=] { update(); },
-		checked ? 0 : 1,
-		checked ? 1 : 0,
-		st::slideWrapDuration);
-}
-
-bool Button::checked() const {
-	return _checked;
-}
-
-void Button::paintEvent(QPaintEvent *event) {
-	auto p = Painter(this);
-	auto hq = PainterHighQualityEnabler(p);
-	Ui::RippleButton::paintRipple(p, QPoint());
-	const auto radius = height() / 2;
-	p.setPen(Qt::NoPen);
-	st::moderateBoxExpand.paint(
-		p,
-		radius,
-		(height() - st::moderateBoxExpand.height()) / 2,
-		width());
-
-	const auto innerSkip = st::moderateBoxExpandInnerSkip;
-
-	p.setBrush(Qt::NoBrush);
-	p.setPen(st::boxTextFg);
-	p.setFont(st::moderateBoxExpandFont);
-	p.drawText(
-		QRect(
-			innerSkip + radius + st::moderateBoxExpand.width(),
-			0,
-			width(),
-			height()),
-		_text,
-		style::al_left);
-
-	const auto path = Ui::ToggleUpDownArrowPath(
-		width() - st::moderateBoxExpandToggleSize - radius,
-		height() / 2,
-		st::moderateBoxExpandToggleSize,
-		st::moderateBoxExpandToggleFourStrokes,
-		_animation.value(_checked ? 1. : 0.));
-	p.fillPath(path, st::boxTextFg);
-}
-
-QImage Button::prepareRippleMask() const {
-	return Ui::RippleAnimation::RoundRectMask(size(), size().height() / 2);
-}
-
-QPoint Button::prepareRippleStartPosition() const {
-	return mapFromGlobal(QCursor::pos());
-}
-
 } // namespace
 
 void CreateModerateMessagesBox(
 		not_null<Ui::GenericBox*> box,
 		const HistoryItemsList &items,
 		Fn<void()> confirmed) {
-	struct Controller final {
-		rpl::event_stream<bool> toggleRequestsFromTop;
-		rpl::event_stream<bool> toggleRequestsFromInner;
-		rpl::event_stream<bool> checkAllRequests;
-		Fn<Participants()> collectRequests;
-	};
+	using Controller = Ui::ExpandablePeerListController;
+
 	const auto [allCanBan, allCanDelete, participants]
 		= CalculateModerateOptions(items);
 	const auto inner = box->verticalLayout();
@@ -225,7 +123,12 @@ void CreateModerateMessagesBox(
 	const auto isSingle = participants.size() == 1;
 	const auto buttonPadding = isSingle
 		? QMargins()
-		: QMargins(0, 0, Button::ComputeSize(participants.size()).width(), 0);
+		: QMargins(
+			0,
+			0,
+			Ui::ParticipantsCheckView::ComputeSize(
+				participants.size()).width(),
+			0);
 
 	const auto session = &items.front()->history()->session();
 	const auto historyPeerId = items.front()->history()->peer->id;
@@ -307,135 +210,6 @@ void CreateModerateMessagesBox(
 		});
 	};
 
-	const auto createParticipantsList = [&](
-			not_null<Controller*> controller) {
-		const auto wrap = inner->add(
-			object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
-				inner,
-				object_ptr<Ui::VerticalLayout>(inner)));
-		wrap->toggle(false, anim::type::instant);
-
-		controller->toggleRequestsFromTop.events(
-		) | rpl::start_with_next([=](bool toggled) {
-			wrap->toggle(toggled, anim::type::normal);
-		}, wrap->lifetime());
-
-		const auto container = wrap->entity();
-		Ui::AddSkip(container);
-
-		auto &lifetime = wrap->lifetime();
-		const auto clicks = lifetime.make_state<rpl::event_stream<>>();
-		const auto checkboxes = ranges::views::all(
-			participants
-		) | ranges::views::transform([&](not_null<PeerData*> peer) {
-			const auto line = container->add(
-				object_ptr<Ui::AbstractButton>(container));
-			const auto &st = st::moderateBoxUserpic;
-			line->resize(line->width(), st.size.height());
-
-			const auto userpic = Ui::CreateChild<Ui::UserpicButton>(
-				line,
-				peer,
-				st);
-			const auto checkbox = Ui::CreateChild<Ui::Checkbox>(
-				line,
-				peer->name(),
-				false,
-				st::defaultBoxCheckbox);
-			line->widthValue(
-			) | rpl::start_with_next([=](int width) {
-				userpic->moveToLeft(
-					st::boxRowPadding.left()
-						+ checkbox->checkRect().width()
-						+ st::defaultBoxCheckbox.textPosition.x(),
-					0);
-				const auto skip = st::defaultBoxCheckbox.textPosition.x();
-				checkbox->resizeToWidth(width
-					- rect::right(userpic)
-					- skip
-					- st::boxRowPadding.right());
-				checkbox->moveToLeft(
-					rect::right(userpic) + skip,
-					((userpic->height() - checkbox->height()) / 2)
-						+ st::defaultBoxCheckbox.margin.top());
-			}, checkbox->lifetime());
-
-			userpic->setAttribute(Qt::WA_TransparentForMouseEvents);
-			checkbox->setAttribute(Qt::WA_TransparentForMouseEvents);
-
-			line->setClickedCallback([=] {
-				checkbox->setChecked(!checkbox->checked());
-				clicks->fire({});
-			});
-
-			return checkbox;
-		}) | ranges::to_vector;
-
-		clicks->events(
-		) | rpl::start_with_next([=] {
-			controller->toggleRequestsFromInner.fire_copy(
-				ranges::any_of(checkboxes, &Ui::Checkbox::checked));
-		}, container->lifetime());
-
-		controller->checkAllRequests.events(
-		) | rpl::start_with_next([=](bool checked) {
-			for (const auto &c : checkboxes) {
-				c->setChecked(checked);
-			}
-		}, container->lifetime());
-
-		controller->collectRequests = [=] {
-			auto result = Participants();
-			for (auto i = 0; i < checkboxes.size(); i++) {
-				if (checkboxes[i]->checked()) {
-					result.push_back(participants[i]);
-				}
-			}
-			return result;
-		};
-	};
-
-	const auto appendList = [&](
-			not_null<Ui::Checkbox*> checkbox,
-			not_null<Controller*> controller) {
-		if (isSingle) {
-			const auto p = participants.front();
-			controller->collectRequests = [=] { return Participants{ p }; };
-			return;
-		}
-		const auto count = int(participants.size());
-		const auto button = Ui::CreateChild<Button>(inner, count);
-		button->resize(Button::ComputeSize(count));
-
-		const auto overlay = Ui::CreateChild<Ui::AbstractButton>(inner);
-
-		checkbox->geometryValue(
-		) | rpl::start_with_next([=](const QRect &rect) {
-			overlay->setGeometry(rect);
-			overlay->raise();
-
-			button->moveToRight(
-				st::moderateBoxExpandRight,
-				rect.top() + (rect.height() - button->height()) / 2,
-				box->width());
-			button->raise();
-		}, button->lifetime());
-
-		controller->toggleRequestsFromInner.events(
-		) | rpl::start_with_next([=](bool toggled) {
-			checkbox->setChecked(toggled);
-		}, checkbox->lifetime());
-		button->setClickedCallback([=] {
-			button->setChecked(!button->checked());
-			controller->toggleRequestsFromTop.fire_copy(button->checked());
-		});
-		overlay->setClickedCallback([=] {
-			checkbox->setChecked(!checkbox->checked());
-			controller->checkAllRequests.fire_copy(checkbox->checked());
-		});
-		createParticipantsList(controller);
-	};
-
 	Ui::AddSkip(inner);
 	const auto title = box->addRow(
 		object_ptr<Ui::FlatLabel>(
@@ -457,8 +231,9 @@ void CreateModerateMessagesBox(
 				false,
 				st::defaultBoxCheckbox),
 			st::boxRowPadding + buttonPadding);
-		const auto controller = box->lifetime().make_state<Controller>();
-		appendList(report, controller);
+		const auto controller = box->lifetime().make_state<Controller>(
+			Controller::Data{ .participants = participants });
+		Ui::AddExpandablePeerList(report, controller, inner);
 		handleSubmition(report);
 
 		const auto ids = items.front()->from()->owner().itemsToIds(items);
@@ -515,8 +290,9 @@ void CreateModerateMessagesBox(
 			}, title->lifetime());
 		}
 
-		const auto controller = box->lifetime().make_state<Controller>();
-		appendList(deleteAll, controller);
+		const auto controller = box->lifetime().make_state<Controller>(
+			Controller::Data{ .participants = participants });
+		Ui::AddExpandablePeerList(deleteAll, controller, inner);
 		handleSubmition(deleteAll);
 
 		handleConfirmation(deleteAll, controller, [=](
@@ -549,8 +325,9 @@ void CreateModerateMessagesBox(
 				false,
 				st::defaultBoxCheckbox),
 			st::boxRowPadding + buttonPadding);
-		const auto controller = box->lifetime().make_state<Controller>();
-		appendList(ban, controller);
+		const auto controller = box->lifetime().make_state<Controller>(
+			Controller::Data{ .participants = participants });
+		Ui::AddExpandablePeerList(ban, controller, inner);
 		handleSubmition(ban);
 
 		Ui::AddSkip(inner);
@@ -819,6 +596,20 @@ void DeleteChatBox(not_null<Ui::GenericBox*> box, not_null<PeerData*> peer) {
 				st::defaultBoxCheckbox));
 	}();
 
+	const auto maybeBotCheckbox = [&]() -> Ui::Checkbox* {
+		if (!maybeUser || !maybeUser->isBot()) {
+			return nullptr;
+		}
+		Ui::AddSkip(container);
+		Ui::AddSkip(container);
+		return box->addRow(
+			object_ptr<Ui::Checkbox>(
+				container,
+				tr::lng_profile_block_bot(tr::now, Ui::Text::WithEntities),
+				false,
+				st::defaultBoxCheckbox));
+	}();
+
 	Ui::AddSkip(container);
 
 	auto buttonText = maybeUser
@@ -832,7 +623,11 @@ void DeleteChatBox(not_null<Ui::GenericBox*> box, not_null<PeerData*> peer) {
 	const auto close = crl::guard(box, [=] { box->closeBox(); });
 	box->addButton(std::move(buttonText), [=] {
 		const auto revoke = maybeCheckbox && maybeCheckbox->checked();
+		const auto stopBot = maybeBotCheckbox && maybeBotCheckbox->checked();
 		Core::App().closeChatFromWindows(peer);
+		if (stopBot) {
+			peer->session().api().blockedPeers().block(peer);
+		}
 		// Don't delete old history by default,
 		// because Android app doesn't.
 		//

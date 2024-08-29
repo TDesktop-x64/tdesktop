@@ -124,6 +124,7 @@ PRIVATE
     editor/scene/scene_item_line.cpp
     editor/scene/scene_item_line.h
 
+    history/admin_log/history_admin_log_filter_value.h
     history/history_view_top_toast.cpp
     history/history_view_top_toast.h
     history/view/controls/history_view_characters_limit.cpp
@@ -427,6 +428,8 @@ PRIVATE
     ui/widgets/multi_select.h
     ui/widgets/sent_code_field.cpp
     ui/widgets/sent_code_field.h
+    ui/widgets/participants_check_view.cpp
+    ui/widgets/participants_check_view.h
     ui/widgets/slider_natural_width.h
     ui/widgets/vertical_drum_picker.cpp
     ui/widgets/vertical_drum_picker.h

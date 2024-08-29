@@ -37,6 +37,10 @@ include(cmake/td_scheme.cmake)
 include(cmake/td_ui.cmake)
 include(cmake/generate_appdata_changelog.cmake)
 
+if (DESKTOP_APP_TEST_APPS)
+    include(cmake/tests.cmake)
+endif()
+
 if (WIN32)
     include(cmake/generate_midl.cmake)
     generate_midl(Telegram ${src_loc}
@@ -312,6 +316,8 @@ PRIVATE
     boxes/self_destruction_box.h
     boxes/send_credits_box.cpp
     boxes/send_credits_box.h
+    boxes/send_gif_with_caption_box.cpp
+    boxes/send_gif_with_caption_box.h
     boxes/send_files_box.cpp
     boxes/send_files_box.h
     boxes/sessions_box.cpp
@@ -1490,6 +1496,8 @@ PRIVATE
     ui/chat/choose_send_as.h
     ui/chat/choose_theme_controller.cpp
     ui/chat/choose_theme_controller.h
+    ui/controls/emoji_button_factory.cpp
+    ui/controls/emoji_button_factory.h
     ui/controls/location_picker.cpp
     ui/controls/location_picker.h
     ui/controls/silent_toggle.cpp
@@ -1515,6 +1523,8 @@ PRIVATE
     ui/image/image_location_factory.h
     ui/text/format_song_document_name.cpp
     ui/text/format_song_document_name.h
+    ui/widgets/expandable_peer_list.cpp
+    ui/widgets/expandable_peer_list.h
     ui/widgets/label_with_custom_emoji.cpp
     ui/widgets/label_with_custom_emoji.h
     ui/countryinput.cpp

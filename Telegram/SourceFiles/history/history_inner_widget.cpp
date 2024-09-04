@@ -28,6 +28,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_emoji_interactions.h"
 #include "history/history_item_components.h"
 #include "history/history_item_text.h"
+#include "history/history_view_swipe.h"
 #include "payments/payments_reaction_process.h"
 #include "ui/toast/toast.h"
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
@@ -128,6 +129,15 @@ int BinarySearchBlocksOrItems(const T &list, int edge) {
 		}
 	}
 	return start;
+}
+
+[[nodiscard]] bool CanSendReply(not_null<const HistoryItem*> item) {
+	const auto peer = item->history()->peer;
+	const auto topic = item->topic();
+	return topic
+		? Data::CanSendAnything(topic)
+		: (Data::CanSendAnything(peer)
+			&& (!peer->isChannel() || peer->asChannel()->amIn()));
 }
 
 void FillSponsoredMessagesMenu(
@@ -494,6 +504,7 @@ HistoryInner::HistoryInner(
 	}, _scroll->lifetime());
 
 	setupSharingDisallowed();
+	setupSwipeReply();
 }
 
 void HistoryInner::reactionChosen(const ChosenReaction &reaction) {
@@ -574,6 +585,72 @@ void HistoryInner::setupSharingDisallowed() {
 			mouseActionCancel();
 		}
 	}, lifetime());
+}
+
+void HistoryInner::setupSwipeReply() {
+	HistoryView::SetupSwipeHandler(this, _scroll, [=, history = _history](
+			HistoryView::ChatPaintGestureHorizontalData data) {
+		const auto changed = (_gestureHorizontal.msgBareId != data.msgBareId)
+			|| (_gestureHorizontal.translation != data.translation)
+			|| (_gestureHorizontal.reachRatio != data.reachRatio);
+		_gestureHorizontal = data;
+		if (changed) {
+			const auto item = history->peer->owner().message(
+				history->peer->id,
+				MsgId{ data.msgBareId });
+			if (item) {
+				repaintItem(item);
+			}
+		}
+	}, [=, show = _controller->uiShow()](int cursorTop) {
+		auto result = HistoryView::SwipeHandlerFinishData();
+		if (inSelectionMode()) {
+			return result;
+		}
+		enumerateItems<EnumItemsDirection::BottomToTop>([&](
+				not_null<Element*> view,
+				int itemtop,
+				int itembottom) {
+			if ((cursorTop < itemtop)
+				|| (cursorTop > itembottom)
+				|| !view->data()->isRegular()
+				|| view->data()->isService()) {
+				return true;
+			}
+			const auto item = view->data();
+			const auto canSendReply = CanSendReply(item);
+			const auto canReply = (canSendReply || item->allowsForward());
+			if (!canReply) {
+				return true;
+			}
+			result.msgBareId = item->fullId().msg.bare;
+			result.callback = [=, itemId = item->fullId()] {
+				const auto still = show->session().data().message(itemId);
+				const auto selected = selectedQuote(still);
+				const auto replyToItemId = (selected.item
+					? selected.item
+					: still)->fullId();
+				if (canSendReply) {
+					_widget->replyToMessage({
+						.messageId = replyToItemId,
+						.quote = selected.text,
+						.quoteOffset = selected.offset,
+					});
+					if (!selected.text.empty()) {
+						_widget->clearSelected();
+					}
+				} else {
+					HistoryView::Controls::ShowReplyToChatBox(show, {
+						.messageId = replyToItemId,
+						.quote = selected.text,
+						.quoteOffset = selected.offset,
+					});
+				}
+			};
+			return false;
+		});
+		return result;
+	}, _touchMaybeSelecting.value());
 }
 
 bool HistoryInner::hasSelectRestriction() const {
@@ -953,6 +1030,7 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 	auto clip = e->rect();
 
 	auto context = preparePaintContext(clip);
+	context.gestureHorizontal = _gestureHorizontal;
 	context.highlightPathCache = &_highlightPathCache;
 	_pathGradient->startFrame(
 		0,
@@ -1166,6 +1244,20 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 		// paint the userpic if it intersects the painted rect
 		if (userpicTop + st::msgPhotoSize > clip.top()) {
 			const auto item = view->data();
+			const auto hasTranslation = context.gestureHorizontal.translation
+				&& (context.gestureHorizontal.msgBareId
+					== item->fullId().msg.bare);
+			if (hasTranslation) {
+				p.translate(context.gestureHorizontal.translation, 0);
+				update(
+					QRect(
+						st::historyPhotoLeft
+							+ context.gestureHorizontal.translation,
+						userpicTop,
+						st::msgPhotoSize
+							- context.gestureHorizontal.translation,
+						st::msgPhotoSize));
+			}
 			if (const auto from = item->displayFrom()) {
 				Dialogs::Ui::PaintUserpic(
 					p,
@@ -1200,6 +1292,9 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 				}
 			} else {
 				Unexpected("Corrupt forwarded information in message.");
+			}
+			if (hasTranslation) {
+				p.translate(-_gestureHorizontal.translation, 0);
 			}
 		}
 		return true;
@@ -1421,6 +1516,7 @@ void HistoryInner::touchEvent(QTouchEvent *e) {
 		_touchScroll = _touchSelect = false;
 		_horizontalScrollLocked = false;
 		_touchScrollState = Ui::TouchScrollState::Manual;
+		_touchMaybeSelecting = false;
 		mouseActionCancel();
 		return;
 	}
@@ -1443,6 +1539,7 @@ void HistoryInner::touchEvent(QTouchEvent *e) {
 		_touchInProgress = true;
 		_horizontalScrollLocked = false;
 		if (_touchScrollState == Ui::TouchScrollState::Auto) {
+			_touchMaybeSelecting = false;
 			_touchScrollState = Ui::TouchScrollState::Acceleration;
 			_touchWaitingAcceleration = true;
 			_touchAccelerationTime = crl::now();
@@ -1450,6 +1547,7 @@ void HistoryInner::touchEvent(QTouchEvent *e) {
 			_touchStart = _touchPos;
 		} else {
 			_touchScroll = false;
+			_touchMaybeSelecting = true;
 			_touchSelectTimer.callOnce(QApplication::startDragTime());
 		}
 		_touchSelect = false;
@@ -1463,6 +1561,7 @@ void HistoryInner::touchEvent(QTouchEvent *e) {
 			mouseActionUpdate(_touchPos);
 		} else if (!_touchScroll && (_touchPos - _touchStart).manhattanLength() >= QApplication::startDragDistance()) {
 			_touchSelectTimer.cancel();
+			_touchMaybeSelecting = false;
 			_touchScroll = true;
 			touchUpdateSpeed();
 		}
@@ -1484,11 +1583,18 @@ void HistoryInner::touchEvent(QTouchEvent *e) {
 			return;
 		}
 		_touchInProgress = false;
+		const auto notMoved = (_touchPos - _touchStart).manhattanLength()
+			< QApplication::startDragDistance();
 		auto weak = Ui::MakeWeak(this);
 		if (_touchSelect) {
-			mouseActionFinish(_touchPos, Qt::RightButton);
-			QContextMenuEvent contextMenu(QContextMenuEvent::Mouse, mapFromGlobal(_touchPos), _touchPos);
-			showContextMenu(&contextMenu, true);
+			if (notMoved || _touchMaybeSelecting.current()) {
+				mouseActionFinish(_touchPos, Qt::RightButton);
+				auto contextMenu = QContextMenuEvent(
+					QContextMenuEvent::Mouse,
+					mapFromGlobal(_touchPos),
+					_touchPos);
+				showContextMenu(&contextMenu, true);
+			}
 			_touchScroll = false;
 		} else if (_touchScroll) {
 			if (_touchScrollState == Ui::TouchScrollState::Manual) {
@@ -1506,12 +1612,13 @@ void HistoryInner::touchEvent(QTouchEvent *e) {
 				_touchWaitingAcceleration = false;
 				_touchPrevPosValid = false;
 			}
-		} else { // One short tap is like left mouse click.
+		} else if (notMoved) { // One short tap is like left mouse click.
 			mouseActionStart(_touchPos, Qt::LeftButton);
 			mouseActionFinish(_touchPos, Qt::LeftButton);
 		}
 		if (weak) {
 			_touchSelectTimer.cancel();
+			_touchMaybeSelecting = false;
 			_touchSelect = false;
 		}
 	} break;
@@ -2502,14 +2609,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 		if (!item || !item->isRegular()) {
 			return;
 		}
-		const auto canSendReply = [&] {
-			const auto peer = item->history()->peer;
-			const auto topic = item->topic();
-			return topic
-				? Data::CanSendAnything(topic)
-				: (Data::CanSendAnything(peer)
-					&& (!peer->isChannel() || peer->asChannel()->amIn()));
-		}();
+		const auto canSendReply = CanSendReply(item);
 		const auto canReply = canSendReply || item->allowsForward();
 		if (canReply) {
 			const auto selected = selectedQuote(item);
@@ -3972,6 +4072,7 @@ MessageIdsList HistoryInner::getSelectedItems() const {
 
 void HistoryInner::onTouchSelect() {
 	_touchSelect = true;
+	_touchMaybeSelecting = true;
 	mouseActionStart(_touchPos, Qt::LeftButton);
 }
 

@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/dragging_scroll_manager.h"
 #include "ui/widgets/tooltip.h"
 #include "ui/widgets/scroll_area.h"
+#include "history/history_view_swipe_data.h"
 #include "history/view/history_view_top_bar_widget.h"
 
 #include <QtGui/QPainterPath>
@@ -427,6 +428,7 @@ private:
 	void reactionChosen(const ChosenReaction &reaction);
 
 	void setupSharingDisallowed();
+	void setupSwipeReply();
 	[[nodiscard]] bool hasCopyRestriction(HistoryItem *item = nullptr) const;
 	[[nodiscard]] bool hasCopyMediaRestriction(
 		not_null<HistoryItem*> item) const;
@@ -519,6 +521,7 @@ private:
 	bool _touchSelect = false;
 	bool _touchInProgress = false;
 	QPoint _touchStart, _touchPrevPos, _touchPos;
+	rpl::variable<bool> _touchMaybeSelecting;
 	base::Timer _touchSelectTimer;
 
 	Ui::DraggingScrollManager _selectScroll;
@@ -533,6 +536,8 @@ private:
 	crl::time _touchAccelerationTime = 0;
 	crl::time _touchTime = 0;
 	base::Timer _touchScrollTimer;
+
+	HistoryView::ChatPaintGestureHorizontalData _gestureHorizontal;
 
 	// _menu must be destroyed before _whoReactedMenuLifetime.
 	rpl::lifetime _whoReactedMenuLifetime;

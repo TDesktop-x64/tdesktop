@@ -39,6 +39,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/chat/chat_style.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/expandable_peer_list.h"
+#include "ui/widgets/menu/menu_add_action_callback_factory.h"
+#include "ui/widgets/menu/menu_add_action_callback.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/image/image.h"
 #include "ui/text/text_utilities.h"
@@ -1568,54 +1570,29 @@ void InnerWidget::suggestRestrictParticipant(
 		}
 	}, &st::menuIconPermissions);
 
-	_menu->addAction(tr::lng_context_remove_from_group(tr::now), [=] {
-		PeerData* sender = nullptr;
-		if (participant->isUser()) {
-			sender = participant->asUser();
-		} else {
-			sender = participant->asChannel();
-		}
-		const auto text = tr::lng_profile_sure_kick(tr::now, lt_user, sender->name());
-		auto editRestrictions = [=](bool hasAdminRights, ChatRestrictionsInfo currentRights) {
-			Ui::show(
-				Ui::MakeConfirmBox({
-					.text = text,
-					.confirmed = crl::guard(this, [=](Fn<void()> &&close) {
-						restrictParticipant(
-							participant,
-							ChatRestrictionsInfo(),
-							ChannelData::KickedRestrictedRights(participant));
-						close();
-					}),
-					.confirmText = tr::lng_profile_kick(tr::now),
-				}),
-				Ui::LayerOption::KeepOther);
+	{
+		const auto lifetime = std::make_shared<rpl::lifetime>();
+		auto handler = [=, this] {
+			participant->session().changes().peerUpdates(
+				_channel,
+				Data::PeerUpdate::Flag::Members
+			) | rpl::start_with_next([=](const Data::PeerUpdate &update) {
+				_downLoaded = false;
+				preloadMore(Direction::Down);
+				lifetime->destroy();
+			}, *lifetime);
+			participant->session().api().chatParticipants().kick(
+				_channel,
+				participant,
+				{ _channel->restrictions(), 0 });
 		};
-		if (base::contains(_admins, sender)) {
-			editRestrictions(true, ChatRestrictionsInfo());
-		} else {
-			_api.request(MTPchannels_GetParticipant(
-				_channel->inputChannel,
-				sender->input
-			)).done([=](const MTPchannels_ChannelParticipant &result) {
-				Expects(result.type() == mtpc_channels_channelParticipant);
-
-				auto &participant = result.c_channels_channelParticipant();
-				_channel->owner().processUsers(participant.vusers());
-				auto type = participant.vparticipant().type();
-				if (type == mtpc_channelParticipantBanned) {
-					auto &banned = participant.vparticipant().c_channelParticipantBanned();
-					editRestrictions(false, ChatRestrictionsInfo(banned.vbanned_rights()));
-				} else {
-					auto hasAdminRights = (type == mtpc_channelParticipantAdmin)
-										  || (type == mtpc_channelParticipantCreator);
-					editRestrictions(hasAdminRights, ChatRestrictionsInfo());
-				}
-			}).fail([=](const MTP::Error &error) {
-				editRestrictions(false, ChatRestrictionsInfo());
-			}).send();
-		}
-	}, &st::menuIconRemove);
+		Ui::Menu::CreateAddActionCallback(_menu)({
+			.text = tr::lng_context_ban_user(tr::now),
+			.handler = std::move(handler),
+			.icon = &st::menuIconBlockAttention,
+			.isAttention = true,
+		});
+	}
 }
 
 void InnerWidget::restrictParticipant(

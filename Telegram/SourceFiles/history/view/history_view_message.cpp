@@ -40,6 +40,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "payments/payments_reaction_process.h" // TryAddingPaidReaction.
 #include "ui/text/text_options.h"
 #include "ui/painter.h"
+#include "window/themes/window_theme.h" // IsNightMode.
 #include "window/window_session_controller.h"
 #include "apiwrap.h"
 #include "base/qt/qt_key_modifiers.h"
@@ -1102,6 +1103,12 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 	const auto item = data();
 	const auto media = this->media();
 
+	const auto hasGesture = context.gestureHorizontal.translation
+		&& (context.gestureHorizontal.msgBareId == item->fullId().msg.bare);
+	if (hasGesture) {
+		p.translate(context.gestureHorizontal.translation, 0);
+	}
+
 	if (item->hasUnrequestedFactcheck()) {
 		item->history()->session().factchecks().requestFor(item);
 	}
@@ -1497,6 +1504,78 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 
 	if (GetEnhancedBool("screenshot_mode") != _previousMode) {
 		_previousMode = GetEnhancedBool("screenshot_mode"); // Update the previous mode
+	}
+
+	if (hasGesture) {
+		p.translate(-context.gestureHorizontal.translation, 0);
+
+		constexpr auto kShiftRatio = 1.5;
+		constexpr auto kBouncePart = 0.25;
+		constexpr auto kMaxHeightRatio = 3.5;
+		constexpr auto kStrokeWidth = 2.;
+		constexpr auto kWaveWidth = 10.;
+		const auto isLeftSize = (!context.outbg)
+			|| delegate()->elementIsChatWide();
+		const auto ratio = std::min(context.gestureHorizontal.ratio, 1.);
+		const auto reachRatio = context.gestureHorizontal.reachRatio;
+		const auto size = st::historyFastShareSize;
+		const auto outerWidth = st::historySwipeIconSkip
+			+ (isLeftSize ? rect::right(g) : width())
+			+ ((g.height() < size * kMaxHeightRatio)
+				? rightActionSize().value_or(QSize()).width()
+				: 0);
+		const auto rect = QRectF(
+			outerWidth
+				- (size * kShiftRatio * context.gestureHorizontal.ratio)
+				- (st::historySwipeIconSkip * ratio * (isLeftSize ? .7 : 1.)),
+			g.y() + (g.height() - size) / 2,
+			size,
+			size);
+		const auto center = rect::center(rect);
+		const auto spanAngle = ratio * arc::kFullLength;
+		const auto strokeWidth = style::ConvertFloatScale(kStrokeWidth);
+
+		const auto reachScale = std::clamp(
+			(reachRatio > kBouncePart)
+				? (kBouncePart * 2 - reachRatio)
+				: reachRatio,
+			0.,
+			1.);
+		auto pen = Window::Theme::IsNightMode()
+			? QPen(anim::with_alpha(context.st->msgServiceFg()->c, 0.3))
+			: QPen(context.st->msgServiceBg());
+		pen.setWidthF(strokeWidth - (1. * (reachScale / kBouncePart)));
+		const auto arcRect = rect - Margins(strokeWidth);
+		p.save();
+		{
+			auto hq = PainterHighQualityEnabler(p);
+			p.setPen(Qt::NoPen);
+			p.setBrush(context.st->msgServiceBg());
+			p.setOpacity(ratio);
+			p.translate(center);
+			if (reachScale) {
+				p.scale(-(1. + 1. * reachScale), (1. + 1. * reachScale));
+			} else {
+				p.scale(-1., 1.);
+			}
+			p.translate(-center);
+			// All the next draws are mirrored.
+			p.drawEllipse(rect);
+			context.st->historyFastShareIcon().paintInCenter(p, rect);
+			p.setPen(pen);
+			p.setBrush(Qt::NoBrush);
+			p.drawArc(arcRect, arc::kQuarterLength, spanAngle);
+			// p.drawArc(arcRect, arc::kQuarterLength, spanAngle);
+			if (reachRatio) {
+				const auto w = style::ConvertFloatScale(kWaveWidth);
+				p.setOpacity(ratio - reachRatio);
+				p.drawArc(
+					arcRect + Margins(reachRatio * reachRatio * w),
+					arc::kQuarterLength,
+					spanAngle);
+			}
+		}
+		p.restore();
 	}
 }
 
@@ -3875,10 +3954,10 @@ void Message::drawRightAction(
 	} else if (_rightAction->second) {
 		st->historyFastCloseIcon().paintInCenter(
 			p,
-			{ left, top, size->width(), size->width() });
+			QRect(left, top, size->width(), size->width()));
 		st->historyFastMoreIcon().paintInCenter(
 			p,
-			{ left, size->width() + top, size->width(), size->width() });
+			QRect(left, size->width() + top, size->width(), size->width()));
 	} else {
 		const auto &icon = data()->isSponsored()
 			? st->historyFastCloseIcon()
@@ -3887,7 +3966,7 @@ void Message::drawRightAction(
 				&& this->context() != Context::SavedSublist)
 			? st->historyFastShareIcon()
 			: st->historyGoToOriginalIcon();
-		icon.paintInCenter(p, { left, top, size->width(), size->height() });
+		icon.paintInCenter(p, Rect(left, top, *size));
 	}
 }
 

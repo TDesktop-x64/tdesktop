@@ -1898,6 +1898,12 @@ void HistoryItem::applyEdition(
 }
 
 void HistoryItem::applySentMessage(const MTPDmessage &data) {
+	if (data.is_invert_media()) {
+		_flags |= MessageFlag::InvertMedia;
+	} else {
+		_flags &= ~MessageFlag::InvertMedia;
+	}
+
 	updateSentContent({
 		qs(data.vmessage()),
 		Api::EntitiesFromMTP(
@@ -3505,9 +3511,10 @@ ItemPreview HistoryItem::toPreview(ToPreviewOptions options) const {
 			return _media->toPreview(options);
 		} else if (!emptyText()) {
 			return {
-				.text = st::wrap_rtl(options.translated
-					? translatedText()
-					: _text)
+				// wrap_rtl "adds" a newline in case text starts with quote.
+				// So we remove those by DialogsPreviewText call.
+				.text = st::wrap_rtl(Dialogs::Ui::DialogsPreviewText(
+					options.translated ? translatedText() : _text))
 			};
 		}
 		return {};

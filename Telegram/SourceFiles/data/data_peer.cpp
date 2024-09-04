@@ -446,11 +446,12 @@ InMemoryKey PeerData::userpicUniqueKey(Ui::PeerUserpicView &view) const {
 		: inMemoryKey(_userpic.location());
 }
 
-QImage PeerData::generateUserpicImage(
+QImage PeerData::GenerateUserpicImage(
+		not_null<PeerData*> peer,
 		Ui::PeerUserpicView &view,
 		int size,
-		std::optional<int> radius) const {
-	if (const auto userpic = userpicCloudImage(view)) {
+		std::optional<int> radius) {
+	if (const auto userpic = peer->userpicCloudImage(view)) {
 		auto image = userpic->scaled(
 			{ size, size },
 			Qt::IgnoreAspectRatio,
@@ -464,7 +465,7 @@ QImage PeerData::generateUserpicImage(
 			return image;
 		} else if (radius) {
 			return round(*radius);
-		} else if (isForum()) {
+		} else if (peer->isForum()) {
 			return round(size * Ui::ForumUserpicRadiusMultiplier());
 		} else {
 			return Images::Circle(std::move(image));
@@ -477,11 +478,12 @@ QImage PeerData::generateUserpicImage(
 
 	Painter p(&result);
 	if (radius == 0) {
-		ensureEmptyUserpic()->paintSquare(p, 0, 0, size, size);
+		peer->ensureEmptyUserpic()->paintSquare(p, 0, 0, size, size);
 	} else if (radius) {
-		ensureEmptyUserpic()->paintRounded(p, 0, 0, size, size, *radius);
-	} else if (isForum()) {
-		ensureEmptyUserpic()->paintRounded(
+		const auto r = *radius;
+		peer->ensureEmptyUserpic()->paintRounded(p, 0, 0, size, size, r);
+	} else if (peer->isForum()) {
+		peer->ensureEmptyUserpic()->paintRounded(
 			p,
 			0,
 			0,
@@ -489,7 +491,7 @@ QImage PeerData::generateUserpicImage(
 			size,
 			size * Ui::ForumUserpicRadiusMultiplier());
 	} else {
-		ensureEmptyUserpic()->paintCircle(p, 0, 0, size, size);
+		peer->ensureEmptyUserpic()->paintCircle(p, 0, 0, size, size);
 	}
 	p.end();
 

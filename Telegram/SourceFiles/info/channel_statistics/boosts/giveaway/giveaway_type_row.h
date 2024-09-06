@@ -27,6 +27,9 @@ public:
 		OnlyNewMembers,
 
 		Prepaid,
+		PrepaidCredits,
+
+		Credits,
 	};
 
 	GiveawayTypeRow(
@@ -57,6 +60,8 @@ private:
 	Ui::EmptyUserpic _userpic;
 	Ui::Text::String _status;
 	Ui::Text::String _name;
+
+	QImage _customUserpic;
 
 	QImage _badge;
 

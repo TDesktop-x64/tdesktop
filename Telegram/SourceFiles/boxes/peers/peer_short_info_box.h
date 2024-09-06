@@ -163,7 +163,6 @@ public:
 private:
 	void prepare() override;
 	void prepareRows();
-	RectParts customCornersFilling() override;
 
 	void resizeEvent(QResizeEvent *e) override;
 

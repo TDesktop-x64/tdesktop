@@ -108,6 +108,7 @@ struct GiveawayStart {
 	TimeId untilDate = 0;
 	int quantity = 0;
 	int months = 0;
+	uint64 credits = 0;
 	bool all = false;
 };
 
@@ -121,19 +122,21 @@ struct GiveawayResults {
 	int winnersCount = 0;
 	int unclaimedCount = 0;
 	int months = 0;
+	uint64 credits = 0;
 	bool refunded = false;
 	bool all = false;
 };
 
 enum class GiftType : uchar {
 	Premium, // count - months
-	Stars, // count - stars
+	Credits, // count - credits
 };
 
 struct GiftCode {
 	QString slug;
 	ChannelData *channel = nullptr;
 	int count = 0;
+	int giveawayMsgId = 0;
 	GiftType type = GiftType::Premium;
 	bool viaGiveaway = false;
 	bool unclaimed = false;

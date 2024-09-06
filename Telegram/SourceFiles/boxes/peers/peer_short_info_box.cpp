@@ -721,6 +721,7 @@ void PeerShortInfoBox::prepare() {
 	_roundedTop.setDevicePixelRatio(style::DevicePixelRatio());
 	refreshRoundedTopImage(getDelegate()->style().bg->c);
 
+	setCustomCornersFilling(RectPart::FullTop);
 	setDimensionsToContent(st::shortInfoWidth, _rows);
 }
 
@@ -797,10 +798,6 @@ void PeerShortInfoBox::prepareRows() {
 		birthdayLabel(),
 		birthdayValue() | Ui::Text::ToWithEntities(),
 		tr::lng_mediaview_copy(tr::now));
-}
-
-RectParts PeerShortInfoBox::customCornersFilling() {
-	return RectPart::FullTop;
 }
 
 void PeerShortInfoBox::resizeEvent(QResizeEvent *e) {

@@ -8,11 +8,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/channel_statistics/boosts/giveaway/giveaway_type_row.h"
 
 #include "lang/lang_keys.h"
+#include "ui/effects/credits_graphics.h"
+#include "ui/effects/premium_graphics.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
 #include "ui/text/text_options.h"
 #include "ui/widgets/checkbox.h"
 #include "styles/style_boxes.h"
+#include "styles/style_chat.h"
 #include "styles/style_giveaway.h"
 #include "styles/style_statistics.h"
 
@@ -33,7 +36,8 @@ GiveawayTypeRow::GiveawayTypeRow(
 	(type == Type::SpecificUsers)
 		? tr::lng_giveaway_award_option()
 		: (type == Type::Random)
-		? tr::lng_giveaway_create_option()
+		? tr::lng_premium_summary_title()
+		// ? tr::lng_giveaway_create_option()
 		: (type == Type::AllMembers)
 		? (group
 			? tr::lng_giveaway_users_all_group()
@@ -54,19 +58,27 @@ GiveawayTypeRow::GiveawayTypeRow(
 	QImage badge)
 : RippleButton(parent, st::defaultRippleAnimation)
 , _type(type)
-, _st((_type == Type::SpecificUsers || _type == Type::Random)
+, _st((_type == Type::SpecificUsers
+		|| _type == Type::Random
+		|| _type == Type::Credits)
 	? st::giveawayTypeListItem
-	: (_type == Type::Prepaid)
+	: ((_type == Type::Prepaid) || (_type == Type::PrepaidCredits))
 	? st::boostsListBox.item
 	: st::giveawayGiftCodeMembersPeerList.item)
 , _userpic(
 	Ui::EmptyUserpic::UserpicColor(Ui::EmptyUserpic::ColorIndex(colorIndex)),
 	QString())
 , _badge(std::move(badge)) {
+	if (_type == Type::Credits || _type == Type::PrepaidCredits) {
+		_customUserpic = Ui::CreditsWhiteDoubledIcon(_st.photoSize, 1.);
+	}
 	std::move(
 		subtitle
-	) | rpl::start_with_next([=] (const QString &s) {
-		_status.setText(st::defaultTextStyle, s, Ui::NameTextOptions());
+	) | rpl::start_with_next([=] (QString s) {
+		_status.setText(
+			st::defaultTextStyle,
+			s.replace(QChar('>'), QString()),
+			Ui::NameTextOptions());
 	}, lifetime());
 	std::move(
 		title
@@ -85,11 +97,13 @@ void GiveawayTypeRow::paintEvent(QPaintEvent *e) {
 	const auto paintOver = (isOver() || isDown()) && !isDisabled();
 	const auto skipRight = _st.photoPosition.x();
 	const auto outerWidth = width();
+	const auto isRandom = (_type == Type::Random);
 	const auto isSpecific = (_type == Type::SpecificUsers);
 	const auto isPrepaid = (_type == Type::Prepaid);
-	const auto hasUserpic = (_type == Type::Random)
+	const auto hasUserpic = isRandom
 		|| isSpecific
-		|| isPrepaid;
+		|| isPrepaid
+		|| (!_customUserpic.isNull());
 
 	if (paintOver) {
 		p.fillRect(e->rect(), _st.button.textBgOver);
@@ -103,16 +117,20 @@ void GiveawayTypeRow::paintEvent(QPaintEvent *e) {
 			outerWidth,
 			_st.photoSize);
 
-		const auto &userpic = isSpecific
-			? st::giveawayUserpicGroup
-			: st::giveawayUserpic;
 		const auto userpicRect = QRect(
 			_st.photoPosition
 				- QPoint(
 					isSpecific ? -st::giveawayUserpicSkip : 0,
 					isSpecific ? 0 : st::giveawayUserpicSkip),
 			Size(_st.photoSize));
-		userpic.paintInCenter(p, userpicRect);
+		if (!_customUserpic.isNull()) {
+			p.drawImage(_st.photoPosition, _customUserpic);
+		} else {
+			const auto &userpic = isSpecific
+				? st::giveawayUserpicGroup
+				: st::giveawayUserpic;
+			userpic.paintInCenter(p, userpicRect);
+		}
 	}
 
 	const auto namex = _st.namePosition.x();
@@ -133,12 +151,29 @@ void GiveawayTypeRow::paintEvent(QPaintEvent *e) {
 			_badge);
 	}
 
+	const auto statusIcon = isRandom ? &st::topicButtonArrow : nullptr;
 	const auto statusx = _st.statusPosition.x();
 	const auto statusy = _st.statusPosition.y();
-	const auto statusw = outerWidth - statusx - skipRight;
+	const auto statusw = outerWidth
+		- statusx
+		- skipRight
+		- (statusIcon
+			? (statusIcon->width() + st::boostsListMiniIconSkip)
+			: 0);
 	p.setFont(st::contactsStatusFont);
-	p.setPen((isSpecific || !hasUserpic) ? st::lightButtonFg : _st.statusFg);
+	p.setPen((isRandom || !hasUserpic) ? st::lightButtonFg : _st.statusFg);
 	_status.drawLeftElided(p, statusx, statusy, statusw, outerWidth);
+	if (statusIcon) {
+		statusIcon->paint(
+			p,
+			QPoint(
+				statusx
+					+ std::min(_status.maxWidth(), statusw)
+					+ st::boostsListMiniIconSkip,
+				statusy + st::contactsStatusFont->descent),
+			outerWidth,
+			st::lightButtonFg->c);
+	}
 }
 
 void GiveawayTypeRow::addRadio(

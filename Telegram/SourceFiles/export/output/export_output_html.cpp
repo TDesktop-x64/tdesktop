@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "export/output/export_output_html.h"
 
+#include "countries/countries_instance.h"
 #include "export/output/export_output_result.h"
 #include "export/data/export_data_types.h"
 #include "core/utils.h"
@@ -597,7 +598,8 @@ private:
 		const Data::Message &message,
 		const QString &basePath,
 		const PeersMap &peers,
-		const QString &internalLinksDomain);
+		const QString &internalLinksDomain,
+		Fn<QByteArray(int messageId, QByteArray text)> wrapMessageLink);
 	[[nodiscard]] QByteArray pushGenericMedia(const MediaData &data);
 	[[nodiscard]] QByteArray pushStickerMedia(
 		const Data::Document &data,
@@ -615,6 +617,10 @@ private:
 	[[nodiscard]] QByteArray pushGiveaway(
 		const PeersMap &peers,
 		const Data::GiveawayStart &data);
+	[[nodiscard]] QByteArray pushGiveaway(
+		const PeersMap &peers,
+		const Data::GiveawayResults &data,
+		Fn<QByteArray(int messageId, QByteArray text)> wrapMessageLink);
 
 	File _file;
 	QByteArray _composedStart;
@@ -1307,9 +1313,20 @@ auto HtmlWriter::Wrap::pushMessage(
 		return serviceFrom + " just started a giveaway "
 			"of Telegram Premium subscriptions to its followers.";
 	}, [&](const ActionGiveawayResults &data) {
-		return QByteArray::number(data.winners)
-			+ " of the giveaway were randomly selected by Telegram "
-			"and received private messages with giftcodes.";
+		return !data.winners
+			? "No winners of the giveaway could be selected."
+			: (data.credits && data.unclaimed)
+			? "Some winners of the giveaway were randomly selected by "
+				"Telegram and received their prize."
+			: (!data.credits && data.unclaimed)
+			? "Some winners of the giveaway were randomly selected by "
+				"Telegram and received private messages with giftcodes."
+			: (data.credits && !data.unclaimed)
+			? NumberToString(data.winners) + " of the giveaway was randomly "
+				"selected by Telegram and received their prize."
+			: NumberToString(data.winners) + " of the giveaway was randomly "
+				"selected by Telegram and received private messages with "
+				"giftcodes.";
 	}, [&](const ActionBoostApply &data) {
 		return serviceFrom
 			+ " boosted the group "
@@ -1322,14 +1339,20 @@ auto HtmlWriter::Wrap::pushMessage(
 			+ amount;
 		return result;
 	}, [&](const ActionGiftStars &data) {
-		if (!data.stars || data.cost.isEmpty()) {
+		if (!data.credits || data.cost.isEmpty()) {
 			return serviceFrom + " sent you a gift.";
 		}
 		return serviceFrom
 			+ " sent you a gift for "
 			+ data.cost
 			+ ": "
-			+ QString::number(data.stars).toUtf8()
+			+ QString::number(data.credits).toUtf8()
+			+ " Telegram Stars.";
+	}, [&](const ActionPrizeStars &data) {
+		return "You won a prize in a giveaway organized by "
+			+ peers.wrapPeerName(data.peerId)
+			+ ".\n Your prize is "
+			+ QString::number(data.amount).toUtf8()
 			+ " Telegram Stars.";
 	}, [](v::null_t) { return QByteArray(); });
 
@@ -1451,7 +1474,13 @@ auto HtmlWriter::Wrap::pushMessage(
 		block.append(popTag());
 	}
 
-	block.append(pushMedia(message, basePath, peers, internalLinksDomain));
+	block.append(
+		pushMedia(
+			message,
+			basePath,
+			peers,
+			internalLinksDomain,
+			wrapMessageLink));
 
 	const auto text = FormatText(message.text, internalLinksDomain, _base);
 	if (!text.isEmpty()) {
@@ -1554,7 +1583,8 @@ QByteArray HtmlWriter::Wrap::pushMedia(
 		const Data::Message &message,
 		const QString &basePath,
 		const PeersMap &peers,
-		const QString &internalLinksDomain) {
+		const QString &internalLinksDomain,
+		Fn<QByteArray(int messageId, QByteArray text)> wrapMessageLink) {
 	const auto data = prepareMediaData(
 		message,
 		basePath,
@@ -1582,6 +1612,8 @@ QByteArray HtmlWriter::Wrap::pushMedia(
 		return pushPoll(*poll);
 	} else if (const auto giveaway = std::get_if<GiveawayStart>(&content)) {
 		return pushGiveaway(peers, *giveaway);
+	} else if (const auto giveaway = std::get_if<GiveawayResults>(&content)) {
+		return pushGiveaway(peers, *giveaway, wrapMessageLink);
 	}
 	Assert(v::is_null(content));
 	return QByteArray();
@@ -1910,17 +1942,47 @@ QByteArray HtmlWriter::Wrap::pushGiveaway(
 	result.append(pushDiv("media_giveaway"));
 
 	result.append(pushDiv("section_title bold"));
-	result.append(SerializeString("Giveaway Prizes"));
+	result.append((data.quantity > 1)
+		? SerializeString("Giveaway Prizes")
+		: SerializeString("Giveaway Prize"));
 	result.append(popTag());
+
+	{
+		result.append(pushDiv("section_body"));
+		result.append("<b>"
+			+ Data::NumberToString(data.quantity)
+			+ "</b> "
+			+ SerializeString(data.additionalPrize.toUtf8()));
+		result.append(popTag());
+		result.append(pushDiv("section_title bold"));
+		result.append(SerializeString("with"));
+		result.append(popTag());
+	};
 	result.append(pushDiv("section_body"));
-	result.append("<b>"
-		+ Data::NumberToString(data.quantity)
-		+ "</b> "
-		+ SerializeString((data.quantity > 1)
-			? "Telegram Premium Subscriptions"
-			: "Telegram Premium Subscription")
-		+ " for <b>" + Data::NumberToString(data.months) + "</b> "
-		+ (data.months > 1 ? "months." : "month."));
+	if (data.credits > 0) {
+		result.append("<b>"
+			+ Data::NumberToString(data.credits)
+			+ (SerializeString(data.credits == 1 ? (" Star") : (" Stars")))
+			+ "</b> " + SerializeString("will be distributed ")
+			+ ((data.quantity == 1)
+				? SerializeString("to ")
+					+ "<b>"
+					+ Data::NumberToString(data.quantity)
+					+ "</b> " + SerializeString("winner.")
+				: SerializeString("among ")
+					+ "<b>"
+					+ Data::NumberToString(data.quantity)
+					+ "</b> " + SerializeString("winners.")));
+	} else {
+		result.append("<b>"
+			+ Data::NumberToString(data.quantity)
+			+ "</b> "
+			+ SerializeString((data.quantity > 1)
+				? "Telegram Premium Subscriptions"
+				: "Telegram Premium Subscription")
+			+ " for <b>" + Data::NumberToString(data.months) + "</b> "
+			+ (data.months > 1 ? "months." : "month."));
+	}
 	result.append(popTag());
 
 	result.append(pushDiv("section_title bold"));
@@ -1928,20 +1990,169 @@ QByteArray HtmlWriter::Wrap::pushGiveaway(
 	result.append(popTag());
 	result.append(pushDiv("section_body"));
 	auto channels = QByteArrayList();
+	auto anyChannel = false;
+	auto anyGroup = false;
 	for (const auto &channel : data.channels) {
+		if (const auto chat = peers.peer(channel).chat()) {
+			if (chat->isBroadcast) {
+				anyChannel = true;
+			} else if (chat->isSupergroup) {
+				anyGroup = true;
+			}
+		}
 		channels.append("<b>" + peers.wrapPeerName(channel) + "</b>");
 	}
-	result.append(SerializeString((channels.size() > 1)
-		? "All subscribers of those channels: "
-		: "All subscribers of the channel: ")
-		+ channels.join(", "));
+
+	const auto participants = [&] {
+		if (data.all && !anyGroup && anyChannel && channels.size() == 1) {
+			return "All subscribers of the channel:";
+		}
+		if (data.all && !anyGroup && anyChannel && channels.size() > 1) {
+			return "All subscribers of the channels:";
+		}
+		if (data.all && anyGroup && !anyChannel && channels.size() == 1) {
+			return "All members of the group:";
+		}
+		if (data.all && anyGroup && !anyChannel && channels.size() > 1) {
+			return "All members of the groups:";
+		}
+		if (data.all && anyGroup && anyChannel && channels.size() == 1) {
+			return "All members of the group:";
+		}
+		if (data.all && anyGroup && anyChannel && channels.size() > 1) {
+			return "All members of the groups and channels:";
+		}
+		if (!data.all && !anyGroup && anyChannel && channels.size() == 1) {
+			return "All users who joined the channel below after this date:";
+		}
+		if (!data.all && !anyGroup && anyChannel && channels.size() > 1) {
+			return "All users who joined the channels below after this date:";
+		}
+		if (!data.all && anyGroup && !anyChannel && channels.size() == 1) {
+			return "All users who joined the group below after this date:";
+		}
+		if (!data.all && anyGroup && !anyChannel && channels.size() > 1) {
+			return "All users who joined the groups below after this date:";
+		}
+		if (!data.all && anyGroup && anyChannel && channels.size() == 1) {
+			return "All users who joined the group below after this date:";
+		}
+		if (!data.all && anyGroup && anyChannel && channels.size() > 1) {
+			return "All users who joined the groups and channels below "
+				"after this date:";
+		}
+		return "";
+	}();
+
+	result.append(SerializeString(participants)) + channels.join(", ");
 	result.append(popTag());
 
+	{
+		const auto &instance = Countries::Instance();
+		auto countries = QStringList();
+		for (const auto &country : data.countries) {
+			const auto name = instance.countryNameByISO2(country);
+			const auto flag = instance.flagEmojiByISO2(country);
+			countries.push_back(flag + QChar(0xA0) + name);
+		}
+
+		if (const auto count = countries.size()) {
+			auto united = countries.front();
+			for (auto i = 1; i != count; ++i) {
+				united = ((i + 1 == count)
+					? u"%1 and %2"_q
+					: u"%1, %2"_q).arg(united, countries[i]);
+			}
+			result.append(pushDiv("section_body"));
+			result.append(
+				SerializeString((u"from %1"_q).arg(united).toUtf8()));
+			result.append(popTag());
+		}
+	}
 	result.append(pushDiv("section_title bold"));
 	result.append(SerializeString("Winners Selection Date"));
 	result.append(popTag());
 	result.append(pushDiv("section_body"));
 	result.append(Data::FormatDateTime(data.untilDate));
+	result.append(popTag());
+
+	result.append(popTag());
+	result.append(popTag());
+	return result;
+}
+
+QByteArray HtmlWriter::Wrap::pushGiveaway(
+		const PeersMap &peers,
+		const Data::GiveawayResults &data,
+		Fn<QByteArray(int messageId, QByteArray text)> wrapMessageLink) {
+	auto result = pushDiv("media_wrap clearfix");
+	result.append(pushDiv("media_giveaway"));
+
+	result.append(pushDiv("section_title bold"));
+	result.append((data.winnersCount > 1)
+		? SerializeString("Winners Selected!")
+		: SerializeString("Winner Selected!"));
+	result.append(popTag());
+
+	result.append(pushDiv("section_body"));
+	result.append(
+		"<b>" + Data::NumberToString(data.winnersCount) + "</b> "
+		+ SerializeString((data.winnersCount > 1) ? "winners" : "winner")
+		+ " of the "
+		+ wrapMessageLink(data.launchId, "Giveaway")
+		+ " was randomly selected by Telegram.");
+	result.append(popTag());
+
+	result.append(pushDiv("section_title bold"));
+	result.append((data.winnersCount > 1)
+		? SerializeString("Winners")
+		: SerializeString("Winner"));
+	result.append(popTag());
+
+	result.append(pushDiv("section_body"));
+	auto winners = QByteArrayList();
+	for (const auto &winner : data.winners) {
+		winners.append("<b>" + peers.wrapPeerName(winner) + "</b>");
+	}
+	const auto andMore = [&, size = data.winners.size()] {
+		if (data.winnersCount > size) {
+			return SerializeString(" and ")
+				+ Data::NumberToString(data.winnersCount - size)
+				+ SerializeString(" more!");
+		}
+		return QByteArray();
+	}();
+	result.append(winners.join(", ") + andMore);
+	result.append(popTag());
+
+	result.append(pushDiv("section_body"));
+	const auto prize = [&, singleStar = (data.credits == 1)] {
+		if (data.credits && data.winnersCount == 1) {
+			return SerializeString("The winner received ")
+				+ "<b>"
+				+ Data::NumberToString(data.credits)
+				+ "</b>"
+				+ SerializeString(singleStar ? " Star." : " Stars.");
+		} else if (data.credits && data.winnersCount > 1) {
+			return SerializeString("All winners received ")
+				+ "<b>"
+				+ Data::NumberToString(data.credits)
+				+ "</b>"
+				+ SerializeString(singleStar
+					? " Star in total."
+					: " Stars in total.");
+		} else if (data.unclaimedCount) {
+			return SerializeString("Some winners couldn't be selected.");
+		} else if (data.winnersCount == 1) {
+			return SerializeString(
+				"The winner received their gift link in a private message.");
+		} else if (data.winnersCount > 1) {
+			return SerializeString(
+				"All winners received gift links in private messages.");
+		}
+		return QByteArray();
+	}();
+	result.append(prize);
 	result.append(popTag());
 
 	result.append(popTag());
@@ -2108,6 +2319,7 @@ MediaData HtmlWriter::Wrap::prepareMediaData(
 		result.status = Data::FormatMoneyAmount(data.amount, data.currency);
 	}, [](const Poll &data) {
 	}, [](const GiveawayStart &data) {
+	}, [](const GiveawayResults &data) {
 	}, [&](const PaidMedia &data) {
 		result.classes = "media_invoice";
 		result.status = Data::FormatMoneyAmount(data.stars, "XTR");

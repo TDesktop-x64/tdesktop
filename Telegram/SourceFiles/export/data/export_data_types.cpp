@@ -733,11 +733,46 @@ Poll ParsePoll(const MTPDmessageMediaPoll &data) {
 GiveawayStart ParseGiveaway(const MTPDmessageMediaGiveaway &data) {
 	auto result = GiveawayStart{
 		.untilDate = data.vuntil_date().v,
+		.credits = data.vstars().value_or_empty(),
 		.quantity = data.vquantity().v,
-		.months = data.vmonths().v,
+		.months = data.vmonths().value_or_empty(),
+		.all = !data.is_only_new_subscribers(),
 	};
 	for (const auto &id : data.vchannels().v) {
 		result.channels.push_back(ChannelId(id));
+	}
+	if (const auto countries = data.vcountries_iso2()) {
+		result.countries.reserve(countries->v.size());
+		for (const auto &country : countries->v) {
+			result.countries.push_back(qs(country));
+		}
+	}
+	if (const auto additional = data.vprize_description()) {
+		result.additionalPrize = qs(*additional);
+	}
+	return result;
+}
+
+GiveawayResults ParseGiveaway(const MTPDmessageMediaGiveawayResults &data) {
+	const auto additional = data.vadditional_peers_count();
+	auto result = GiveawayResults{
+		.channel = ChannelId(data.vchannel_id()),
+		.untilDate = data.vuntil_date().v,
+		.launchId = data.vlaunch_msg_id().v,
+		.additionalPeersCount = additional.value_or_empty(),
+		.winnersCount = data.vwinners_count().v,
+		.unclaimedCount = data.vunclaimed_count().v,
+		.months = data.vmonths().value_or_empty(),
+		.credits = data.vstars().value_or_empty(),
+		.refunded = data.is_refunded(),
+		.all = !data.is_only_new_subscribers(),
+	};
+	result.winners.reserve(data.vwinners().v.size());
+	for (const auto &id : data.vwinners().v) {
+		result.winners.push_back(UserId(id));
+	}
+	if (const auto additional = data.vprize_description()) {
+		result.additionalPrize = qs(*additional);
 	}
 	return result;
 }
@@ -1246,7 +1281,7 @@ Media ParseMedia(
 	}, [&](const MTPDmessageMediaGiveaway &data) {
 		result.content = ParseGiveaway(data);
 	}, [&](const MTPDmessageMediaGiveawayResults &data) {
-		// #TODO export giveaway
+		result.content = ParseGiveaway(data);
 	}, [&](const MTPDmessageMediaPaidMedia &data) {
 		result.content = ParsePaidMedia(context, data, folder, date);
 	}, [](const MTPDmessageMediaEmpty &data) {});
@@ -1508,6 +1543,7 @@ ServiceAction ParseServiceAction(
 		auto content = ActionGiveawayResults();
 		content.winners = data.vwinners_count().v;
 		content.unclaimed = data.vunclaimed_count().v;
+		content.credits = data.is_stars();
 		result.content = content;
 	}, [&](const MTPDmessageActionBoostApply &data) {
 		auto content = ActionBoostApply();
@@ -1527,8 +1563,16 @@ ServiceAction ParseServiceAction(
 		content.cost = Ui::FillAmountAndCurrency(
 			data.vamount().v,
 			qs(data.vcurrency())).toUtf8();
-		content.stars = data.vstars().v;
+		content.credits = data.vstars().v;
 		result.content = content;
+	}, [&](const MTPDmessageActionPrizeStars &data) {
+		result.content = ActionPrizeStars{
+			.peerId = ParsePeerId(data.vboost_peer()),
+			.amount = data.vstars().v,
+			.transactionId = data.vtransaction_id().v,
+			.giveawayMsgId = data.vgiveaway_msg_id().v,
+			.isUnclaimed = data.is_unclaimed(),
+		};
 	}, [](const MTPDmessageActionEmpty &data) {});
 	return result;
 }

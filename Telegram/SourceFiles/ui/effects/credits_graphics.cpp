@@ -84,13 +84,7 @@ PaintRoundImageCallback MultiThumbnail(
 	};
 }
 
-} // namespace
-
-QImage GenerateStars(int height, int count) {
-	constexpr auto kOutlineWidth = .6;
-	constexpr auto kStrokeWidth = 3;
-	constexpr auto kShift = 3;
-
+QByteArray CreditsIconSvg(int strokeWidth) {
 	auto colorized = qs(Premium::ColorizedSvg(
 		Premium::CreditsIconGradientStops()));
 	colorized.replace(
@@ -98,8 +92,18 @@ QImage GenerateStars(int height, int count) {
 		u"stroke=\"%1\""_q.arg(st::creditsStroke->c.name()));
 	colorized.replace(
 		u"stroke-width=\"1\""_q,
-		u"stroke-width=\"%1\""_q.arg(kStrokeWidth));
-	auto svg = QSvgRenderer(colorized.toUtf8());
+		u"stroke-width=\"%1\""_q.arg(strokeWidth));
+	return colorized.toUtf8();
+}
+
+} // namespace
+
+QImage GenerateStars(int height, int count) {
+	constexpr auto kOutlineWidth = .6;
+	constexpr auto kStrokeWidth = 3;
+	constexpr auto kShift = 3;
+
+	auto svg = QSvgRenderer(CreditsIconSvg(kStrokeWidth));
 	svg.setViewBox(svg.viewBox() + Margins(kStrokeWidth));
 
 	const auto starSize = Size(height - kOutlineWidth * 2);
@@ -457,6 +461,8 @@ Fn<PaintRoundImageCallback(Fn<void()>)> PaintPreviewCallback(
 TextWithEntities GenerateEntryName(const Data::CreditsHistoryEntry &entry) {
 	return (entry.reaction
 		? tr::lng_credits_box_history_entry_reaction_name
+		: entry.bareGiveawayMsgId
+		? tr::lng_credits_box_history_entry_giveaway_name
 		: entry.gift
 		? tr::lng_credits_box_history_entry_gift_name
 		: (entry.peerType == Data::CreditsHistoryEntry::PeerType::Fragment)
@@ -468,6 +474,95 @@ TextWithEntities GenerateEntryName(const Data::CreditsHistoryEntry &entry) {
 		: tr::lng_credits_summary_history_entry_inner_in)(
 			tr::now,
 			TextWithEntities::Simple);
+}
+
+Fn<void(QPainter &)> PaintOutlinedColoredCreditsIconCallback(
+		int size,
+		float64 outlineRatio) {
+	// constexpr auto kIdealSize = 42;
+	constexpr auto kPoints = uint(16);
+	constexpr auto kAngleStep = 2. * M_PI / kPoints;
+	constexpr auto kOutlineWidth = 1.6;
+	// constexpr auto kStarShift = 3.8;
+	constexpr auto kStrokeWidth = 3;
+	const auto starSize = Size(size);
+
+	auto svg = std::make_shared<QSvgRenderer>(CreditsIconSvg(kStrokeWidth));
+	svg->setViewBox(svg->viewBox() + Margins(kStrokeWidth));
+	const auto s = style::ConvertFloatScale(kOutlineWidth * outlineRatio);
+	return [=](QPainter &q) {
+		q.save();
+		q.setCompositionMode(QPainter::CompositionMode_Clear);
+		for (auto i = 0; i < kPoints; ++i) {
+			const auto angle = i * kAngleStep;
+			const auto x = s * std::cos(angle);
+			const auto y = s * std::sin(angle);
+			svg->render(&q, QRectF(QPointF(x, y), starSize));
+		}
+		q.setCompositionMode(QPainter::CompositionMode_SourceOver);
+		svg->render(&q, Rect(starSize));
+		q.restore();
+	};
+}
+
+QImage CreditsWhiteDoubledIcon(int size, float64 outlineRatio) {
+	auto svg = QSvgRenderer(Ui::Premium::Svg());
+	auto result = QImage(
+		Size(size) * style::DevicePixelRatio(),
+		QImage::Format_ARGB32_Premultiplied);
+	result.fill(Qt::transparent);
+	result.setDevicePixelRatio(style::DevicePixelRatio());
+
+	// constexpr auto kIdealSize = 42;
+	constexpr auto kPoints = uint(16);
+	constexpr auto kAngleStep = 2. * M_PI / kPoints;
+	constexpr auto kOutlineWidth = 1.6;
+	constexpr auto kStarShift = 3.8;
+	const auto userpicRect = Rect(Size(size));
+	const auto starRect = userpicRect - Margins(userpicRect.width() / 4.);
+	const auto starSize = starRect.size();
+	const auto drawSingle = [&](QPainter &q) {
+		const auto s = style::ConvertFloatScale(kOutlineWidth * outlineRatio);
+		q.save();
+		q.setCompositionMode(QPainter::CompositionMode_Clear);
+		for (auto i = 0; i < kPoints; ++i) {
+			const auto angle = i * kAngleStep;
+			const auto x = s * std::cos(angle);
+			const auto y = s * std::sin(angle);
+			svg.render(&q, QRectF(QPointF(x, y), starSize));
+		}
+		q.setCompositionMode(QPainter::CompositionMode_SourceOver);
+		svg.render(&q, Rect(starSize));
+		q.restore();
+	};
+	{
+		auto p = QPainter(&result);
+		p.setPen(Qt::NoPen);
+		p.setBrush(st::lightButtonFg);
+		p.translate(starRect.topLeft());
+		p.translate(
+			style::ConvertFloatScale(kStarShift * outlineRatio) / 2.,
+			0);
+		drawSingle(p);
+		{
+			// Remove the previous star at bottom.
+			p.setCompositionMode(QPainter::CompositionMode_Clear);
+			p.save();
+			p.resetTransform();
+			p.fillRect(
+				userpicRect.x(),
+				userpicRect.y(),
+				userpicRect.width() / 2.,
+				userpicRect.height(),
+				Qt::transparent);
+			p.restore();
+		}
+		p.translate(
+			-style::ConvertFloatScale(kStarShift * outlineRatio),
+			0);
+		drawSingle(p);
+	}
+	return result;
 }
 
 } // namespace Ui

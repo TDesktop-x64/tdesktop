@@ -588,13 +588,16 @@ void HistoryInner::setupSharingDisallowed() {
 }
 
 void HistoryInner::setupSwipeReply() {
+	if (_peer && _peer->isChannel() && !_peer->isMegagroup()) {
+		return;
+	}
 	HistoryView::SetupSwipeHandler(this, _scroll, [=, history = _history](
 			HistoryView::ChatPaintGestureHorizontalData data) {
 		const auto changed = (_gestureHorizontal.msgBareId != data.msgBareId)
 			|| (_gestureHorizontal.translation != data.translation)
 			|| (_gestureHorizontal.reachRatio != data.reachRatio);
-		_gestureHorizontal = data;
 		if (changed) {
+			_gestureHorizontal = data;
 			const auto item = history->peer->owner().message(
 				history->peer->id,
 				MsgId{ data.msgBareId });

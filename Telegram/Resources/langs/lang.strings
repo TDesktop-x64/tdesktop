@@ -1891,9 +1891,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_action_story_mention_unavailable" = "The story where {user} mentioned you is no longer available.";
 "lng_action_giveaway_started_group" = "{from} just started a giveaway of Telegram Premium subscriptions to its members.";
 "lng_action_giveaway_started" = "{from} just started a giveaway of Telegram Premium subscriptions to its followers.";
+"lng_action_giveaway_credits_started_amount#one" = "{count} Star";
+"lng_action_giveaway_credits_started_amount#other" = "{count} Stars";
+"lng_action_giveaway_credits_started_group" = "{from} just started a giveaway of {amount} to its members.";
+"lng_action_giveaway_credits_started" = "{from} just started a giveaway of {amount} to its followers.";
 "lng_action_giveaway_results#one" = "{count} winner of the giveaway was randomly selected by Telegram and received private messages with giftcodes.";
 "lng_action_giveaway_results#other" = "{count} winners of the giveaway were randomly selected by Telegram and received private messages with giftcodes.";
 "lng_action_giveaway_results_some" = "Some winners of the giveaway were randomly selected by Telegram and received private messages with giftcodes.";
+"lng_action_giveaway_results_credits#one" = "{count} winner of the giveaway was randomly selected by Telegram and received their prize.";
+"lng_action_giveaway_results_credits#other" = "{count} winner of the giveaway was randomly selected by Telegram and received their prize.";
+"lng_action_giveaway_results_credits_some" = "Some winners of the giveaway were randomly selected by Telegram and received their prize.";
 "lng_action_giveaway_results_none" = "No winners of the giveaway could be selected.";
 "lng_action_boost_apply#one" = "{from} boosted the group";
 "lng_action_boost_apply#other" = "{from} boosted the group {count} times";
@@ -2414,11 +2421,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_credits_box_history_entry_fragment" = "Fragment";
 "lng_credits_box_history_entry_anonymous" = "Unknown User";
 "lng_credits_box_history_entry_gift_name" = "Received Gift";
+"lng_credits_box_history_entry_giveaway_name" = "Received Prize";
 "lng_credits_box_history_entry_gift_sent" = "Sent Gift";
 "lng_credits_box_history_entry_gift_out_about" = "With Stars, **{user}** will be able to unlock content and services on Telegram.\n{link}";
 "lng_credits_box_history_entry_gift_in_about" = "Use Stars to unlock content and services on Telegram. {link}";
 "lng_credits_box_history_entry_gift_about_link" = "See Examples {emoji}";
-"lng_credits_box_history_entry_gift_about_url" = "https://telegram.org/blog/telegram-stars";
+"lng_credits_box_history_entry_gift_examples" = "Examples";
 "lng_credits_box_history_entry_ads" = "Ads Platform";
 "lng_credits_box_history_entry_premium_bot" = "Stars Top-Up";
 "lng_credits_box_history_entry_via_premium_bot" = "Premium Bot";
@@ -2750,6 +2758,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_giveaway_new_title" = "Boosts via Gifts";
 "lng_giveaway_new_about" = "Get more boosts for your channel by gifting Premium to your subscribers.";
 "lng_giveaway_new_about_group" = "Get more boosts for your group by gifting Premium to your subscribers.";
+"lng_giveaway_credits_new_about" = "Get more boosts and subscribers for your channel by giving away prizes.";
+"lng_giveaway_credits_new_about_group" = "Get more boosts and members for your group by giving away prizes.";
 "lng_giveaway_create_option" = "Create Giveaway";
 "lng_giveaway_create_subtitle" = "winners are chosen randomly";
 "lng_giveaway_award_option" = "Award Specific Users";
@@ -2780,6 +2790,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_giveaway_users_about_group" = "Choose if you want to limit the giveaway only to those who joined the group after the giveaway started or to members from specific countries.";
 "lng_giveaway_start" = "Start Giveaway";
 "lng_giveaway_award" = "Gift Premium";
+"lng_giveaway_random_button" = "Choose randomly";
 "lng_giveaway_start_sure" = "Are you sure you want to start this prepaid giveaway now? This action cannot be undone.";
 "lng_giveaway_date_title" = "Date when giveaway ends";
 "lng_giveaway_date" = "Date and Time";
@@ -2809,6 +2820,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_giveaway_prizes_just_premium#other" = "All prizes: **{count}** Telegram Premium subscriptions {duration}.";
 "lng_giveaway_prizes_additional#one" = "All prizes: **{count}** {prize} with Telegram Premium subscription {duration}.";
 "lng_giveaway_prizes_additional#other" = "All prizes: **{count}** {prize} with Telegram Premium subscriptions {duration}.";
+"lng_giveaway_additional_credits_about" = "Turn this on if you want to give the winners your own prizes in addition to Stars.";
+"lng_giveaway_prizes_just_credits#one" = "All prizes: **{count}** Star.";
+"lng_giveaway_prizes_just_credits#other" = "All prizes: **{count}** Stars.";
+"lng_giveaway_prizes_additional_credits#one" = "All prizes: **{count}** {prize} with {amount}.";
+"lng_giveaway_prizes_additional_credits#other" = "All prizes: **{count}** {prize} with {amount}.";
+"lng_giveaway_prizes_additional_credits_amount#one" = "{count} Star";
+"lng_giveaway_prizes_additional_credits_amount#other" = "{count} Stars";
 "lng_giveaway_show_winners" = "Show winners";
 "lng_giveaway_show_winners_about" = "Choose whether to make the list of winners public when the giveaway ends.";
 
@@ -2820,9 +2838,19 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_giveaway_awarded_body_group" = "Check your groups' {link} to see how gifts boosted your group.";
 "lng_giveaway_created_link" = "Statistics";
 
+"lng_giveaway_credits_options_title" = "Stars to distribute";
+"lng_giveaway_credits_option_status#one" = "{count} per user";
+"lng_giveaway_credits_option_status#other" = "{count} per user";
+"lng_giveaway_credits_options_about" = "Choose how many stars to give away and how many boosts to receive for 1 year.";
+"lng_giveaway_credits_quantity_title" = "Number of winners";
+"lng_giveaway_credits_quantity_about" = "Choose how many winners you want to distribute stars among.";
+
 "lng_prize_title" = "Congratulations!";
 "lng_prize_about" = "You won a prize in a giveaway organized by {channel}.";
 "lng_prize_duration" = "Your prize is a **Telegram Premium** subscription {duration}.";
+"lng_prize_credits" = "Your prize is {amount}.";
+"lng_prize_credits_amount#one" = "{count} Star";
+"lng_prize_credits_amount#other" = "{count} Stars";
 "lng_prize_gift_about" = "You've received a gift from {channel}.";
 "lng_prize_gift_duration" = "Your gift is a **Telegram Premium** subscription {duration}.";
 "lng_prize_open" = "Open Gift Link";
@@ -2837,6 +2865,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_prizes_additional_with" = "with";
 "lng_prizes_about#one" = "**{count}** Telegram Premium Subscription {duration}.";
 "lng_prizes_about#other" = "**{count}** Telegram Premium Subscriptions {duration}.";
+"lng_prizes_credits_about_single" = "**{amount}** will be distributed to the **1** winner.";
+"lng_prizes_credits_about#one" = "**{amount}** will be distributed among {count} winner.";
+"lng_prizes_credits_about#other" = "**{amount}** will be distributed among {count} winners.";
+"lng_prizes_credits_about_amount#one" = "{count} Star";
+"lng_prizes_credits_about_amount#other" = "{count} Stars";
 "lng_prizes_participants" = "Participants";
 "lng_prizes_participants_all#one" = "All subscribers of the channel:";
 "lng_prizes_participants_all#other" = "All subscribers of the channels:";
@@ -2863,6 +2896,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_prizes_admins#other" = "the admins of {channel}, who aquired **{count} Telegram Premium** subscriptions {duration} for its followers";
 "lng_prizes_admins_group#one" = "the admins of {channel}, who aquired **{count} Telegram Premium** subscription {duration} for its members";
 "lng_prizes_admins_group#other" = "the admins of {channel}, who aquired **{count} Telegram Premium** subscriptions {duration} for its members";
+"lng_prizes_credits_admins" = "the admins of {channel}, who aquired **{amount}** for its followers";
+"lng_prizes_credits_admins_group" = "the admins of {channel}, who aquired **{amount}** for its members";
+"lng_prizes_credits_admins_amount#one" = "{count} Star";
+"lng_prizes_credits_admins_amount#other" = "{count} Stars";
 "lng_prizes_additional_added#one" = "{channel} also included **{count} {prize}** in the prize. Admins of the channel are responsible for delivering this prize.";
 "lng_prizes_additional_added#other" = "{channel} also included **{count} {prize}** in the prizes. Admins of the channel are responsible for delivering these prizes.";
 "lng_prizes_additional_added_group#one" = "{channel} also included **{count} {prize}** in the prize. Admins of the group are responsible for delivering this prize.";
@@ -2893,6 +2930,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_prizes_how_yes_joined_one" = "You are participating in this giveaway, because you have joined {channel}.";
 "lng_prizes_how_yes_joined_many" = "You are participating in this giveaway, because you have joined {channel} (and other listed groups and channels).";
 "lng_prizes_you_won" = "You won a prize in this giveaway {cup}";
+"lng_prizes_you_won_credits" = "You won {amount} in this giveaway {cup}";
+"lng_prizes_you_won_credits_amount#one" = "{count} Star";
+"lng_prizes_you_won_credits_amount#other" = "{count} Stars";
 "lng_prizes_view_prize" = "View my prize";
 "lng_prizes_you_didnt" = "You didn't win a prize in this giveaway.";
 "lng_prizes_cancelled" = "The channel cancelled the prizes by reversing the payment for them.";
@@ -2910,6 +2950,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_prizes_results_more#other" = "and {count} more!";
 "lng_prizes_results_one" = "The winner received their gift link in a private message.";
 "lng_prizes_results_all" = "All winners received gift links in private messages.";
+"lng_prizes_credits_results_one#one" = "The winner received {count} Star.";
+"lng_prizes_credits_results_one#other" = "The winner received {count} Stars.";
+"lng_prizes_credits_results_all#one" = "All winners received {count} Star in total.";
+"lng_prizes_credits_results_all#other" = "All winners received {count} Stars in total.";
 "lng_prizes_results_some" = "Some winners couldn't be selected.";
 
 "lng_gift_link_title" = "Gift Link";
@@ -2942,6 +2986,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_gift_stars_title#other" = "{count} Stars";
 "lng_gift_stars_outgoing" = "With Stars, {user} will be able to unlock content and services on Telegram.";
 "lng_gift_stars_incoming" = "Use Stars to unlock content and services on Telegram.";
+"lng_gift_until" = "Until";
 
 "lng_accounts_limit_title" = "Limit Reached";
 "lng_accounts_limit1#one" = "You have reached the limit of **{count}** connected accounts.";
@@ -4374,6 +4419,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_admin_log_filter_invite_links" = "Invite links";
 "lng_admin_log_filter_members_removed" = "Leaving members";
 "lng_admin_log_filter_topics" = "Topics";
+"lng_admin_log_filter_sub_extend" = "Subscription Renewals";
 "lng_admin_log_filter_all_admins" = "All users and admins";
 "lng_admin_log_filter_actions_admins_subtitle" = "Filter actions by admins";
 "lng_admin_log_filter_actions_admins_section" = "Show Actions by All Admins";
@@ -4556,6 +4602,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_admin_log_admin_manage_calls" = "Manage voice chats";
 "lng_admin_log_admin_manage_calls_channel" = "Manage live streams";
 "lng_admin_log_admin_add_admins" = "Add new admins";
+"lng_admin_log_subscription_extend" = "{name} renewed subscription until {date}";
 
 "lng_admin_log_antispam_menu_report" = "Report False Positive";
 "lng_admin_log_antispam_menu_report_toast" = "You can manage anti-spam settings in {link}.";
@@ -5354,6 +5401,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_boosts_prepaid_giveaway_moths#other" = "{count}-month subscriptions";
 "lng_boosts_prepaid_giveaway_status#one" = "{count} subscription {duration}";
 "lng_boosts_prepaid_giveaway_status#other" = "{count} subscriptions {duration}";
+"lng_boosts_prepaid_giveaway_credits_status#one" = "{amount} among {count} winner.";
+"lng_boosts_prepaid_giveaway_credits_status#other" = "{amount} among {count} winners.";
 
 "lng_channel_earn_title" = "Monetization";
 "lng_channel_earn_about" = "Telegram shares 50% of the revenue from ads displayed in your channel. {link}";

@@ -23,6 +23,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/statistics/info_statistics_inner_widget.h" // FillLoading.
 #include "info/statistics/info_statistics_list_controllers.h"
 #include "lang/lang_keys.h"
+#include "settings/settings_credits_graphics.h"
 #include "statistics/widgets/chart_header_widget.h"
 #include "ui/boxes/boost_box.h"
 #include "ui/controls/invite_link_label.h"
@@ -253,9 +254,11 @@ void FillGetBoostsButton(
 			(st.height + rect::m::sum::v(st.padding) - icon.height()) / 2,
 		})->show();
 	Ui::AddSkip(content);
-	Ui::AddDividerText(content, peer->isMegagroup()
-		? tr::lng_boosts_get_boosts_subtext_group()
-		: tr::lng_boosts_get_boosts_subtext());
+	Ui::AddDividerText(
+		content,
+		peer->isMegagroup()
+			? tr::lng_boosts_get_boosts_subtext_group()
+			: tr::lng_boosts_get_boosts_subtext());
 }
 
 } // namespace
@@ -334,6 +337,7 @@ void InnerWidget::fill() {
 	Ui::AddSkip(inner);
 
 	if (!status.prepaidGiveaway.empty()) {
+		constexpr auto kColorIndexCredits = int(1);
 		const auto multiplier = Api::PremiumGiftCodeOptions(_peer)
 			.giveawayBoostsPerPremium();
 		Ui::AddSkip(inner);
@@ -343,17 +347,30 @@ void InnerWidget::fill() {
 			using namespace Giveaway;
 			const auto button = inner->add(object_ptr<GiveawayTypeRow>(
 				inner,
-				GiveawayTypeRow::Type::Prepaid,
-				g.id,
-				tr::lng_boosts_prepaid_giveaway_quantity(
-					lt_count,
-					rpl::single(g.quantity) | tr::to_count()),
-				tr::lng_boosts_prepaid_giveaway_moths(
-					lt_count,
-					rpl::single(g.months) | tr::to_count()),
+				g.credits
+					? GiveawayTypeRow::Type::PrepaidCredits
+					: GiveawayTypeRow::Type::Prepaid,
+				g.credits ? kColorIndexCredits : g.id,
+				g.credits
+					? tr::lng_boosts_prepaid_giveaway_single()
+					: tr::lng_boosts_prepaid_giveaway_quantity(
+						lt_count,
+						rpl::single(g.quantity) | tr::to_count()),
+				g.credits
+					? tr::lng_boosts_prepaid_giveaway_credits_status(
+						lt_count,
+						rpl::single(g.quantity) | tr::to_count(),
+						lt_amount,
+						tr::lng_prize_credits_amount(
+							lt_count_decimal,
+							rpl::single(g.credits) | tr::to_count()))
+					: tr::lng_boosts_prepaid_giveaway_moths(
+						lt_count,
+						rpl::single(g.months) | tr::to_count()),
 				Info::Statistics::CreateBadge(
 					st::statisticsDetailsBottomCaptionStyle,
-					QString::number(g.quantity * multiplier),
+					QString::number(
+						g.boosts ? g.boosts : (g.quantity * multiplier)),
 					st::boostsListBadgeHeight,
 					st::boostsListBadgeTextPadding,
 					st::premiumButtonBg2,
@@ -397,6 +414,12 @@ void InnerWidget::fill() {
 						_controller->showPeerInfo(user);
 					});
 				}
+			} else if (boost.credits) {
+				_show->showBox(
+					Box(
+						::Settings::BoostCreditsBox,
+						_controller->parentController(),
+						boost));
 			} else if (!boost.isUnclaimed) {
 				_show->showToast(tr::lng_boosts_list_pending_about(tr::now));
 			}

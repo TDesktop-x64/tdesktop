@@ -57,6 +57,7 @@ struct CreditsHistoryEntry final {
 	uint64 credits = 0;
 	uint64 bareMsgId = 0;
 	uint64 barePeerId = 0;
+	uint64 bareGiveawayMsgId = 0;
 	PeerType peerType;
 	QDateTime subscriptionUntil;
 	QDateTime successDate;
@@ -79,5 +80,23 @@ struct CreditsStatusSlice final {
 	OffsetToken token;
 	OffsetToken tokenSubscriptions;
 };
+
+struct CreditsGiveawayOption final {
+	struct Winner final {
+		int users = 0;
+		uint64 perUserStars = 0;
+		bool isDefault = false;
+	};
+	std::vector<Winner> winners;
+	QString storeProduct;
+	QString currency;
+	uint64 amount = 0;
+	uint64 credits = 0;
+	int yearlyBoosts = 0;
+	bool isExtended = false;
+	bool isDefault = false;
+};
+
+using CreditsGiveawayOptions = std::vector<CreditsGiveawayOption>;
 
 } // namespace Data

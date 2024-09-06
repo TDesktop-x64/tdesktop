@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_credits.h"
 #include "api/api_statistics.h"
 #include "boxes/peer_list_controllers.h"
+#include "chat_helpers/stickers_gift_box_pack.h"
 #include "core/ui_integration.h" // Core::MarkedTextContext.
 #include "data/data_channel.h"
 #include "data/data_credits.h"
@@ -46,6 +47,7 @@ namespace Info::Statistics {
 namespace {
 
 using BoostCallback = Fn<void(const Data::Boost &)>;
+constexpr auto kColorIndexCredits = int(1);
 constexpr auto kColorIndexUnclaimed = int(3);
 constexpr auto kColorIndexPending = int(4);
 
@@ -478,6 +480,7 @@ private:
 	Ui::EmptyUserpic _userpic;
 	QImage _badge;
 	QImage _rightBadge;
+	PaintRoundImageCallback _paintUserpicCallback;
 
 };
 
@@ -492,7 +495,9 @@ BoostRow::BoostRow(const Data::Boost &boost)
 : PeerListRow(UniqueRowIdFromString(boost.id))
 , _boost(boost)
 , _userpic(
-	Ui::EmptyUserpic::UserpicColor(boost.isUnclaimed
+	Ui::EmptyUserpic::UserpicColor(boost.credits
+		? kColorIndexCredits
+		: boost.isUnclaimed
 		? kColorIndexUnclaimed
 		: kColorIndexPending),
 	QString()) {
@@ -500,8 +505,41 @@ BoostRow::BoostRow(const Data::Boost &boost)
 }
 
 void BoostRow::init() {
+	if (!PeerListRow::special()) {
+		_paintUserpicCallback = PeerListRow::generatePaintUserpicCallback(
+			false);
+	} else if (_boost.credits) {
+		const auto creditsIcon = std::make_shared<QImage>();
+		_paintUserpicCallback = [=](
+				Painter &p,
+				int x,
+				int y,
+				int outerWidth,
+				int size) mutable {
+			_userpic.paintCircle(p, x, y, outerWidth, size);
+			if (creditsIcon->isNull()) {
+				*creditsIcon = Ui::CreditsWhiteDoubledIcon(size, 1.);
+			}
+			p.drawImage(x, y, *creditsIcon);
+		};
+	} else {
+		_paintUserpicCallback = [=](
+				Painter &p,
+				int x,
+				int y,
+				int outerWidth,
+				int size) mutable {
+			_userpic.paintCircle(p, x, y, outerWidth, size);
+			(_boost.isUnclaimed
+				? st::boostsListUnclaimedIcon
+				: st::boostsListUnknownIcon).paintInCenter(
+					p,
+					Rect(x, y, Size(size)));
+		};
+	}
+
 	invalidateBadges();
-	auto status = !PeerListRow::special()
+	auto status = (!PeerListRow::special() || _boost.credits)
 		? tr::lng_boosts_list_status(
 			tr::now,
 			lt_date,
@@ -521,23 +559,18 @@ const Data::Boost &BoostRow::boost() const {
 QString BoostRow::generateName() {
 	return !PeerListRow::special()
 		? PeerListRow::generateName()
+		: _boost.credits
+		? tr::lng_giveaway_prizes_additional_credits_amount(
+			tr::now,
+			lt_count_decimal,
+			_boost.credits)
 		: _boost.isUnclaimed
 		? tr::lng_boosts_list_unclaimed(tr::now)
 		: tr::lng_boosts_list_pending(tr::now);
 }
 
 PaintRoundImageCallback BoostRow::generatePaintUserpicCallback(bool force) {
-	if (!PeerListRow::special()) {
-		return PeerListRow::generatePaintUserpicCallback(force);
-	}
-	return [=](Painter &p, int x, int y, int outerWidth, int size) mutable {
-		_userpic.paintCircle(p, x, y, outerWidth, size);
-		(_boost.isUnclaimed
-			? st::boostsListUnclaimedIcon
-			: st::boostsListUnknownIcon).paintInCenter(
-				p,
-				Rect(x, y, Size(size)));
-	};
+	return _paintUserpicCallback;
 }
 
 void BoostRow::invalidateBadges() {
@@ -561,7 +594,7 @@ void BoostRow::invalidateBadges() {
 	const auto &rightIcon = _boost.isGiveaway
 		? st::boostsListGiveawayMiniIcon
 		: st::boostsListGiftMiniIcon;
-	_rightBadge = (_boost.isGift || _boost.isGiveaway)
+	_rightBadge = ((_boost.isGift || _boost.isGiveaway) && !_boost.credits)
 		? CreateBadge(
 			st::boostsListRightBadgeTextStyle,
 			_boost.isGiveaway
@@ -810,7 +843,7 @@ void CreditsRow::init() {
 	const auto name = !isSpecial
 		? PeerListRow::generateName()
 		: Ui::GenerateEntryName(_entry).text;
-	_name = _entry.reaction
+	_name = (_entry.reaction || _entry.bareGiveawayMsgId)
 		? Ui::GenerateEntryName(_entry).text
 		: _entry.title.isEmpty()
 		? name
@@ -1041,7 +1074,13 @@ void CreditsController::applySlice(const Data::CreditsStatusSlice &slice) {
 			return std::make_unique<CreditsRow>(descriptor);
 		}
 	};
+
+	auto giftPacksRequested = false;
 	for (const auto &item : slice.list) {
+		if (item.bareGiveawayMsgId && !giftPacksRequested) {
+			giftPacksRequested = true;
+			session().giftBoxStickersPacks().load();
+		}
 		delegate()->peerListAppendRow(create(item, {}));
 	}
 	for (const auto &item : slice.subscriptions) {

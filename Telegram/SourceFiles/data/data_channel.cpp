@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_channel.h"
 
+#include "api/api_global_privacy.h"
 #include "data/data_peer_values.h"
 #include "data/data_changes.h"
 #include "data/data_channel_admins.h"
@@ -994,6 +995,9 @@ PeerId ChannelData::groupCallDefaultJoinAs() const {
 
 void ChannelData::setAllowedReactions(Data::AllowedReactions value) {
 	if (_allowedReactions != value) {
+		if (value.paidEnabled) {
+			session().api().globalPrivacy().loadPaidReactionAnonymous();
+		}
 		const auto enabled = [](const Data::AllowedReactions &allowed) {
 			return (allowed.type != Data::AllowedReactionsType::Some)
 				|| !allowed.some.empty()

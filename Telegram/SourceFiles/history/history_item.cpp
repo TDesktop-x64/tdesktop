@@ -2577,7 +2577,7 @@ bool HistoryItem::canReact() const {
 	return true;
 }
 
-void HistoryItem::addPaidReaction(int count, bool anonymous) {
+void HistoryItem::addPaidReaction(int count, std::optional<bool> anonymous) {
 	Expects(count >= 0);
 	Expects(_history->peer->isBroadcast() || isDiscussionPost());
 
@@ -2704,9 +2704,11 @@ auto HistoryItem::topPaidReactionsWithLocal() const
 	const auto i = ranges::find_if(
 		result,
 		[](const TopPaid &entry) { return entry.my != 0; });
-	const auto peer = _reactions->localPaidAnonymous()
-		? nullptr
-		: history()->session().user().get();
+	const auto peerForMine = [&] {
+		return _reactions->localPaidAnonymous()
+			? nullptr
+			: history()->session().user().get();
+	};
 	if (const auto local = _reactions->localPaidCount()) {
 		const auto top = [&](int mine) {
 			return ranges::count_if(result, [&](const TopPaid &entry) {
@@ -2715,18 +2717,18 @@ auto HistoryItem::topPaidReactionsWithLocal() const
 		};
 		if (i != end(result)) {
 			i->count += local;
-			i->peer = peer;
+			i->peer = peerForMine();
 			i->top = top(i->count) ? 1 : 0;
 		} else {
 			result.push_back({
-				.peer = peer,
+				.peer = peerForMine(),
 				.count = uint32(local),
 				.top = uint32(top(local) ? 1 : 0),
 				.my = uint32(1),
 			});
 		}
 	} else if (i != end(result)) {
-		i->peer = peer;
+		i->peer = peerForMine();
 	}
 	return result;
 }
@@ -5204,15 +5206,30 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 	};
 
 	auto prepareGiveawayLaunch = [&](const MTPDmessageActionGiveawayLaunch &action) {
+		const auto credits = action.vstars().value_or_empty();
 		auto result = PreparedServiceText();
 		result.links.push_back(fromLink());
-		result.text = (_history->peer->isMegagroup()
-			? tr::lng_action_giveaway_started_group
-			: tr::lng_action_giveaway_started)(
-				tr::now,
-				lt_from,
-				fromLinkText(), // Link 1.
-				Ui::Text::WithEntities);
+		result.text = credits
+			? (_history->peer->isMegagroup()
+				? tr::lng_action_giveaway_credits_started_group
+				: tr::lng_action_giveaway_credits_started)(
+					tr::now,
+					lt_from,
+					fromLinkText(), // Link 1.
+					lt_amount,
+					tr::lng_action_giveaway_credits_started_amount(
+						tr::now,
+						lt_count_decimal,
+						float64(credits),
+						Ui::Text::Bold),
+					Ui::Text::WithEntities)
+			: (_history->peer->isMegagroup()
+				? tr::lng_action_giveaway_started_group
+				: tr::lng_action_giveaway_started)(
+					tr::now,
+					lt_from,
+					fromLinkText(), // Link 1.
+					Ui::Text::WithEntities);
 		return result;
 	};
 
@@ -5220,15 +5237,20 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 		auto result = PreparedServiceText();
 		const auto winners = action.vwinners_count().v;
 		const auto unclaimed = action.vunclaimed_count().v;
+		const auto credits = action.is_stars();
 		result.text = {
 			(!winners
 				? tr::lng_action_giveaway_results_none(tr::now)
-				: unclaimed
+				: (credits && unclaimed)
+				? tr::lng_action_giveaway_results_credits_some(tr::now)
+				: (!credits && unclaimed)
 				? tr::lng_action_giveaway_results_some(tr::now)
-				: tr::lng_action_giveaway_results(
+				: (credits && !unclaimed)
+				? tr::lng_action_giveaway_results_credits(
 					tr::now,
 					lt_count,
-					winners))
+					winners)
+				: tr::lng_action_giveaway_results(tr::now, lt_count, winners))
 		};
 		return result;
 	};
@@ -5289,6 +5311,22 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 		return result;
 	};
 
+	auto prepareGiftPrize = [&](
+			const MTPDmessageActionPrizeStars &action) {
+		auto result = PreparedServiceText();
+		_history->session().giftBoxStickersPacks().load();
+		result.text = {
+			(action.is_unclaimed()
+				? tr::lng_prize_unclaimed_about
+				: tr::lng_prize_about)(
+					tr::now,
+					lt_channel,
+					_from->owner().peer(
+						peerFromMTP(action.vboost_peer()))->name()),
+		};
+		return result;
+	};
+
 	setServiceText(action.match(
 		prepareChatAddUserText,
 		prepareChatJoinedByLink,
@@ -5333,6 +5371,7 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 		prepareBoostApply,
 		preparePaymentRefunded,
 		prepareGiftStars,
+		prepareGiftPrize,
 		PrepareEmptyText<MTPDmessageActionRequestedPeerSentMe>,
 		PrepareErrorText<MTPDmessageActionEmpty>));
 
@@ -5429,8 +5468,22 @@ void HistoryItem::applyAction(const MTPMessageAction &action) {
 		_media = std::make_unique<Data::MediaGiftBox>(
 			this,
 			_from,
-			Data::GiftType::Stars,
+			Data::GiftType::Credits,
 			data.vstars().v);
+	}, [&](const MTPDmessageActionPrizeStars &data) {
+		_media = std::make_unique<Data::MediaGiftBox>(
+			this,
+			_from,
+			Data::GiftCode{
+				.slug = qs(data.vtransaction_id()),
+				.channel = history()->owner().channel(
+					peerToChannel(peerFromMTP(data.vboost_peer()))),
+				.count = int(data.vstars().v),
+				.giveawayMsgId = data.vgiveaway_msg_id().v,
+				.type = Data::GiftType::Credits,
+				.viaGiveaway = true,
+				.unclaimed = data.is_unclaimed(),
+			});
 	}, [](const auto &) {
 	});
 }

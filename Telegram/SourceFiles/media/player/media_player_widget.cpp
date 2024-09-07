@@ -690,7 +690,7 @@ void Widget::handleSongChange() {
 			const auto date = [item] {
 				const auto parsed = ItemDateTime(item);
 				const auto date = parsed.date();
-				const auto time = QLocale().toString(parsed.time(), GetEnhancedBool("show_seconds") ? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t") : QLocale::system().timeFormat(QLocale::ShortFormat));
+				const auto time = QLocale().toString(parsed.time(), GetEnhancedBool("show_seconds") ? QLocale::system().timeFormat(QLocale::LongFormat).remove("t") : QLocale::system().timeFormat(QLocale::ShortFormat));
 				const auto today = QDateTime::currentDateTime().date();
 				if (date == today) {
 					return tr::lng_player_message_today(

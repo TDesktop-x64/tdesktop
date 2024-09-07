@@ -412,7 +412,7 @@ void BottomInfo::layoutDateText() {
 	const auto prefix = !author.isEmpty() ? u", "_q : QString();
 	const auto date = edited + QLocale().toString(
 		_data.date.time(),
-		GetEnhancedBool("show_seconds") ? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t") : QLocale::system().timeFormat(QLocale::ShortFormat)) + _data.msgId;
+		GetEnhancedBool("show_seconds") ? QLocale::system().timeFormat(QLocale::LongFormat).remove("t") : QLocale::system().timeFormat(QLocale::ShortFormat)) + _data.msgId;
 	const auto afterAuthor = prefix + date;
 	const auto afterAuthorWidth = st::msgDateFont->width(afterAuthor);
 	const auto authorWidth = st::msgDateFont->width(author);

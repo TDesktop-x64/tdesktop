@@ -499,7 +499,7 @@ QString FormatDialogsDate(const QDateTime &lastTime, bool showSeconds) {
 
 	if ((lastDate == nowDate)
 		|| (std::abs(lastTime.secsTo(now)) < kRecentlyInSeconds)) {
-		return QLocale().toString(lastTime.time(), showSeconds ? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t") : QLocale::system().timeFormat(QLocale::ShortFormat));
+		return QLocale().toString(lastTime.time(), showSeconds ? QLocale::system().timeFormat(QLocale::LongFormat).remove("t") : QLocale::system().timeFormat(QLocale::ShortFormat));
 	} else if (std::abs(lastDate.daysTo(nowDate)) < 7) {
 		return langDayOfWeek(lastDate);
 	} else {

@@ -246,6 +246,9 @@ void Stories::apply(not_null<PeerData*> peer, const MTPPeerStories *data) {
 }
 
 Story *Stories::applySingle(PeerId peerId, const MTPstoryItem &story) {
+	if (GetEnhancedBool("hide_stories")) {
+		return nullptr;
+	}
 	const auto idDates = parseAndApply(
 		_owner->peer(peerId),
 		story,
@@ -1633,6 +1636,9 @@ bool Stories::savedLoaded(PeerId peerId) const {
 }
 
 void Stories::archiveLoadMore(PeerId peerId) {
+	if (GetEnhancedBool("hide_stories")) {
+		return;
+	}
 	const auto peer = _owner->peer(peerId);
 	const auto archive = lookupArchive(peer);
 	if (!archive || archive->requestId || archive->loaded) {

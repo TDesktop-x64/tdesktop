@@ -1059,6 +1059,9 @@ void Widget::setupStories() {
 }
 
 void Widget::storiesToggleExplicitExpand(bool expand) {
+	if (GetEnhancedBool("hide_stories")) {
+		return;
+	}
 	if (_storiesExplicitExpand == expand) {
 		return;
 	}
@@ -1399,7 +1402,7 @@ void Widget::changeOpenedFolder(Data::Folder *folder, anim::type animated) {
 		controller()->closeForum();
 		_openedFolder = folder;
 		_inner->changeOpenedFolder(folder);
-		if (_stories) {
+		if (!GetEnhancedBool("hide_stories") && _stories) {
 			storiesExplicitCollapse();
 		}
 	}, (folder != nullptr), animated);
@@ -1800,6 +1803,9 @@ void Widget::stopWidthAnimation() {
 void Widget::updateStoriesVisibility() {
 	updateLockUnlockVisibility();
 	if (!_stories) {
+		return;
+	}
+	if (GetEnhancedBool("hide_stories")) {
 		return;
 	}
 	const auto hidden = (_showAnimation != nullptr)

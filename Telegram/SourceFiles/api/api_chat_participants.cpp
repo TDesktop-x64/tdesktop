@@ -8,7 +8,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_chat_participants.h"
 
 #include "apiwrap.h"
-#include "base/unixtime.h"
 #include "boxes/add_contact_box.h" // ShowAddParticipantsError
 #include "boxes/peers/add_participants_box.h" // ChatInviteForbidden
 #include "data/data_changes.h"
@@ -265,22 +264,24 @@ ChatParticipant::ChatParticipant(
 		_rank = qs(data.vrank().value_or_empty());
 		_rights = ChatAdminRightsInfo(data.vadmin_rights());
 		_by = peerToUser(peerFromUser(data.vpromoted_by()));
+		_date = data.vdate().v;
 	}, [&](const MTPDchannelParticipantSelf &data) {
 		_type = Type::Member;
+		_date = data.vdate().v;
 		_by = peerToUser(peerFromUser(data.vinviter_id()));
 		if (data.vsubscription_until_date()) {
-			_subscriptionDate = base::unixtime::parse(
-				data.vsubscription_until_date()->v);
+			_subscriptionDate = data.vsubscription_until_date()->v;
 		}
 	}, [&](const MTPDchannelParticipant &data) {
 		_type = Type::Member;
+		_date = data.vdate().v;
 		if (data.vsubscription_until_date()) {
-			_subscriptionDate = base::unixtime::parse(
-				data.vsubscription_until_date()->v);
+			_subscriptionDate = data.vsubscription_until_date()->v;
 		}
 	}, [&](const MTPDchannelParticipantBanned &data) {
 		_restrictions = ChatRestrictionsInfo(data.vbanned_rights());
 		_by = peerToUser(peerFromUser(data.vkicked_by()));
+		_date = data.vdate().v;
 
 		_type = (_restrictions.flags & ChatRestriction::ViewMessages)
 			? Type::Banned
@@ -357,8 +358,22 @@ ChatAdminRightsInfo ChatParticipant::rights() const {
 	return _rights;
 }
 
-QDateTime ChatParticipant::subscriptionDate() const {
+TimeId ChatParticipant::subscriptionDate() const {
 	return _subscriptionDate;
+}
+
+TimeId ChatParticipant::promotedSince() const {
+	return (_type == Type::Admin) ? _date : TimeId(0);
+}
+
+TimeId ChatParticipant::restrictedSince() const {
+	return (_type == Type::Restricted || _type == Type::Banned)
+		? _date
+		: TimeId(0);
+}
+
+TimeId ChatParticipant::memberSince() const {
+	return (_type == Type::Member) ? _date : TimeId(0);
 }
 
 ChatParticipant::Type ChatParticipant::type() const {

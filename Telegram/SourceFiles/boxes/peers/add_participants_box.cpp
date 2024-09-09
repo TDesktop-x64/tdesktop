@@ -1276,7 +1276,9 @@ void AddSpecialBoxController::showAdmin(
 		_peer,
 		user,
 		currentRights,
-		_additional.adminRank(user));
+		_additional.adminRank(user),
+		_additional.adminPromotedSince(user),
+		_additional.adminPromotedBy(user));
 	const auto show = delegate()->peerListUiShow();
 	if (_additional.canAddOrEditAdmin(user)) {
 		const auto done = crl::guard(this, [=](
@@ -1354,7 +1356,9 @@ void AddSpecialBoxController::showRestricted(
 		_peer,
 		user,
 		_additional.adminRights(user).has_value(),
-		currentRights);
+		currentRights,
+		_additional.restrictedBy(user),
+		_additional.restrictedSince(user));
 	if (_additional.canRestrictParticipant(user)) {
 		const auto done = crl::guard(this, [=](
 				ChatRestrictionsInfo newRights) {

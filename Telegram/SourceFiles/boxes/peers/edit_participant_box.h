@@ -79,6 +79,8 @@ public:
 		not_null<UserData*> user,
 		ChatAdminRightsInfo rights,
 		const QString &rank,
+		TimeId promotedSince,
+		UserData *by,
 		std::optional<EditAdminBotFields> addingBot = {});
 
 	void setSaveCallback(
@@ -110,7 +112,6 @@ private:
 	}
 	void finishAddAdmin();
 	void refreshButtons();
-	void refreshAboutAddAdminsText(bool canAddAdmins);
 	bool canTransferOwnership() const;
 	not_null<Ui::SlideWrap<Ui::RpWidget>*> setupTransferButton(
 		not_null<Ui::VerticalLayout*> container,
@@ -127,11 +128,12 @@ private:
 	Ui::Checkbox *_addAsAdmin = nullptr;
 	Ui::SlideWrap<Ui::VerticalLayout> *_adminControlsWrap = nullptr;
 	Ui::InputField *_rank = nullptr;
-	QPointer<Ui::FlatLabel> _aboutAddAdmins;
 	mtpRequestId _checkTransferRequestId = 0;
 	mtpRequestId _transferRequestId = 0;
 	Fn<void()> _save, _finishSave;
 
+	TimeId _promotedSince = 0;
+	UserData *_by = nullptr;
 	std::optional<EditAdminBotFields> _addingBot;
 
 };
@@ -146,7 +148,9 @@ public:
 		not_null<PeerData*> peer,
 		not_null<UserData*> user,
 		bool hasAdminRights,
-		ChatRestrictionsInfo rights);
+		ChatRestrictionsInfo rights,
+		UserData *by,
+		TimeId since);
 
 	void setSaveCallback(
 			Fn<void(ChatRestrictionsInfo, ChatRestrictionsInfo)> callback) {
@@ -170,6 +174,8 @@ private:
 	TimeId getRealUntilValue() const;
 
 	const ChatRestrictionsInfo _oldRights;
+	UserData *_by = nullptr;
+	TimeId _since = 0;
 	TimeId _until = 0;
 	Fn<void(ChatRestrictionsInfo, ChatRestrictionsInfo)> _saveCallback;
 

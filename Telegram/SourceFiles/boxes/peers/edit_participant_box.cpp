@@ -206,6 +206,8 @@ EditAdminBox::EditAdminBox(
 	not_null<UserData*> user,
 	ChatAdminRightsInfo rights,
 	const QString &rank,
+	TimeId promotedSince,
+	UserData *by,
 	std::optional<EditAdminBotFields> addingBot)
 : EditParticipantBox(
 	nullptr,
@@ -214,6 +216,8 @@ EditAdminBox::EditAdminBox(
 	(rights.flags != 0))
 , _oldRights(rights)
 , _oldRank(rank)
+, _promotedSince(promotedSince)
+, _by(by)
 , _addingBot(std::move(addingBot)) {
 }
 
@@ -288,8 +292,26 @@ void EditAdminBox::prepare() {
 			object_ptr<Ui::VerticalLayout>(this)));
 	const auto inner = _adminControlsWrap->entity();
 
-	Ui::AddDivider(inner);
-	Ui::AddSkip(inner);
+	if (_promotedSince) {
+		const auto parsed = base::unixtime::parse(_promotedSince);
+		const auto label = Ui::AddDividerText(
+			inner,
+			tr::lng_rights_about_by(
+				lt_user,
+				rpl::single(_by
+					? Ui::Text::Link(_by->name(), 1)
+					: TextWithEntities{ QString::fromUtf8("\U0001F47B") }),
+				lt_date,
+				rpl::single(TextWithEntities{ langDateTimeFull(parsed) }),
+				Ui::Text::WithEntities));
+		if (_by) {
+			label->setLink(1, _by->createOpenLink());
+		}
+		Ui::AddSkip(inner);
+	} else {
+		Ui::AddDivider(inner);
+		Ui::AddSkip(inner);
+	}
 
 	const auto chat = peer()->asChat();
 	const auto channel = peer()->asChannel();
@@ -356,17 +378,47 @@ void EditAdminBox::prepare() {
 	) | rpl::then(std::move(
 		changes
 	));
-	_aboutAddAdmins = inner->add(
-		object_ptr<Ui::FlatLabel>(inner, st::boxDividerLabel),
-		st::rightsAboutMargin);
-	rpl::duplicate(
-		selectedFlags
-	) | rpl::map(
-		(_1 & Flag::AddAdmins) != 0
-	) | rpl::distinct_until_changed(
-	) | rpl::start_with_next([=](bool checked) {
-		refreshAboutAddAdminsText(checked);
-	}, lifetime());
+
+	const auto hasRank = canSave() && (chat || channel->isMegagroup());
+
+	{
+		const auto aboutAddAdminsInner = inner->add(
+			object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+				inner,
+				object_ptr<Ui::VerticalLayout>(inner)));
+		const auto emptyAboutAddAdminsInner = inner->add(
+			object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+				inner,
+				object_ptr<Ui::VerticalLayout>(inner)));
+		aboutAddAdminsInner->toggle(false, anim::type::instant);
+		emptyAboutAddAdminsInner->toggle(false, anim::type::instant);
+		Ui::AddSkip(emptyAboutAddAdminsInner->entity());
+		if (hasRank) {
+			Ui::AddDivider(emptyAboutAddAdminsInner->entity());
+			Ui::AddSkip(emptyAboutAddAdminsInner->entity());
+		}
+		Ui::AddSkip(aboutAddAdminsInner->entity());
+		Ui::AddDividerText(
+			aboutAddAdminsInner->entity(),
+			rpl::duplicate(
+				selectedFlags
+			) | rpl::map(
+				(_1 & Flag::AddAdmins) != 0
+			) | rpl::distinct_until_changed(
+			) | rpl::map([=](bool canAddAdmins) -> rpl::producer<QString> {
+				const auto empty = (amCreator() && user()->isSelf());
+				aboutAddAdminsInner->toggle(!empty, anim::type::instant);
+				emptyAboutAddAdminsInner->toggle(empty, anim::type::instant);
+				if (empty) {
+					return rpl::single(QString());
+				} else if (!canSave()) {
+					return tr::lng_rights_about_admin_cant_edit();
+				} else if (canAddAdmins) {
+					return tr::lng_rights_about_add_admins_yes();
+				}
+				return tr::lng_rights_about_add_admins_no();
+			}) | rpl::flatten_latest());
+	}
 
 	if (canTransferOwnership()) {
 		const auto allFlags = AdminRightsForOwnershipTransfer(options);
@@ -381,9 +433,7 @@ void EditAdminBox::prepare() {
 	}
 
 	if (canSave()) {
-		_rank = (chat || channel->isMegagroup())
-			? addRankInput(inner).get()
-			: nullptr;
+		_rank = hasRank ? addRankInput(inner).get() : nullptr;
 		_finishSave = [=, value = getChecked] {
 			const auto newFlags = (value() | ChatAdminRight::Other)
 				& ((!channel || channel->amCreator())
@@ -449,7 +499,7 @@ void EditAdminBox::refreshButtons() {
 
 not_null<Ui::InputField*> EditAdminBox::addRankInput(
 		not_null<Ui::VerticalLayout*> container) {
-	Ui::AddDivider(container);
+	// Ui::AddDivider(container);
 
 	container->add(
 		object_ptr<Ui::FlatLabel>(
@@ -486,14 +536,13 @@ not_null<Ui::InputField*> EditAdminBox::addRankInput(
 		}
 	}, result->lifetime());
 
-	container->add(
-		object_ptr<Ui::FlatLabel>(
-			container,
-			tr::lng_rights_edit_admin_rank_about(
-				lt_title,
-				(isOwner ? tr::lng_owner_badge : tr::lng_admin_badge)()),
-			st::boxDividerLabel),
-		st::rightsAboutMargin);
+	Ui::AddSkip(container);
+	Ui::AddDividerText(
+		container,
+		tr::lng_rights_edit_admin_rank_about(
+			lt_title,
+			(isOwner ? tr::lng_owner_badge : tr::lng_admin_badge)()));
+	Ui::AddSkip(container);
 
 	return result;
 }
@@ -687,27 +736,18 @@ void EditAdminBox::sendTransferRequestFrom(
 	})).handleFloodErrors().send();
 }
 
-void EditAdminBox::refreshAboutAddAdminsText(bool canAddAdmins) {
-	_aboutAddAdmins->setText([&] {
-		if (amCreator() && user()->isSelf()) {
-			return QString();
-		} else if (!canSave()) {
-			return tr::lng_rights_about_admin_cant_edit(tr::now);
-		} else if (canAddAdmins) {
-			return tr::lng_rights_about_add_admins_yes(tr::now);
-		}
-		return tr::lng_rights_about_add_admins_no(tr::now);
-	}());
-}
-
 EditRestrictedBox::EditRestrictedBox(
 	QWidget*,
 	not_null<PeerData*> peer,
 	not_null<UserData*> user,
 	bool hasAdminRights,
-	ChatRestrictionsInfo rights)
+	ChatRestrictionsInfo rights,
+	UserData *by,
+	TimeId since)
 : EditParticipantBox(nullptr, peer, user, hasAdminRights)
-, _oldRights(rights) {
+, _oldRights(rights)
+, _by(by)
+, _since(since) {
 }
 
 void EditRestrictedBox::prepare() {
@@ -781,6 +821,29 @@ void EditRestrictedBox::prepare() {
 	//		this,
 	//		tr::lng_rights_chat_banned_block(tr::now),
 	//		st::boxLinkButton));
+
+	if (_since) {
+		const auto parsed = base::unixtime::parse(_since);
+		const auto inner = addControl(object_ptr<Ui::VerticalLayout>(this));
+		const auto isBanned = (_oldRights.flags
+			& ChatRestriction::ViewMessages);
+		Ui::AddSkip(inner);
+		const auto label = Ui::AddDividerText(
+			inner,
+			(isBanned
+				? tr::lng_rights_chat_banned_by
+				: tr::lng_rights_chat_restricted_by)(
+					lt_user,
+					rpl::single(_by
+						? Ui::Text::Link(_by->name(), 1)
+						: TextWithEntities{ QString::fromUtf8("\U0001F47B") }),
+					lt_date,
+					rpl::single(TextWithEntities{ langDateTimeFull(parsed) }),
+					Ui::Text::WithEntities));
+		if (_by) {
+			label->setLink(1, _by->createOpenLink());
+		}
+	}
 
 	if (canSave()) {
 		const auto save = [=, value = getRestrictions] {

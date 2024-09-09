@@ -60,7 +60,10 @@ public:
 	ChatRestrictionsInfo restrictions() const;
 	ChatAdminRightsInfo rights() const;
 
-	QDateTime subscriptionDate() const;
+	TimeId subscriptionDate() const;
+	TimeId promotedSince() const;
+	TimeId restrictedSince() const;
+	TimeId memberSince() const;
 
 	Type type() const;
 	QString rank() const;
@@ -75,7 +78,8 @@ private:
 	bool _canBeEdited = false;
 
 	QString _rank;
-	QDateTime _subscriptionDate;
+	TimeId _subscriptionDate = 0;
+	TimeId _date = 0;
 
 	ChatRestrictionsInfo _restrictions;
 	ChatAdminRightsInfo _rights;

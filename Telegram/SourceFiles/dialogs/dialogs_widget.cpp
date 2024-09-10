@@ -1801,11 +1801,11 @@ void Widget::stopWidthAnimation() {
 }
 
 void Widget::updateStoriesVisibility() {
+	if (GetEnhancedBool("hide_stories")) {
+		_stories = nullptr;
+	}
 	updateLockUnlockVisibility();
 	if (!_stories) {
-		return;
-	}
-	if (GetEnhancedBool("hide_stories")) {
 		return;
 	}
 	const auto hidden = (_showAnimation != nullptr)

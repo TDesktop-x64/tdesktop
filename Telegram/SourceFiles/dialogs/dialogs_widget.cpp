@@ -1700,7 +1700,7 @@ void Widget::raiseWithTooltip() {
 	raise();
 	if (_stories) {
 		Ui::PostponeCall(this, [=] {
-			_stories->raiseTooltip();
+			if (_stories) _stories->raiseTooltip();
 		});
 	}
 }

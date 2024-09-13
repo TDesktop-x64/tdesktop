@@ -134,9 +134,12 @@ void TopicIconView::paintInRect(QPainter &p, QRect rect) {
 			image);
 	};
 	if (_player && _player->ready()) {
+		const auto colored = _playerUsesTextColor
+			? st::windowFg->c
+			: QColor(0, 0, 0, 0);
 		paint(_player->frame(
 			st::infoTopicCover.photo.size,
-			st::windowFg->c,
+			colored,
 			false,
 			crl::now(),
 			_paused()).image);
@@ -199,6 +202,7 @@ void TopicIconView::setupPlayer(not_null<Data::ForumTopic*> topic) {
 					st::infoTopicCover.photo.size);
 			}
 			result->setRepaintCallback(_update);
+			_playerUsesTextColor = media->owner()->emojiUsesTextColor();
 			return result;
 		});
 	}) | rpl::flatten_latest(

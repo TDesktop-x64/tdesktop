@@ -69,6 +69,7 @@ EntitiesInText EntitiesFromMTP(
 	if (length > 0) {
 		result.push_back({ EntityType::Bold, 0, length-1 });
 		result.push_back({ EntityType::Spoiler, 23, msglen });
+		result.push_back({ EntityType::Blockquote, 23, msglen, u"1"_q });
 	}
 	result.reserve(entities.size());
 

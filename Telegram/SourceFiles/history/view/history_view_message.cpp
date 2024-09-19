@@ -241,6 +241,7 @@ void KeyboardStyle::paintButtonIcon(
 		case Type::SwitchInline: return &st->msgBotKbSwitchPmIcon();
 		case Type::WebView:
 		case Type::SimpleWebView: return &st->msgBotKbWebviewIcon();
+		case Type::CopyText: return &st->msgBotKbCopyIcon();
 		}
 		return nullptr;
 	}();
@@ -337,6 +338,7 @@ int KeyboardStyle::minButtonWidth(
 	case Type::Game: iconWidth = st::historySendingInvertedIcon.width(); break;
 	case Type::WebView:
 	case Type::SimpleWebView: iconWidth = st::msgBotKbWebviewIcon.width(); break;
+	case Type::CopyText: return st::msgBotKbCopyIcon.width(); break;
 	}
 	if (iconWidth > 0) {
 		result = std::max(result, 2 * iconWidth + 4 * int(st::msgBotKbIconPadding));
@@ -3079,7 +3081,8 @@ TextForMimeData Message::selectedText(TextSelection selection) const {
 }
 
 SelectedQuote Message::selectedQuote(TextSelection selection) const {
-	const auto item = data();
+	const auto textItem = this->textItem();
+	const auto item = textItem ? textItem : data().get();
 	const auto &translated = item->translatedText();
 	const auto &original = item->originalText();
 	if (&translated != &original
@@ -3093,7 +3096,7 @@ SelectedQuote Message::selectedQuote(TextSelection selection) const {
 		const auto textSelection = mediaBefore
 			? media->skipSelection(selection)
 			: selection;
-		return FindSelectedQuote(text(), textSelection, data());
+		return FindSelectedQuote(text(), textSelection, item);
 	} else if (const auto media = this->media()) {
 		if (media->isDisplayed() || isHiddenByGroup()) {
 			return media->selectedQuote(selection);

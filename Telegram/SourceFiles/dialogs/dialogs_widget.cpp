@@ -923,6 +923,7 @@ void Widget::setupMainMenuToggle() {
 	}, lifetime());
 
 	Window::OtherAccountsUnreadState(
+		&controller()->session().account()
 	) | rpl::start_with_next([=](const Window::OthersUnreadState &state) {
 		const auto icon = !state.count
 			? nullptr

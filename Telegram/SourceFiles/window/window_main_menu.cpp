@@ -195,7 +195,7 @@ void ShowCallsBox(not_null<Window::SessionController*> window) {
 
 class MainMenu::ToggleAccountsButton final : public Ui::AbstractButton {
 public:
-	explicit ToggleAccountsButton(QWidget *parent);
+	ToggleAccountsButton(QWidget *parent, not_null<Main::Account*> current);
 
 	[[nodiscard]] int rightSkip() const {
 		return _rightSkip.current();
@@ -211,6 +211,7 @@ private:
 	void validateUnreadBadge();
 	[[nodiscard]] QString computeUnreadBadge() const;
 
+	const not_null<Main::Account*> _current;
 	rpl::variable<int> _rightSkip = 0;
 	Ui::Animations::Simple _toggledAnimation;
 	bool _toggled = false;
@@ -231,8 +232,11 @@ protected:
 
 };
 
-MainMenu::ToggleAccountsButton::ToggleAccountsButton(QWidget *parent)
-: AbstractButton(parent) {
+MainMenu::ToggleAccountsButton::ToggleAccountsButton(
+	QWidget *parent,
+	not_null<Main::Account*> current)
+: AbstractButton(parent)
+, _current(current) {
 	rpl::single(rpl::empty) | rpl::then(
 		Core::App().unreadBadgeChanges()
 	) | rpl::start_with_next([=] {
@@ -321,7 +325,7 @@ void MainMenu::ToggleAccountsButton::validateUnreadBadge() {
 }
 
 QString MainMenu::ToggleAccountsButton::computeUnreadBadge() const {
-	const auto state = OtherAccountsUnreadStateCurrent();
+	const auto state = OtherAccountsUnreadStateCurrent(_current);
 	return state.allMuted
 		? QString()
 		: (state.count > 0)
@@ -382,7 +386,7 @@ MainMenu::MainMenu(
 	this,
 	_controller->session().user(),
 	st::mainMenuUserpic)
-, _toggleAccounts(this)
+, _toggleAccounts(this, &controller->session().account())
 , _setEmojiStatus(this, SetStatusLabel(&controller->session()))
 , _emojiStatusPanel(std::make_unique<Info::Profile::EmojiStatusPanel>())
 , _badge(std::make_unique<Info::Profile::Badge>(
@@ -1013,13 +1017,13 @@ void MainMenu::initResetScaleButton() {
 	}, lifetime());
 }
 
-OthersUnreadState OtherAccountsUnreadStateCurrent() {
+OthersUnreadState OtherAccountsUnreadStateCurrent(
+		not_null<Main::Account*> current) {
 	auto &domain = Core::App().domain();
-	const auto active = &domain.active();
 	auto counter = 0;
 	auto allMuted = true;
 	for (const auto &[index, account] : domain.accounts()) {
-		if (account.get() == active) {
+		if (account.get() == current) {
 			continue;
 		} else if (const auto session = account->maybeSession()) {
 			counter += session->data().unreadBadge();
@@ -1034,10 +1038,13 @@ OthersUnreadState OtherAccountsUnreadStateCurrent() {
 	};
 }
 
-rpl::producer<OthersUnreadState> OtherAccountsUnreadState() {
+rpl::producer<OthersUnreadState> OtherAccountsUnreadState(
+		not_null<Main::Account*> current) {
 	return rpl::single(rpl::empty) | rpl::then(
 		Core::App().unreadBadgeChanges()
-	) | rpl::map(OtherAccountsUnreadStateCurrent);
+	) | rpl::map([=] {
+		return OtherAccountsUnreadStateCurrent(current);
+	});
 }
 
 } // namespace Window

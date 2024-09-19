@@ -433,7 +433,10 @@ SponsoredMessages::Details SponsoredMessages::lookupDetails(
 	};
 }
 
-void SponsoredMessages::clicked(const FullMsgId &fullId) {
+void SponsoredMessages::clicked(
+		const FullMsgId &fullId,
+		bool isMedia,
+		bool isFullscreen) {
 	const auto entryPtr = find(fullId);
 	if (!entryPtr) {
 		return;
@@ -441,7 +444,11 @@ void SponsoredMessages::clicked(const FullMsgId &fullId) {
 	const auto randomId = entryPtr->sponsored.randomId;
 	const auto channel = entryPtr->item->history()->peer->asChannel();
 	Assert(channel != nullptr);
+	using Flag = MTPchannels_ClickSponsoredMessage::Flag;
 	_session->api().request(MTPchannels_ClickSponsoredMessage(
+		MTP_flags(Flag(0)
+			| (isMedia ? Flag::f_media : Flag(0))
+			| (isFullscreen ? Flag::f_fullscreen : Flag(0))),
 		channel->inputChannel,
 		MTP_bytes(randomId)
 	)).send();

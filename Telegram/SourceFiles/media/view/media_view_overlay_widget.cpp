@@ -860,20 +860,12 @@ void OverlayWidget::moveToScreen(bool inMove) {
 	if (!_fullscreen || _wasWindowedMode) {
 		return;
 	}
-	const auto widgetScreen = [&](auto &&widget) -> QScreen* {
-		if (!widget) {
-			return nullptr;
-		}
-		if (const auto screen = QGuiApplication::screenAt(
-				widget->geometry().center())) {
-			return screen;
-		}
-		return widget->screen();
-	};
 	const auto applicationWindow = Core::App().activeWindow()
 		? Core::App().activeWindow()->widget().get()
 		: nullptr;
-	const auto activeWindowScreen = widgetScreen(applicationWindow);
+	const auto activeWindowScreen = applicationWindow
+		? applicationWindow->screen()
+		: nullptr;
 	const auto myScreen = _window->screen();
 	if (activeWindowScreen && myScreen != activeWindowScreen) {
 		const auto screenList = QGuiApplication::screens();
@@ -981,7 +973,7 @@ void OverlayWidget::savePosition() {
 
 void OverlayWidget::updateGeometry(bool inMove) {
 	initFullScreen();
-	if (_fullscreen && (!Platform::IsWindows11OrGreater() || !isHidden())) {
+	if (_fullscreen) {
 		updateGeometryToScreen(inMove);
 	} else if (_windowed && _normalGeometryInited) {
 		DEBUG_LOG(("Viewer Pos: Setting %1, %2, %3, %4")
@@ -1006,35 +998,15 @@ void OverlayWidget::updateGeometry(bool inMove) {
 
 void OverlayWidget::updateGeometryToScreen(bool inMove) {
 	const auto available = _window->screen()->geometry();
-	const auto openglWidget = _opengl
-		? static_cast<QOpenGLWidget*>(_widget.get())
-		: nullptr;
-	const auto possibleSizeHack = Platform::IsWindows() && openglWidget;
-	const auto useSizeHack = possibleSizeHack
-		&& (openglWidget->format().renderableType()
-			!= QSurfaceFormat::OpenGLES);
-	const auto use = useSizeHack
-		? available.marginsAdded({ 0, 0, 0, 1 })
-		: available;
-	const auto mask = useSizeHack
-		? QRegion(QRect(QPoint(), available.size()))
-		: QRegion();
-	if (inMove && use.contains(_window->geometry())) {
-		return;
-	}
-	if ((_window->geometry() == use)
-		&& (!possibleSizeHack || _window->mask() == mask)) {
+	if (_window->geometry() == available) {
 		return;
 	}
 	DEBUG_LOG(("Viewer Pos: Setting %1, %2, %3, %4")
-		.arg(use.x())
-		.arg(use.y())
-		.arg(use.width())
-		.arg(use.height()));
-	_window->setGeometry(use);
-	if (possibleSizeHack) {
-		_window->setMask(mask);
-	}
+		.arg(available.x())
+		.arg(available.y())
+		.arg(available.width())
+		.arg(available.height()));
+	_window->setGeometry(available);
 }
 
 void OverlayWidget::updateControlsGeometry() {
@@ -3756,14 +3728,16 @@ void OverlayWidget::initSponsoredButton() {
 	} else if (!has && !_sponsoredButton) {
 		return;
 	}
-	const auto &component = _session->sponsoredMessages();
-	const auto details = component.lookupDetails(_message->fullId());
+	const auto sponsoredMessages = &_session->sponsoredMessages();
+	const auto fullId = _message->fullId();
+	const auto details = sponsoredMessages->lookupDetails(fullId);
 	_sponsoredButton = base::make_unique_q<SponsoredButton>(_body);
 	_sponsoredButton->setText(details.buttonText);
 	_sponsoredButton->setOpacity(1.0);
 
 	_sponsoredButton->setClickedCallback([=, link = details.link] {
 		UrlClickHandler::Open(link);
+		sponsoredMessages->clicked(fullId, false, true);
 		hide();
 	});
 }
@@ -3819,9 +3793,6 @@ void OverlayWidget::showAndActivate() {
 		_wasWindowedMode = true;
 	} else if (_fullscreen) {
 		_window->showFullScreen();
-		if (Platform::IsWindows11OrGreater()) {
-			updateGeometry();
-		}
 	} else {
 		_window->showMaximized();
 	}
@@ -6064,7 +6035,18 @@ void OverlayWidget::handleMouseRelease(
 		if (_stories) {
 			_stories->contentPressed(false);
 		} else if (_streamed && !_window->mousePressCancelled()) {
-			playbackPauseResume();
+			if (_sponsoredButton && _session && _message) {
+				const auto sponsoredMessages = &_session->sponsoredMessages();
+				const auto fullId = _message->fullId();
+				const auto details = sponsoredMessages->lookupDetails(fullId);
+				if (const auto link = details.link; !link.isEmpty()) {
+					UrlClickHandler::Open(link);
+					sponsoredMessages->clicked(fullId, true, true);
+					hide();
+				}
+			} else {
+				playbackPauseResume();
+			}
 		}
 	} else if (_pressed) {
 		if (_dragging) {

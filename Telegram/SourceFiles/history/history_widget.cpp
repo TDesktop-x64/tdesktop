@@ -118,6 +118,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/media/history_view_media.h"
 #include "profile/profile_block_group_members.h"
 #include "core/click_handler_types.h"
+#include "chat_helpers/field_autocomplete.h"
 #include "chat_helpers/tabbed_panel.h"
 #include "chat_helpers/tabbed_selector.h"
 #include "chat_helpers/tabbed_section.h"
@@ -244,7 +245,6 @@ HistoryWidget::HistoryWidget(
 	_scroll.data(),
 	controller->chatStyle(),
 	static_cast<HistoryView::CornerButtonsDelegate*>(this))
-, _fieldAutocomplete(this, controller->uiShow())
 , _supportAutocomplete(session().supportMode()
 	? object_ptr<Support::Autocomplete>(this, &session())
 	: nullptr)
@@ -422,15 +422,6 @@ HistoryWidget::HistoryWidget(
 		saveDraftDelayed();
 	}, _field->lifetime());
 
-	connect(rawTextEdit, &QTextEdit::cursorPositionChanged, this, [=] {
-		checkFieldAutocomplete();
-	}, Qt::QueuedConnection);
-
-	controller->session().data().shortcutMessages().shortcutsChanged(
-	) | rpl::start_with_next([=] {
-		checkFieldAutocomplete();
-	}, lifetime());
-
 	_fieldBarCancel->hide();
 
 	_topBar->hide();
@@ -479,82 +470,10 @@ HistoryWidget::HistoryWidget(
 		sendBotCommand(r);
 	}, lifetime());
 
-	_fieldAutocomplete->mentionChosen(
-	) | rpl::start_with_next([=](FieldAutocomplete::MentionChosen data) {
-		auto replacement = QString();
-		auto entityTag = QString();
-		if (data.mention.isEmpty()) {
-			replacement = data.user->firstName;
-			if (replacement.isEmpty()) {
-				replacement = data.user->name();
-			}
-			entityTag = PrepareMentionTag(data.user);
-		} else {
-			replacement = '@' + data.mention;
-		}
-		_field->insertTag(replacement, entityTag);
-	}, lifetime());
-
-	_fieldAutocomplete->hashtagChosen(
-	) | rpl::start_with_next([=](FieldAutocomplete::HashtagChosen data) {
-		insertHashtagOrBotCommand(data.hashtag, data.method);
-	}, lifetime());
-
-	_fieldAutocomplete->botCommandChosen(
-	) | rpl::start_with_next([=](FieldAutocomplete::BotCommandChosen data) {
-		using Method = FieldAutocomplete::ChooseMethod;
-		const auto messages = &data.user->owner().shortcutMessages();
-		const auto shortcut = data.user->isSelf();
-		const auto command = data.command.mid(1);
-		const auto byTab = (data.method == Method::ByTab);
-		const auto shortcutId = (_peer && shortcut && !byTab)
-			? messages->lookupShortcutId(command)
-			: BusinessShortcutId();
-		if (shortcut && command.isEmpty()) {
-			controller->showSettings(Settings::QuickRepliesId());
-		} else if (!shortcutId) {
-			insertHashtagOrBotCommand(data.command, data.method);
-		} else if (!_peer->session().premium()) {
-			ShowPremiumPreviewToBuy(
-				controller,
-				PremiumFeature::QuickReplies);
-		} else {
-			session().api().sendShortcutMessages(_peer, shortcutId);
-			session().api().finishForwarding(prepareSendAction({}));
-			setFieldText(_field->getTextWithTagsPart(_field->textCursor().position()));
-		}
-	}, lifetime());
-
-	_fieldAutocomplete->setModerateKeyActivateCallback([=](int key) {
-		const auto context = [=](FullMsgId itemId) {
-			return _list->prepareClickContext(Qt::LeftButton, itemId);
-		};
-		return !_keyboard->isHidden() && _keyboard->moderateKeyActivate(
-			key,
-			context);
-	});
-
-	_fieldAutocomplete->choosingProcesses(
-	) | rpl::start_with_next([=](FieldAutocomplete::Type type) {
-		if (!_history) {
-			return;
-		}
-		if (type == FieldAutocomplete::Type::Stickers) {
-			session().sendProgressManager().update(
-				_history,
-				Api::SendProgressType::ChooseSticker);
-		}
-	}, lifetime());
-
-	_fieldAutocomplete->setSendMenuDetails([=] {
-		return sendMenuDetails();
-	});
-
 	if (_supportAutocomplete) {
 		supportInitAutocomplete();
 	}
 	_field->rawTextEdit()->installEventFilter(this);
-	_field->rawTextEdit()->installEventFilter(_fieldAutocomplete);
 	_field->setMimeDataHook([=](
 			not_null<const QMimeData*> data,
 			Ui::InputField::MimeAction action) {
@@ -569,15 +488,6 @@ HistoryWidget::HistoryWidget(
 		Unexpected("action in MimeData hook.");
 	});
 
-	const auto allow = [=](const auto&) {
-		return _peer && _peer->isSelf();
-	};
-	const auto suggestions = Ui::Emoji::SuggestionsController::Init(
-		this,
-		_field,
-		&controller->session(),
-		{ .suggestCustomEmoji = true, .allowCustomWithoutPremium = allow });
-	_raiseEmojiSuggestions = [=] { suggestions->raise(); };
 	updateFieldSubmitSettings();
 
 	_field->hide();
@@ -702,9 +612,6 @@ HistoryWidget::HistoryWidget(
 		if (updateCmdStartShown()) {
 			updateControlsVisibility();
 			updateControlsGeometry();
-		}
-		if (_fieldAutocomplete->clearFilteredBotCommands()) {
-			checkFieldAutocomplete();
 		}
 	}, lifetime());
 
@@ -841,7 +748,6 @@ HistoryWidget::HistoryWidget(
 		return update.flags;
 	}) | rpl::start_with_next([=](Data::PeerUpdate::Flags flags) {
 		if (flags & PeerUpdateFlag::Rights) {
-			updateStickersByEmoji();
 			updateFieldPlaceholder();
 			_preview->checkNow(false);
 
@@ -1210,35 +1116,10 @@ void HistoryWidget::initTabbedSelector() {
 
 	rpl::merge(
 		selector->fileChosen() | filter,
-		_fieldAutocomplete->stickerChosen(),
 		selector->customEmojiChosen() | filter,
 		controller()->stickerOrEmojiChosen() | filter
-	) | rpl::start_with_next([=](ChatHelpers::FileChosen data) {
-		controller()->hideLayer(anim::type::normal);
-		if (const auto info = data.document->sticker()
-			; info && info->setType == Data::StickersType::Emoji) {
-			if (data.document->isPremiumEmoji()
-				&& !session().premium()
-				&& (!_peer
-					|| !Data::AllowEmojiWithoutPremium(
-						_peer,
-						data.document))) {
-				showPremiumToast(data.document);
-			} else if (!_field->isHidden()) {
-				Data::InsertCustomEmoji(_field.data(), data.document);
-			}
-		} else {
-			controller()->sendingAnimation().appendSending(
-				data.messageSendingFrom);
-			const auto localId = data.messageSendingFrom.localId;
-			auto messageToSend = Api::MessageToSend(
-				prepareSendAction(data.options));
-			messageToSend.textWithTags = base::take(data.caption);
-			sendExistingDocument(
-				data.document,
-				std::move(messageToSend),
-				localId);
-		}
+	) | rpl::start_with_next([=](ChatHelpers::FileChosen &&data) {
+		fileChosen(std::move(data));
 	}, lifetime());
 
 	selector->photoChosen(
@@ -1500,63 +1381,93 @@ int HistoryWidget::itemTopForHighlight(
 	return itemTop;
 }
 
-void HistoryWidget::start() {
-	session().data().stickers().updated(
-		Data::StickersType::Stickers
-	) | rpl::start_with_next([=] {
-		updateStickersByEmoji();
-	}, lifetime());
-	session().data().stickers().notifySavedGifsUpdated();
-}
-
-void HistoryWidget::insertHashtagOrBotCommand(
-		QString str,
-		FieldAutocomplete::ChooseMethod method) {
+void HistoryWidget::initFieldAutocomplete() {
+	_emojiSuggestions = nullptr;
+	_autocomplete = nullptr;
 	if (!_peer) {
 		return;
 	}
-
-	// Send bot command at once, if it was not inserted by pressing Tab.
-	if (str.at(0) == '/' && method != FieldAutocomplete::ChooseMethod::ByTab) {
-		sendBotCommand({ _peer, str, FullMsgId(), replyTo() });
-		session().api().finishForwarding(prepareSendAction({}));
-		setFieldText(_field->getTextWithTagsPart(_field->textCursor().position()));
-	} else {
-		_field->insertTag(str);
-	}
+	const auto processShortcut = [=](QString shortcut) {
+		if (!_peer) {
+			return;
+		}
+		const auto messages = &_peer->owner().shortcutMessages();
+		const auto shortcutId = messages->lookupShortcutId(shortcut);
+		if (shortcut.isEmpty()) {
+			controller()->showSettings(Settings::QuickRepliesId());
+		} else if (!_peer->session().premium()) {
+			ShowPremiumPreviewToBuy(
+				controller(),
+				PremiumFeature::QuickReplies);
+		} else if (shortcutId) {
+			session().api().sendShortcutMessages(_peer, shortcutId);
+			session().api().finishForwarding(prepareSendAction({}));
+			setFieldText(_field->getTextWithTagsPart(
+				_field->textCursor().position()));
+		}
+	};
+	ChatHelpers::InitFieldAutocomplete(_autocomplete, {
+		.parent = this,
+		.show = controller()->uiShow(),
+		.field = _field.data(),
+		.peer = _peer,
+		.features = [=] {
+			auto result = ChatHelpers::ComposeFeatures();
+			if (_showAnimation
+				|| isChoosingTheme()
+				|| (_inlineBot && !_inlineLookingUpBot)) {
+				result.autocompleteMentions = false;
+				result.autocompleteHashtags = false;
+				result.autocompleteCommands = false;
+			}
+			if (_editMsgId) {
+				result.autocompleteCommands = false;
+				result.suggestStickersByEmoji = false;
+			}
+			return result;
+		},
+		.sendMenuDetails = [=] { return sendMenuDetails(); },
+		.stickerChoosing = [=] {
+			if (_history) {
+				session().sendProgressManager().update(
+					_history,
+					Api::SendProgressType::ChooseSticker);
+			}
+		},
+		.stickerChosen = [=](ChatHelpers::FileChosen &&data) {
+			fileChosen(std::move(data));
+		},
+		.setText = [=](TextWithTags text) { if (_peer) setFieldText(text); },
+		.sendBotCommand = [=](QString command) {
+			if (_peer) {
+				sendBotCommand({ _peer, command, FullMsgId(), replyTo() });
+				session().api().finishForwarding(prepareSendAction({}));
+			}
+		},
+		.processShortcut = processShortcut,
+		.moderateKeyActivateCallback = [=](int key) {
+			const auto context = [=](FullMsgId itemId) {
+				return _list->prepareClickContext(Qt::LeftButton, itemId);
+			};
+			return !_keyboard->isHidden() && _keyboard->moderateKeyActivate(
+				key,
+				context);
+		},
+	});
+	const auto allow = [=](const auto&) {
+		return _peer->isSelf();
+	};
+	_emojiSuggestions.reset(Ui::Emoji::SuggestionsController::Init(
+		this,
+		_field,
+		&controller()->session(),
+		{ .suggestCustomEmoji = true, .allowCustomWithoutPremium = allow }));
 }
-
 
 InlineBotQuery HistoryWidget::parseInlineBotQuery() const {
 	return (isChoosingTheme() || _editMsgId)
 		? InlineBotQuery()
 		: ParseInlineBotQuery(&session(), _field);
-}
-
-AutocompleteQuery HistoryWidget::parseMentionHashtagBotCommandQuery() const {
-	const auto result = (isChoosingTheme()
-		|| (_inlineBot && !_inlineLookingUpBot))
-		? AutocompleteQuery()
-		: ParseMentionHashtagBotCommandQuery(_field, {});
-	if (result.query.isEmpty()) {
-		return result;
-	} else if (result.query[0] == '#'
-		&& cRecentWriteHashtags().isEmpty()
-		&& cRecentSearchHashtags().isEmpty()) {
-		session().local().readRecentHashtagsAndBots();
-	} else if (result.query[0] == '@'
-		&& cRecentInlineBots().isEmpty()) {
-		session().local().readRecentHashtagsAndBots();
-	} else if (result.query[0] == '/') {
-		if (_editMsgId) {
-			return {};
-		} else if (_peer->isUser()
-			&& !_peer->asUser()->isBot()
-			&& _peer->owner().shortcutMessages().shortcuts().list.empty()) {
-			return {};
-		}
-	}
-	return result;
 }
 
 void HistoryWidget::updateInlineBotQuery() {
@@ -1650,8 +1561,8 @@ void HistoryWidget::applyInlineBotQuery(UserData *bot, const QString &query) {
 			orderWidgets();
 		}
 		_inlineResults->queryInlineBot(_inlineBot, _peer, query);
-		if (!_fieldAutocomplete->isHidden()) {
-			_fieldAutocomplete->hideAnimated();
+		if (_autocomplete) {
+			_autocomplete->hideAnimated();
 		}
 	} else {
 		clearInlineBot();
@@ -1683,7 +1594,9 @@ void HistoryWidget::orderWidgets() {
 		_chooseTheme->raise();
 	}
 	_topShadow->raise();
-	_fieldAutocomplete->raise();
+	if (_autocomplete) {
+		_autocomplete->raise();
+	}
 	if (_membersDropdown) {
 		_membersDropdown->raise();
 	}
@@ -1693,32 +1606,11 @@ void HistoryWidget::orderWidgets() {
 	if (_tabbedPanel) {
 		_tabbedPanel->raise();
 	}
-	_raiseEmojiSuggestions();
+	if (_emojiSuggestions) {
+		_emojiSuggestions->raise();
+	}
 	_attachDragAreas.document->raise();
 	_attachDragAreas.photo->raise();
-}
-
-bool HistoryWidget::updateStickersByEmoji() {
-	if (!_peer) {
-		return false;
-	}
-	const auto emoji = [&] {
-		const auto errorForStickers = Data::RestrictionError(
-			_peer,
-			ChatRestriction::SendStickers);
-		if (!_editMsgId && !errorForStickers) {
-			const auto &text = _field->getTextWithTags().text;
-			auto length = 0;
-			if (const auto emoji = Ui::Emoji::Find(text, &length)) {
-				if (text.size() <= length) {
-					return emoji;
-				}
-			}
-		}
-		return EmojiPtr(nullptr);
-	}();
-	_fieldAutocomplete->showStickers(emoji);
-	return (emoji != nullptr);
 }
 
 void HistoryWidget::toggleChooseChatTheme(
@@ -1763,11 +1655,10 @@ void HistoryWidget::fieldChanged() {
 
 	InvokeQueued(this, [=] {
 		updateInlineBotQuery();
-		const auto choosingSticker = updateStickersByEmoji();
 		if (_history
 			&& !_inlineBot
 			&& !_editMsgId
-			&& !choosingSticker
+			&& (!_autocomplete || !_autocomplete->stickersEmoji())
 			&& updateTyping) {
 			session().sendProgressManager().update(
 				_history,
@@ -1854,6 +1745,34 @@ void HistoryWidget::saveFieldToHistoryLocalDraft() {
 			_history->clearLocalDraft(topicRootId);
 		}
 		_history->clearLocalEditDraft(topicRootId);
+	}
+}
+
+void HistoryWidget::fileChosen(ChatHelpers::FileChosen &&data) {
+	controller()->hideLayer(anim::type::normal);
+	if (const auto info = data.document->sticker()
+		; info && info->setType == Data::StickersType::Emoji) {
+		if (data.document->isPremiumEmoji()
+			&& !session().premium()
+			&& (!_peer
+				|| !Data::AllowEmojiWithoutPremium(
+					_peer,
+					data.document))) {
+			showPremiumToast(data.document);
+		} else if (!_field->isHidden()) {
+			Data::InsertCustomEmoji(_field.data(), data.document);
+		}
+	} else {
+		controller()->sendingAnimation().appendSending(
+			data.messageSendingFrom);
+		const auto localId = data.messageSendingFrom.localId;
+		auto messageToSend = Api::MessageToSend(
+			prepareSendAction(data.options));
+		messageToSend.textWithTags = base::take(data.caption);
+		sendExistingDocument(
+			data.document,
+			std::move(messageToSend),
+			localId);
 	}
 }
 
@@ -2061,7 +1980,11 @@ void HistoryWidget::fastShowAtEnd(not_null<History*> history) {
 }
 
 bool HistoryWidget::applyDraft(FieldHistoryAction fieldHistoryAction) {
-	InvokeQueued(this, [=] { updateStickersByEmoji(); });
+	InvokeQueued(this, [=] {
+		if (_autocomplete) {
+			_autocomplete->requestStickersUpdate();
+		}
+	});
 
 	const auto editDraft = _history ? _history->localEditDraft({}) : nullptr;
 	const auto draft = editDraft
@@ -2398,6 +2321,7 @@ void HistoryWidget::showHistory(
 		controller()->tabbedSelector()->setCurrentPeer(_peer);
 	}
 	refreshTabbedPanel();
+	initFieldAutocomplete();
 
 	if (_peer) {
 		_unblock->setText(((_peer->isUser()
@@ -2920,7 +2844,7 @@ void HistoryWidget::refreshSendAsToggle() {
 bool HistoryWidget::contentOverlapped(const QRect &globalRect) {
 	return (_attachDragAreas.document->overlaps(globalRect)
 			|| _attachDragAreas.photo->overlaps(globalRect)
-			|| _fieldAutocomplete->overlaps(globalRect)
+			|| (_autocomplete && _autocomplete->overlaps(globalRect))
 			|| (_tabbedPanel && _tabbedPanel->overlaps(globalRect))
 			|| (_inlineResults && _inlineResults->overlaps(globalRect)));
 }
@@ -3048,7 +2972,9 @@ void HistoryWidget::updateControlsVisibility() {
 			_discuss->hide();
 		}
 		_kbShown = false;
-		_fieldAutocomplete->hide();
+		if (_autocomplete) {
+			_autocomplete->hide();
+		}
 		if (_supportAutocomplete) {
 			_supportAutocomplete->hide();
 		}
@@ -3092,7 +3018,9 @@ void HistoryWidget::updateControlsVisibility() {
 		}
 		hideFieldIfVisible();
 	} else if (editingMessage() || _canSendMessages) {
-		checkFieldAutocomplete();
+		if (_autocomplete) {
+			_autocomplete->requestRefresh();
+		}
 		_unblock->hide();
 		_botStart->hide();
 		_joinChannel->hide();
@@ -3200,7 +3128,9 @@ void HistoryWidget::updateControlsVisibility() {
 			_fieldBarCancel->hide();
 		}
 	} else {
-		_fieldAutocomplete->hide();
+		if (_autocomplete) {
+			_autocomplete->hide();
+		}
 		if (_supportAutocomplete) {
 			_supportAutocomplete->hide();
 		}
@@ -4202,7 +4132,9 @@ void HistoryWidget::hideChildWidgets() {
 }
 
 void HistoryWidget::hideSelectorControlsAnimated() {
-	_fieldAutocomplete->hideAnimated();
+	if (_autocomplete) {
+		_autocomplete->hideAnimated();
+	}
 	if (_supportAutocomplete) {
 		_supportAutocomplete->hide();
 	}
@@ -5053,10 +4985,10 @@ bool HistoryWidget::updateCmdStartShown() {
 					},
 					.source = InlineBots::WebViewSourceBotMenu(),
 				});
-			} else if (!_fieldAutocomplete->isHidden()) {
-				_fieldAutocomplete->hideAnimated();
-			} else {
-				_fieldAutocomplete->showFiltered(_peer, "/", true);
+			} else if (_autocomplete && !_autocomplete->isHidden()) {
+				_autocomplete->hideAnimated();
+			} else if (_autocomplete) {
+				_autocomplete->showFiltered(_peer, "/", true);
 			}
 		});
 		_botMenu.button->widthValue(
@@ -5537,7 +5469,9 @@ void HistoryWidget::clearInlineBot() {
 	if (_inlineResults) {
 		_inlineResults->clearInlineBot();
 	}
-	checkFieldAutocomplete();
+	if (_autocomplete) {
+		_autocomplete->requestRefresh();
+	}
 }
 
 void HistoryWidget::inlineBotChanged() {
@@ -5560,18 +5494,6 @@ void HistoryWidget::fieldFocused() {
 	if (_list) {
 		_list->clearSelected(true);
 	}
-}
-
-void HistoryWidget::checkFieldAutocomplete() {
-	if (!_history || _showAnimation) {
-		return;
-	}
-
-	const auto autocomplete = parseMentionHashtagBotCommandQuery();
-	_fieldAutocomplete->showFiltered(
-		_peer,
-		autocomplete.query,
-		autocomplete.fromStart);
 }
 
 void HistoryWidget::updateFieldPlaceholder() {
@@ -6049,7 +5971,9 @@ void HistoryWidget::updateControlsGeometry() {
 	const auto scrollAreaTop = businessBotTop + (_businessBotStatus ? _businessBotStatus->bar().height() : 0);
 	if (_scroll->y() != scrollAreaTop) {
 		_scroll->moveToLeft(0, scrollAreaTop);
-		_fieldAutocomplete->setBoundings(_scroll->geometry());
+		if (_autocomplete) {
+			_autocomplete->setBoundings(_scroll->geometry());
+		}
 		if (_supportAutocomplete) {
 			_supportAutocomplete->setBoundings(_scroll->geometry());
 		}
@@ -6326,7 +6250,9 @@ void HistoryWidget::updateHistoryGeometry(
 			visibleAreaUpdated();
 		}
 
-		_fieldAutocomplete->setBoundings(_scroll->geometry());
+		if (_autocomplete) {
+			_autocomplete->setBoundings(_scroll->geometry());
+		}
 		if (_supportAutocomplete) {
 			_supportAutocomplete->setBoundings(_scroll->geometry());
 		}
@@ -7027,8 +6953,6 @@ bool HistoryWidget::showSlowmodeError() {
 void HistoryWidget::fieldTabbed() {
 	if (_supportAutocomplete) {
 		_supportAutocomplete->activate(_field.data());
-	} else if (!_fieldAutocomplete->isHidden()) {
-		_fieldAutocomplete->chooseSelected(FieldAutocomplete::ChooseMethod::ByTab);
 	}
 }
 
@@ -7636,7 +7560,7 @@ bool HistoryWidget::sendExistingDocument(
 		document,
 		localId);
 
-	if (_fieldAutocomplete->stickersShown()) {
+	if (_autocomplete && _autocomplete->stickersShown()) {
 		clearFieldText();
 		//_saveDraftText = true;
 		//_saveDraftStart = crl::now();
@@ -8122,7 +8046,9 @@ void HistoryWidget::fullInfoUpdated() {
 		if (updateCanSendMessage()) {
 			refresh = true;
 		}
-		checkFieldAutocomplete();
+		if (_autocomplete) {
+			_autocomplete->requestRefresh();
+		}
 		_list->refreshAboutView();
 		_list->updateBotInfo();
 
@@ -8319,8 +8245,8 @@ void HistoryWidget::escape() {
 		} else {
 			cancelEdit();
 		}
-	} else if (!_fieldAutocomplete->isHidden()) {
-		_fieldAutocomplete->hideAnimated();
+	} else if (_autocomplete && !_autocomplete->isHidden()) {
+		_autocomplete->hideAnimated();
 	} else if (_replyTo && _field->getTextWithTags().text.isEmpty()) {
 		cancelReply();
 	} else if (auto &voice = _voiceRecordBar; voice->isActive()) {

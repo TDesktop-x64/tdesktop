@@ -694,7 +694,7 @@ void Gif::draw(Painter &p, const PaintContext &context) const {
 	}
 
 	if (!unwrapped && !skipDrawingSurrounding) {
-		if (!isRound || !inWebPage) {
+		if ((!isRound || !inWebPage) && !_realParent->isSponsored()) {
 			drawCornerStatus(p, context, QPoint());
 		}
 	} else if (!skipDrawingSurrounding) {

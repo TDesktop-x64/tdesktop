@@ -1415,7 +1415,7 @@ TextState WebPage::textState(QPoint point, StateRequest request) const {
 	} else if (sponsored && outer.contains(point)) {
 		result.link = sponsored->link;
 	}
-	if (!result.link && outer.contains(point)) {
+	if (_data->iv) {
 		result.link = _openl;
 	}
 	if (const auto hint = hintData()) {

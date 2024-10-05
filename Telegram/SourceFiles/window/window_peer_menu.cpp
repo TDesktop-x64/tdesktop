@@ -2295,11 +2295,14 @@ QPointer<Ui::BoxContent> ShowOldForwardMessagesBox(
 
 	field->submits(
 	) | rpl::start_with_next([=] { submit({}); }, field->lifetime());
-	InitMessageFieldHandlers(
-		session,
-		show,
-		field,
-		[=] { return show->paused(GifPauseReason::Layer); });
+	InitMessageFieldHandlers({
+		.session = session,
+		.show = show,
+		.field = field,
+		.customEmojiPaused = [=] {
+			return show->paused(GifPauseReason::Layer);
+		},
+		});
 	field->setSubmitSettings(Core::App().settings().sendSubmitWay());
 
 	Ui::SendPendingMoveResizeEvents(comment);

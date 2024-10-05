@@ -28,6 +28,9 @@ public:
 		return top();
 	}
 	[[nodiscard]] virtual rpl::producer<QString> button() = 0;
+	[[nodiscard]] virtual QString cornerTagText() {
+		return {};
+	}
 	virtual void draw(
 		Painter &p,
 		const PaintContext &context,
@@ -78,6 +81,7 @@ public:
 	[[nodiscard]] bool hideServiceText() const override {
 		return _content->hideServiceText();
 	}
+	void hideSpoilers() override;
 
 	bool hasHeavyPart() const override;
 	void unloadHeavyPart() override;

@@ -27,6 +27,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/language_box.h"
 #include "boxes/username_box.h"
 #include "boxes/about_box.h"
+#include "boxes/star_gift_box.h"
 #include "ui/basic_click_handlers.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/controls/userpic_button.h"
@@ -503,18 +504,9 @@ void SetupPremium(
 	});
 	{
 		controller->session().credits().load();
-
-		const auto wrap = container->add(
-			object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
-				container,
-				object_ptr<Ui::VerticalLayout>(container)));
-		wrap->toggleOn(
-			controller->session().credits().balanceValue(
-			) | rpl::map(rpl::mappers::_1 > 0));
-		wrap->finishAnimating();
 		AddPremiumStar(
 			AddButtonWithLabel(
-				wrap->entity(),
+				container,
 				tr::lng_settings_credits(),
 				controller->session().credits().balanceValue(
 				) | rpl::map([=](uint64 c) {
@@ -545,7 +537,7 @@ void SetupPremium(
 			{ .icon = &st::menuIconGiftPremium }
 		);
 		button->addClickHandler([=] {
-			controller->showGiftPremiumsBox(u"gift"_q);
+			Ui::ChooseStarGiftRecipient(controller);
 		});
 	}
 	Ui::AddSkip(container);

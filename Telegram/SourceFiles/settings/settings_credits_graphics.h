@@ -12,10 +12,15 @@ class object_ptr;
 
 class PeerData;
 
+namespace Api {
+struct UserStarGift;
+} // namespace Api
+
 namespace Data {
 struct Boost;
 struct CreditsHistoryEntry;
 struct SubscriptionEntry;
+struct GiftCode;
 } // namespace Data
 
 namespace Main {
@@ -86,6 +91,20 @@ void GiftedCreditsBox(
 	not_null<PeerData*> to,
 	int count,
 	TimeId date);
+void CreditsPrizeBox(
+	not_null<Ui::GenericBox*> box,
+	not_null<Window::SessionController*> controller,
+	const Data::GiftCode &data,
+	TimeId date);
+void UserStarGiftBox(
+	not_null<Ui::GenericBox*> box,
+	not_null<Window::SessionController*> controller,
+	const Api::UserStarGift &data);
+void StarGiftViewBox(
+	not_null<Ui::GenericBox*> box,
+	not_null<Window::SessionController*> controller,
+	const Data::GiftCode &data,
+	not_null<HistoryItem*> item);
 void ShowRefundInfoBox(
 	not_null<Window::SessionController*> controller,
 	FullMsgId refundItemId);

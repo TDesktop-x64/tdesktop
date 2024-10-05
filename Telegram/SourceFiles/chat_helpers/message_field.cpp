@@ -63,6 +63,12 @@ constexpr auto kParseLinksTimeout = crl::time(1000);
 constexpr auto kTypesDuration = 4 * crl::time(1000);
 constexpr auto kCodeLanguageLimit = 32;
 
+constexpr auto kLinkProtocols = {
+    "http://",
+    "https://",
+    "tonsite://"
+};
+
 // For mention / custom emoji tags save and validate selfId,
 // ignore tags for different users.
 [[nodiscard]] Fn<QString(QStringView)> FieldTagMimeProcessor(
@@ -152,11 +158,10 @@ void EditLinkBox(
 			return startLink.trimmed();
 		}
 		const auto clipboard = QGuiApplication::clipboard()->text().trimmed();
-		if (clipboard.startsWith("http://")
-			|| clipboard.startsWith("https://")) {
-			return clipboard;
-		}
-		return QString();
+		const auto starts = [&](const auto &protocol) {
+  			return clipboard.startsWith(protocol);
+		};
+		return std::ranges::any_of(kLinkProtocols, starts) ? clipboard : QString();
 	}();
 	const auto url = Ui::AttachParentChild(
 		content,
@@ -444,18 +449,14 @@ Fn<void(QString now, Fn<void(QString)> save)> DefaultEditLanguageCallback(
 	};
 }
 
-void InitMessageFieldHandlers(
-		not_null<Main::Session*> session,
-		std::shared_ptr<Main::SessionShow> show,
-		not_null<Ui::InputField*> field,
-		Fn<bool()> customEmojiPaused,
-		Fn<bool(not_null<DocumentData*>)> allowPremiumEmoji,
-		const style::InputField *fieldStyle) {
-	const auto paused = [customEmojiPaused] {
-		return customEmojiPaused && customEmojiPaused();
+void InitMessageFieldHandlers(MessageFieldHandlersArgs &&args) {
+	const auto paused = [passed = args.customEmojiPaused] {
+		return passed && passed();
 	};
+	const auto field = args.field;
+	const auto session = args.session;
 	field->setTagMimeProcessor(
-		FieldTagMimeProcessor(session, allowPremiumEmoji));
+		FieldTagMimeProcessor(session, args.allowPremiumEmoji));
 	field->setCustomTextContext([=](Fn<void()> repaint) {
 		return std::any(Core::MarkedTextContext{
 			.session = session,
@@ -469,12 +470,14 @@ void InitMessageFieldHandlers(
 	field->setInstantReplaces(Ui::InstantReplaces::Default());
 	field->setInstantReplacesEnabled(
 		Core::App().settings().replaceEmojiValue());
-	field->setMarkdownReplacesEnabled(true);
-	if (show) {
+	field->setMarkdownReplacesEnabled(rpl::single(Ui::MarkdownEnabledState{
+		Ui::MarkdownEnabled{ std::move(args.allowMarkdownTags) }
+	}));
+	if (const auto &show = args.show) {
 		field->setEditLinkCallback(
-			DefaultEditLinkCallback(show, field, fieldStyle));
+			DefaultEditLinkCallback(show, field, args.fieldStyle));
 		field->setEditLanguageCallback(DefaultEditLanguageCallback(show));
-		InitSpellchecker(show, field, fieldStyle != nullptr);
+		InitSpellchecker(show, field, args.fieldStyle != nullptr);
 	}
 	const auto style = field->lifetime().make_state<Ui::ChatStyle>(
 		session->colorIndicesValue());
@@ -574,12 +577,15 @@ void InitMessageFieldHandlers(
 		not_null<Ui::InputField*> field,
 		ChatHelpers::PauseReason pauseReasonLevel,
 		Fn<bool(not_null<DocumentData*>)> allowPremiumEmoji) {
-	InitMessageFieldHandlers(
-		&controller->session(),
-		controller->uiShow(),
-		field,
-		[=] { return controller->isGifPausedAtLeastFor(pauseReasonLevel); },
-		allowPremiumEmoji);
+	InitMessageFieldHandlers({
+		.session = &controller->session(),
+		.show = controller->uiShow(),
+		.field = field,
+		.customEmojiPaused = [=] {
+			return controller->isGifPausedAtLeastFor(pauseReasonLevel);
+		},
+		.allowPremiumEmoji = std::move(allowPremiumEmoji),
+	});
 }
 
 void InitMessageFieldGeometry(not_null<Ui::InputField*> field) {
@@ -595,14 +601,16 @@ void InitMessageField(
 		std::shared_ptr<ChatHelpers::Show> show,
 		not_null<Ui::InputField*> field,
 		Fn<bool(not_null<DocumentData*>)> allowPremiumEmoji) {
-	InitMessageFieldHandlers(
-		&show->session(),
-		show,
-		field,
-		[=] { return show->paused(ChatHelpers::PauseReason::Any); },
-		std::move(allowPremiumEmoji));
+	InitMessageFieldHandlers({
+		.session = &show->session(),
+		.show = show,
+		.field = field,
+		.customEmojiPaused = [=] {
+			return show->paused(ChatHelpers::PauseReason::Any);
+		},
+		.allowPremiumEmoji = std::move(allowPremiumEmoji),
+	});
 	InitMessageFieldGeometry(field);
-	field->customTab(true);
 }
 
 void InitMessageField(

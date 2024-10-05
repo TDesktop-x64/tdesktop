@@ -399,7 +399,8 @@ void PeerData::paintUserpic(
 		Ui::PeerUserpicView &view,
 		int x,
 		int y,
-		int size) const {
+		int size,
+		bool forceCircle) const {
 	const auto cloud = userpicCloudImage(view);
 	const auto shouldLoad = cloud
 		&& (!GetEnhancedBool("screenshot_mode")
@@ -411,7 +412,7 @@ void PeerData::paintUserpic(
 		shouldLoad ? cloud : nullptr,
 		shouldLoad ? nullptr : ensureEmptyUserpic().get(),
 		size * ratio,
-		isForum());
+		!forceCircle && isForum());
 	p.drawImage(QRect(x, y, size, size), view.cached);
 }
 
@@ -636,7 +637,8 @@ bool PeerData::canCreatePolls() const {
 	if (const auto user = asUser()) {
 		return user->isBot()
 			&& !user->isSupport()
-			&& !user->isRepliesChat();
+			&& !user->isRepliesChat()
+			&& !user->isVerifyCodes();
 	}
 	return Data::CanSend(this, ChatRestriction::SendPolls);
 }
@@ -672,7 +674,7 @@ bool PeerData::canEditMessagesIndefinitely() const {
 }
 
 bool PeerData::canExportChatHistory() const {
-	if (isRepliesChat() || !allowsForwarding()) {
+	if (isRepliesChat() || isVerifyCodes() || !allowsForwarding()) {
 		return false;
 	} else if (const auto channel = asChannel()) {
 		if (!channel->amIn() && channel->invitePeekExpires()) {
@@ -869,6 +871,13 @@ void PeerData::fillNames() {
 		} else if (isRepliesChat()) {
 			const auto english = u"Replies"_q;
 			const auto localized = tr::lng_replies_messages(tr::now);
+			appendToIndex(english);
+			if (localized != english) {
+				appendToIndex(localized);
+			}
+		} else if (isVerifyCodes()) {
+			const auto english = u"Verification Codes"_q;
+			const auto localized = tr::lng_verification_codes(tr::now);
 			appendToIndex(english);
 			if (localized != english) {
 				appendToIndex(localized);
@@ -1231,6 +1240,11 @@ bool PeerData::isRepliesChat() const {
 	return ((session().mtp().environment() == MTP::Environment::Production)
 		? kProductionId
 		: kTestId) == id;
+}
+
+bool PeerData::isVerifyCodes() const {
+	constexpr auto kVerifyCodesId = peerFromUser(489000);
+	return (id == kVerifyCodesId);
 }
 
 bool PeerData::sharedMediaInfo() const {

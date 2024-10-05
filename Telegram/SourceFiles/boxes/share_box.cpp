@@ -241,13 +241,12 @@ void ShareBox::prepareCommentField() {
 	}, field->lifetime());
 
 	if (const auto show = uiShow(); show->valid()) {
-		InitMessageFieldHandlers(
-			_descriptor.session,
-			Main::MakeSessionShow(show, _descriptor.session),
-			field,
-			nullptr,
-			nullptr,
-			_descriptor.stLabel);
+		InitMessageFieldHandlers({
+			.session = _descriptor.session,
+			.show = Main::MakeSessionShow(show, _descriptor.session),
+			.field = field,
+			.fieldStyle = _descriptor.stLabel,
+		});
 	}
 	field->setSubmitSettings(Core::App().settings().sendSubmitWay());
 
@@ -839,6 +838,8 @@ void ShareBox::Inner::updateChatName(not_null<Chat*> chat) {
 		? tr::lng_saved_messages(tr::now)
 		: peer->isRepliesChat()
 		? tr::lng_replies_messages(tr::now)
+		: peer->isVerifyCodes()
+		? tr::lng_verification_codes(tr::now)
 		: peer->name();
 	chat->name.setText(_st.item.nameStyle, text, Ui::NameTextOptions());
 }

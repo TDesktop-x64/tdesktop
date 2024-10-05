@@ -27,6 +27,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/core_settings.h"
 #include "core/click_handler_types.h"
 #include "core/ui_integration.h"
+#include "main/main_app_config.h"
 #include "main/main_session.h"
 #include "chat_helpers/stickers_emoji_pack.h"
 #include "window/window_session_controller.h"
@@ -498,7 +499,10 @@ Element::Element(
 	}
 	if (data->isFakeAboutView()) {
 		const auto user = data->history()->peer->asUser();
-		if (user && user->isBot() && !user->isRepliesChat()) {
+		if (user
+			&& user->isBot()
+			&& !user->isRepliesChat()
+			&& !user->isVerifyCodes()) {
 			AddComponents(FakeBotAboutTop::Bit());
 		}
 	}
@@ -1126,8 +1130,10 @@ bool Element::computeIsAttachToPrevious(not_null<Element*> previous) {
 		if (possible) {
 			const auto forwarded = item->Get<HistoryMessageForwarded>();
 			const auto prevForwarded = prev->Get<HistoryMessageForwarded>();
-			if (item->history()->peer->isSelf()
-				|| item->history()->peer->isRepliesChat()
+			const auto peer = item->history()->peer;
+			if (peer->isSelf()
+				|| peer->isRepliesChat()
+				|| peer->isVerifyCodes()
 				|| (forwarded && forwarded->imported)
 				|| (prevForwarded && prevForwarded->imported)) {
 				return IsAttachedToPreviousInSavedMessages(
@@ -1659,6 +1665,12 @@ SelectedQuote Element::FindSelectedQuote(
 	if (modified.empty() || modified.to > result.text.size()) {
 		return {};
 	}
+	const auto session = &item->history()->session();
+	const auto limit = session->appConfig().quoteLengthMax();
+	const auto overflown = (modified.from + limit < modified.to);
+	if (overflown) {
+		modified.to = modified.from + limit;
+	}
 	result.text = result.text.mid(
 		modified.from,
 		modified.to - modified.from);
@@ -1685,7 +1697,7 @@ SelectedQuote Element::FindSelectedQuote(
 			++i;
 		}
 	}
-	return { item, result, modified.from };
+	return { item, result, modified.from, overflown };
 }
 
 TextSelection Element::FindSelectionFromQuote(

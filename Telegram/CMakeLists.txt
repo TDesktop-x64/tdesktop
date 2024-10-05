@@ -324,6 +324,8 @@ PRIVATE
     boxes/sessions_box.h
     boxes/share_box.cpp
     boxes/share_box.h
+    boxes/star_gift_box.cpp
+    boxes/star_gift_box.h
     boxes/sticker_set_box.cpp
     boxes/sticker_set_box.h
     boxes/stickers_box.cpp
@@ -573,6 +575,8 @@ PRIVATE
     data/data_lastseen_status.h
     data/data_location.cpp
     data/data_location.h
+    data/data_media_preload.cpp
+    data/data_media_preload.h
     data/data_media_rotation.cpp
     data/data_media_rotation.h
     data/data_media_types.cpp
@@ -608,6 +612,7 @@ PRIVATE
     data/data_replies_list.h
     data/data_reply_preview.cpp
     data/data_reply_preview.h
+    data/data_report.h
     data/data_saved_messages.cpp
     data/data_saved_messages.h
     data/data_saved_sublist.cpp
@@ -951,6 +956,10 @@ PRIVATE
     info/media/info_media_widget.h
     info/members/info_members_widget.cpp
     info/members/info_members_widget.h
+    info/peer_gifts/info_peer_gifts_common.cpp
+    info/peer_gifts/info_peer_gifts_common.h
+    info/peer_gifts/info_peer_gifts_widget.cpp
+    info/peer_gifts/info_peer_gifts_widget.h
     info/polls/info_polls_results_inner_widget.cpp
     info/polls/info_polls_results_inner_widget.h
     info/polls/info_polls_results_widget.cpp

@@ -97,6 +97,10 @@ giveawayGiftCodeValueMultiline: FlatLabel(giveawayGiftCodeValue) {
 	minWidth: 128px;
 	maxHeight: 100px;
 }
+giveawayGiftMessage: FlatLabel(giveawayGiftCodeValue) {
+	minWidth: 128px;
+	maxHeight: 0px;
+}
 giveawayGiftCodeValueMargin: margins(13px, 9px, 13px, 9px);
 giveawayGiftCodePeerMargin: margins(11px, 6px, 11px, 4px);
 giveawayGiftCodeUserpic: UserpicButton(defaultUserpicButton) {
@@ -201,5 +205,13 @@ startGiveawayButtonTextStyle: TextStyle(defaultTextStyle) {
 
 startGiveawayButtonLoading: InfiniteRadialAnimation(defaultInfiniteRadialAnimation) {
 	color: activeButtonFg;
+	thickness: 2px;
+}
+
+starGiftBox: Box(giveawayGiftCodeBox) {
+	buttonPadding: margins(22px, 11px, 22px, 52px);
+}
+starConvertButtonLoading: InfiniteRadialAnimation(startGiveawayButtonLoading) {
+	color: windowActiveTextFg;
 	thickness: 2px;
 }

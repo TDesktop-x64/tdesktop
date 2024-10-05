@@ -7,7 +7,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_stories.h"
 
-#include "api/api_report.h"
 #include "base/unixtime.h"
 #include "apiwrap.h"
 #include "core/application.h"
@@ -1918,17 +1917,6 @@ void Stories::togglePinnedList(
 		_savedChanged.fire_copy(peerId);
 	}).send();
 
-}
-
-void Stories::report(
-		std::shared_ptr<Ui::Show> show,
-		FullStoryId id,
-		Ui::ReportReason reason,
-		QString text) {
-	if (const auto maybeStory = lookup(id)) {
-		const auto story = *maybeStory;
-		Api::SendReport(show, story->peer(), reason, text, story->id());
-	}
 }
 
 bool Stories::isQuitPrevent() {

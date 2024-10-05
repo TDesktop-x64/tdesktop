@@ -45,7 +45,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/controls/delete_message_context_action.h"
 #include "ui/controls/who_reacted_context_action.h"
 #include "ui/boxes/edit_factcheck_box.h"
-#include "ui/boxes/report_box.h"
+#include "ui/boxes/report_box_graphics.h"
 #include "ui/ui_utility.h"
 #include "menu/menu_item_download_files.h"
 #include "menu/menu_send.h"
@@ -1151,11 +1151,15 @@ void AddReportAction(
 	const auto callback = crl::guard(controller, [=] {
 		if (const auto item = owner->message(itemId)) {
 			const auto group = owner->groups().find(item);
-			controller->show(ReportItemsBox(
-				item->history()->peer,
-				(group
-					? owner->itemsToIds(group->items)
-					: MessageIdsList{ 1, itemId })));
+			const auto ids = group
+				? (ranges::views::all(
+					group->items
+				) | ranges::views::transform([](const auto &i) {
+					return i->fullId().msg;
+				}) | ranges::to_vector)
+				: std::vector<MsgId>{ 1, itemId.msg };
+			const auto peer = item->history()->peer;
+			ShowReportMessageBox(controller->uiShow(), peer, ids, {});
 		}
 	});
 	menu->addAction(

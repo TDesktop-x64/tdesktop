@@ -7,8 +7,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "window/window_peer_menu.h"
 
+#include "api/api_report.h"
 #include "menu/menu_check_item.h"
 #include "boxes/share_box.h"
+#include "boxes/star_gift_box.h"
 #include "chat_helpers/compose/compose_show.h"
 #include "chat_helpers/message_field.h"
 #include "chat_helpers/share_message_phrase_factory.h"
@@ -39,7 +41,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/share_box.h"
 #include "calls/calls_instance.h"
 #include "inline_bots/bot_attach_web_view.h" // InlineBots::PeerType.
-#include "ui/boxes/report_box.h"
+#include "ui/boxes/report_box_graphics.h"
 #include "ui/toast/toast.h"
 #include "ui/text/format_values.h"
 #include "ui/text/text_utilities.h"
@@ -583,7 +585,10 @@ void Filler::addSupportInfo() {
 }
 
 void Filler::addInfo() {
-	if (_peer && (_peer->isSelf() || _peer->isRepliesChat())) {
+	if (_peer
+		&& (_peer->isSelf()
+			|| _peer->isRepliesChat()
+			|| _peer->isVerifyCodes())) {
 		return;
 	} else if (!_thread) {
 		return;
@@ -822,7 +827,8 @@ void Filler::addBlockUser() {
 	if (!user
 		|| user->isInaccessible()
 		|| user->isSelf()
-		|| user->isRepliesChat()) {
+		|| user->isRepliesChat()
+		|| user->isVerifyCodes()) {
 		return;
 	}
 	const auto window = &_controller->window();
@@ -926,7 +932,7 @@ void Filler::addReport() {
 	const auto peer = _peer;
 	const auto navigation = _controller;
 	_addAction(tr::lng_profile_report(tr::now), [=] {
-		ShowReportPeerBox(navigation, peer);
+		ShowReportMessageBox(navigation->uiShow(), peer, {}, {});
 	}, &st::menuIconReport);
 }
 
@@ -1242,15 +1248,15 @@ void Filler::addGiftPremium() {
 		|| user->isSelf()
 		|| user->isBot()
 		|| user->isNotificationsUser()
-		|| !user->canReceiveGifts()
 		|| user->isRepliesChat()
+		|| user->isVerifyCodes()
 		|| !user->session().premiumCanBuy()) {
 		return;
 	}
 
 	const auto navigation = _controller;
 	_addAction(tr::lng_profile_gift_premium(tr::now), [=] {
-		navigation->showGiftPremiumBox(user);
+		Ui::ShowStarGiftBox(navigation, user);
 	}, &st::menuIconGiftPremium);
 }
 
@@ -2781,11 +2787,14 @@ QPointer<Ui::BoxContent> ShowForwardMessagesBox(
 
 	field->submits(
 	) | rpl::start_with_next([=] { submit({}); }, field->lifetime());
-	InitMessageFieldHandlers(
-		session,
-		show,
-		field,
-		[=] { return show->paused(GifPauseReason::Layer); });
+	InitMessageFieldHandlers({
+		.session = session,
+		.show = show,
+		.field = field,
+		.customEmojiPaused = [=] {
+			return show->paused(GifPauseReason::Layer);
+		},
+	});
 	field->setSubmitSettings(Core::App().settings().sendSubmitWay());
 
 	Ui::SendPendingMoveResizeEvents(comment);

@@ -459,6 +459,7 @@ infoProfileLabeledButtonQr: IconButton(infoProfileLabeledButtonCopy) {
 
 infoIconInformation: icon {{ "info/info_information", infoIconFg }};
 infoIconAddMember: icon {{ "info/info_add_member", infoIconFg }};
+infoIconBotBalance: icon {{ "menu/earn", infoIconFg, point(5px, 5px) }};
 infoIconNotifications: icon {{ "info/info_notifications", infoIconFg }};
 infoIconMediaPhoto: icon {{ "info/info_media_photo", infoIconFg }};
 infoIconMediaVideo: icon {{ "info/info_media_video", infoIconFg }};
@@ -473,6 +474,7 @@ infoIconMediaStories: icon {{ "info/info_media_stories", infoIconFg }};
 infoIconMediaSaved: icon {{ "info/info_media_saved", infoIconFg }};
 infoIconMediaStoriesArchive: icon {{ "info/info_stories_archive", infoIconFg }};
 infoIconMediaStoriesRecent: icon {{ "info/info_stories_recent", infoIconFg }};
+infoIconMediaGifts: icon {{ "menu/gift_premium", infoIconFg, point(4px, 4px) }};
 
 infoIconShare: icon {{ "info/info_share", infoIconFg }};
 infoIconEdit: icon {{ "info/info_edit", infoIconFg }};
@@ -486,7 +488,8 @@ infoInformationIconPosition: point(25px, 12px);
 infoNotificationsIconPosition: point(20px, 5px);
 infoSharedMediaButtonIconPosition: point(20px, 3px);
 infoGroupMembersIconPosition: point(20px, 10px);
-infoChannelMembersIconPosition: point(20px, 19px);
+infoChannelMembersIconPosition: point(20px, 4px);
+infoChannelAdminsIconPosition: point(24px, 7px);
 
 infoOpenApp: RoundButton(defaultActiveButton) {
 	textTop: 11px;

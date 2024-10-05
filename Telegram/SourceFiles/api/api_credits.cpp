@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_updates.h"
 #include "apiwrap.h"
 #include "base/unixtime.h"
+#include "data/components/credits.h"
 #include "data/data_channel.h"
 #include "data/data_document.h"
 #include "data/data_peer.h"
@@ -69,10 +70,12 @@ constexpr auto kTransactionsLimit = 100;
 	}, [](const auto &) {
 		return PeerId(0);
 	}).value;
+	const auto stargift = tl.data().vstargift();
+	const auto incoming = (int64(tl.data().vstars().v) >= 0);
 	return Data::CreditsHistoryEntry{
 		.id = qs(tl.data().vid()),
 		.title = qs(tl.data().vtitle().value_or_empty()),
-		.description = qs(tl.data().vdescription().value_or_empty()),
+		.description = { qs(tl.data().vdescription().value_or_empty()) },
 		.date = base::unixtime::parse(tl.data().vdate().v),
 		.photoId = photo ? photo->id : 0,
 		.extended = std::move(extended),
@@ -81,6 +84,9 @@ constexpr auto kTransactionsLimit = 100;
 		.barePeerId = barePeerId,
 		.bareGiveawayMsgId = uint64(
 			tl.data().vgiveaway_post_id().value_or_empty()),
+		.bareGiftStickerId = (stargift
+			? owner->processDocument(stargift->data().vsticker())->id
+			: 0),
 		.peerType = tl.data().vpeer().match([](const HistoryPeerTL &) {
 			return Data::CreditsHistoryEntry::PeerType::Peer;
 		}, [](const MTPDstarsTransactionPeerPlayMarket &) {
@@ -104,12 +110,16 @@ constexpr auto kTransactionsLimit = 100;
 			? base::unixtime::parse(tl.data().vtransaction_date()->v)
 			: QDateTime(),
 		.successLink = qs(tl.data().vtransaction_url().value_or_empty()),
+		.convertStars = int(stargift
+			? stargift->data().vconvert_stars().v
+			: 0),
+		.converted = stargift && incoming,
 		.reaction = tl.data().is_reaction(),
 		.refunded = tl.data().is_refund(),
 		.pending = tl.data().is_pending(),
 		.failed = tl.data().is_failed(),
-		.in = (int64(tl.data().vstars().v) >= 0),
-		.gift = tl.data().is_gift(),
+		.in = incoming,
+		.gift = tl.data().is_gift() || stargift.has_value(),
 	};
 }
 
@@ -239,6 +249,8 @@ void CreditsStatus::request(
 		_peer->isSelf() ? MTP_inputPeerSelf() : _peer->input
 	)).done([=](const TLResult &result) {
 		_requestId = 0;
+		const auto balance = result.data().vbalance().v;
+		_peer->session().credits().apply(_peer->id, balance);
 		if (const auto onstack = done) {
 			onstack(StatusFromTL(result, _peer));
 		}

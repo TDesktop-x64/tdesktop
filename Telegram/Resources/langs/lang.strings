@@ -1323,6 +1323,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_profile_similar_channels#other" = "{count} similar channels";
 "lng_profile_saved_messages#one" = "{count} saved message";
 "lng_profile_saved_messages#other" = "{count} saved messages";
+"lng_profile_peer_gifts#one" = "{count} gift";
+"lng_profile_peer_gifts#other" = "{count} gifts";
 "lng_profile_participants_section" = "Members";
 "lng_profile_subscribers_section" = "Subscribers";
 "lng_profile_add_contact" = "Add Contact";
@@ -1377,6 +1379,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_profile_copy_fullname" = "Copy Name";
 "lng_profile_photo_by_you" = "photo set by you";
 "lng_profile_public_photo" = "public photo";
+"lng_profile_administrators#one" = "{count} administrator";
+"lng_profile_administrators#other" = "{count} administrators";
+"lng_profile_manage" = "Channel settings";
 
 "lng_invite_upgrade_title" = "Upgrade to Premium";
 "lng_invite_upgrade_group_invite#one" = "{users} only accepts invitations to groups from Contacts and **Premium** users.";
@@ -1660,6 +1665,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_report_and_ban_button" = "Ban user";
 "lng_report_details_about" = "Please enter any additional details relevant to your report.";
 "lng_report_details" = "Additional Details";
+"lng_report_details_optional" = "Add Comment (Optional)";
+"lng_report_details_non_optional" = "Add Comment";
+"lng_report_details_message_about" = "Please help us by telling what is wrong with the message you have selected";
 "lng_report_reason_spam" = "Spam";
 "lng_report_reason_fake" = "Fake Account";
 "lng_report_reason_violence" = "Violence";
@@ -1853,8 +1861,19 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_action_proximity_distance_km#other" = "{count} km";
 "lng_action_webview_data_done" = "Data from the \"{text}\" button was transferred to the bot.";
 "lng_action_gift_received" = "{user} sent you a gift for {cost}";
-"lng_action_gift_received_me" = "You sent to {user} a gift for {cost}";
+"lng_action_gift_sent" = "You sent a gift for {cost}";
 "lng_action_gift_received_anonymous" = "Unknown user sent you a gift for {cost}";
+"lng_action_gift_for_stars#one" = "{count} Star";
+"lng_action_gift_for_stars#other" = "{count} Stars";
+"lng_action_gift_got_subtitle" = "Gift from {user}";
+"lng_action_gift_got_stars_text#one" = "Display this gift on your page or convert it to **{count}** Star.";
+"lng_action_gift_got_stars_text#other" = "Display this gift on your page or convert it to **{count}** Stars.";
+"lng_action_gift_sent_subtitle" = "Gift for {user}";
+"lng_action_gift_sent_text#one" = "{user} can display this gift on their page or convert it to {count} Star.";
+"lng_action_gift_sent_text#other" = "{user} can display this gift on their page or convert it to {count} Stars.";
+"lng_action_gift_premium_months#one" = "{count} Month Premium";
+"lng_action_gift_premium_months#other" = "{count} Months Premium";
+"lng_action_gift_premium_about" = "Subscription for exclusive Telegram features.";
 "lng_action_suggested_photo_me" = "You suggested this photo for {user}'s Telegram profile.";
 "lng_action_suggested_photo" = "{user} suggests this photo for your Telegram profile.";
 "lng_action_suggested_photo_button" = "View Photo";
@@ -1915,6 +1934,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_similar_channels_premium_all#other" = "Subscribe to {link} to unlock up to **{count}** similar channels.";
 "lng_similar_channels_premium_all_link" = "Telegram Premium";
 "lng_similar_channels_show_more" = "Show more channels";
+
+"lng_peer_gifts_title" = "Gifts";
+"lng_peer_gifts_about" = "These gifts were sent to {user} by other users.";
+"lng_peer_gifts_about_mine" = "These gifts were sent to you by other users. Click on a gift to convert it to Stars or change its privacy settings.";
 
 "lng_premium_gift_duration_months#one" = "for {count} month";
 "lng_premium_gift_duration_months#other" = "for {count} months";
@@ -2424,6 +2447,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_credits_box_history_entry_gift_name" = "Received Gift";
 "lng_credits_box_history_entry_giveaway_name" = "Received Prize";
 "lng_credits_box_history_entry_gift_sent" = "Sent Gift";
+"lng_credits_box_history_entry_gift_converted" = "Converted Gift";
 "lng_credits_box_history_entry_gift_out_about" = "With Stars, **{user}** will be able to unlock content and services on Telegram.\n{link}";
 "lng_credits_box_history_entry_gift_in_about" = "Use Stars to unlock content and services on Telegram. {link}";
 "lng_credits_box_history_entry_gift_about_link" = "See Examples {emoji}";
@@ -2989,6 +3013,49 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_gift_stars_incoming" = "Use Stars to unlock content and services on Telegram.";
 "lng_gift_until" = "Until";
 
+"lng_gift_premium_or_stars" = "Gift Premium or Stars";
+"lng_gift_premium_subtitle" = "Gift Premium";
+"lng_gift_premium_about" = "Give {name} access to exclusive features with Telegram Premium. {features}";
+"lng_gift_premium_features" = "See Features >";
+"lng_gift_premium_label" = "Premium";
+"lng_gift_stars_subtitle" = "Gift Stars";
+"lng_gift_stars_about" = "Give {name} gifts that can be kept on your profile or converted to Stars. {link}";
+"lng_gift_stars_link" = "What are Stars >";
+"lng_gift_stars_limited" = "limited";
+"lng_gift_stars_tabs_all" = "All Gifts";
+"lng_gift_stars_tabs_limited" = "Limited";
+"lng_gift_send_title" = "Send a Gift";
+"lng_gift_send_message" = "Enter Message";
+"lng_gift_send_anonymous" = "Hide My Name";
+"lng_gift_send_anonymous_about" = "You can hide your name and message from visitors to {user}'s profile. {recipient} will still see your name and message.";
+"lng_gift_send_premium_about" = "Only {user} will see your message.";
+"lng_gift_send_button" = "Send a Gift for {cost}";
+"lng_gift_sent_title" = "Gift Sent!";
+"lng_gift_sent_about#one" = "You spent **{count}** Star from your balance.";
+"lng_gift_sent_about#other" = "You spent **{count}** Stars from your balance.";
+"lng_gift_limited_of_one" = "unique";
+"lng_gift_limited_of_count" = "1 of {amount}";
+"lng_gift_anonymous_hint" = "Only you can see the sender's name.";
+"lng_gift_hidden_hint" = "This gift is hidden. Only you can see it.";
+"lng_gift_visible_hint" = "This gift is visible to visitors of your page.";
+"lng_gift_availability" = "Availability";
+"lng_gift_from_hidden" = "Hidden User";
+"lng_gift_availability_left#one" = "{count} of {amount} left";
+"lng_gift_availability_left#other" = "{count} of {amount} left";
+"lng_gift_availability_none" = "None of {amount} left";
+"lng_gift_display_on_page" = "Display on my Page";
+"lng_gift_display_on_page_hide" = "Hide from my Page";
+"lng_gift_convert_to_stars#one" = "Convert to {count} Star";
+"lng_gift_convert_to_stars#other" = "Convert to {count} Stars";
+"lng_gift_convert_sure_title" = "Convert Gift to Stars";
+"lng_gift_convert_sure_text#one" = "Do you want to convert this gift from {user} to **{count} Star**?\n\nThis action cannot be undone.";
+"lng_gift_convert_sure_text#other" = "Do you want to convert this gift from {user} to **{count} Stars**?\n\nThis action cannot be undone.";
+"lng_gift_convert_sure" = "Convert";
+"lng_gift_display_done" = "The gift is now shown on your profile page.";
+"lng_gift_display_done_hide" = "The gift is now hidden from your profile page.";
+"lng_gift_got_stars#one" = "You got **{count} Star** for this gift.";
+"lng_gift_got_stars#other" = "You got **{count} Stars** for this gift.";
+
 "lng_accounts_limit_title" = "Limit Reached";
 "lng_accounts_limit1#one" = "You have reached the limit of **{count}** connected account.";
 "lng_accounts_limit1#other" = "You have reached the limit of **{count}** connected accounts.";
@@ -3232,6 +3299,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_replies_discussion_started" = "Discussion started";
 "lng_replies_no_comments" = "No comments here yet...";
 
+"lng_verification_codes" = "Verification Codes";
+
 "lng_archived_name" = "Archived chats";
 "lng_archived_add" = "Archive";
 "lng_archived_remove" = "Unarchive";
@@ -3256,7 +3325,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_open_link" = "Open";
 "lng_allow_bot_pass" = "Allow {bot_name} to pass your Telegram name and ID (not your phone number) to the web pages you open via this bot?";
 "lng_allow_bot" = "Allow";
-"lng_allow_bot_webview" = "{bot_name} would like to open its web app to proceed.\n\nIt will be able to access your **IP address** and basic device info.";
+"lng_allow_bot_webview_details" = "More about this bot {emoji}";
+"lng_allow_bot_webview_details_about" = "To launch this web app, you will connect to its website.\n\nIt will be able to access your **IP address** and basic device info.";
 "lng_url_auth_open_confirm" = "Do you want to open {link}?";
 "lng_url_auth_login_option" = "Log in to {domain} as {user}";
 "lng_url_auth_allow_messages" = "Allow {bot} to send me messages";
@@ -3617,6 +3687,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_reply_header_short" = "Reply";
 "lng_reply_quote_selected" = "Quote Selected";
 "lng_reply_from_private_chat" = "This reply is from a private chat.";
+"lng_reply_quote_long_title" = "Quote too long!";
+"lng_reply_quote_long_text" = "The selected text is too long to quote.";
 "lng_link_options_header" = "Link Preview Settings";
 "lng_link_header_short" = "Link";
 "lng_link_move_up" = "Move Up";
@@ -4245,6 +4317,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_rights_restriction_for_all" = "This option is disabled for all members in Group Permissions.";
 "lng_rights_permission_for_all" = "This option is enabled for all members in Group Permissions.";
 "lng_rights_permission_unavailable" = "This permission is not available in public groups.";
+"lng_rights_permission_in_discuss" = "This permission is not available in discussion groups.";
 "lng_rights_permission_cant_edit" = "You cannot change this permission.";
 "lng_rights_user_restrictions" = "User permissions";
 "lng_rights_user_restrictions_header" = "What can this member do?";

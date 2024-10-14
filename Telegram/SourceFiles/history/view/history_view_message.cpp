@@ -3904,7 +3904,7 @@ bool Message::displayFastForward() const {
 		&& data()->isRegular()
 		&& data()->allowsForward()
 		&& base::IsCtrlPressed()
-		&& !delegate()->elementInSelectionMode();
+		&& !delegate()->elementInSelectionMode().inSelectionMode;
 }
 
 bool Message::displayRightActionComments() const {

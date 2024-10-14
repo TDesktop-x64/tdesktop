@@ -46,8 +46,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/boxes/report_box_graphics.h"
 #include "ui/layers/generic_box.h"
 #include "ui/controls/delete_message_context_action.h"
-#include "ui/painter.h"
 #include "ui/inactive_press.h"
+#include "ui/painter.h"
+#include "ui/rect.h"
 #include "ui/ui_utility.h"
 #include "window/window_session_controller.h"
 #include "window/window_controller.h"
@@ -217,8 +218,10 @@ public:
 			not_null<const Element*> view) override {
 		return (Element::Moused() == view);
 	}
-	bool elementInSelectionMode() override {
-		return _widget ? _widget->inSelectionMode() : false;
+	HistoryView::SelectionModeResult elementInSelectionMode() override {
+		return _widget
+			? _widget->inSelectionMode()
+			: HistoryView::SelectionModeResult();
 	}
 	bool elementIntersectsRange(
 			not_null<const Element*> view,
@@ -608,7 +611,7 @@ void HistoryInner::setupSwipeReply() {
 		}
 	}, [=, show = _controller->uiShow()](int cursorTop) {
 		auto result = HistoryView::SwipeHandlerFinishData();
-		if (inSelectionMode()) {
+		if (inSelectionMode().inSelectionMode) {
 			return result;
 		}
 		enumerateItems<EnumItemsDirection::BottomToTop>([&](
@@ -1378,6 +1381,18 @@ bool HistoryInner::eventHook(QEvent *e) {
 	return RpWidget::eventHook(e);
 }
 
+int HistoryInner::SelectionViewOffset(
+		not_null<const HistoryInner*> inner,
+		not_null<const Element*> view) {
+	if (inner->_lastInSelectionMode) {
+		const auto translation
+			= Element::AdditionalSpaceForSelectionCheckbox(view);
+		const auto progress = inner->_inSelectionModeAnimation.value(1.);
+		return translation * progress;
+	}
+	return 0;
+}
+
 HistoryInner::VideoUserpic *HistoryInner::validateVideoUserpic(
 		not_null<PeerData*> peer) {
 	if (!peer->isPremium()
@@ -1714,7 +1729,7 @@ void HistoryInner::mouseActionStart(const QPoint &screenPos, Qt::MouseButton but
 		&& (!Element::Hovered()
 			|| !Element::Hovered()->allowTextSelectionByHandler(pressed))) {
 		_mouseAction = MouseAction::PrepareDrag;
-	} else if (inSelectionMode()) {
+	} else if (inSelectionMode().inSelectionMode) {
 		if (_dragStateItem
 			&& _selected.find(_dragStateItem) != _selected.cend()
 			&& Element::Hovered()) {
@@ -2002,7 +2017,7 @@ void HistoryInner::mouseActionFinish(
 		// toggle selection instead of activating the pressed link
 		if (_mouseAction == MouseAction::PrepareDrag
 			&& !_pressWasInactive
-			&& inSelectionMode()
+			&& inSelectionMode().inSelectionMode
 			&& button != Qt::RightButton) {
 			if (const auto view = viewByItem(_mouseActionItem)) {
 				if (view->toggleSelectionByHandlerClick(activated)) {
@@ -2035,7 +2050,7 @@ void HistoryInner::mouseActionFinish(
 	}
 	if ((_mouseAction == MouseAction::PrepareSelect)
 		&& !_pressWasInactive
-		&& inSelectionMode()) {
+		&& inSelectionMode().inSelectionMode) {
 		changeSelectionAsGroup(
 			&_selected,
 			_mouseActionItem,
@@ -2052,7 +2067,7 @@ void HistoryInner::mouseActionFinish(
 		} else if ((i == _selected.cend())
 			&& !_dragStateItem->isService()
 			&& _dragStateItem->isRegular()
-			&& inSelectionMode()) {
+			&& inSelectionMode().inSelectionMode) {
 			if (_selected.size() < MaxSelectedItems) {
 				_selected.emplace(_dragStateItem, FullSelection);
 				repaintItem(_mouseActionItem);
@@ -2136,7 +2151,7 @@ void HistoryInner::mouseDoubleClickEvent(QMouseEvent *e) {
 		&& !ClickHandler::getPressed()
 		&& (_mouseCursorState == CursorState::None
 			|| _mouseCursorState == CursorState::Date)
-		&& !inSelectionMode()
+		&& !inSelectionMode().inSelectionMode
 		&& !_emptyPainter
 		&& e->button() == Qt::LeftButton) {
 		if (const auto view = Element::Moused()) {
@@ -3899,17 +3914,48 @@ bool HistoryInner::canDeleteSelected() const {
 		&& (selectedState.count == selectedState.canDeleteCount);
 }
 
-bool HistoryInner::inSelectionMode() const {
-	if (hasSelectedItems()) {
-		return true;
-	} else if (_mouseAction == MouseAction::Selecting
-		&& _dragSelFrom
-		&& _dragSelTo) {
-		return true;
-	} else if (_chooseForReportReason.has_value()) {
-		return true;
+HistoryView::SelectionModeResult HistoryInner::inSelectionMode() const {
+	const auto inSelectionMode = [&] {
+		if (hasSelectedItems()) {
+			return true;
+		}
+		const auto isSelecting = _mouseAction == MouseAction::Selecting;
+		if (isSelecting && _dragSelFrom && _dragSelTo) {
+			return true;
+		} else if (_chooseForReportReason.has_value()) {
+			return true;
+		} else if (_lastInSelectionMode && isSelecting) {
+			return true;
+		}
+		return false;
+	}();
+	const auto now = inSelectionMode;
+	if (_lastInSelectionMode != now) {
+		_lastInSelectionMode = now;
+		if (_inSelectionModeAnimation.animating()) {
+			const auto progress = !now
+				? _inSelectionModeAnimation.value(0.)
+				: 1. - _inSelectionModeAnimation.value(0.);
+			_inSelectionModeAnimation.change(
+				now ? 1. : 0.,
+				st::universalDuration * (1. - progress));
+		} else {
+			_inSelectionModeAnimation.stop();
+			_inSelectionModeAnimation.start(
+				[this] {
+					const_cast<HistoryInner*>(this)->update(
+						QRect(
+							0,
+							_visibleAreaTop,
+							width(),
+							_visibleAreaBottom - _visibleAreaTop));
+				},
+				now ? 0. : 1.,
+				now ? 1. : 0.,
+				st::universalDuration);
+		}
 	}
-	return false;
+	return { now, _inSelectionModeAnimation.value(now ? 1. : 0.) };
 }
 
 bool HistoryInner::elementIntersectsRange(
@@ -4096,7 +4142,7 @@ auto HistoryInner::reactionButtonParameters(
 		|| !view->data()->canReact()
 		|| _mouseAction == MouseAction::Dragging
 		|| _mouseAction == MouseAction::Selecting
-		|| inSelectionMode()) {
+		|| inSelectionMode().inSelectionMode) {
 		return {};
 	}
 	auto result = view->reactionButtonParameters(
@@ -4117,7 +4163,7 @@ void HistoryInner::mouseActionUpdate() {
 	auto mousePos = mapFromGlobal(_mousePosition);
 	auto point = _widget->clampMousePosition(mousePos);
 
-	QPoint m;
+	auto m = QPoint();
 
 	adjustCurrent(point.y());
 	const auto reactionState = _reactionsManager->buttonTextState(point);
@@ -4134,6 +4180,10 @@ void HistoryInner::mouseActionUpdate() {
 		? _curHistory->blocks[_curBlock]->messages[_curItem].get()
 		: nullptr;
 	const auto item = view ? view->data().get() : nullptr;
+	const auto selectionViewOffset = view
+		? QPoint(SelectionViewOffset(this, view), 0)
+		: QPoint(0, 0);
+	point -= selectionViewOffset;
 	if (view) {
 		const auto changed = (Element::Moused() != view);
 		if (changed) {
@@ -4181,7 +4231,7 @@ void HistoryInner::mouseActionUpdate() {
 		dragState = reactionState;
 		lnkhost = reactionView;
 	} else if (item) {
-		if (item != _mouseActionItem || (m - _dragStartPosition).manhattanLength() >= QApplication::startDragDistance()) {
+		if (item != _mouseActionItem || ((m + selectionViewOffset) - _dragStartPosition).manhattanLength() >= QApplication::startDragDistance()) {
 			if (_mouseAction == MouseAction::PrepareDrag) {
 				_mouseAction = MouseAction::Dragging;
 				InvokeQueued(this, [=] { performDrag(); });

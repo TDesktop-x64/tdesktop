@@ -1230,8 +1230,36 @@ bool ListWidget::hasSelectedItems() const {
 	return !_selected.empty();
 }
 
-bool ListWidget::inSelectionMode() const {
-	return hasSelectedItems() || !_dragSelected.empty();
+SelectionModeResult ListWidget::inSelectionMode() const {
+	const auto now = hasSelectedItems()
+		|| !_dragSelected.empty()
+		|| (_mouseAction == MouseAction::Selecting && _lastInSelectionMode);
+	if (_lastInSelectionMode != now) {
+		_lastInSelectionMode = now;
+		if (_inSelectionModeAnimation.animating()) {
+			const auto progress = !now
+				? _inSelectionModeAnimation.value(0.)
+				: 1. - _inSelectionModeAnimation.value(0.);
+			_inSelectionModeAnimation.change(
+				now ? 1. : 0.,
+				st::universalDuration * (1. - progress));
+		} else {
+			_inSelectionModeAnimation.stop();
+			_inSelectionModeAnimation.start(
+				[this] {
+					const_cast<ListWidget*>(this)->update(
+						QRect(
+							0,
+							_visibleTop,
+							width(),
+							_visibleBottom - _visibleTop));
+				},
+				now ? 0. : 1.,
+				now ? 1. : 0.,
+				st::universalDuration);
+		}
+	}
+	return { now, _inSelectionModeAnimation.value(now ? 1. : 0.) };
 }
 
 bool ListWidget::overSelectedItems() const {
@@ -1752,7 +1780,7 @@ bool ListWidget::elementUnderCursor(
 	return (_overElement == view);
 }
 
-bool ListWidget::elementInSelectionMode() {
+SelectionModeResult ListWidget::elementInSelectionMode() {
 	return inSelectionMode();
 }
 
@@ -2605,7 +2633,11 @@ auto ListWidget::countScrollState() const -> ScrollTopState {
 }
 
 void ListWidget::keyPressEvent(QKeyEvent *e) {
-	if (e->key() == Qt::Key_Escape || e->key() == Qt::Key_Back) {
+	const auto key = e->key();
+	const auto hasModifiers = (Qt::NoModifier !=
+		(e->modifiers()
+			& ~(Qt::KeypadModifier | Qt::GroupSwitchModifier)));
+	if (key == Qt::Key_Escape || key == Qt::Key_Back) {
 		if (hasSelectedText() || hasSelectedItems()) {
 			cancelSelection();
 		} else {
@@ -2617,20 +2649,31 @@ void ListWidget::keyPressEvent(QKeyEvent *e) {
 		&& !hasCopyRestrictionForSelected()) {
 		TextUtilities::SetClipboardText(getSelectedText());
 #ifdef Q_OS_MAC
-	} else if (e->key() == Qt::Key_E
+	} else if (key == Qt::Key_E
 		&& e->modifiers().testFlag(Qt::ControlModifier)
 		&& !showCopyRestriction()
 		&& !hasCopyRestrictionForSelected()) {
 		TextUtilities::SetClipboardText(getSelectedText(), QClipboard::FindBuffer);
 #endif // Q_OS_MAC
-	} else if (e == QKeySequence::Delete || e->key() == Qt::Key_Backspace) {
+	} else if (e == QKeySequence::Delete || key == Qt::Key_Backspace) {
 		_delegate->listDeleteRequest();
+	} else if (!hasModifiers
+		&& ((key == Qt::Key_Up)
+			|| (key == Qt::Key_Down)
+			|| (key == Qt::Key_PageUp)
+			|| (key == Qt::Key_PageDown))) {
+		_scrollKeyEvents.fire(std::move(e));
 	} else if (!(e->modifiers() & ~Qt::ShiftModifier)
-		&& e->key() != Qt::Key_Shift) {
+		&& key != Qt::Key_Shift) {
 		_delegate->listTryProcessKeyInput(e);
 	} else {
 		e->ignore();
 	}
+}
+
+auto ListWidget::scrollKeyEvents() const
+-> rpl::producer<not_null<QKeyEvent*>> {
+	return _scrollKeyEvents.events();
 }
 
 void ListWidget::mouseDoubleClickEvent(QMouseEvent *e) {
@@ -3396,7 +3439,7 @@ Reactions::ButtonParameters ListWidget::reactionButtonParameters(
 	if (top < 0
 		|| !view->data()->canReact()
 		|| _mouseAction == MouseAction::Dragging
-		|| inSelectionMode()) {
+		|| inSelectionMode().inSelectionMode) {
 		return {};
 	}
 	auto result = view->reactionButtonParameters(
@@ -3522,6 +3565,19 @@ ClickHandlerContext ListWidget::prepareClickHandlerContext(FullMsgId id) {
 	};
 }
 
+int ListWidget::SelectionViewOffset(
+		not_null<const ListWidget*> inner,
+		not_null<const Element*> view) {
+	if (inner->_lastInSelectionMode) {
+		const auto translation
+			= Element::AdditionalSpaceForSelectionCheckbox(view);
+		const auto progress = inner->_inSelectionModeAnimation.value(1.);
+		return translation * progress;
+	}
+	return 0;
+}
+
+
 void ListWidget::mouseActionUpdate() {
 	auto mousePosition = mapFromGlobal(_mousePosition);
 	auto point = QPoint(
@@ -3537,6 +3593,9 @@ void ListWidget::mouseActionUpdate() {
 		? reactionView
 		: strictFindItemByY(point.y());
 	const auto item = view ? view->data().get() : nullptr;
+	if (view) {
+		point -= QPoint(SelectionViewOffset(this, view), 0);
+	}
 	const auto itemPoint = mapPointToItem(point, view);
 	_overState = MouseState(
 		item ? item->fullId() : FullMsgId(),

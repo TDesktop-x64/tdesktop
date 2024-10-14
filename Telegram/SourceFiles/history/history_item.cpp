@@ -5478,8 +5478,18 @@ void HistoryItem::applyAction(const MTPMessageAction &action) {
 		_media = std::make_unique<Data::MediaGiftBox>(
 			this,
 			_from,
-			Data::GiftType::Premium,
-			data.vmonths().v);
+			Data::GiftCode{
+				.message = (data.vmessage()
+					? TextWithEntities{
+						.text = qs(data.vmessage()->data().vtext()),
+						.entities = Api::EntitiesFromMTP(
+							&history()->session(),
+							data.vmessage()->data().ventities().v),
+					}
+					: TextWithEntities()),
+				.count = data.vmonths().v,
+				.type = Data::GiftType::Premium,
+			});
 	}, [&](const MTPDmessageActionSuggestProfilePhoto &data) {
 		data.vphoto().match([&](const MTPDphoto &photo) {
 			_flags |= MessageFlag::IsUserpicSuggestion;
@@ -5510,6 +5520,14 @@ void HistoryItem::applyAction(const MTPMessageAction &action) {
 			_from,
 			Data::GiftCode{
 				.slug = qs(data.vslug()),
+				.message = (data.vmessage()
+					? TextWithEntities{
+						.text = qs(data.vmessage()->data().vtext()),
+						.entities = Api::EntitiesFromMTP(
+							&history()->session(),
+							data.vmessage()->data().ventities().v),
+					}
+					: TextWithEntities()),
 				.channel = (boostedId
 					? history()->owner().channel(boostedId).get()
 					: nullptr),

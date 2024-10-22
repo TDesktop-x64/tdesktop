@@ -363,7 +363,7 @@ base::unique_qptr<Ui::SideBarButton> FiltersMenu::prepareButton(
 			}
 		}
 	});
-	if (id >= 0) {
+	if (id > 0) {
 		raw->setAcceptDrops(true);
 		raw->events(
 		) | rpl::filter([=](not_null<QEvent*> e) {

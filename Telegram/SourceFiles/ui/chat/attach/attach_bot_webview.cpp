@@ -592,7 +592,7 @@ bool Panel::showWebview(
 			callback(tr::lng_bot_terms(tr::now), [=] {
 				File::OpenUrl(tr::lng_mini_apps_tos_url(tr::now));
 			}, &st::menuIconGroupLog);
-			callback(tr::lng_profile_bot_privacy(tr::now), [=] {
+			callback(tr::lng_bot_privacy(tr::now), [=] {
 				_delegate->botOpenPrivacyPolicy();
 			}, &st::menuIconAntispam);
 		}
@@ -712,6 +712,7 @@ bool Panel::createWebview(const Webview::ThemeParams &params) {
 			view->setGeometry(geometry.marginsRemoved({ 0, 0, 0, footer }));
 			crl::on_main(view, [=] {
 				sendViewport();
+				InvokeQueued(view, [=] { sendViewport(); });
 			});
 		}
 	}, _webview->lifetime);
@@ -1603,6 +1604,10 @@ TextWithEntities ErrorText(const Webview::Available &info) {
 			Ui::Text::WithEntities);
 	case Error::NoWebKitGTK:
 		return { tr::lng_payments_webview_install_webkit(tr::now) };
+	case Error::NoOpenGL:
+		return { tr::lng_payments_webview_enable_opengl(tr::now) };
+	case Error::NonX11:
+		return { tr::lng_payments_webview_switch_x11(tr::now) };
 	case Error::OldWindows:
 		return { tr::lng_payments_webview_update_windows(tr::now) };
 	default:

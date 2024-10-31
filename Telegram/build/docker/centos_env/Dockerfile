@@ -42,7 +42,7 @@ FROM builder AS patches
 RUN git init patches \
 	&& cd patches \
 	&& git remote add origin {{ GIT }}/desktop-app/patches.git \
-	&& git fetch --depth=1 origin e47e7ed0d383b8ca5622a58a5ffa0c8d5f00651f \
+	&& git fetch --depth=1 origin 643b18c2be6424fc6f35a52891ed5a6a42502ac2 \
 	&& git reset --hard FETCH_HEAD \
 	&& rm -rf .git
 
@@ -473,6 +473,7 @@ RUN git clone -b n12.1.14.0 --depth=1 {{ GIT }}/FFmpeg/nv-codec-headers.git \
 
 FROM builder AS ffmpeg
 COPY --link --from=opus {{ LibrariesPath }}/opus-cache /
+COPY --link --from=openh264 {{ LibrariesPath }}/openh264-cache /
 COPY --link --from=dav1d {{ LibrariesPath }}/dav1d-cache /
 COPY --link --from=libvpx {{ LibrariesPath }}/libvpx-cache /
 COPY --link --from=libXext {{ LibrariesPath }}/libXext-cache /
@@ -493,6 +494,7 @@ RUN git clone -b n6.1.1 --depth=1 {{ GIT }}/FFmpeg/FFmpeg.git \
 		--disable-autodetect \
 		--disable-everything \
 		--enable-libdav1d \
+		--enable-libopenh264 \
 		--enable-libopus \
 		--enable-libvpx \
 		--enable-vaapi \
@@ -587,6 +589,8 @@ RUN git clone -b n6.1.1 --depth=1 {{ GIT }}/FFmpeg/FFmpeg.git \
 		--enable-decoder=wmav1 \
 		--enable-decoder=wmav2 \
 		--enable-decoder=wmavoice \
+		--enable-encoder=aac \
+		--enable-encoder=libopenh264 \
 		--enable-encoder=libopus \
 		--enable-filter=atempo \
 		--enable-parser=aac \
@@ -610,6 +614,7 @@ RUN git clone -b n6.1.1 --depth=1 {{ GIT }}/FFmpeg/FFmpeg.git \
 		--enable-demuxer=mp3 \
 		--enable-demuxer=ogg \
 		--enable-demuxer=wav \
+		--enable-muxer=mp4 \
 		--enable-muxer=ogg \
 		--enable-muxer=opus \
 	&& make -j$(nproc) \
@@ -765,7 +770,7 @@ COPY --link --from=pipewire {{ LibrariesPath }}/pipewire-cache /
 RUN git init tg_owt \
 	&& cd tg_owt \
 	&& git remote add origin {{ GIT }}/desktop-app/tg_owt.git \
-	&& git fetch --depth=1 origin 4a60ce1ab9fdb962004c6a959f682ace3db50cbd \
+	&& git fetch --depth=1 origin 8198c4d8b91e22d68eb5c7327fd408e3b6abcc79 \
 	&& git reset --hard FETCH_HEAD \
 	&& git submodule update --init --recursive --depth=1 \
 	&& rm -rf .git \

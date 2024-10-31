@@ -81,6 +81,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/controls/silent_toggle.h"
 #include "ui/chat/choose_send_as.h"
 #include "ui/effects/spoiler_mess.h"
+#include "webrtc/webrtc_environment.h"
 #include "window/window_adaptive.h"
 #include "window/window_session_controller.h"
 #include "mainwindow.h"
@@ -1151,7 +1152,7 @@ void ComposeControls::setMimeDataHook(MimeDataHook hook) {
 bool ComposeControls::confirmMediaEdit(Ui::PreparedList &list) {
 	if (!isEditingMessage() || !_regularWindow) {
 		return false;
-	} else if (_canReplaceMedia) {
+	} else if (_canReplaceMedia || _canAddMedia) {
 		const auto queryToEdit = _header->queryToEdit();
 		EditCaptionBox::StartMediaReplace(
 			_regularWindow,
@@ -1517,7 +1518,7 @@ void ComposeControls::orderControls() {
 }
 
 bool ComposeControls::showRecordButton() const {
-	return ::Media::Capture::instance()->available()
+	return (_recordAvailability != Webrtc::RecordAvailability::None)
 		&& !_voiceRecordBar->isListenState()
 		&& !_voiceRecordBar->isRecordingByAnotherBar()
 		&& !HasSendText(_field)
@@ -1942,7 +1943,7 @@ void ComposeControls::applyDraft(FieldHistoryAction fieldHistoryAction) {
 			_preview->apply({ .removed = true });
 			_preview->setDisabled(false);
 		}
-		_canReplaceMedia = false;
+		_canReplaceMedia = _canAddMedia = false;
 		_photoEditMedia = nullptr;
 		return;
 	}
@@ -1962,7 +1963,16 @@ void ComposeControls::applyDraft(FieldHistoryAction fieldHistoryAction) {
 		const auto resolve = [=] {
 			if (const auto item = _history->owner().message(editingId)) {
 				const auto media = item->media();
-				_canReplaceMedia = media && media->allowsEditMedia();
+				_canReplaceMedia = item->allowsEditMedia();
+				if (media) {
+					_canAddMedia = false;
+				} else {
+					_canAddMedia = base::take(_canReplaceMedia);
+				}
+				if (_canReplaceMedia || _canAddMedia) {
+					// Invalidate the button, maybe icon has changed.
+					_replaceMedia = nullptr;
+				}
 				_photoEditMedia = (_canReplaceMedia
 					&& _regularWindow
 					&& media->photo()
@@ -1983,7 +1993,7 @@ void ComposeControls::applyDraft(FieldHistoryAction fieldHistoryAction) {
 				}
 				return true;
 			}
-			_canReplaceMedia = false;
+			_canReplaceMedia = _canAddMedia = false;
 			_photoEditMedia = nullptr;
 			_header->editMessage(editingId, false);
 			return false;
@@ -2004,7 +2014,7 @@ void ComposeControls::applyDraft(FieldHistoryAction fieldHistoryAction) {
 		}
 		_header->replyToMessage({});
 	} else {
-		_canReplaceMedia = false;
+		_canReplaceMedia = _canAddMedia = false;
 		_photoEditMedia = nullptr;
 		_header->replyToMessage(draft->reply);
 		if (_header->replyingToMessage()) {
@@ -2137,12 +2147,17 @@ void ComposeControls::initSendButton() {
 		}
 	};
 
-
 	SendMenu::SetupMenuAndShortcuts(
 		_send.get(),
 		_show,
 		[=] { return sendButtonMenuDetails(); },
 		sendAction);
+
+	Core::App().mediaDevices().recordAvailabilityValue(
+	) | rpl::start_with_next([=](Webrtc::RecordAvailability value) {
+		_recordAvailability = value;
+		updateSendButtonType();
+	}, _send->lifetime());
 }
 
 void ComposeControls::initSendAsButton(not_null<PeerData*> peer) {
@@ -2413,6 +2428,42 @@ void ComposeControls::initVoiceRecordBar() {
 		return false;
 	});
 
+	_voiceRecordBar->recordingTipRequests(
+	) | rpl::start_with_next([=] {
+		Core::App().settings().setRecordVideoMessages(
+			!Core::App().settings().recordVideoMessages());
+		updateSendButtonType();
+		switch (_send->type()) {
+		case Ui::SendButton::Type::Record: {
+			const auto both = Webrtc::RecordAvailability::VideoAndAudio;
+			_show->showToast((_recordAvailability == both)
+				? tr::lng_record_voice_tip(tr::now)
+				: tr::lng_record_hold_tip(tr::now));
+		} break;
+		case Ui::SendButton::Type::Round:
+			_show->showToast(tr::lng_record_video_tip(tr::now));
+			break;
+		}
+	}, _wrap->lifetime());
+
+	_voiceRecordBar->errors(
+	) | rpl::start_with_next([=](::Media::Capture::Error error) {
+		using Error = ::Media::Capture::Error;
+		switch (error) {
+		case Error::AudioInit:
+		case Error::AudioTimeout:
+			_show->showToast(tr::lng_record_audio_problem(tr::now));
+			break;
+		case Error::VideoInit:
+		case Error::VideoTimeout:
+			_show->showToast(tr::lng_record_video_problem(tr::now));
+			break;
+		default:
+			_show->showToast(u"Unknown error."_q);
+			break;
+		}
+	}, _wrap->lifetime());
+
 	_voiceRecordBar->updateSendButtonTypeRequests(
 	) | rpl::start_with_next([=] {
 		updateSendButtonType();
@@ -2454,7 +2505,11 @@ auto ComposeControls::computeSendButtonType() const {
 	} else if (_isInlineBot) {
 		return Type::Cancel;
 	} else if (showRecordButton()) {
-		return Type::Record;
+		const auto both = Webrtc::RecordAvailability::VideoAndAudio;
+		const auto video = Core::App().settings().recordVideoMessages();
+		return (video && _recordAvailability == both)
+			? Type::Round
+			: Type::Record;
 	}
 	return (_mode == Mode::Normal) ? Type::Send : Type::Schedule;
 }
@@ -2487,7 +2542,9 @@ void ComposeControls::updateSendButtonType() {
 	}();
 	_send->setSlowmodeDelay(delay);
 	_send->setDisabled(_sendDisabledBySlowmode.current()
-		&& (type == Type::Send || type == Type::Record));
+		&& (type == Type::Send
+			|| type == Type::Record
+			|| type == Type::Round));
 }
 
 void ComposeControls::finishAnimating() {
@@ -2882,7 +2939,7 @@ void ComposeControls::editMessage(not_null<HistoryItem*> item) {
 }
 
 bool ComposeControls::updateReplaceMediaButton() {
-	if (!_canReplaceMedia || !_regularWindow) {
+	if ((!_canReplaceMedia && !_canAddMedia) || !_regularWindow) {
 		const auto result = (_replaceMedia != nullptr);
 		_replaceMedia = nullptr;
 		return result;
@@ -2891,7 +2948,7 @@ bool ComposeControls::updateReplaceMediaButton() {
 	}
 	_replaceMedia = std::make_unique<Ui::IconButton>(
 		_wrap.get(),
-		st::historyReplaceMedia);
+		_canReplaceMedia ? st::historyReplaceMedia : st::historyAddMedia);
 	const auto hideDuration = st::historyReplaceMedia.ripple.hideDuration;
 	_replaceMedia->setClickedCallback([=] {
 		base::call_delayed(hideDuration, _wrap.get(), [=] {
@@ -3149,8 +3206,9 @@ bool ComposeControls::isRecording() const {
 bool ComposeControls::isRecordingPressed() const {
 	return !_voiceRecordBar->isRecordingLocked()
 		&& (!_voiceRecordBar->isHidden()
-			|| (_send->type() == Ui::SendButton::Type::Record
-				&& _send->isDown()));
+			|| (_send->isDown()
+				&& (_send->type() == Ui::SendButton::Type::Record
+					|| _send->type() == Ui::SendButton::Type::Round)));
 }
 
 rpl::producer<bool> ComposeControls::recordingActiveValue() const {

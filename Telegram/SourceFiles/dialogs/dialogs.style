@@ -222,9 +222,7 @@ dialogsMenuToggle: IconButton {
 
 	rippleAreaPosition: point(0px, 0px);
 	rippleAreaSize: 40px;
-	ripple: RippleAnimation(defaultRippleAnimation) {
-		color: windowBgOver;
-	}
+	ripple: defaultRippleAnimationBgOver;
 }
 dialogsMenuToggleUnread: icon {
 	{ "dialogs/dialogs_menu_unread", dialogsMenuIconFg },
@@ -745,3 +743,7 @@ dialogsSearchTagPromoLeft: 6px;
 dialogsSearchTagPromoRight: 1px;
 dialogsSearchTagPromoSkip: 6px;
 
+dialogsPopularAppsPadding: margins(10px, 8px, 10px, 12px);
+dialogsPopularAppsAbout: FlatLabel(boxDividerLabel) {
+	minWidth: 128px;
+}

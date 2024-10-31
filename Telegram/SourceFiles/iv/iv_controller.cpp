@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "iv/iv_controller.h"
 
 #include "base/platform/base_platform_info.h"
+#include "base/qt/qt_key_modifiers.h"
 #include "base/invoke_queued.h"
 #include "base/qt_signal_producer.h"
 #include "base/qthelp_url.h"
@@ -21,9 +22,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/menu/menu_action.h"
 #include "ui/widgets/rp_window.h"
 #include "ui/widgets/popup_menu.h"
+#include "ui/widgets/tooltip.h"
 #include "ui/wrap/fade_wrap.h"
 #include "ui/basic_click_handlers.h"
 #include "ui/painter.h"
+#include "ui/rect.h"
 #include "ui/webview_helpers.h"
 #include "ui/ui_utility.h"
 #include "webview/webview_data_stream_memory.h"
@@ -52,9 +55,13 @@ namespace Iv {
 namespace {
 
 constexpr auto kZoomStep = int(10);
+constexpr auto kZoomSmallStep = int(5);
+constexpr auto kZoomTinyStep = int(1);
 constexpr auto kDefaultZoom = int(100);
 
-class ItemZoom final : public Ui::Menu::Action {
+class ItemZoom final
+	: public Ui::Menu::Action
+	, public Ui::AbstractTooltipShower {
 public:
 	ItemZoom(
 		not_null<RpWidget*> parent,
@@ -76,43 +83,21 @@ public:
 
 		AbstractButton::setDisabled(true);
 
-		class SmallButton final : public Ui::IconButton {
-		public:
-			SmallButton(
-				not_null<Ui::RpWidget*> parent,
-				QChar c,
-				float64 skip,
-				const style::color &color)
-			: Ui::IconButton(parent, st::ivPlusMinusZoom)
-			, _color(color)
-			, _skip(style::ConvertFloatScale(skip))
-			, _c(c) {
-			}
-
-			void paintEvent(QPaintEvent *event) override {
-				auto p = Painter(this);
-				Ui::RippleButton::paintRipple(
-					p,
-					st::ivPlusMinusZoom.rippleAreaPosition);
-				p.setPen(_color);
-				p.setFont(st::normalFont);
-				p.drawText(
-					QRectF(rect()).translated(0, _skip),
-					_c,
-					style::al_center);
-			}
-
-		private:
-			const style::color _color;
-			const float64 _skip;
-			const QChar _c;
-
+		const auto processTooltip = [=](not_null<Ui::RpWidget*> w) {
+			w->events() | rpl::start_with_next([=](not_null<QEvent*> e) {
+				if (e->type() == QEvent::Enter) {
+					Ui::Tooltip::Show(1000, this);
+				} else if (e->type() == QEvent::Leave) {
+					Ui::Tooltip::Hide();
+				}
+			}, w->lifetime());
 		};
 
 		const auto reset = Ui::CreateChild<Ui::RoundButton>(
 			this,
 			rpl::single<QString>(QString()),
 			st::ivResetZoom);
+		processTooltip(reset);
 		const auto resetLabel = Ui::CreateChild<Ui::FlatLabel>(
 			reset,
 			tr::lng_background_reset_default(),
@@ -123,24 +108,59 @@ public:
 			_delegate->ivSetZoom(kDefaultZoom);
 		});
 		reset->show();
-		const auto plus = Ui::CreateChild<SmallButton>(
+		const auto plus = Ui::CreateSimpleCircleButton(
 			this,
-			'+',
-			0,
-			_st.itemFg);
-		plus->setClickedCallback([this] {
-			_delegate->ivSetZoom(_delegate->ivZoom() + kZoomStep);
+			st::defaultRippleAnimationBgOver);
+		plus->resize(Size(st::ivZoomButtonsSize));
+		plus->paintRequest() | rpl::start_with_next([=, fg = _st.itemFg] {
+			auto p = QPainter(plus);
+			p.setPen(fg);
+			p.setFont(st::normalFont);
+			p.drawText(plus->rect(), QChar('+'), style::al_center);
+		}, plus->lifetime());
+		processTooltip(plus);
+		const auto step = [] {
+			return base::IsAltPressed()
+				? kZoomTinyStep
+				: base::IsCtrlPressed()
+				? kZoomSmallStep
+				: kZoomStep;
+		};
+		plus->setClickedCallback([this, step] {
+			_delegate->ivSetZoom(_delegate->ivZoom() + step());
 		});
 		plus->show();
-		const auto minus = Ui::CreateChild<SmallButton>(
+		const auto minus = Ui::CreateSimpleCircleButton(
 			this,
-			QChar(0x2013),
-			-1,
-			_st.itemFg);
-		minus->setClickedCallback([this] {
-			_delegate->ivSetZoom(_delegate->ivZoom() - kZoomStep);
+			st::defaultRippleAnimationBgOver);
+		minus->resize(Size(st::ivZoomButtonsSize));
+		minus->paintRequest() | rpl::start_with_next([=, fg = _st.itemFg] {
+			auto p = QPainter(minus);
+			const auto r = minus->rect();
+			p.setPen(fg);
+			p.setFont(st::normalFont);
+			p.drawText(
+				QRectF(r).translated(0, style::ConvertFloatScale(-1)),
+				QChar(0x2013),
+				style::al_center);
+		}, minus->lifetime());
+		processTooltip(minus);
+		minus->setClickedCallback([this, step] {
+			_delegate->ivSetZoom(_delegate->ivZoom() - step());
 		});
 		minus->show();
+
+		{
+			const auto maxWidthText = u"000%"_q;
+			_text.setText(_st.itemStyle, maxWidthText);
+			Ui::Menu::ItemBase::setMinWidth(
+				_text.maxWidth()
+					+ st::ivResetZoomInnerPadding
+					+ resetLabel->width()
+					+ plus->width()
+					+ minus->width()
+					+ _st.itemPadding.right() * 2);
+		}
 
 		_delegate->ivZoomValue(
 		) | rpl::start_with_next([this](int value) {
@@ -151,7 +171,7 @@ public:
 		rpl::combine(
 			sizeValue(),
 			reset->sizeValue()
-		) | rpl::start_with_next([=, this](const QSize &size, const QSize &) {
+		) | rpl::start_with_next([=](const QSize &size, const QSize &) {
 			reset->setFullWidth(0
 				+ resetLabel->width()
 				+ st::ivResetZoomInnerPadding);
@@ -180,6 +200,22 @@ public:
 			.outerWidth = width(),
 			.availableWidth = width(),
 		});
+	}
+
+	QString tooltipText() const override {
+#ifdef Q_OS_MAC
+		return tr::lng_iv_zoom_tooltip_cmd(tr::now);
+#else
+		return tr::lng_iv_zoom_tooltip_ctrl(tr::now);
+#endif
+	}
+
+	QPoint tooltipPos() const override {
+		return QCursor::pos();
+	}
+
+	bool tooltipWindowActive() const override {
+		return true;
 	}
 
 private:
@@ -345,10 +381,16 @@ Controller::Controller(
 	Fn<ShareBoxResult(ShareBoxDescriptor)> showShareBox)
 : _delegate(delegate)
 , _updateStyles([=] {
-	const auto zoom = _delegate->ivZoom();
-	const auto str = Ui::EscapeForScriptString(ComputeStyles(zoom));
 	if (_webview) {
+		const auto webviewZoomController = _webview->zoomController();
+		const auto styleZoom = webviewZoomController
+			? kDefaultZoom
+			: _delegate->ivZoom();
+		const auto str = Ui::EscapeForScriptString(ComputeStyles(styleZoom));
 		_webview->eval("IV.updateStyles('" + str + "');");
+		if (webviewZoomController) {
+			webviewZoomController->setZoom(_delegate->ivZoom());
+		}
 	}
 })
 , _showShareBox(std::move(showShareBox)) {
@@ -610,6 +652,17 @@ void Controller::createWebview(const Webview::StorageId &storageId) {
 		});
 	const auto raw = _webview.get();
 
+	if (const auto webviewZoomController = raw->zoomController()) {
+		webviewZoomController->zoomValue(
+		) | rpl::start_with_next([this](int value) {
+			_delegate->ivSetZoom(value);
+		}, lifetime());
+		_delegate->ivZoomValue(
+		) | rpl::start_with_next([=](int value) {
+			webviewZoomController->setZoom(value);
+		}, lifetime());
+	}
+
 	window->lifetime().add([=] {
 		_ready = false;
 		base::take(_webview);
@@ -761,8 +814,12 @@ void Controller::createWebview(const Webview::StorageId &storageId) {
 				|| index >= _pages.size()) {
 				return Webview::DataResult::Failed;
 			}
+			const auto webviewZoomController = _webview->zoomController();
+			const auto styleZoom = webviewZoomController
+				? kDefaultZoom
+				: _delegate->ivZoom();
 			return finishWith(
-				WrapPage(_pages[index], _delegate->ivZoom()),
+				WrapPage(_pages[index], styleZoom),
 				"text/html; charset=utf-8");
 		} else if (id.starts_with("page") && id.ends_with(".json")) {
 			auto index = 0;
@@ -933,6 +990,8 @@ void Controller::processKey(const QString &key, const QString &modifier) {
 		minimize();
 	} else if (key == u"q"_q && modifier == ctrl) {
 		quit();
+	} else if (key == u"0"_q && modifier == ctrl) {
+		_delegate->ivSetZoom(kDefaultZoom);
 	}
 }
 

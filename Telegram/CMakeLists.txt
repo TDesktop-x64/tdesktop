@@ -999,6 +999,7 @@ PRIVATE
     info/statistics/info_statistics_list_controllers.h
     info/statistics/info_statistics_recent_message.cpp
     info/statistics/info_statistics_recent_message.h
+    info/statistics/info_statistics_tag.h
     info/statistics/info_statistics_widget.cpp
     info/statistics/info_statistics_widget.h
     info/stories/info_stories_inner_widget.cpp
@@ -1166,6 +1167,8 @@ PRIVATE
     media/streaming/media_streaming_player.h
     media/streaming/media_streaming_reader.cpp
     media/streaming/media_streaming_reader.h
+    media/streaming/media_streaming_round_preview.cpp
+    media/streaming/media_streaming_round_preview.h
     media/streaming/media_streaming_utility.cpp
     media/streaming/media_streaming_utility.h
     media/streaming/media_streaming_video_track.cpp
@@ -1507,6 +1510,8 @@ PRIVATE
     ui/chat/choose_send_as.h
     ui/chat/choose_theme_controller.cpp
     ui/chat/choose_theme_controller.h
+    ui/chat/sponsored_message_bar.cpp
+    ui/chat/sponsored_message_bar.h
     ui/controls/emoji_button_factory.cpp
     ui/controls/emoji_button_factory.h
     ui/controls/location_picker.cpp
@@ -1858,7 +1863,7 @@ endif()
 
 set_target_properties(Telegram PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${output_folder})
 
-if (WIN32 AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+if (MSVC)
     target_link_libraries(Telegram
     PRIVATE
         delayimp
@@ -1955,7 +1960,7 @@ if (NOT DESKTOP_APP_DISABLE_AUTOUPDATE AND NOT build_macstore AND NOT build_wins
             base/platform/win/base_windows_safe_library.h
         )
         target_include_directories(Updater PRIVATE ${lib_base_loc})
-        if (CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+        if (MSVC)
             target_link_libraries(Updater
             PRIVATE
                 delayimp

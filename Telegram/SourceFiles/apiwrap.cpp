@@ -3339,6 +3339,7 @@ void ApiWrap::forwardMessages(
 		}
 		const auto requestType = Data::Histories::RequestType::Send;
 		const auto idsCopy = localIds;
+		const auto scheduled = action.options.scheduled;
 		histories.sendRequest(history, requestType, [=](Fn<void()> finish) {
 			history->sendRequestId = request(MTPmessages_ForwardMessages(
 				MTP_flags(sendFlags),
@@ -3351,6 +3352,9 @@ void ApiWrap::forwardMessages(
 				(sendAs ? sendAs->input : MTP_inputPeerEmpty()),
 				Data::ShortcutIdToMTP(_session, action.options.shortcutId)
 			)).done([=](const MTPUpdates &result) {
+				if (!scheduled) {
+					this->updates().checkForSentToScheduled(result);
+				}
 				applyUpdates(result);
 				if (shared && !--shared->requestsLeft) {
 					shared->callback();
@@ -3512,6 +3516,7 @@ void ApiWrap::sendVoiceMessage(
 		QByteArray result,
 		VoiceWaveform waveform,
 		crl::time duration,
+		bool video,
 		const SendAction &action) {
 	const auto caption = TextWithTags();
 	const auto to = FileLoadTaskOptions(action);
@@ -3520,6 +3525,7 @@ void ApiWrap::sendVoiceMessage(
 		result,
 		duration,
 		waveform,
+		video,
 		to,
 		caption));
 }

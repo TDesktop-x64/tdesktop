@@ -76,6 +76,10 @@ namespace Main {
 class Session;
 } // namespace Main
 
+namespace Webrtc {
+enum class RecordAvailability : uchar;
+} // namespace Webrtc
+
 namespace Window {
 struct SectionShow;
 class SessionController;
@@ -436,10 +440,12 @@ private:
 	bool _isInlineBot = false;
 	bool _botCommandShown = false;
 	bool _likeShown = false;
+	Webrtc::RecordAvailability _recordAvailability = {};
 
 	FullMsgId _editingId;
 	std::shared_ptr<Data::PhotoMedia> _photoEditMedia;
 	bool _canReplaceMedia = false;
+	bool _canAddMedia = false;
 
 	std::unique_ptr<Controls::WebpageProcessor> _preview;
 

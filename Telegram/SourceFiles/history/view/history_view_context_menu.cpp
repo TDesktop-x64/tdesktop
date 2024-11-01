@@ -1506,9 +1506,6 @@ base::unique_qptr<Ui::PopupMenu> FillContextMenu(
 	}
 	if (item) {
 		const auto added = (result->actions().size() > wasAmount);
-		if (!added) {
-			result->addSeparator();
-		}
 		AddSelectRestrictionAction(result, item, !added);
 	}
 
@@ -2105,6 +2102,9 @@ void AddSelectRestrictionAction(
 	if ((peer->allowsForwarding() && !item->forbidsForward())
 		|| item->isSponsored()) {
 		return;
+	}
+	if (addIcon && !menu->empty()) {
+		menu->addSeparator();
 	}
 	auto button = base::make_unique_q<Ui::Menu::MultilineAction>(
 		menu->menu(),

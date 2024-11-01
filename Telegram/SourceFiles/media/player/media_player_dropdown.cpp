@@ -734,10 +734,14 @@ SpeedController::SpeedController(
 	Expects(_qualities.empty() || (_lookupQuality && _changeQuality));
 
 	button->setClickedCallback([=] {
-		toggleDefault();
-		save();
-		if (const auto current = menu()) {
-			current->otherEnter();
+		if (_lookup && !_lookupQuality && !_changeQuality) {
+			toggleDefault();
+			save();
+			if (const auto current = menu()) {
+				current->otherEnter();
+			}
+		} else {
+			showMenu();
 		}
 	});
 	if (const auto lookup = _lookup) {

@@ -1168,7 +1168,9 @@ void AddCreditsHistoryEntryTable(
 			});
 			AddTableRow(
 				table,
-				tr::lng_credits_box_history_entry_media(),
+				(entry.reaction
+					? tr::lng_credits_box_history_entry_message
+					: tr::lng_credits_box_history_entry_media)(),
 				std::move(label),
 				st::giveawayGiftCodeValueMargin);
 		}
@@ -1310,6 +1312,16 @@ void AddSubscriptionEntryTable(
 		controller,
 		peerId);
 	if (!s.until.isNull()) {
+		if (s.subscription.period > 0) {
+			const auto subscribed = s.until.addSecs(-s.subscription.period);
+			if (subscribed.isValid()) {
+				AddTableRow(
+					table,
+					tr::lng_group_invite_joined_row_date(),
+					rpl::single(
+						Ui::Text::WithEntities(langDateTime(subscribed))));
+			}
+		}
 		AddTableRow(
 			table,
 			s.expired

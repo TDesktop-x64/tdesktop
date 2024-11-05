@@ -1811,7 +1811,10 @@ void OverlayWidget::fillContextMenuActions(
 			}, &st::mediaMenuIconStats);
 		}
 	}
-	if (_stories && _stories->allowStealthMode()) {
+	if (_stories
+		&& _stories->allowStealthMode()
+		&& story
+		&& story->peer()->isUser()) {
 		const auto now = base::unixtime::now();
 		const auto stealth = _session->data().stories().stealthMode();
 		addAction(tr::lng_stealth_mode_menu_item(tr::now), [=] {
@@ -4363,9 +4366,11 @@ void OverlayWidget::restartAtSeekPosition(crl::time position) {
 		_rotation = saved;
 		updateContentRect();
 	}
+	const auto overrideDuration = _stories
+		|| (_chosenQuality && _chosenQuality != _document);
 	auto options = Streaming::PlaybackOptions{
 		.position = position,
-		.durationOverride = ((_stories
+		.durationOverride = ((overrideDuration
 			&& _document
 			&& _document->hasDuration())
 			? _document->duration()

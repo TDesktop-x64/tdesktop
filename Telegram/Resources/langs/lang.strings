@@ -2109,6 +2109,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 "lng_channel_public_link_copied" = "Link copied to clipboard.";
 "lng_context_about_private_link" = "This link will only work for members of this chat.";
+"lng_public_post_private_hint_ctrl" = "Use Ctrl+Click to copy a non-public link.";
+"lng_public_post_private_hint_cmd" = "Use Cmd+Click to copy a non-public link.";
 
 "lng_forwarded" = "Forwarded from {user}";
 "lng_forwarded_story" = "Story from {user}";
@@ -3628,6 +3630,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_context_disable_spoiler" = "Remove Spoiler";
 "lng_context_make_paid" = "Make This Content Paid";
 "lng_context_change_price" = "Change Price";
+
+"lng_context_mention" = "Mention";
+"lng_context_search_from" = "Search messages";
 
 "lng_factcheck_title" = "Fact Check";
 "lng_factcheck_placeholder" = "Add Facts or Context";
@@ -5614,6 +5619,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_bot_earn_credits_out_minimal" = "You cannot withdraw less than {link}.";
 "lng_bot_earn_credits_out_minimal_link#one" = "{count} star";
 "lng_bot_earn_credits_out_minimal_link#other" = "{count} stars";
+"lng_bot_copy_text_tooltip" = "Copy to Clipboard: {text}";
 
 "lng_contact_add" = "Add";
 "lng_contact_send_message" = "Message";

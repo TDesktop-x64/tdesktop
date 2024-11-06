@@ -653,7 +653,7 @@ HttpChecker::HttpChecker(bool testing) : Checker(testing) {
 }
 
 void HttpChecker::start() {
-	const auto updaterVersion = Platform::AutoUpdateVersion();
+	//const auto updaterVersion = Platform::AutoUpdateVersion();
 	const auto path = Local::readAutoupdatePrefix() + qstr("/check");
 	auto url = QUrl(path);
 	DEBUG_LOG(("Update Info: requesting update state"));

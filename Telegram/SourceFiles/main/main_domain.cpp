@@ -501,12 +501,12 @@ void Domain::scheduleWriteAccounts() {
 }
 
 int Domain::maxAccounts() const {
-	const auto premiumCount = ranges::count_if(accounts(), [](
-			const Main::Domain::AccountWithIndex &d) {
-		return d.account->sessionExists()
-			&& (d.account->session().premium()
-				|| d.account->session().isTestMode());
-	});
+	//const auto premiumCount = ranges::count_if(accounts(), [](
+	//		const Main::Domain::AccountWithIndex &d) {
+	//	return d.account->sessionExists()
+	//		&& (d.account->session().premium()
+	//			|| d.account->session().isTestMode());
+	//});
 	//return std::min(int(premiumCount) + kMaxAccounts, kPremiumMaxAccounts);
 	return 100;
 }

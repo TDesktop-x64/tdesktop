@@ -4423,7 +4423,7 @@ QRect Message::countGeometry() const {
 	}
 
 	// sponsored move to right
-	if (const auto sponsored = data()->isSponsored()) {
+	if (data()->isSponsored()) {
 		contentLeft = st::msgMargin.right() + availableWidth - contentWidth;
 	}
 

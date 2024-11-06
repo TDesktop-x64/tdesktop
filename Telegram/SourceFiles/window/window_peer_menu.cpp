@@ -2265,8 +2265,7 @@ QPointer<Ui::BoxContent> ShowOldForwardMessagesBox(
 
 			state->menu->addSeparator();
 		}
-		const auto type = sendMenuType();
-		const auto result = SendMenu::FillSendMenu(
+		SendMenu::FillSendMenu(
 			state->menu.get(),
 			show,
 			SendMenu::Details{ sendMenuType() },
@@ -2848,7 +2847,7 @@ QPointer<Ui::BoxContent> ShowForwardMessagesBox(
 		Fn<void()> &&successCallback) {
 	return ShowOldForwardMessagesBox(
 		navigation->uiShow(),
-		Data::ForwardDraft{ .ids = std::move(items) },
+		Data::ForwardDraft{ .ids = items },
 		std::move(successCallback));
 }
 

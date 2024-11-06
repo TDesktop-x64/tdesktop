@@ -219,15 +219,15 @@ TextWithEntities AboutWithEntities(
 	auto flags = TextParseLinks | TextParseMentions;
 	const auto user = peer->asUser();
 	const auto isBot = user && user->isBot();
-	const auto isPremium = user && user->isPremium();
+	//const auto isPremium = user && user->isPremium();
 	if (!user) {
 		flags |= TextParseHashtags;
 	} else if (isBot) {
 		flags |= TextParseHashtags | TextParseBotCommands;
 	}
-	const auto stripExternal = peer->isChat()
-		|| peer->isMegagroup()
-		|| (user && !isBot && !isPremium);
+	//const auto stripExternal = peer->isChat()
+	//	|| peer->isMegagroup()
+	//	|| (user && !isBot && !isPremium);
 	auto result = TextWithEntities{ value };
 	TextUtilities::ParseEntities(result, flags);
 //	if (stripExternal) {

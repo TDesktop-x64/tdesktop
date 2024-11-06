@@ -937,8 +937,6 @@ void Widget::setupShortcuts(not_null<Window::SessionController *> controller) {
 	}) | rpl::start_with_next([=](not_null<Shortcuts::Request*> request) {
 		using Command = Shortcuts::Command;
 
-		const auto row = controller->activeChatEntryCurrent();
-
 		request->check(Command::GlobalSearch) && request->handle([=] {
 			if (_openedFolder) {
 				controller->closeFolder();

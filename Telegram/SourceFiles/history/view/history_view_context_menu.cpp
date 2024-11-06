@@ -435,7 +435,7 @@ bool AddForwardSelectedAction(
 		action.generateLocal = false;
 
 		const auto history = item->history()->peer->owner().history(self);
-		auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = std::move(items) });
+		auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = items });
 
 		api->forwardMessages(std::move(resolved), action, [=] {
 			Ui::Toast::Show(tr::lng_share_done(tr::now));
@@ -555,7 +555,7 @@ void AddRepeaterAction(
 					}
 
 					const auto history = item->history()->peer->owner().history(item->history()->peer);
-					auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = std::move(MessageIdsList(1, itemId)) });
+					auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = MessageIdsList(1, itemId) });
 
 					api->forwardMessages(std::move(resolved), action, [] {
 						Ui::Toast::Show(tr::lng_share_done(tr::now));
@@ -604,7 +604,7 @@ void AddRepeaterAction(
 						}
 
 						const auto history = item->history()->peer->owner().history(item->history()->peer);
-						auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = std::move(MessageIdsList(1, itemId)), .options = Data::ForwardOptions::NoSenderNames });
+						auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = MessageIdsList(1, itemId), .options = Data::ForwardOptions::NoSenderNames });
 
 						api->forwardMessages(std::move(resolved), action, [] {
 							Ui::Toast::Show(tr::lng_share_done(tr::now));
@@ -639,7 +639,7 @@ void AddRepeaterAction(
 					action.generateLocal = false;
 
 					const auto history = item->history()->peer->owner().history(api->session().user()->asUser());
-					auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = std::move(MessageIdsList( 1, itemId )) });
+					auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = MessageIdsList(1, itemId) });
 
 					api->forwardMessages(std::move(resolved), action, [] {
 						Ui::Toast::Show(tr::lng_share_done(tr::now));

@@ -2738,7 +2738,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 								}
 
 								const auto history = item->history()->peer->owner().history(item->history()->peer);
-								auto resolved = history->resolveForwardDraft(Data::ForwardDraft{.ids = std::move(MessageIdsList(1, itemId))});
+								auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = MessageIdsList(1, itemId) });
 
 								api->forwardMessages(std::move(resolved), action, [] {
 									Ui::Toast::Show(tr::lng_share_done(tr::now));
@@ -2778,7 +2778,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 									}
 
 									const auto history = item->history()->peer->owner().history(item->history()->peer);
-									auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = std::move(MessageIdsList(1, itemId)), .options = Data::ForwardOptions::NoSenderNames });
+									auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = MessageIdsList(1, itemId), .options = Data::ForwardOptions::NoSenderNames });
 
 									api->forwardMessages(std::move(resolved), action, [] {
 										Ui::Toast::Show(tr::lng_share_done(tr::now));
@@ -2809,7 +2809,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 						action.generateLocal = false;
 
 						const auto history = item->history()->peer->owner().history(api->session().user()->asUser());
-						auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = std::move(MessageIdsList( 1, itemId )) });
+						auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = MessageIdsList(1, itemId) });
 
 						api->forwardMessages(std::move(resolved), action, [] {
 							Ui::Toast::Show(tr::lng_share_done(tr::now));
@@ -3072,7 +3072,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 								}
 
 								const auto history = item->history()->peer->owner().history(item->history()->peer);
-								auto resolved = history->resolveForwardDraft(Data::ForwardDraft{.ids = std::move(MessageIdsList(1, itemId))});
+								auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = MessageIdsList(1, itemId) });
 
 								api->forwardMessages(std::move(resolved), action, [] {
 									Ui::Toast::Show(tr::lng_share_done(tr::now));
@@ -3107,7 +3107,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 									}
 
 									const auto history = item->history()->peer->owner().history(item->history()->peer);
-									auto resolved = history->resolveForwardDraft(Data::ForwardDraft{.ids = std::move(MessageIdsList(1, itemId)), .options = Data::ForwardOptions::NoSenderNames});
+									auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = MessageIdsList(1, itemId), .options = Data::ForwardOptions::NoSenderNames });
 
 									api->forwardMessages(std::move(resolved), action, [] {
 										Ui::Toast::Show(tr::lng_share_done(tr::now));
@@ -3138,7 +3138,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 						action.generateLocal = false;
 
 						const auto history = item->history()->peer->owner().history(api->session().user()->asUser());
-						auto resolved = history->resolveForwardDraft(Data::ForwardDraft{.ids = std::move(MessageIdsList(1, itemId))});
+						auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = MessageIdsList(1, itemId) });
 
 						api->forwardMessages(std::move(resolved), action, [] {
 							Ui::Toast::Show(tr::lng_share_done(tr::now));

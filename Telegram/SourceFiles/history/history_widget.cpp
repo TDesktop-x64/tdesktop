@@ -8534,7 +8534,7 @@ void HistoryWidget::forwardSelectedToSavedMessages() {
 	action.generateLocal = false;
 
 	const auto history = item->history()->peer->owner().history(self);
-	auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = std::move(items) });
+	auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = items });
 
 	api->forwardMessages(std::move(resolved), action, [=] {
 		Ui::Toast::Show(tr::lng_share_done(tr::now));

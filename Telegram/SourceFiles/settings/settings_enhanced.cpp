@@ -499,12 +499,6 @@ namespace Settings {
 		AddSkip(container);
 		AddSubsectionTitle(container, tr::lng_settings_other());
 
-		const auto wrap = container->add(
-				object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
-						container,
-						object_ptr<Ui::VerticalLayout>(container)));
-		const auto inner = wrap->entity();
-
 		auto hideBtn = AddButtonWithIcon(
 			container,
 			tr::lng_settings_hide_all_chats(),

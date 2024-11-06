@@ -424,8 +424,8 @@ HistoryItem::HistoryItem(
 		auto user = history->session().data().peerLoaded(peerId);
 		auto isBlocked = false;
 
-		if (GetEnhancedBool("blocked_user_spoiler_mode") && blockExist(int64(peerId.value) ||
-			GetEnhancedBool("blocked_user_spoiler_mode") && user && user->isBlocked())) {
+		if ((GetEnhancedBool("blocked_user_spoiler_mode") && blockExist(peerId.value)) ||
+			(GetEnhancedBool("blocked_user_spoiler_mode") && user && user->isBlocked())) {
 			isBlocked = true;
 		}
 
@@ -462,7 +462,7 @@ HistoryItem::HistoryItem(
 			};
 		}
 
-		if (GetEnhancedBool("blocked_user_spoiler_mode") && blockExist(int64(peerId.value)) || GetEnhancedBool("blocked_user_spoiler_mode") && user && user->isBlocked()) {
+		if ((GetEnhancedBool("blocked_user_spoiler_mode") && blockExist(peerId.value)) || (GetEnhancedBool("blocked_user_spoiler_mode") && user && user->isBlocked())) {
 			textWithEntities = _blockMsg;
 		} else {
 			textWithEntities = TextWithEntities{

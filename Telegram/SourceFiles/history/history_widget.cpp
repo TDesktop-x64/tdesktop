@@ -428,8 +428,16 @@ HistoryWidget::HistoryWidget(
 	initTabbedSelector();
 
 	_attachToggle->setClickedCallback([=] {
+		const auto toggle = _attachBotsMenu && _attachBotsMenu->isHidden();
 		base::call_delayed(st::historyAttach.ripple.hideDuration, this, [=] {
-			chooseAttach();
+			if (_attachBotsMenu && toggle) {
+				_attachBotsMenu->showAnimated();
+			} else {
+				chooseAttach();
+				if (_attachBotsMenu) {
+					_attachBotsMenu->hideAnimated();
+				}
+			}
 		});
 	});
 
@@ -2597,6 +2605,8 @@ void HistoryWidget::showHistory(
 					}
 				}));
 			checkState();
+		} else {
+			requestSponsoredMessageBar();
 		}
 	} else {
 		_chooseForReport = nullptr;
@@ -2634,7 +2644,7 @@ void HistoryWidget::setHistory(History *history) {
 	if (was && !now) {
 		_attachToggle->removeEventFilter(_attachBotsMenu.get());
 		_attachBotsMenu->hideFast();
-	} else if (now && !was) {
+	} else if (now && !was && !ChatHelpers::ShowPanelOnClick()) {
 		_attachToggle->installEventFilter(_attachBotsMenu.get());
 	}
 
@@ -2722,7 +2732,9 @@ void HistoryWidget::refreshAttachBotsMenu() {
 	}
 	_attachBotsMenu->setOrigin(
 		Ui::PanelAnimation::Origin::BottomLeft);
-	_attachToggle->installEventFilter(_attachBotsMenu.get());
+	if (!ChatHelpers::ShowPanelOnClick()) {
+		_attachToggle->installEventFilter(_attachBotsMenu.get());
+	}
 	_attachBotsMenu->heightValue(
 	) | rpl::start_with_next([=] {
 		moveFieldControls();
@@ -4587,7 +4599,6 @@ void HistoryWidget::showFinished() {
 	_showAnimation = nullptr;
 	doneShow();
 	synteticScrollToY(_scroll->scrollTop());
-	requestSponsoredMessageBar();
 }
 
 void HistoryWidget::doneShow() {

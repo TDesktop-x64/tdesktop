@@ -632,7 +632,6 @@ private:
 
 	void init();
 	void setupShortcuts();
-	void refreshFiltersMenu();
 	void checkOpenedFilter();
 	void suggestArchiveAndMute();
 	void activateFirstChatsFilter();

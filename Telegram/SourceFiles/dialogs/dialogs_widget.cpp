@@ -16,7 +16,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "dialogs/dialogs_inner_widget.h"
 #include "dialogs/dialogs_search_from_controllers.h"
 #include "dialogs/dialogs_key.h"
-#include "dialogs/dialogs_entry.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/view/history_view_top_bar_widget.h"
@@ -26,6 +25,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/peers/edit_peer_requests_box.h"
 #include "ui/text/text_utilities.h"
 #include "ui/widgets/buttons.h"
+#include "ui/widgets/chat_filters_tabs_strip.h"
 #include "ui/widgets/elastic_scroll.h"
 #include "ui/widgets/fields/input_field.h"
 #include "ui/wrap/fade_wrap.h"
@@ -46,14 +46,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session_settings.h"
 #include "api/api_chat_filters.h"
 #include "apiwrap.h"
-#include "base/event_filter.h"
 #include "core/application.h"
 #include "core/ui_integration.h"
 #include "core/update_checker.h"
 #include "core/shortcuts.h"
-#include "boxes/peer_list_box.h"
-#include "boxes/peers/edit_participants_box.h"
-#include "window/window_adaptive.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
 #include "window/window_slide_animation.h"
@@ -656,6 +652,11 @@ Widget::Widget(
 		setupMoreChatsBar();
 		setupDownloadBar();
 		setupShortcuts(controller);
+	}
+
+	if (session().settings().dialogsFiltersEnabled()
+		&& Core::App().settings().chatFiltersHorizontal()) {
+		toggleFiltersMenu(true);
 	}
 }
 
@@ -1263,6 +1264,9 @@ void Widget::updateControlsVisibility(bool fast) {
 	if (_moreChatsBar) {
 		_moreChatsBar->show();
 	}
+	if (_chatFilters) {
+		_chatFilters->show();
+	}
 	if (_openedFolder || _openedForum) {
 		_subsectionTopBar->show();
 		if (_forumTopShadow) {
@@ -1329,6 +1333,41 @@ void Widget::updateHasFocus(not_null<QWidget*> focused) {
 			// synchronously, because it may lead to a crash.
 			crl::on_main(this, [=] { processSearchFocusChange(); });
 		}
+	}
+}
+
+void Widget::toggleFiltersMenu(bool enabled) {
+	if (!enabled == !_chatFilters) {
+		return;
+	} else if (enabled) {
+		_chatFilters = base::make_unique_q<Ui::RpWidget>(this);
+		const auto raw = _chatFilters.get();
+		const auto inner = Ui::AddChatFiltersTabsStrip(
+			_chatFilters.get(),
+			&session(),
+			[this](FilterId id) {
+				if (controller()->activeChatsFilterCurrent() != id) {
+					controller()->setActiveChatsFilter(id);
+				}
+			},
+			true);
+		raw->show();
+		raw->stackUnder(_scroll);
+		raw->resizeToWidth(width());
+		const auto shadow = Ui::CreateChild<Ui::PlainShadow>(raw);
+		shadow->show();
+		inner->sizeValue() | rpl::start_with_next([=, this](const QSize &s) {
+			raw->resize(s);
+			shadow->setGeometry(
+				0,
+				s.height() - shadow->height(),
+				s.width(),
+				shadow->height());
+			updateControlsGeometry();
+		}, _chatFilters->lifetime());
+		updateControlsGeometry();
+	} else {
+		_chatFilters = nullptr;
 	}
 }
 
@@ -1881,6 +1920,12 @@ void Widget::scrollToDefault(bool verytop) {
 			this,
 			QPoint(),
 			QRect(0, top, wideGeometry.width(), skip));
+		if (_chatFilters) {
+			Ui::RenderWidget(
+				p,
+				_chatFilters,
+				QPoint(0, skip - _chatFilters->height()));
+		}
 		Ui::RenderWidget(p, _scroll, QPoint(0, skip));
 	}
 	if (scrollGeometry != wideGeometry) {
@@ -1896,6 +1941,9 @@ void Widget::startWidthAnimation() {
 	}
 	_widthAnimationCache = grabNonNarrowScrollFrame();
 	_scroll->hide();
+	if (_chatFilters) {
+		_chatFilters->hide();
+	}
 	updateStoriesVisibility();
 }
 
@@ -1903,6 +1951,9 @@ void Widget::stopWidthAnimation() {
 	_widthAnimationCache = QPixmap();
 	if (!_showAnimation) {
 		_scroll->setVisible(!_suggestions);
+		if (_chatFilters) {
+			_chatFilters->setVisible(!_suggestions);
+		}
 	}
 	updateStoriesVisibility();
 	update();
@@ -1999,6 +2050,9 @@ void Widget::startSlideAnimation(
 	}
 	if (_moreChatsBar) {
 		_moreChatsBar->hide();
+	}
+	if (_chatFilters) {
+		_chatFilters->hide();
 	}
 	if (_forumTopShadow) {
 		_forumTopShadow->hide();
@@ -3125,6 +3179,9 @@ bool Widget::applySearchState(SearchState state) {
 	const auto tagsChanged = (_searchState.tags != state.tags);
 	const auto queryChanged = (_searchState.query != state.query);
 	const auto tabChanged = (_searchState.tab != state.tab);
+	const auto queryEmptyChanged = queryChanged
+		? (_searchState.query.isEmpty() != state.query.isEmpty())
+		: false;
 
 	if (forum) {
 		if (_openedForum == forum) {
@@ -3160,6 +3217,10 @@ bool Widget::applySearchState(SearchState state) {
 		? peer->owner().history(migrateFrom).get()
 		: nullptr;
 	_searchState = state;
+	if (_chatFilters && queryEmptyChanged) {
+		_chatFilters->setVisible(_searchState.query.isEmpty());
+		updateControlsGeometry();
+	}
 	_searchWithPostsPreview = computeSearchWithPostsPreview();
 	if (queryChanged) {
 		updateLockUnlockVisibility(anim::type::normal);
@@ -3547,6 +3608,9 @@ void Widget::updateControlsGeometry() {
 	if (_forumRequestsBar) {
 		_forumRequestsBar->resizeToWidth(barw);
 	}
+	if (_chatFilters) {
+		_chatFilters->resizeToWidth(barw);
+	}
 	_updateScrollGeometryCached = [=] {
 		const auto moreChatsBarTop = expandedStoriesTop
 			+ ((!_stories || _stories->isHidden()) ? 0 : _aboveScrollAdded);
@@ -3568,8 +3632,15 @@ void Widget::updateControlsGeometry() {
 		if (_forumReportBar) {
 			_forumReportBar->bar().move(0, forumReportTop);
 		}
-		const auto scrollTop = forumReportTop
+		const auto chatFiltersTop = forumReportTop
 			+ (_forumReportBar ? _forumReportBar->bar().height() : 0);
+		if (_chatFilters) {
+			_chatFilters->move(0, chatFiltersTop);
+		}
+		const auto scrollTop = chatFiltersTop
+			+ ((_chatFilters && _searchState.query.isEmpty())
+				? (_chatFilters->height() * (1. - narrowRatio))
+				: 0);
 		const auto scrollHeight = height() - scrollTop - bottomSkip;
 		const auto wasScrollHeight = _scroll->height();
 		_scroll->setGeometry(0, scrollTop, scrollWidth, scrollHeight);

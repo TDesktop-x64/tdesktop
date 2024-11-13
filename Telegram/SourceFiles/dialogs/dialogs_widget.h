@@ -129,6 +129,7 @@ public:
 	[[nodiscard]] RowDescriptor resolveChatNext(RowDescriptor from = {}) const;
 	[[nodiscard]] RowDescriptor resolveChatPrevious(RowDescriptor from = {}) const;
 	void updateHasFocus(not_null<QWidget*> focused);
+	void toggleFiltersMenu(bool value);
 
 	// Float player interface.
 	bool floatPlayerHandleWheelEvent(QEvent *e) override;
@@ -317,6 +318,8 @@ private:
 	std::unique_ptr<Ui::GroupCallBar> _forumGroupCallBar;
 	std::unique_ptr<Ui::RequestsBar> _forumRequestsBar;
 	std::unique_ptr<HistoryView::ContactStatus> _forumReportBar;
+
+	base::unique_qptr<Ui::RpWidget> _chatFilters;
 
 	object_ptr<Ui::ElasticScroll> _scroll;
 	QPointer<InnerWidget> _inner;

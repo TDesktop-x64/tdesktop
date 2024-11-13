@@ -112,6 +112,8 @@ PRIVATE
     api/api_bot.h
     api/api_chat_filters.cpp
     api/api_chat_filters.h
+    api/api_chat_filters_remove_manager.cpp
+    api/api_chat_filters_remove_manager.h
     api/api_chat_invite.cpp
     api/api_chat_invite.h
     api/api_chat_links.cpp
@@ -640,6 +642,8 @@ PRIVATE
     data/data_thread.h
     data/data_types.cpp
     data/data_types.h
+    data/data_unread_value.cpp
+    data/data_unread_value.h
     data/data_user.cpp
     data/data_user.h
     data/data_user_photos.cpp
@@ -1543,6 +1547,8 @@ PRIVATE
     ui/widgets/expandable_peer_list.h
     ui/widgets/label_with_custom_emoji.cpp
     ui/widgets/label_with_custom_emoji.h
+    ui/widgets/chat_filters_tabs_strip.cpp
+    ui/widgets/chat_filters_tabs_strip.h
     ui/countryinput.cpp
     ui/countryinput.h
     ui/dynamic_thumbnails.cpp

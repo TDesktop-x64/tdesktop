@@ -237,6 +237,8 @@ void Uploader::processDocumentProgress(FullMsgId itemId) {
 		const auto document = media ? media->document() : nullptr;
 		const auto sendAction = (document && document->isVoiceMessage())
 			? Api::SendProgressType::UploadVoice
+			: (document && document->isVideoMessage())
+			? Api::SendProgressType::UploadRound
 			: Api::SendProgressType::UploadFile;
 		const auto progress = (document && document->uploading())
 			? ((document->uploadingData->offset * 100)
@@ -258,6 +260,8 @@ void Uploader::processDocumentFailed(FullMsgId itemId) {
 		const auto document = media ? media->document() : nullptr;
 		const auto sendAction = (document && document->isVoiceMessage())
 			? Api::SendProgressType::UploadVoice
+			: (document && document->isVideoMessage())
+			? Api::SendProgressType::UploadRound
 			: Api::SendProgressType::UploadFile;
 		sendProgressUpdate(item, sendAction, -1);
 	}

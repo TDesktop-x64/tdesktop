@@ -2572,6 +2572,10 @@ QPointer<Ui::BoxContent> ShowForwardMessagesBox(
 		}) {
 		}
 
+		void setSearchNoResultsText(const QString &text) {
+			PeerListController::setSearchNoResultsText(text);
+		}
+
 		void rowClicked(not_null<PeerListRow*> row) override final {
 			const auto count = delegate()->peerListSelectedRowsCount();
 			if (showLockedError(row) || (count && row->peer()->isForum())) {
@@ -2626,6 +2630,8 @@ QPointer<Ui::BoxContent> ShowForwardMessagesBox(
 		auto controller = std::make_unique<Controller>(session);
 		const auto controllerRaw = controller.get();
 		auto init = [=](not_null<PeerListBox*> box) {
+			controllerRaw->setSearchNoResultsText(
+				tr::lng_bot_chats_not_found(tr::now));
 			box->setSpecialTabMode(true);
 			auto applyFilter = [=](FilterId id) {
 				box->scrollToY(0);
@@ -2634,18 +2640,32 @@ QPointer<Ui::BoxContent> ShowForwardMessagesBox(
 				if (list.size() <= 1) {
 					return;
 				}
-				const auto pinned = filters.chatsList(id)->pinned()->order();
+				const auto pinned = [&] {
+					const auto &list = id
+						? filters.chatsList(id)
+						: session->data().chatsList(nullptr);
+					const auto pinned = list->pinned()->order();
+					auto peers = std::vector<not_null<PeerData*>>();
+					peers.reserve(pinned.size());
+					auto foundSelf = !!id;
+					for (const auto &pin : pinned) {
+						if (!foundSelf && pin.peer()->isSelf()) {
+							peers.insert(peers.begin(), pin.peer());
+							foundSelf = true;
+						} else {
+							peers.push_back(pin.peer());
+						}
+					}
+					if (!foundSelf) {
+						peers.insert(peers.begin(), session->user());
+					}
+					return peers;
+				}();
 				box->peerListSortRows([&](
 						const PeerListRow &r1,
 						const PeerListRow &r2) {
-					const auto it1 = ranges::find_if(pinned, [&](
-							const Dialogs::Key &k) {
-						return k.peer() == r1.peer();
-					});
-					const auto it2 = ranges::find_if(pinned, [&](
-							const Dialogs::Key &k) {
-						return k.peer() == r2.peer();
-					});
+					const auto it1 = ranges::find(pinned, r1.peer());
+					const auto it2 = ranges::find(pinned, r2.peer());
 					if (it1 == pinned.end() && it2 != pinned.end()) {
 						return false;
 					} else if (it2 == pinned.end() && it1 != pinned.end()) {

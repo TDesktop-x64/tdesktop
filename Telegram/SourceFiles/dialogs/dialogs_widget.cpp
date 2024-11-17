@@ -655,7 +655,8 @@ Widget::Widget(
 	}
 
 	if (session().settings().dialogsFiltersEnabled()
-		&& Core::App().settings().chatFiltersHorizontal()) {
+		&& (Core::App().settings().chatFiltersHorizontal()
+			|| !controller->enoughSpaceForFilters())) {
 		toggleFiltersMenu(true);
 	}
 }
@@ -1363,6 +1364,7 @@ void Widget::toggleFiltersMenu(bool enabled) {
 			_chatFilters.get(),
 			&session(),
 			[this](FilterId id) {
+				_scroll->scrollToY(0);
 				if (controller()->activeChatsFilterCurrent() != id) {
 					controller()->setActiveChatsFilter(id);
 				}

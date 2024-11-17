@@ -1200,6 +1200,9 @@ void OverlayWidget::setStaticContent(QImage image) {
 		image = std::move(image).convertToFormat(kGood);
 	}
 	image.setDevicePixelRatio(style::DevicePixelRatio());
+	if (_flip) {
+		image = image.mirrored(_flip & Qt::Horizontal, _flip & Qt::Vertical);
+	}
 	_staticContent = std::move(image);
 	_staticContentTransparent = IsSemitransparent(_staticContent);
 }
@@ -2291,6 +2294,7 @@ OverlayWidget::~OverlayWidget() {
 
 void OverlayWidget::assignMediaPointer(DocumentData *document) {
 	_savePhotoVideoWhenLoaded = SavePhotoVideo::None;
+	_flip = {};
 	_photo = nullptr;
 	_photoMedia = nullptr;
 	if (_document != document) {
@@ -2319,6 +2323,7 @@ void OverlayWidget::assignMediaPointer(not_null<PhotoData*> photo) {
 	_documentMedia = nullptr;
 	_documentLoadingTo = QString();
 	if (_photo != photo) {
+		_flip = {};
 		_photo = photo;
 		_photoMedia = _photo->createMediaView();
 		_photoMedia->wanted(Data::PhotoSize::Small, fileOrigin());
@@ -5474,6 +5479,26 @@ void OverlayWidget::handleKeyPress(not_null<QKeyEvent*> e) {
 			activateControls();
 		}
 		moveToNext(-1);
+	} else if (key == Qt::Key_H) {
+		if (_flip & Qt::Horizontal) {
+			_flip &= ~Qt::Horizontal;
+		} else {
+			_flip |= Qt::Horizontal;
+		}
+		if (_photo) {
+			validatePhotoCurrentImage();
+			redisplayContent();
+		}
+	} else if (key == Qt::Key_V) {
+		if (_flip & Qt::Vertical) {
+			_flip &= ~Qt::Vertical;
+		} else {
+			_flip |= Qt::Vertical;
+		}
+		if (_photo) {
+			validatePhotoCurrentImage();
+			redisplayContent();
+		}
 	} else if (key == Qt::Key_Right) {
 		if (_controlsHideTimer.isActive()) {
 			activateControls();

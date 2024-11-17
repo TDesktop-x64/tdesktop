@@ -86,10 +86,12 @@ void ShowMenu(
 		auto showRemoveBox = [=] {
 			state->removeApi.request(Ui::MakeWeak(parent), controller, id);
 		};
-		addAction(
-			tr::lng_filters_context_remove(tr::now),
-			std::move(showRemoveBox),
-			&st::menuIconDelete);
+		addAction({
+			.text = tr::lng_filters_context_remove(tr::now),
+			.handler = std::move(showRemoveBox),
+			.icon = &st::menuIconDeleteAttention,
+			.isAttention = true,
+		});
 	} else {
 		auto customUnreadState = [=] {
 			return Data::MainListMapUnreadState(
@@ -288,7 +290,7 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 
 	const auto rebuild = [=] {
 		const auto &list = session->data().chatsFilters().list();
-		if ((list.size() <= 1) || state->ignoreRefresh) {
+		if ((list.size() <= 1 && !slider->width()) || state->ignoreRefresh) {
 			return;
 		}
 		auto sections = ranges::views::all(
@@ -379,14 +381,18 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 				state->reorder->finishReordering();
 			}, slider->lifetime());
 		}
-		slider->sectionActivated() | rpl::distinct_until_changed(
-		) | rpl::start_with_next([=](int index) {
+		rpl::single(-1) | rpl::then(
+			slider->sectionActivated()
+		) | rpl::combine_previous(
+		) | rpl::start_with_next([=](int was, int index) {
 			if (slider->reordering()) {
 				return;
 			}
 			const auto &filter = filterByIndex(index);
-			state->lastFilterId = filter.id();
-			scrollToIndex(index, anim::type::normal);
+			if (was != index) {
+				state->lastFilterId = filter.id();
+				scrollToIndex(index, anim::type::normal);
+			}
 			applyFilter(filter);
 		}, wrap->lifetime());
 		slider->contextMenuRequested() | rpl::start_with_next([=](int index) {

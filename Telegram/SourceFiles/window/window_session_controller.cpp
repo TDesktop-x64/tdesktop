@@ -637,6 +637,7 @@ void SessionNavigation::showPeerByLinkResolved(
 				.context = {
 					.controller = parentController(),
 					.action = action,
+					.fullscreen = info.botAppFullScreen,
 					.maySkipConfirmation = !info.botAppForceConfirmation,
 				},
 				.button = { .startCommand = info.startToken },
@@ -697,14 +698,18 @@ void SessionNavigation::showPeerByLinkResolved(
 					parentController(),
 					Api::SendAction(history),
 					attachBotUsername,
-					info.attachBotToggleCommand.value_or(QString()));
+					info.attachBotToggleCommand.value_or(QString()),
+					info.botAppFullScreen);
 			});
 		} else if (bot && info.attachBotMainOpen) {
 			const auto startCommand = info.attachBotToggleCommand.value_or(
 				QString());
 			bot->session().attachWebView().open({
 				.bot = bot,
-				.context = { .controller = parentController() },
+				.context = {
+					.controller = parentController(),
+					.fullscreen = info.botAppFullScreen,
+				},
 				.button = { .startCommand = startCommand },
 				.source = InlineBots::WebViewSourceLinkBotProfile{
 					.token = startCommand,
@@ -728,6 +733,7 @@ void SessionNavigation::showPeerByLinkResolved(
 						? Api::SendAction(
 							contextUser->owner().history(contextUser))
 						: std::optional<Api::SendAction>()),
+					.fullscreen = info.botAppFullScreen,
 				},
 				.button = { .startCommand = *info.attachBotToggleCommand },
 				.source = InlineBots::WebViewSourceLinkAttachMenu{
@@ -1315,6 +1321,7 @@ SessionController::SessionController(
 	}, lifetime());
 
 	rpl::merge(
+		enoughSpaceForFiltersValue() | rpl::skip(1) | rpl::to_empty,
 		Core::App().settings().chatFiltersHorizontalChanges() | rpl::to_empty,
 		session->data().chatsFilters().changed()
 	) | rpl::start_with_next([=] {
@@ -1322,7 +1329,8 @@ SessionController::SessionController(
 		crl::on_main(this, [this] {
 			if (SessionNavigation::session().data().chatsFilters().has()) {
 				const auto isHorizontal
-					= Core::App().settings().chatFiltersHorizontal();
+					= Core::App().settings().chatFiltersHorizontal()
+						|| !enoughSpaceForFilters();
 				content()->toggleFiltersMenu(isHorizontal);
 				toggleFiltersMenu(!isHorizontal);
 			} else {
@@ -2617,6 +2625,16 @@ not_null<MainWidget*> SessionController::content() const {
 
 int SessionController::filtersWidth() const {
 	return _filters ? st::windowFiltersWidth : 0;
+}
+
+bool SessionController::enoughSpaceForFilters() const {
+	return widget()->width() >= widget()->minimumWidth() + st::windowFiltersWidth;
+}
+
+rpl::producer<bool> SessionController::enoughSpaceForFiltersValue() const {
+	return widget()->widthValue() | rpl::map([=] {
+		return enoughSpaceForFilters();
+	}) | rpl::distinct_until_changed();
 }
 
 rpl::producer<FilterId> SessionController::activeChatsFilter() const {

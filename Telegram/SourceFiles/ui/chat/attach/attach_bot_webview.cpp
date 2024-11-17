@@ -8,9 +8,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/chat/attach/attach_bot_webview.h"
 
 #include "core/file_utilities.h"
+#include "ui/boxes/confirm_box.h"
+#include "ui/chat/attach/attach_bot_downloads.h"
 #include "ui/effects/radial_animation.h"
 #include "ui/effects/ripple_animation.h"
 #include "ui/layers/box_content.h"
+#include "ui/style/style_core_palette.h"
 #include "ui/text/text_utilities.h"
 #include "ui/widgets/separate_panel.h"
 #include "ui/widgets/buttons.h"
@@ -28,6 +31,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/debug_log.h"
 #include "base/invoke_queued.h"
 #include "base/qt_signal_producer.h"
+#include "styles/style_chat.h"
 #include "styles/style_payments.h"
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
@@ -38,6 +42,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QGuiApplication>
 #include <QtGui/QClipboard>
 #include <QtGui/QWindow>
+#include <QtGui/QScreen>
+#include <QtGui/qpa/qplatformscreen.h>
 
 namespace Ui::BotWebView {
 namespace {
@@ -181,7 +187,8 @@ struct Panel::WebviewWithLifetime {
 		Webview::WindowConfig config = Webview::WindowConfig());
 
 	Webview::Window window;
-	QPointer<RpWidget> lastHidingBox;
+	std::vector<QPointer<RpWidget>> boxes;
+	rpl::lifetime boxesLifetime;
 	rpl::lifetime lifetime;
 };
 
@@ -363,20 +370,29 @@ Panel::Progress::Progress(QWidget *parent, Fn<QRect()> rect)
 	st::paymentsLoading) {
 }
 
-Panel::Panel(
-	const Webview::StorageId &storageId,
-	rpl::producer<QString> title,
-	object_ptr<Ui::RpWidget> titleBadge,
-	not_null<Delegate*> delegate,
-	MenuButtons menuButtons,
-	bool allowClipboardRead)
-: _storageId(storageId)
-, _delegate(delegate)
-, _menuButtons(menuButtons)
-, _widget(std::make_unique<SeparatePanel>())
-, _allowClipboardRead(allowClipboardRead) {
+Panel::Panel(Args &&args)
+: _storageId(args.storageId)
+, _delegate(args.delegate)
+, _menuButtons(args.menuButtons)
+, _widget(std::make_unique<SeparatePanel>(Ui::SeparatePanelArgs{
+	.menuSt = &st::botWebViewMenu,
+}))
+, _fullscreen(args.fullscreen)
+, _allowClipboardRead(args.allowClipboardRead) {
 	_widget->setWindowFlag(Qt::WindowStaysOnTopHint, false);
 	_widget->setInnerSize(st::botWebViewPanelSize, true);
+
+	const auto params = _delegate->botThemeParams();
+	updateColorOverrides(params);
+
+	_fullscreen.value(
+	) | rpl::start_with_next([=](bool fullscreen) {
+		_widget->toggleFullScreen(fullscreen);
+		layoutButtons();
+		sendFullScreen();
+		sendSafeArea();
+		sendContentSafeArea();
+	}, _widget->lifetime());
 
 	_widget->closeRequests(
 	) | rpl::start_with_next([=] {
@@ -412,14 +428,120 @@ Panel::Panel(
 		});
 	}, _widget->lifetime());
 
-	setTitle(std::move(title));
-	_widget->setTitleBadge(std::move(titleBadge));
+	setTitle(std::move(args.title));
+	_widget->setTitleBadge(std::move(args.titleBadge));
+
+	if (!showWebview(std::move(args), params)) {
+		const auto available = Webview::Availability();
+		if (available.error != Webview::Available::Error::None) {
+			showWebviewError(tr::lng_bot_no_webview(tr::now), available);
+		} else {
+			showCriticalError({ "Error: Could not initialize WebView." });
+		}
+	}
 }
 
 Panel::~Panel() {
 	base::take(_webview);
 	_progress = nullptr;
 	_widget = nullptr;
+}
+
+void Panel::setupDownloadsProgress(
+		not_null<RpWidget*> button,
+		rpl::producer<DownloadsProgress> progress,
+		bool fullscreen) {
+	const auto widget = Ui::CreateChild<RpWidget>(button.get());
+	widget->show();
+	widget->setAttribute(Qt::WA_TransparentForMouseEvents);
+
+	button->sizeValue() | rpl::start_with_next([=](QSize size) {
+		widget->setGeometry(QRect(QPoint(), size));
+	}, widget->lifetime());
+
+	struct State {
+		State(QWidget *parent)
+		: animation([=](crl::time now) {
+			const auto total = progress.total;
+			const auto current = total
+				? (progress.ready / float64(total))
+				: 0.;
+			const auto updated = animation.update(current, false, now);
+			if (!anim::Disabled() || updated) {
+				parent->update();
+			}
+		}) {
+		}
+
+		DownloadsProgress progress;
+		RadialAnimation animation;
+		Animations::Simple fade;
+		bool shown = false;
+	};
+	const auto state = widget->lifetime().make_state<State>(widget);
+	std::move(
+		progress
+	) | rpl::start_with_next([=](DownloadsProgress progress) {
+		const auto toggle = [&](bool shown) {
+			if (state->shown == shown) {
+				return;
+			}
+			state->shown = shown;
+			if (shown && !state->fade.animating()) {
+				return;
+			}
+			state->fade.start([=] {
+				widget->update();
+				if (!state->shown
+					&& !state->fade.animating()
+					&& (!state->progress.total
+						|| (state->progress.ready
+							== state->progress.total))) {
+					state->animation.stop();
+				}
+			}, shown ? 0. : 2., shown ? 2. : 0., st::radialDuration * 2);
+		};
+		if (!state->shown && progress.loading) {
+			if (!state->animation.animating()) {
+				state->animation.start(0.);
+			}
+			toggle(true);
+		} else if ((state->progress.total && !progress.total)
+			|| (state->progress.ready < state->progress.total
+				&& progress.ready == progress.total)) {
+			state->animation.update(1., false, crl::now());
+			toggle(false);
+		}
+		state->progress = progress;
+	}, widget->lifetime());
+
+	widget->paintRequest() | rpl::start_with_next([=] {
+		const auto opacity = std::clamp(
+			state->fade.value(state->shown ? 2. : 0.) - 1.,
+			0.,
+			1.);
+		if (!opacity) {
+			return;
+		}
+		auto p = QPainter(widget);
+		p.setOpacity(opacity);
+		const auto palette = _widget->titleOverridePalette();
+		const auto color = fullscreen
+			? st::radialFg
+			: palette
+			? palette->boxTitleCloseFg()
+			: st::paymentsLoading.color;
+		const auto &st = fullscreen
+			? st::fullScreenPanelMenu
+			: st::separatePanelMenu;
+		const auto size = st.rippleAreaSize;
+		const auto rect = QRect(st.rippleAreaPosition, QSize(size, size));
+		const auto stroke = st::botWebViewRadialStroke;
+		const auto shift = stroke * 1.5;
+		const auto inner = QRectF(rect).marginsRemoved(
+			QMarginsF{ shift, shift, shift, shift });
+		state->animation.draw(p, inner, stroke, color);
+	}, widget->lifetime());
 }
 
 void Panel::requestActivate() {
@@ -549,11 +671,8 @@ void Panel::hideWebviewProgress() {
 	toggleProgress(false);
 }
 
-bool Panel::showWebview(
-		const QString &url,
-		const Webview::ThemeParams &params,
-		rpl::producer<QString> bottomText) {
-	_bottomText = std::move(bottomText);
+bool Panel::showWebview(Args &&args, const Webview::ThemeParams &params) {
+	_bottomText = std::move(args.bottom);
 	if (!_webview && !createWebview(params)) {
 		return false;
 	}
@@ -561,9 +680,39 @@ bool Panel::showWebview(
 	showWebviewProgress();
 	_widget->hideLayer(anim::type::instant);
 	updateThemeParams(params);
+	const auto url = args.url;
 	_webview->window.navigate(url);
 	_widget->setBackAllowed(allowBack);
-	_widget->setMenuAllowed([=](const Ui::Menu::MenuCallback &callback) {
+
+	rpl::duplicate(args.downloadsProgress) | rpl::start_with_next([=] {
+		_downloadsUpdated.fire({});
+	}, lifetime());
+
+	_widget->setMenuAllowed([=](
+			const Ui::Menu::MenuCallback &callback) {
+		auto list = _delegate->botDownloads(true);
+		if (!list.empty()) {
+			auto value = rpl::single(
+				std::move(list)
+			) | rpl::then(_downloadsUpdated.events(
+			) | rpl::map([=] {
+				return _delegate->botDownloads();
+			}));
+			const auto action = [=](uint32 id, DownloadsAction type) {
+				_delegate->botDownloadsAction(id, type);
+			};
+			callback(Ui::Menu::MenuCallback::Args{
+				.text = tr::lng_downloads_section(tr::now),
+				.icon = &st::menuIconDownload,
+				.fillSubmenu = FillAttachBotDownloadsSubmenu(
+					std::move(value),
+					action),
+			});
+			callback({
+				.separatorSt = &st::expandedMenuSeparator,
+				.isSeparator = true,
+			});
+		}
 		if (_webview && _webview->window.widget() && _hasSettingsButton) {
 			callback(tr::lng_bot_settings(tr::now), [=] {
 				postEvent("settings_button_pressed");
@@ -612,14 +761,22 @@ bool Panel::showWebview(
 				.isAttention = true,
 			});
 		}
+	}, [=, progress = std::move(args.downloadsProgress)](
+			not_null<RpWidget*> button,
+			bool fullscreen) {
+		setupDownloadsProgress(
+			button,
+			rpl::duplicate(progress),
+			fullscreen);
 	});
+
 	return true;
 }
 
 void Panel::createWebviewBottom() {
 	_webviewBottom = std::make_unique<RpWidget>(_widget.get());
 	const auto bottom = _webviewBottom.get();
-	bottom->show();
+	bottom->setVisible(!_fullscreen.current());
 
 	const auto &padding = st::paymentsPanelPadding;
 	const auto label = CreateChild<FlatLabel>(
@@ -656,13 +813,17 @@ bool Panel::createWebview(const Webview::ThemeParams &params) {
 	_widget->showInner(std::move(outer));
 	_webviewParent = container;
 
+	_headerColorReceived = false;
+	_bodyColorReceived = false;
+	_bottomColorReceived = false;
+	updateColorOverrides(params);
 	createWebviewBottom();
 
 	container->show();
 	_webview = std::make_unique<WebviewWithLifetime>(
 		container,
 		Webview::WindowConfig{
-			.opaqueBg = params.opaqueBg,
+			.opaqueBg = params.bodyBg,
 			.storageId = _storageId,
 		});
 	const auto raw = &_webview->window;
@@ -744,6 +905,40 @@ bool Panel::createWebview(const Webview::ThemeParams &params) {
 			_themeUpdateForced.fire({});
 		} else if (command == "web_app_request_viewport") {
 			sendViewport();
+		} else if (command == "web_app_request_safe_area") {
+			sendSafeArea();
+		} else if (command == "web_app_request_content_safe_area") {
+			sendContentSafeArea();
+		} else if (command == "web_app_request_fullscreen") {
+			if (!_fullscreen.current()) {
+				_fullscreen = true;
+			} else {
+				sendFullScreen();
+			}
+		} else if (command == "web_app_request_file_download") {
+			processDownloadRequest(arguments);
+		} else if (command == "web_app_exit_fullscreen") {
+			if (_fullscreen.current()) {
+				_fullscreen = false;
+			} else {
+				sendFullScreen();
+			}
+		} else if (command == "web_app_check_home_screen") {
+			postEvent("home_screen_checked", "{ status: \"unsupported\" }");
+		} else if (command == "web_app_start_accelerometer") {
+			postEvent("accelerometer_failed", "{ error: \"UNSUPPORTED\" }");
+		} else if (command == "web_app_start_device_orientation") {
+			postEvent(
+				"device_orientation_failed",
+				"{ error: \"UNSUPPORTED\" }");
+		} else if (command == "web_app_start_gyroscope") {
+			postEvent("gyroscope_failed", "{ error: \"UNSUPPORTED\" }");
+		} else if (command == "web_app_check_location") {
+			postEvent("location_checked", "{ available: false }");
+		} else if (command == "web_app_request_location") {
+			postEvent("location_requested", "{ available: false }");
+		} else if (command == "web_app_biometry_get_info") {
+			postEvent("biometry_info_received", "{ available: false }");
 		} else if (command == "web_app_open_tg_link") {
 			openTgLink(arguments);
 		} else if (command == "web_app_open_link") {
@@ -768,8 +963,16 @@ bool Panel::createWebview(const Webview::ThemeParams &params) {
 			requestClipboardText(arguments);
 		} else if (command == "web_app_set_header_color") {
 			processHeaderColor(arguments);
+		} else if (command == "web_app_set_background_color") {
+			processBackgroundColor(arguments);
 		} else if (command == "web_app_set_bottom_bar_color") {
 			processBottomBarColor(arguments);
+		} else if (command == "web_app_send_prepared_message") {
+			processSendMessageRequest(arguments);
+		} else if (command == "web_app_set_emoji_status") {
+			processEmojiStatusRequest(arguments);
+		} else if (command == "web_app_request_emoji_status_access") {
+			processEmojiStatusAccessRequest();
 		} else if (command == "share_score") {
 			_delegate->botHandleMenuButton(MenuButton::ShareGame);
 		}
@@ -828,6 +1031,36 @@ void Panel::sendViewport() {
 		"is_expanded: true }");
 }
 
+void Panel::sendFullScreen() {
+	postEvent("fullscreen_changed", _fullscreen.current()
+		? "{ is_fullscreen: true }"
+		: "{ is_fullscreen: false }");
+}
+
+void Panel::sendSafeArea() {
+	postEvent("safe_area_changed",
+		"{ top: 0, right: 0, bottom: 0, left: 0 }");
+}
+
+void Panel::sendContentSafeArea() {
+	const auto shift = st::separatePanelClose.rippleAreaPosition.y();
+	const auto top = _fullscreen.current()
+		? (shift + st::fullScreenPanelClose.height + (shift / 2))
+		: 0;
+	const auto scaled = top * style::DevicePixelRatio();
+	auto report = 0;
+	if (const auto screen = QGuiApplication::primaryScreen()) {
+		const auto dpi = screen->logicalDotsPerInch();
+		const auto ratio = screen->devicePixelRatio();
+		const auto basePair = screen->handle()->logicalBaseDpi();
+		const auto base = (basePair.first + basePair.second) * 0.5;
+		const auto systemScreenScale = dpi * ratio / base;
+		report = int(base::SafeRound(scaled / systemScreenScale));
+	}
+	postEvent("content_safe_area_changed",
+		u"{ top: %1, right: 0, bottom: 0, left: 0 }"_q.arg(report));
+}
+
 void Panel::setTitle(rpl::producer<QString> title) {
 	_widget->setTitle(std::move(title));
 }
@@ -877,6 +1110,71 @@ void Panel::switchInlineQueryMessage(const QJsonObject &args) {
 		}
 	}
 	_delegate->botSwitchInlineQuery(types, query);
+}
+
+void Panel::processSendMessageRequest(const QJsonObject &args) {
+	if (args.isEmpty()) {
+		_delegate->botClose();
+		return;
+	}
+	const auto id = args["id"].toString();
+	auto callback = crl::guard(this, [=](QString error) {
+		if (error.isEmpty()) {
+			postEvent("prepared_message_sent");
+		} else {
+			postEvent(
+				"prepared_message_failed",
+				u"{ error: \"%1\" }"_q.arg(error));
+		}
+	});
+	_delegate->botSendPreparedMessage({
+		.id = id,
+		.callback = std::move(callback),
+	});
+}
+
+void Panel::processEmojiStatusRequest(const QJsonObject &args) {
+	if (args.isEmpty()) {
+		_delegate->botClose();
+		return;
+	}
+	const auto emojiId = args["custom_emoji_id"].toString().toULongLong();
+	const auto duration = TimeId(base::SafeRound(
+		args["duration"].toDouble()));
+	if (!emojiId) {
+		postEvent(
+			"emoji_status_failed",
+			"{ error: \"SUGGESTED_EMOJI_INVALID\" }");
+		return;
+	} else if (duration < 0) {
+		postEvent(
+			"emoji_status_failed",
+			"{ error: \"DURATION_INVALID\" }");
+		return;
+	}
+	auto callback = crl::guard(this, [=](QString error) {
+		if (error.isEmpty()) {
+			postEvent("emoji_status_set");
+		} else {
+			postEvent(
+				"emoji_status_failed",
+				u"{ error: \"%1\" }"_q.arg(error));
+		}
+	});
+	_delegate->botSetEmojiStatus({
+		.customEmojiId = emojiId,
+		.duration = duration,
+		.callback = std::move(callback),
+	});
+}
+
+void Panel::processEmojiStatusAccessRequest() {
+	auto callback = crl::guard(this, [=](bool allowed) {
+		postEvent("emoji_status_access_requested", allowed
+			? "{ status: \"allowed\" }"
+			: "{ status: \"cancelled\" }");
+	});
+	_delegate->botRequestEmojiStatusAccess(std::move(callback));
 }
 
 void Panel::openTgLink(const QJsonObject &args) {
@@ -1281,6 +1579,7 @@ void Panel::processSettingsButtonMessage(const QJsonObject &args) {
 }
 
 void Panel::processHeaderColor(const QJsonObject &args) {
+	_headerColorReceived = true;
 	if (const auto color = ParseColor(args["color"].toString())) {
 		_widget->overrideTitleColor(color);
 		_headerColorLifetime.destroy();
@@ -1297,7 +1596,32 @@ void Panel::processHeaderColor(const QJsonObject &args) {
 	}
 }
 
+void Panel::processBackgroundColor(const QJsonObject &args) {
+	_bodyColorReceived = true;
+	if (const auto color = ParseColor(args["color"].toString())) {
+		_widget->overrideBodyColor(color);
+		_bodyColorLifetime.destroy();
+	} else if (const auto color = LookupNamedColor(
+			args["color_key"].toString())) {
+		_widget->overrideBodyColor((*color)->c);
+		_bodyColorLifetime = style::PaletteChanged(
+		) | rpl::start_with_next([=] {
+			_widget->overrideBodyColor((*color)->c);
+		});
+	} else {
+		_widget->overrideBodyColor(std::nullopt);
+		_bodyColorLifetime.destroy();
+	}
+	if (const auto raw = _bottomButtonsBg.get()) {
+		raw->update();
+	}
+	if (const auto raw = _webviewBottom.get()) {
+		raw->update();
+	}
+}
+
 void Panel::processBottomBarColor(const QJsonObject &args) {
+	_bottomColorReceived = true;
 	if (const auto color = ParseColor(args["color"].toString())) {
 		_widget->overrideBottomBarColor(color);
 		_bottomBarColor = color;
@@ -1306,7 +1630,7 @@ void Panel::processBottomBarColor(const QJsonObject &args) {
 			args["color_key"].toString())) {
 		_widget->overrideBottomBarColor((*color)->c);
 		_bottomBarColor = (*color)->c;
-		_headerColorLifetime = style::PaletteChanged(
+		_bottomBarColorLifetime = style::PaletteChanged(
 		) | rpl::start_with_next([=] {
 			_widget->overrideBottomBarColor((*color)->c);
 			_bottomBarColor = (*color)->c;
@@ -1314,11 +1638,39 @@ void Panel::processBottomBarColor(const QJsonObject &args) {
 	} else {
 		_widget->overrideBottomBarColor(std::nullopt);
 		_bottomBarColor = std::nullopt;
-		_headerColorLifetime.destroy();
+		_bottomBarColorLifetime.destroy();
 	}
 	if (const auto raw = _bottomButtonsBg.get()) {
 		raw->update();
 	}
+}
+
+void Panel::processDownloadRequest(const QJsonObject &args) {
+	if (args.isEmpty()) {
+		_delegate->botClose();
+		return;
+	}
+	const auto url = args["url"].toString();
+	const auto name = args["file_name"].toString();
+	if (url.isEmpty()) {
+		LOG(("BotWebView Error: Bad 'url' in download request."));
+		_delegate->botClose();
+		return;
+	} else if (name.isEmpty()) {
+		LOG(("BotWebView Error: Bad 'file_name' in download request."));
+		_delegate->botClose();
+		return;
+	}
+	const auto done = crl::guard(this, [=](bool started) {
+		postEvent("file_download_requested", started
+			? "{ status: \"downloading\" }"
+			: "{ status: \"cancelled\" }");
+	});
+	_delegate->botDownloadFile({
+		.url = url,
+		.name = name,
+		.callback = done,
+	});
 }
 
 void Panel::createButton(std::unique_ptr<Button> &button) {
@@ -1362,14 +1714,19 @@ void Panel::createButton(std::unique_ptr<Button> &button) {
 }
 
 void Panel::layoutButtons() {
+	if (!_webviewBottom) {
+		return;
+	}
 	const auto inner = _widget->innerGeometry();
 	const auto shown = [](std::unique_ptr<Button> &button) {
 		return button && !button->isHidden();
 	};
 	const auto any = shown(_mainButton) || shown(_secondaryButton);
-	_webviewBottom->setVisible(!any);
+	_webviewBottom->setVisible(!any
+		&& !_fullscreen.current()
+		&& !_layerShown);
 	if (any) {
-		_bottomButtonsBg->show();
+		_bottomButtonsBg->setVisible(!_layerShown);
 
 		const auto one = shown(_mainButton)
 			? _mainButton.get()
@@ -1435,9 +1792,15 @@ void Panel::layoutButtons() {
 	} else if (_bottomButtonsBg) {
 		_bottomButtonsBg->hide();
 	}
-	_footerHeight = any
+	const auto footer = _layerShown
+		? 0
+		: any
 		? _bottomButtonsBg->height()
+		: _fullscreen.current()
+		? 0
 		: _webviewBottom->height();
+	_widget->setBottomBarHeight((!_layerShown && any) ? footer : 0);
+	_footerHeight = footer;
 }
 
 void Panel::showBox(object_ptr<BoxContent> box) {
@@ -1449,25 +1812,34 @@ void Panel::showBox(
 		LayerOptions options,
 		anim::type animated) {
 	if (const auto widget = _webview ? _webview->window.widget() : nullptr) {
+		_layerShown = true;
 		const auto hideNow = !widget->isHidden();
-		if (hideNow || _webview->lastHidingBox) {
-			const auto raw = _webview->lastHidingBox = box.data();
-			box->boxClosing(
-			) | rpl::start_with_next([=] {
+		const auto raw = box.data();
+		_webview->boxes.push_back(raw);
+		raw->boxClosing(
+		) | rpl::filter([=] {
+			return _webview != nullptr;
+		}) | rpl::start_with_next([=] {
+			auto &list = _webview->boxes;
+			list.erase(ranges::remove_if(list, [&](QPointer<RpWidget> b) {
+				return !b || (b == raw);
+			}), end(list));
+			if (list.empty()) {
+				_webview->boxesLifetime.destroy();
+				_layerShown = false;
 				const auto widget = _webview
 					? _webview->window.widget()
 					: nullptr;
-				if (widget
-					&& widget->isHidden()
-					&& _webview->lastHidingBox == raw) {
+				if (widget && widget->isHidden()) {
 					widget->show();
-					_webviewBottom->show();
+					layoutButtons();
 				}
-			}, _webview->lifetime);
-			if (hideNow) {
-				widget->hide();
-				_webviewBottom->hide();
 			}
+		}, _webview->boxesLifetime);
+
+		if (hideNow) {
+			widget->hide();
+			layoutButtons();
 		}
 	}
 	const auto raw = box.data();
@@ -1533,16 +1905,26 @@ void Panel::showCriticalError(const TextWithEntities &text) {
 }
 
 void Panel::updateThemeParams(const Webview::ThemeParams &params) {
+	updateColorOverrides(params);
 	if (!_webview || !_webview->window.widget()) {
 		return;
 	}
 	_webview->window.updateTheme(
-		params.opaqueBg,
+		params.bodyBg,
 		params.scrollBg,
 		params.scrollBgOver,
 		params.scrollBarBg,
 		params.scrollBarBgOver);
 	postEvent("theme_changed", "{\"theme_params\": " + params.json + "}");
+}
+
+void Panel::updateColorOverrides(const Webview::ThemeParams &params) {
+	if (!_headerColorReceived && params.titleBg.alpha() == 255) {
+		_widget->overrideTitleColor(params.titleBg);
+	}
+	if (!_bodyColorReceived && params.bodyBg.alpha() == 255) {
+		_widget->overrideBodyColor(params.bodyBg);
+	}
 }
 
 void Panel::invoiceClosed(const QString &slug, const QString &status) {
@@ -1628,26 +2010,7 @@ rpl::lifetime &Panel::lifetime() {
 }
 
 std::unique_ptr<Panel> Show(Args &&args) {
-	auto result = std::make_unique<Panel>(
-		args.storageId,
-		std::move(args.title),
-		std::move(args.titleBadge),
-		args.delegate,
-		args.menuButtons,
-		args.allowClipboardRead);
-	const auto params = args.delegate->botThemeParams();
-	if (!result->showWebview(args.url, params, std::move(args.bottom))) {
-		const auto available = Webview::Availability();
-		if (available.error != Webview::Available::Error::None) {
-			result->showWebviewError(
-				tr::lng_bot_no_webview(tr::now),
-				available);
-		} else {
-			result->showCriticalError({
-				"Error: Could not initialize WebView." });
-		}
-	}
-	return result;
+	return std::make_unique<Panel>(std::move(args));
 }
 
 } // namespace Ui::BotWebView

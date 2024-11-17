@@ -1155,3 +1155,49 @@ msgSelectionCheck: RoundCheckbox(defaultPeerListCheck) {
 }
 
 sponsoredMessageBarMaxHeight: 156px;
+
+botEmojiStatusPreviewHeight: 148px;
+botEmojiStatusTitle: FlatLabel(boxTitle) {
+	style: TextStyle(defaultTextStyle) {
+		font: font(16px semibold);
+		lineHeight: 20px;
+	}
+	minWidth: 256px;
+	maxHeight: 0px;
+	align: align(top);
+}
+botEmojiStatusText: FlatLabel(defaultFlatLabel) {
+	style: boxTextStyle;
+	minWidth: 256px;
+	maxHeight: 0px;
+	align: align(top);
+}
+botEmojiStatusUserpic: UserpicButton(defaultUserpicButton) {
+	size: size(chatGiveawayPeerSize, chatGiveawayPeerSize);
+	photoSize: chatGiveawayPeerSize;
+}
+botEmojiStatusName: FlatLabel(defaultFlatLabel) {
+}
+botEmojiStatusEmoji: FlatLabel(botEmojiStatusName) {
+	textFg: profileVerifiedCheckBg;
+}
+
+botDownloadLabel: boxLabel;
+botDownloadProgress: FlatLabel(defaultFlatLabel) {
+	textFg: windowSubTextFg;
+	style: TextStyle(defaultTextStyle) {
+		font: ttlItemTimerFont;
+	}
+}
+botDownloadCancel: IconButton {
+	width: 20px;
+	height: 20px;
+
+	icon: smallCloseIcon;
+	iconOver: smallCloseIconOver;
+	iconPosition: point(-1px, -1px);
+
+	rippleAreaPosition: point(0px, 0px);
+	rippleAreaSize: 20px;
+	ripple: defaultRippleAnimationBgOver;
+}

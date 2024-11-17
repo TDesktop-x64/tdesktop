@@ -7,11 +7,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "api/api_common.h"
 #include "base/flags.h"
 #include "base/timer.h"
 #include "base/weak_ptr.h"
 #include "dialogs/dialogs_key.h"
-#include "api/api_common.h"
 #include "mtproto/sender.h"
 #include "ui/chat/attach/attach_bot_webview.h"
 #include "ui/rp_widget.h"
@@ -28,6 +28,7 @@ class DropdownMenu;
 
 namespace Ui::BotWebView {
 class Panel;
+struct DownloadsEntry;
 } // namespace Ui::BotWebView
 
 namespace Main {
@@ -51,6 +52,7 @@ enum class CheckoutResult;
 namespace InlineBots {
 
 class WebViewInstance;
+class Downloads;
 
 enum class PeerType : uint8 {
 	SameBot   = 0x01,
@@ -187,6 +189,7 @@ struct WebViewContext {
 	base::weak_ptr<Window::SessionController> controller;
 	Dialogs::EntryState dialogsEntryState;
 	std::optional<Api::SendAction> action;
+	bool fullscreen = false;
 	bool maySkipConfirmation = false;
 };
 
@@ -234,7 +237,12 @@ private:
 	void confirmOpen(Fn<void()> done);
 	void confirmAppOpen(bool writeAccess, Fn<void(bool allowWrite)> done);
 
-	void show(const QString &url, uint64 queryId = 0);
+	struct ShowArgs {
+		QString url;
+		uint64 queryId = 0;
+		bool fullscreen = false;
+	};
+	void show(ShowArgs &&args);
 	void showGame();
 	void started(uint64 queryId);
 
@@ -243,6 +251,11 @@ private:
 	-> Fn<void(Payments::NonPanelPaymentForm)>;
 
 	Webview::ThemeParams botThemeParams() override;
+	auto botDownloads(bool forceCheck = false)
+		-> const std::vector<Ui::BotWebView::DownloadsEntry> & override;
+	void botDownloadsAction(
+		uint32 id,
+		Ui::BotWebView::DownloadsAction type) override;
 	bool botHandleLocalUri(QString uri, bool keepOpen) override;
 	void botHandleInvoice(QString slug) override;
 	void botHandleMenuButton(Ui::BotWebView::MenuButton button) override;
@@ -254,9 +267,17 @@ private:
 		QString query) override;
 	void botCheckWriteAccess(Fn<void(bool allowed)> callback) override;
 	void botAllowWriteAccess(Fn<void(bool allowed)> callback) override;
+	void botRequestEmojiStatusAccess(
+		Fn<void(bool allowed)> callback) override;
 	void botSharePhone(Fn<void(bool shared)> callback) override;
 	void botInvokeCustomMethod(
 		Ui::BotWebView::CustomMethodRequest request) override;
+	void botSendPreparedMessage(
+		Ui::BotWebView::SendPreparedMessageRequest request) override;
+	void botSetEmojiStatus(
+		Ui::BotWebView::SetEmojiStatusRequest request) override;
+	void botDownloadFile(
+		Ui::BotWebView::DownloadFileRequest request) override;
 	void botOpenPrivacyPolicy() override;
 	void botClose() override;
 
@@ -270,12 +291,15 @@ private:
 	BotAppData *_app = nullptr;
 	QString _appStartParam;
 	bool _dataSent = false;
+	bool _confirmingDownload = false;
 
 	mtpRequestId _requestId = 0;
 	mtpRequestId _prolongId = 0;
 
 	QString _panelUrl;
 	std::unique_ptr<Ui::BotWebView::Panel> _panel;
+
+	rpl::lifetime _lifetime;
 
 	static base::weak_ptr<WebViewInstance> PendingActivation;
 
@@ -286,12 +310,17 @@ public:
 	explicit AttachWebView(not_null<Main::Session*> session);
 	~AttachWebView();
 
+	[[nodiscard]] Downloads &downloads() const {
+		return *_downloads;
+	}
+
 	void open(WebViewDescriptor &&descriptor);
 	void openByUsername(
 		not_null<Window::SessionController*> controller,
 		const Api::SendAction &action,
 		const QString &botUsername,
-		const QString &startCommand);
+		const QString &startCommand,
+		bool fullscreen);
 
 	void cancel();
 
@@ -355,11 +384,13 @@ private:
 		Fn<void(bool added)> callback = nullptr);
 
 	const not_null<Main::Session*> _session;
+	const std::unique_ptr<Downloads> _downloads;
 
 	base::Timer _refreshTimer;
 
 	QString _botUsername;
 	QString _startCommand;
+	bool _fullScreenRequested = false;
 
 	mtpRequestId _requestId = 0;
 

@@ -123,7 +123,9 @@ void GiftCreditsBox(
 		box->verticalLayout(),
 		peer,
 		0,
-		[=] { gifted(); box->uiShow()->hideLayer(); });
+		[=] { gifted(); box->uiShow()->hideLayer(); },
+		tr::lng_credits_summary_options_subtitle(),
+		{});
 
 	box->setPinnedToBottomContent(
 		object_ptr<Ui::VerticalLayout>(box));

@@ -763,6 +763,9 @@ void StickerSetBox::updateButtons() {
 		}();
         const auto author = [=] {
             auto ownerId = _inner->setId() >> 32;
+            if (_inner->setId() >> 16 & 0xff == 0x3f) {
+                ownerId |= 0x80000000;
+            }
             if (_inner->setId() >> 24 & 0xff) {
                 ownerId += 0x100000000;
             }

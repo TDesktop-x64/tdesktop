@@ -47,6 +47,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "payments/payments_checkout_process.h"
 #include "payments/payments_form.h"
+#include "payments/payments_non_panel_process.h"
 #include "settings/settings_common_session.h"
 #include "settings/settings_credits.h"
 #include "statistics/widgets/chart_header_widget.h"
@@ -344,6 +345,37 @@ void AddViewMediaHandler(
 			state->over = false;
 		}
 	}, thumb->lifetime());
+}
+
+void AddMiniStars(
+		not_null<Ui::VerticalLayout*> content,
+		not_null<Ui::RpWidget*> widget,
+		const style::UserpicButton &stUser,
+		int boxWidth,
+		float64 heightRatio) {
+	using ColoredMiniStars = Ui::Premium::ColoredMiniStars;
+	const auto stars = widget->lifetime().make_state<ColoredMiniStars>(
+		widget,
+		false,
+		Ui::Premium::MiniStars::Type::BiStars);
+	stars->setColorOverride(Ui::Premium::CreditsIconGradientStops());
+	widget->resize(
+		boxWidth - stUser.photoSize,
+		stUser.photoSize * heightRatio);
+	content->sizeValue(
+	) | rpl::start_with_next([=](const QSize &size) {
+		widget->moveToLeft(stUser.photoSize / 2, 0);
+		const auto starsRect = Rect(widget->size());
+		stars->setPosition(starsRect.topLeft());
+		stars->setSize(starsRect.size());
+		widget->lower();
+	}, widget->lifetime());
+	widget->paintRequest(
+	) | rpl::start_with_next([=](const QRect &r) {
+		auto p = QPainter(widget);
+		p.fillRect(r, Qt::transparent);
+		stars->paint(p);
+	}, widget->lifetime());
 }
 
 } // namespace
@@ -664,31 +696,12 @@ void BoostCreditsBox(
 	{
 		const auto &stUser = st::premiumGiftsUserpicButton;
 		const auto widget = content->add(object_ptr<Ui::RpWidget>(content));
-		using ColoredMiniStars = Ui::Premium::ColoredMiniStars;
-		const auto stars = widget->lifetime().make_state<ColoredMiniStars>(
-			widget,
-			false,
-			Ui::Premium::MiniStars::Type::BiStars);
-		stars->setColorOverride(Ui::Premium::CreditsIconGradientStops());
-		widget->resize(
-			st::boxWidth - stUser.photoSize,
-			stUser.photoSize * 1.3);
+		AddMiniStars(content, widget, stUser, st::boxWidth, 1.3);
 		const auto svg = std::make_shared<QSvgRenderer>(
 			Ui::Premium::ColorizedSvg(
 				Ui::Premium::CreditsIconGradientStops()));
-		content->sizeValue(
-		) | rpl::start_with_next([=](const QSize &size) {
-			widget->moveToLeft(stUser.photoSize / 2, 0);
-			const auto starsRect = Rect(widget->size());
-			stars->setPosition(starsRect.topLeft());
-			stars->setSize(starsRect.size());
-			widget->lower();
-		}, widget->lifetime());
-		widget->paintRequest(
-		) | rpl::start_with_next([=](const QRect &r) {
+		widget->paintRequest() | rpl::start_with_next([=](const QRect &r) {
 			auto p = QPainter(widget);
-			p.fillRect(r, Qt::transparent);
-			stars->paint(p);
 			svg->render(
 				&p,
 				QRectF(
@@ -790,6 +803,28 @@ void BoostCreditsBox(
 	}, button->lifetime());
 }
 
+void ProcessReceivedSubscriptions(
+		QPointer<Ui::GenericBox> weak,
+		not_null<Main::Session*> session) {
+	const auto rebuilder = session->data().activeCreditsSubsRebuilder();
+	if (const auto strong = weak.data()) {
+		if (!rebuilder) {
+			return strong->closeBox();
+		}
+		const auto api
+			= strong->lifetime().make_state<Api::CreditsHistory>(
+				session->user(),
+				true,
+				true);
+		api->requestSubscriptions({}, [=](Data::CreditsStatusSlice first) {
+			rebuilder->fire(std::move(first));
+			if (const auto strong = weak.data()) {
+				strong->closeBox();
+			}
+		});
+	}
+}
+
 void ReceiptCreditsBox(
 		not_null<Ui::GenericBox*> box,
 		not_null<Window::SessionController*> controller,
@@ -820,6 +855,7 @@ void ReceiptCreditsBox(
 	const auto nonConvertible = (gotStarGift && !e.starsConverted);
 
 	box->setStyle(st::giveawayGiftCodeBox);
+	box->setWidth(st::boxWideWidth);
 	box->setNoContentMargin(true);
 
 	const auto content = box->verticalLayout();
@@ -851,6 +887,20 @@ void ReceiptCreditsBox(
 			content,
 			GenericEntryPhoto(content, callback, stUser.photoSize)));
 		AddViewMediaHandler(thumb->entity(), controller, e);
+	} else if (s.photoId || (e.photoId && !e.subscriptionUntil.isNull())) {
+		if (!(s.cancelled || s.expired || s.cancelledByBot)) {
+			const auto widget = Ui::CreateChild<Ui::RpWidget>(content);
+			AddMiniStars(content, widget, stUser, st::boxWideWidth, 1.5);
+		}
+		const auto photoId = s.photoId ? s.photoId : e.photoId;
+		const auto callback = [=](Fn<void()> update) {
+			return Ui::GenerateCreditsPaintEntryCallback(
+				session->data().photo(photoId),
+				std::move(update));
+		};
+		content->add(object_ptr<Ui::CenterWrap<>>(
+			content,
+			GenericEntryPhoto(content, callback, stUser.photoSize)));
 	} else if (peer && !e.gift) {
 		if (e.subscriptionUntil.isNull() && s.until.isNull()) {
 			content->add(object_ptr<Ui::CenterWrap<>>(
@@ -950,11 +1000,13 @@ void ReceiptCreditsBox(
 		box,
 		object_ptr<Ui::FlatLabel>(
 			box,
-			rpl::single(!s.until.isNull()
+			rpl::single(!s.title.isEmpty()
+				? s.title
+				: !s.until.isNull()
 				? tr::lng_credits_box_subscription_title(tr::now)
 				: isPrize
 				? tr::lng_credits_box_history_entry_giveaway_name(tr::now)
-				: !e.subscriptionUntil.isNull()
+				: (!e.subscriptionUntil.isNull() && e.title.isEmpty())
 				? tr::lng_credits_box_history_entry_subscription(tr::now)
 				: !e.title.isEmpty()
 				? e.title
@@ -1270,16 +1322,48 @@ void ReceiptCreditsBox(
 				st::creditsBoxAboutDivider)));
 	}
 	if (s) {
+		const auto user = peer ? peer->asUser() : nullptr;
+		const auto bot = (user && !user->isSelf()) ? user : nullptr;
+		const auto toCancel = !s.expired && !s.cancelled && !s.cancelledByBot;
+		if (toCancel) {
+			Ui::AddSkip(content);
+		}
 		Ui::AddSkip(content);
 		auto label = object_ptr<Ui::FlatLabel>(
 			box,
-			s.cancelled
+			(s.cancelledByBot && bot)
+				? tr::lng_credits_subscription_off_by_bot_about(
+					lt_bot,
+					rpl::single(bot->name()))
+				: toCancel
+				? tr::lng_credits_subscription_on_button()
+				: s.cancelled
 				? tr::lng_credits_subscription_off_about()
 				: tr::lng_credits_subscription_on_about(
 					lt_date,
 					rpl::single(langDayOfMonthFull(s.until.date()))),
 				st::creditsBoxAboutDivider);
-		if (s.cancelled) {
+		if (toCancel) {
+			label->setClickHandlerFilter([=](
+					const auto &,
+					Qt::MouseButton button) {
+				if (button != Qt::LeftButton) {
+					return false;
+				}
+				const auto done = [=, weak = Ui::MakeWeak(box)] {
+					ProcessReceivedSubscriptions(weak, session);
+				};
+				const auto fail = [=, s = box->uiShow()](const QString &e) {
+					s->showToast(e);
+				};
+				Api::EditCreditsSubscription(session, s.id, true, done, fail);
+				return true;
+			});
+			label->setMarkedText(
+				Ui::Text::Link(
+					tr::lng_credits_subscription_on_button(tr::now),
+					u"internal:"_q));
+		} else if (s.cancelled || s.cancelledByBot) {
 			label->setTextColorOverride(st::menuIconAttentionColor->c);
 		}
 		box->addRow(
@@ -1290,41 +1374,26 @@ void ReceiptCreditsBox(
 
 	if (e.peerType == Data::CreditsHistoryEntry::PeerType::PremiumBot) {
 		const auto widget = Ui::CreateChild<Ui::RpWidget>(content);
-		using ColoredMiniStars = Ui::Premium::ColoredMiniStars;
-		const auto stars = widget->lifetime().make_state<ColoredMiniStars>(
-			widget,
-			false,
-			Ui::Premium::MiniStars::Type::BiStars);
-		stars->setColorOverride(Ui::Premium::CreditsIconGradientStops());
-		widget->resize(
-			st::boxWidth - stUser.photoSize,
-			stUser.photoSize * 2);
-		content->sizeValue(
-		) | rpl::start_with_next([=](const QSize &size) {
-			widget->moveToLeft(stUser.photoSize / 2, 0);
-			const auto starsRect = Rect(widget->size());
-			stars->setPosition(starsRect.topLeft());
-			stars->setSize(starsRect.size());
-			widget->lower();
-		}, widget->lifetime());
-		widget->paintRequest(
-		) | rpl::start_with_next([=](const QRect &r) {
-			auto p = QPainter(widget);
-			p.fillRect(r, Qt::transparent);
-			stars->paint(p);
-		}, widget->lifetime());
+		AddMiniStars(content, widget, stUser, st::boxWideWidth, 2);
 	}
 
+	const auto rejoinByApi = base::unixtime::serialize(s.until)
+		> base::unixtime::now();
+	const auto rejoinByInvite = !s.inviteHash.isEmpty();
+	const auto rejoinBySlug = !s.slug.isEmpty();
 	const auto toRenew = (s.cancelled || s.expired)
-		&& !s.inviteHash.isEmpty();
-	const auto toCancel = !toRenew && s;
+		&& (rejoinByApi || rejoinByInvite)
+		&& !s.cancelledByBot;
+	const auto toRejoin = (s.cancelled || s.expired)
+		&& rejoinBySlug
+		&& !s.cancelledByBot;
 	auto confirmText = rpl::conditional(
 		state->confirmButtonBusy.value(),
 		rpl::single(QString()),
 		(toRenew
 			? tr::lng_credits_subscription_off_button()
-			: toCancel
-			? tr::lng_credits_subscription_on_button()
+			: toRejoin
+			? tr::lng_credits_subscription_off_rejoin_button()
 			: (canConvert || couldConvert || nonConvertible)
 			? (e.savedToProfile
 				? tr::lng_gift_display_on_page_hide()
@@ -1372,45 +1441,57 @@ void ReceiptCreditsBox(
 					save,
 					done);
 			}
+		} else if (toRejoin) {
+			if (const auto window = weakWindow.get()) {
+				const auto finish = [=](Payments::CheckoutResult&&) {
+					ProcessReceivedSubscriptions(weak, session);
+				};
+				Payments::CheckoutProcess::Start(
+					&window->session(),
+					s.slug,
+					[](auto) {},
+					Payments::ProcessNonPanelPaymentFormFactory(
+						window,
+						finish));
+			}
 		} else if (toRenew && s.expired) {
 			Api::CheckChatInvite(controller, s.inviteHash, nullptr, [=] {
-				if (const auto strong = weak.data()) {
-					strong->closeBox();
-				}
+				ProcessReceivedSubscriptions(weak, session);
 			});
 		} else {
-			using Flag = MTPpayments_ChangeStarsSubscription::Flag;
-			session->api().request(
-				MTPpayments_ChangeStarsSubscription(
-					MTP_flags(Flag::f_canceled),
-					MTP_inputPeerSelf(),
-					MTP_string(s.id),
-					MTP_bool(toCancel)
-			)).done([=] {
-				if (const auto strong = weak.data()) {
-					strong->closeBox();
-				}
-			}).fail([=, show = box->uiShow()](const MTP::Error &error) {
+			const auto done = [=] {
+				ProcessReceivedSubscriptions(weak, session);
+			};
+			const auto fail = [=, show = box->uiShow()](const QString &e) {
 				if (const auto strong = weak.data()) {
 					state->confirmButtonBusy = false;
 				}
-				show->showToast(error.type());
-			}).send();
+				show->showToast(e);
+			};
+			Api::EditCreditsSubscription(session, s.id, false, done, fail);
 		}
 	};
+
+	const auto willBusy = toRejoin
+		|| (peer
+			&& (toRenew || canConvert || couldConvert || nonConvertible));
+	if (willBusy) {
+		const auto close = Ui::CreateChild<Ui::IconButton>(
+			content,
+			st::boxTitleClose);
+		close->setClickedCallback([=] { box->closeBox(); });
+		content->widthValue() | rpl::start_with_next([=](int) {
+			close->moveToRight(0, 0);
+		}, content->lifetime());
+	}
 
 	const auto button = box->addButton(std::move(confirmText), [=] {
 		if (state->confirmButtonBusy.current()
 			|| state->convertButtonBusy.current()) {
 			return;
 		}
-		state->confirmButtonBusy = true;
-		if (peer
-			&& (toRenew
-				|| toCancel
-				|| canConvert
-				|| couldConvert
-				|| nonConvertible)) {
+		if (willBusy) {
+			state->confirmButtonBusy = true;
 			send();
 		} else {
 			box->closeBox();
@@ -1424,7 +1505,7 @@ void ReceiptCreditsBox(
 		AddChildToWidgetCenter(button, loadingAnimation);
 		loadingAnimation->showOn(state->confirmButtonBusy.value());
 	}
-	const auto buttonWidth = st::boxWidth
+	const auto buttonWidth = st::boxWideWidth
 		- rect::m::sum::h(st::giveawayGiftCodeBox.buttonPadding);
 
 	button->widthValue() | rpl::filter([=] {

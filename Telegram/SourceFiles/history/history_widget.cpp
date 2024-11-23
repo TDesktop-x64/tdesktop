@@ -1970,24 +1970,12 @@ bool HistoryWidget::notify_switchInlineBotButtonReceived(
 		UserData *samePeerBot,
 		MsgId samePeerReplyTo) {
 	if (samePeerBot) {
-		if (_history) {
-			const auto textWithTags = TextWithTags{
-				'@' + samePeerBot->username() + ' ' + query,
-				TextWithTags::Tags(),
-			};
-			MessageCursor cursor = {
-				int(textWithTags.text.size()),
-				int(textWithTags.text.size()),
-				Ui::kQFixedMax,
-			};
-			_history->setLocalDraft(std::make_unique<Data::Draft>(
-				textWithTags,
-				FullReplyTo(),
-				cursor,
-				Data::WebPageDraft()));
-			applyDraft();
-			return true;
+		const auto to = controller()->currentDialogsEntryState();
+		if (!to.key.owningHistory()) {
+			return false;
 		}
+		controller()->switchInlineQuery(to, samePeerBot, query);
+		return true;
 	} else if (const auto bot = _peer ? _peer->asUser() : nullptr) {
 		const auto to = bot->isBot()
 			? bot->botInfo->inlineReturnTo
@@ -2215,7 +2203,7 @@ void HistoryWidget::showHistory(
 	_showAtMsgHighlightPart = {};
 	_showAtMsgHighlightPartOffsetHint = 0;
 
-	const auto wasDialogsEntryState = computeDialogsEntryState();
+	const auto wasState = controller()->currentDialogsEntryState();
 	const auto startBot = (showAtMsgId == ShowAndStartBotMsgId);
 	if (startBot) {
 		showAtMsgId = ShowAtTheEndMsgId;
@@ -2320,8 +2308,8 @@ void HistoryWidget::showHistory(
 			if (const auto user = _peer->asUser()) {
 				if (const auto &info = user->botInfo) {
 					if (startBot) {
-						if (wasDialogsEntryState.key) {
-							info->inlineReturnTo = wasDialogsEntryState;
+						if (wasState.key) {
+							info->inlineReturnTo = wasState;
 						}
 						sendBotStartCommand();
 						_history->clearLocalDraft({});
@@ -2556,8 +2544,8 @@ void HistoryWidget::showHistory(
 		if (const auto user = _peer->asUser()) {
 			if (const auto &info = user->botInfo) {
 				if (startBot) {
-					if (wasDialogsEntryState.key) {
-						info->inlineReturnTo = wasDialogsEntryState;
+					if (wasState.key) {
+						info->inlineReturnTo = wasState;
 					}
 					sendBotStartCommand();
 				}
@@ -8038,7 +8026,15 @@ void HistoryWidget::clearFieldText(
 
 void HistoryWidget::replyToMessage(FullReplyTo id) {
 	if (const auto item = session().data().message(id.messageId)) {
-		replyToMessage(item, id.quote, id.quoteOffset);
+		if (CanSendReply(item) && !base::IsCtrlPressed()) {
+			replyToMessage(item, id.quote, id.quoteOffset);
+		} else if (item->allowsForward()) {
+			const auto show = controller()->uiShow();
+			HistoryView::Controls::ShowReplyToChatBox(show, id);
+		} else {
+			controller()->showToast(
+				tr::lng_error_cant_reply_other(tr::now));
+		}
 	}
 }
 

@@ -296,6 +296,8 @@ PRIVATE
     boxes/peer_list_box.h
     boxes/peer_list_controllers.cpp
     boxes/peer_list_controllers.h
+    boxes/peer_list_widgets.cpp
+    boxes/peer_list_widgets.h
     boxes/peer_lists_box.cpp
     boxes/peer_lists_box.h
     boxes/passcode_box.cpp
@@ -1557,6 +1559,8 @@ PRIVATE
     ui/widgets/label_with_custom_emoji.h
     ui/widgets/chat_filters_tabs_strip.cpp
     ui/widgets/chat_filters_tabs_strip.h
+    ui/widgets/peer_bubble.cpp
+    ui/widgets/peer_bubble.h
     ui/countryinput.cpp
     ui/countryinput.h
     ui/dynamic_thumbnails.cpp

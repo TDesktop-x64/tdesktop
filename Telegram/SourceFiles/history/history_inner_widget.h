@@ -561,3 +561,5 @@ private:
 	ClickHandlerPtr _scrollDateLink;
 
 };
+
+[[nodiscard]] bool CanSendReply(not_null<const HistoryItem*> item);

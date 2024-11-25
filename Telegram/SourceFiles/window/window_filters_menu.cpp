@@ -181,7 +181,7 @@ void FiltersMenu::refresh() {
 	const auto maxLimit = (reorderAll ? 1 : 0)
 		+ Data::PremiumLimits(&_session->session()).dialogFiltersCurrent();
 	const auto premiumFrom = (reorderAll ? 0 : 1) + maxLimit;
-	if (!reorderAll && !GetEnhancedBool("hide_all_chats")) {
+	if (!reorderAll) {
 		_reorder->addPinnedInterval(0, 1);
 	}
 	_reorder->addPinnedInterval(
@@ -214,7 +214,7 @@ void FiltersMenu::refresh() {
 
 	// Fix active chat folder when hide all chats is enabled.
 	if (GetEnhancedBool("hide_all_chats")) {
-		const auto lookup_id = filters->lookupId(0);
+		const auto lookup_id = filters->lookupId(1);
 		_session->setActiveChatsFilter(lookup_id);
 	}
 }
@@ -272,6 +272,15 @@ base::unique_qptr<Ui::SideBarButton> FiltersMenu::prepareButton(
 		container,
 		id ? title : tr::lng_filters_all(tr::now),
 		st::windowFiltersButton);
+	if (!id && GetEnhancedBool("hide_all_chats")) {
+		const auto raw = prepared.data();
+		raw->sizeValue(
+		) | rpl::filter([](const QSize& s) {
+			return s.height() > 0;
+		}) | rpl::start_with_next([=] {
+			raw->resize(raw->width(), 0);
+		}, raw->lifetime());
+	}
 	auto added = toBeginning
 		? container->insert(0, std::move(prepared))
 		: container->add(std::move(prepared));
@@ -513,11 +522,11 @@ void FiltersMenu::applyReorder(
 
 	const auto filters = &_session->session().data().chatsFilters();
 	const auto &list = filters->list();
-	//if (!premium()) {
-	//	if (list[0].id() != FilterId()) {
-	//		filters->moveAllToFront();
-	//	}
-	//}
+	if (!premium()) {
+		if (list[0].id() != FilterId()) {
+			filters->moveAllToFront();
+		}
+	}
 	Assert(oldPosition >= 0 && oldPosition < list.size());
 	Assert(newPosition >= 0 && newPosition < list.size());
 	const auto id = list[oldPosition].id();

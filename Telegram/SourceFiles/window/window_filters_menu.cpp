@@ -213,7 +213,7 @@ void FiltersMenu::refresh() {
 	_scroll.scrollToY(oldTop);
 
 	// Fix active chat folder when hide all chats is enabled.
-	if (GetEnhancedBool("hide_all_chats")) {
+	if (GetEnhancedBool("hide_all_chats") && filters->isEarlyStart()) {
 		const auto lookup_id = filters->lookupId(1);
 		_session->setActiveChatsFilter(lookup_id);
 	}
@@ -297,11 +297,8 @@ base::unique_qptr<Ui::SideBarButton> FiltersMenu::prepareButton(
 		) | rpl::start_with_next([=](
 				const Dialogs::UnreadState &state,
 				bool includeMuted) {
-			const auto chats = state.chatsTopic
-				? (state.chats - state.chatsTopic + 1)
-				: state.chats;
 			const auto muted = (state.chatsMuted + state.marksMuted);
-			const auto count = (chats + state.marks)
+			const auto count = (state.chats + state.marks)
 				- (includeMuted ? 0 : muted);
 			const auto string = !count
 				? QString()

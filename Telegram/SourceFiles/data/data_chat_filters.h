@@ -185,6 +185,11 @@ public:
 		FilterId id) const;
 	void moreChatsHide(FilterId id, bool localOnly = false);
 
+	bool isEarlyStart() const
+	{
+		return _loadRequestId != 0;
+	}
+
 private:
 	struct MoreChatsData {
 		std::vector<not_null<PeerData*>> missing;

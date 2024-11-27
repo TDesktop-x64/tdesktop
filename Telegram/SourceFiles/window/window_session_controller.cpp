@@ -1621,7 +1621,9 @@ void SessionController::activateFirstChatsFilter() {
 		return;
 	}
 	_filtersActivated = true;
-	setActiveChatsFilter(session().data().chatsFilters().defaultId());
+	if (!GetEnhancedBool("hide_all_chats")) {
+		setActiveChatsFilter(session().data().chatsFilters().defaultId());
+	}
 }
 
 bool SessionController::uniqueChatsInSearchResults() const {
@@ -2663,7 +2665,7 @@ void SessionController::setActiveChatsFilter(
 		closeForum();
 		closeFolder();
 	}
-	if (adaptive().isOneColumn()) {
+	if (!GetEnhancedBool("hide_all_chats") && adaptive().isOneColumn()) {
 		clearSectionStack(params);
 	}
 }

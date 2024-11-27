@@ -765,7 +765,7 @@ void TopBarWidget::backClicked() {
 	if (_activeChat.key.folder()) {
 		if (GetEnhancedBool("hide_all_chats")) {
 			const auto filters = &_controller->session().data().chatsFilters();
-			const auto lookup_id = filters->lookupId(1);
+			const auto lookup_id = filters->lookupId(_controller->session().premium() ? 0 : 1);
 			_controller->setActiveChatsFilter(lookup_id);
 		} else {
 			_controller->closeFolder();

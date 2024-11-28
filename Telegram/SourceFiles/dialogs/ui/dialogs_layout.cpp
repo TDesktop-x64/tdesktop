@@ -7,41 +7,42 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "dialogs/ui/dialogs_layout.h"
 
+#include "base/unixtime.h"
+#include "core/ui_integration.h"
+#include "data/data_channel.h"
 #include "data/data_drafts.h"
+#include "data/data_folder.h"
 #include "data/data_forum_topic.h"
+#include "data/data_peer_values.h"
 #include "data/data_saved_sublist.h"
 #include "data/data_session.h"
+#include "data/data_user.h"
 #include "data/stickers/data_custom_emoji.h"
 #include "dialogs/dialogs_list.h"
 #include "dialogs/dialogs_three_state_icon.h"
 #include "dialogs/ui/dialogs_video_userpic.h"
-#include "styles/style_dialogs.h"
-#include "styles/style_window.h"
+#include "history/history.h"
+#include "history/history_item.h"
+#include "history/history_item_components.h"
+#include "history/history_item_helpers.h"
+#include "history/history_unread_things.h"
+#include "history/view/history_view_item_preview.h"
+#include "history/view/history_view_send_action.h"
+#include "lang/lang_keys.h"
+#include "main/main_session.h"
 #include "storage/localstorage.h"
+#include "support/support_helper.h"
 #include "ui/empty_userpic.h"
+#include "ui/painter.h"
+#include "ui/power_saving.h"
 #include "ui/text/format_values.h"
 #include "ui/text/text_options.h"
 #include "ui/text/text_utilities.h"
 #include "ui/unread_badge.h"
 #include "ui/unread_badge_paint.h"
-#include "ui/painter.h"
-#include "ui/power_saving.h"
-#include "core/ui_integration.h"
-#include "lang/lang_keys.h"
-#include "support/support_helper.h"
-#include "main/main_session.h"
-#include "history/view/history_view_send_action.h"
-#include "history/view/history_view_item_preview.h"
-#include "history/history_unread_things.h"
-#include "history/history_item.h"
-#include "history/history_item_components.h"
-#include "history/history_item_helpers.h"
-#include "history/history.h"
-#include "base/unixtime.h"
-#include "data/data_channel.h"
-#include "data/data_user.h"
-#include "data/data_folder.h"
-#include "data/data_peer_values.h"
+#include "styles/style_dialogs.h"
+#include "styles/style_widgets.h"
+#include "styles/style_window.h"
 
 namespace Dialogs::Ui {
 namespace {
@@ -84,16 +85,68 @@ void PaintRowTopRight(
 		text);
 }
 
+int PaintRightButton(QPainter &p, const PaintContext &context) {
+	if (context.width < st::columnMinimalWidthLeft) {
+		return 0;
+	}
+	if (const auto rightButton = context.rightButton) {
+		const auto size = rightButton->bg.size() / style::DevicePixelRatio();
+		const auto left = context.width
+			- size.width()
+			- st::dialogRowOpenBotRight;
+		const auto top = st::dialogRowOpenBotTop;
+		p.drawImage(
+			left,
+			top,
+			context.active
+				? rightButton->activeBg
+				: context.selected
+				? rightButton->selectedBg
+				: rightButton->bg);
+		if (rightButton->ripple) {
+			rightButton->ripple->paint(
+				p,
+				left,
+				top,
+				size.width() - size.height() / 2,
+				context.active
+					? &st::universalRippleAnimation.color->c
+					: &st::activeButtonBgRipple->c);
+			if (rightButton->ripple->empty()) {
+				rightButton->ripple.reset();
+			}
+		}
+		p.setPen(context.active
+			? st::activeButtonBg
+			: context.selected
+			? st::activeButtonFgOver
+			: st::activeButtonFg);
+		rightButton->text.draw(p, {
+			.position = QPoint(
+				left + size.height() / 2,
+				top + (st::dialogRowOpenBotHeight - rightButton->text.minHeight()) / 2),
+			.outerWidth = size.width() - size.height() / 2,
+			.availableWidth = size.width() - size.height() / 2,
+			.elisionLines = 1,
+		});
+		return size.width() + st::dialogsUnreadPadding;
+	}
+	return 0;
+}
+
 int PaintBadges(
 		QPainter &p,
 		const PaintContext &context,
 		BadgesState badgesState,
 		int right,
 		int top,
-		bool displayPinnedIcon = false,
-		int pinnedIconTop = 0) {
+		bool displayPinnedIcon,
+		int pinnedIconTop,
+		bool narrow) {
 	auto initial = right;
-	if (badgesState.unread
+	if (const auto used = PaintRightButton(p, context)) {
+		return used - st::dialogsUnreadPadding;
+	} else if (badgesState.unread
 		&& !badgesState.unreadCounter
 		&& context.st->unreadMarkDiameter > 0) {
 		const auto d = context.st->unreadMarkDiameter;
@@ -123,9 +176,16 @@ int PaintBadges(
 		st.active = context.active;
 		st.selected = context.selected;
 		st.muted = badgesState.unreadMuted;
-		const auto counter = (badgesState.unreadCounter > 0)
+		const auto counter = (badgesState.unreadCounter <= 0)
+			? QString()
+			: !narrow
 			? QString::number(badgesState.unreadCounter)
-			: QString();
+			: ((badgesState.mention || badgesState.reaction)
+				&& (badgesState.unreadCounter > 999))
+			? (u"99+"_q)
+			: (badgesState.unreadCounter > 999999)
+			? (u"99999+"_q)
+			: QString::number(badgesState.unreadCounter);
 		const auto badge = PaintUnreadBadge(p, counter, right, top, st);
 		right -= badge.width() + st.padding;
 	} else if (displayPinnedIcon) {
@@ -189,7 +249,10 @@ void PaintNarrowCounter(
 		context,
 		badgesState,
 		context.st->padding.left() + context.st->photoSize,
-		top);
+		top,
+		false,
+		0,
+		true);
 }
 
 int PaintWideCounter(
@@ -210,7 +273,8 @@ int PaintWideCounter(
 		context.width - context.st->padding.right(),
 		top,
 		displayPinnedIcon,
-		texttop);
+		texttop,
+		false);
 	return availableWidth - used;
 }
 
@@ -341,10 +405,20 @@ void PaintRow(
 			row->userpicView(),
 			context);
 	} else {
-		row->paintUserpic(p, entry, from, videoUserpic, context);
+		row->paintUserpic(
+			p,
+			entry,
+			from,
+			videoUserpic,
+			context,
+			context.narrow
+				&& !badgesState.empty()
+				&& !draft
+				&& item
+				&& !item->isEmpty());
 	}
 
-	auto nameleft = context.st->nameLeft;
+	const auto nameleft = context.st->nameLeft;
 	if (context.topicsExpanded > 0.) {
 		PaintExpandedTopicsBar(p, context.topicsExpanded);
 	}
@@ -430,7 +504,9 @@ void PaintRow(
 		}
 
 		auto availableWidth = namewidth;
-		if (entry->isPinnedDialog(context.filter)
+		if (const auto used = PaintRightButton(p, context)) {
+			availableWidth -= used;
+		} else if (entry->isPinnedDialog(context.filter)
 			&& (context.filter || !entry->fixedOnTopIndex())) {
 			auto &icon = ThreeStateIcon(
 				st::dialogsPinnedIcon,
@@ -528,7 +604,9 @@ void PaintRow(
 		}
 	} else if (!item) {
 		auto availableWidth = namewidth;
-		if (entry->isPinnedDialog(context.filter)
+		if (const auto used = PaintRightButton(p, context)) {
+			availableWidth -= used;
+		} else if (entry->isPinnedDialog(context.filter)
 			&& (context.filter || !entry->fixedOnTopIndex())) {
 			auto &icon = ThreeStateIcon(
 				st::dialogsPinnedIcon,
@@ -711,6 +789,15 @@ void PaintRow(
 			.availableWidth = rectForName.width(),
 			.elisionLines = 1,
 		});
+	}
+
+	if (const auto tags = context.chatsFilterTags) {
+		auto left = nameleft;
+		for (const auto &tag : *tags) {
+			p.drawImage(left, context.st->tagTop, *tag);
+			left += st::dialogRowFilterTagSkip
+				+ (tag->width() / style::DevicePixelRatio());
+		}
 	}
 }
 

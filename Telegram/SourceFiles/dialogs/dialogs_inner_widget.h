@@ -41,6 +41,7 @@ class SessionController;
 } // namespace Window
 
 namespace Data {
+class ChatFilter;
 class Thread;
 class Folder;
 class Forum;
@@ -65,6 +66,7 @@ class SearchTags;
 class SearchEmpty;
 class ChatSearchIn;
 enum class HashOrCashtag : uchar;
+struct RightButton;
 
 struct ChosenRow {
 	Key key;
@@ -101,6 +103,8 @@ enum class WidgetState {
 
 class InnerWidget final : public Ui::RpWidget {
 public:
+	using ChatsFilterTagsKey = int64;
+
 	struct ChildListShown {
 		PeerId peerId = 0;
 		float64 shown = 0.;
@@ -199,6 +203,8 @@ public:
 		return _touchCancelRequests.events();
 	}
 
+	[[nodiscard]] rpl::producer<UserId> openBotMainAppRequests() const;
+
 protected:
 	void visibleTopBottomUpdated(
 		int visibleTop,
@@ -285,10 +291,13 @@ private:
 	void scrollToItem(int top, int height);
 	void scrollToDefaultSelected();
 	void setCollapsedPressed(int pressed);
-	void setPressed(Row *pressed, bool pressedTopicJump);
+	void setPressed(Row *pressed, bool pressedTopicJump, bool pressedBotApp);
 	void clearPressed();
 	void setHashtagPressed(int pressed);
-	void setFilteredPressed(int pressed, bool pressedTopicJump);
+	void setFilteredPressed(
+		int pressed,
+		bool pressedTopicJump,
+		bool pressedBotApp);
 	void setPeerSearchPressed(int pressed);
 	void setPreviewPressed(int pressed);
 	void setSearchedPressed(int pressed);
@@ -321,6 +330,8 @@ private:
 
 	void updateRowCornerStatusShown(not_null<History*> history);
 	void repaintDialogRowCornerStatus(not_null<History*> history);
+
+	bool addBotAppRipple(QPoint origin, Fn<void()> updateCallback);
 
 	void setupShortcuts();
 	RowDescriptor computeJump(
@@ -450,6 +461,16 @@ private:
 	void saveChatsFilterScrollState(FilterId filterId);
 	void restoreChatsFilterScrollState(FilterId filterId);
 
+	[[nodiscard]] bool lookupIsInBotAppButton(
+		Row *row,
+		QPoint localPosition);
+	[[nodiscard]] RightButton *maybeCacheRightButton(Row *row);
+
+	[[nodiscard]] QImage *cacheChatsFilterTag(
+		const Data::ChatFilter &filter,
+		uint8 more,
+		bool active);
+
 	const not_null<Window::SessionController*> _controller;
 
 	not_null<IndexedList*> _shownList;
@@ -476,6 +497,10 @@ private:
 	MsgId _pressedTopicJumpRootId;
 	bool _selectedTopicJump = false;
 	bool _pressedTopicJump = false;
+
+	RightButton *_pressedBotAppData = nullptr;
+	bool _selectedBotApp = false;
+	bool _pressedBotApp = false;
 
 	Row *_dragging = nullptr;
 	int _draggingIndex = -1;
@@ -556,6 +581,12 @@ private:
 
 	base::flat_map<FilterId, int> _chatsFilterScrollStates;
 
+	std::unordered_map<ChatsFilterTagsKey, QImage> _chatsFilterTags;
+	bool _waitingAllChatListEntryRefreshesForTags = false;
+	rpl::lifetime _handleChatListEntryTagRefreshesLifetime;
+
+	std::unordered_map<PeerId, RightButton> _rightButtons;
+
 	Fn<void()> _loadMoreCallback;
 	Fn<void()> _loadMoreFilteredCallback;
 	rpl::event_stream<> _listBottomReached;
@@ -567,6 +598,7 @@ private:
 	rpl::event_stream<SearchRequestDelay> _searchRequests;
 	rpl::event_stream<QString> _completeHashtagRequests;
 	rpl::event_stream<> _refreshHashtagsRequests;
+	rpl::event_stream<UserId> _openBotMainAppRequests;
 
 	RowDescriptor _chatPreviewRow;
 	bool _chatPreviewScheduled = false;

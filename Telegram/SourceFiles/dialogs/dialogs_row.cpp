@@ -302,7 +302,8 @@ void BasicRow::paintUserpic(
 		not_null<Entry*> entry,
 		PeerData *peer,
 		Ui::VideoUserpic *videoUserpic,
-		const Ui::PaintContext &context) const {
+		const Ui::PaintContext &context,
+		bool hasUnreadBadgesAbove) const {
 	PaintUserpic(p, entry, peer, videoUserpic, _userpic, context);
 }
 
@@ -316,11 +317,19 @@ Row::~Row() {
 	clearTopicJumpRipple();
 }
 
-void Row::recountHeight(float64 narrowRatio) {
+void Row::recountHeight(float64 narrowRatio, FilterId filterId) {
 	if (const auto history = _id.history()) {
+		const auto hasTags = _id.entry()->hasChatsFilterTags(filterId);
 		_height = history->isForum()
 			? anim::interpolate(
-				st::forumDialogRow.height,
+				hasTags
+					? st::taggedForumDialogRow.height
+					: st::forumDialogRow.height,
+				st::defaultDialogRow.height,
+				narrowRatio)
+			: hasTags
+			? anim::interpolate(
+				st::taggedDialogRow.height,
 				st::defaultDialogRow.height,
 				narrowRatio)
 			: st::defaultDialogRow.height;
@@ -363,12 +372,15 @@ void Row::setCornerBadgeShown(
 
 void Row::updateCornerBadgeShown(
 		not_null<PeerData*> peer,
-		Fn<void()> updateCallback) const {
+		Fn<void()> updateCallback,
+		bool hasUnreadBadgesAbove) const {
 	const auto user = peer->asUser();
 	const auto now = user ? base::unixtime::now() : TimeId();
 	const auto channel = user ? nullptr : peer->asChannel();
 	const auto nextLayer = [&] {
-		if (user && Data::IsUserOnline(user, now)) {
+		if (hasUnreadBadgesAbove) {
+			return kNoneLayer;
+		} else if (user && Data::IsUserOnline(user, now)) {
 			return kTopLayer;
 		} else if (channel
 			&& (Data::ChannelHasActiveCall(channel)
@@ -528,9 +540,10 @@ void Row::paintUserpic(
 		not_null<Entry*> entry,
 		PeerData *peer,
 		Ui::VideoUserpic *videoUserpic,
-		const Ui::PaintContext &context) const {
+		const Ui::PaintContext &context,
+		bool hasUnreadBadgesAbove) const {
 	if (peer) {
-		updateCornerBadgeShown(peer);
+		updateCornerBadgeShown(peer, nullptr, hasUnreadBadgesAbove);
 	}
 
 	const auto cornerBadgeShown = !_cornerBadgeUserpic
@@ -546,7 +559,7 @@ void Row::paintUserpic(
 		? storiesFolder->storiesCount()
 		: false;
 	if (!cornerBadgeShown && !storiesHas) {
-		BasicRow::paintUserpic(p, entry, peer, videoUserpic, context);
+		BasicRow::paintUserpic(p, entry, peer, videoUserpic, context, false);
 		if (!peer || !_cornerBadgeShown) {
 			_cornerBadgeUserpic = nullptr;
 		}

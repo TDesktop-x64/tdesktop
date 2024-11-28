@@ -1354,6 +1354,38 @@ void HistoryItem::customEmojiRepaint() {
 	}
 }
 
+bool HistoryItem::needsUpdateForVideoQualities(const MTPMessage &data) {
+	// When video gets the converted alt-videos lists, we need to update
+	// the message data even without edit-message update.
+	return data.match([&](const MTPDmessage &data) {
+		const auto media = data.vmedia();
+		if (!media) {
+			return false;
+		}
+		return media->match([&](const MTPDmessageMediaDocument &data) {
+			const auto document = data.vdocument();
+			const auto alts = data.valt_documents();
+			if (!document || !alts || alts->v.isEmpty()) {
+				return false;
+			}
+			const auto id = document->match([](const auto &data) {
+				return DocumentId(data.vid().v);
+			});
+			const auto existingMedia = this->media();
+			const auto existingDocument = existingMedia
+				? existingMedia->document()
+				: nullptr;
+			return !existingDocument
+				|| (existingDocument->id != id)
+				|| existingDocument->resolveQualities(this).empty();
+		}, [](const auto &) {
+			return false;
+		});
+	}, [](const auto &) {
+		return false;
+	});
+}
+
 void HistoryItem::finishEditionToEmpty() {
 	finishEdition(-1);
 	_history->itemVanished(this);
@@ -2295,7 +2327,7 @@ bool HistoryItem::allowsEdit(TimeId now) const {
 
 bool HistoryItem::allowsEditMedia() const {
 	return !awaitingVideoProcessing()
-		&& (!_media || _media->allowsEditMedia());
+		&& (!_media || _media->allowsEditMedia() || _media->webpage());
 }
 
 bool HistoryItem::canBeEdited() const {

@@ -8,21 +8,105 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/choose_filter_box.h"
 
 #include "apiwrap.h"
+#include "boxes/filters/edit_filter_box.h"
 #include "boxes/premium_limits_box.h"
 #include "core/application.h" // primaryWindow
 #include "data/data_chat_filters.h"
+#include "data/data_premium_limits.h"
 #include "data/data_session.h"
 #include "history/history.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
+#include "ui/empty_userpic.h"
+#include "ui/filter_icons.h"
+#include "ui/painter.h"
+#include "ui/rect.h"
 #include "ui/text/text_utilities.h" // Ui::Text::Bold
 #include "ui/widgets/buttons.h"
+#include "ui/widgets/menu/menu_action.h"
 #include "ui/widgets/popup_menu.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
+#include "styles/style_dialogs.h"
 #include "styles/style_media_player.h" // mediaPlayerMenuCheck
+#include "styles/style_menu_icons.h"
+#include "styles/style_settings.h"
 
 namespace {
+
+[[nodiscard]] QImage Icon(const Data::ChatFilter &f) {
+	constexpr auto kScale = 0.75;
+	const auto icon = Ui::LookupFilterIcon(Ui::ComputeFilterIcon(f)).normal;
+	const auto originalWidth = icon->width();
+	const auto originalHeight = icon->height();
+
+	const auto scaledWidth = int(originalWidth * kScale);
+	const auto scaledHeight = int(originalHeight * kScale);
+
+	auto image = QImage(
+		scaledWidth * style::DevicePixelRatio(),
+		scaledHeight * style::DevicePixelRatio(),
+		QImage::Format_ARGB32_Premultiplied);
+	image.setDevicePixelRatio(style::DevicePixelRatio());
+	image.fill(Qt::transparent);
+
+	{
+		auto p = QPainter(&image);
+		auto hq = PainterHighQualityEnabler(p);
+
+		const auto x = int((scaledWidth - originalWidth * kScale) / 2);
+		const auto y = int((scaledHeight - originalHeight * kScale) / 2);
+
+		p.scale(kScale, kScale);
+		icon->paint(p, x, y, scaledWidth, st::dialogsUnreadBgMuted->c);
+		if (const auto color = f.colorIndex()) {
+			p.resetTransform();
+			const auto circleSize = scaledWidth / 3.;
+			const auto r = QRectF(
+				x + scaledWidth - circleSize,
+				y + scaledHeight - circleSize - circleSize / 3.,
+				circleSize,
+				circleSize);
+			p.setPen(Qt::NoPen);
+			p.setCompositionMode(QPainter::CompositionMode_Clear);
+			p.setBrush(Qt::transparent);
+			p.drawEllipse(r + Margins(st::lineWidth * 1.5));
+			p.setCompositionMode(QPainter::CompositionMode_SourceOver);
+			p.setBrush(Ui::EmptyUserpic::UserpicColor(*color).color2);
+			p.drawEllipse(r);
+		}
+	}
+
+	return image;
+}
+
+class FilterAction : public Ui::Menu::Action {
+public:
+	using Ui::Menu::Action::Action;
+
+	void setIcon(QImage &&image) {
+		_icon = std::move(image);
+	}
+
+protected:
+	void paintEvent(QPaintEvent *event) override {
+		Ui::Menu::Action::paintEvent(event);
+		if (!_icon.isNull()) {
+			const auto size = _icon.size() / style::DevicePixelRatio();
+			auto p = QPainter(this);
+			p.drawImage(
+				width()
+					- size.width()
+					- st::menuWithIcons.itemPadding.right(),
+				(height() - size.height()) / 2,
+				_icon);
+		}
+	}
+
+private:
+	QImage _icon;
+
+};
 
 Data::ChatFilter ChangedFilter(
 		const Data::ChatFilter &filter,
@@ -126,9 +210,7 @@ bool ChooseFilterValidator::canRemove(FilterId filterId) const {
 	const auto list = _history->owner().chatsFilters().list();
 	const auto i = ranges::find(list, filterId, &Data::ChatFilter::id);
 	if (i != end(list)) {
-		const auto &filter = *i;
-		return filter.contains(_history)
-			&& ((filter.always().size() > 1) || filter.flags());
+		return Data::CanRemoveFromChatFilter(*i, _history);
 	}
 	return false;
 }
@@ -164,14 +246,15 @@ void FillChooseFilterMenu(
 		not_null<History*> history) {
 	const auto weak = base::make_weak(controller);
 	const auto validator = ChooseFilterValidator(history);
-	for (const auto &filter : history->owner().chatsFilters().list()) {
+	const auto &list = history->owner().chatsFilters().list();
+	const auto showColors = history->owner().chatsFilters().tagsEnabled();
+	for (const auto &filter : list) {
 		const auto id = filter.id();
 		if (!id) {
 			continue;
 		}
 
-		const auto contains = filter.contains(history);
-		const auto action = menu->addAction(filter.title(), [=] {
+		auto callback = [=] {
 			const auto toAdd = !filter.contains(history);
 			const auto r = validator.limitReached(id, toAdd);
 			if (r.reached) {
@@ -188,11 +271,58 @@ void FillChooseFilterMenu(
 					validator.remove(id);
 				}
 			}
-		}, contains ? &st::mediaPlayerMenuCheck : nullptr);
+		};
+
+		const auto contains = filter.contains(history);
+		auto item = base::make_unique_q<FilterAction>(
+			menu.get(),
+			menu->st().menu,
+			Ui::Menu::CreateAction(
+				menu.get(),
+				Ui::Text::FixAmpersandInAction(filter.title()),
+				std::move(callback)),
+			contains ? &st::mediaPlayerMenuCheck : nullptr,
+			contains ? &st::mediaPlayerMenuCheck : nullptr);
+
+		item->setIcon(Icon(showColors ? filter : filter.withColorIndex({})));
+		const auto &p = st::menuWithIcons.itemPadding;
+		item->setMinWidth(item->minWidth() + p.left() - p.right() - p.top());
+		const auto action = menu->addAction(std::move(item));
 		action->setEnabled(contains
 			? validator.canRemove(id)
 			: validator.canAdd());
 	}
+
+	const auto limit = [session = &controller->session()] {
+		return Data::PremiumLimits(session).dialogFiltersCurrent();
+	};
+	if ((list.size() - 1) < limit()) {
+		menu->addAction(tr::lng_filters_create(tr::now), [=] {
+			const auto strong = weak.get();
+			if (!strong) {
+				return;
+			}
+			const auto session = &strong->session();
+			const auto count = session->data().chatsFilters().list().size();
+			if ((count - 1) >= limit()) {
+				return;
+			}
+			auto filter =
+				Data::ChatFilter({}, {}, {}, {}, {}, { history }, {}, {});
+			const auto send = [=](const Data::ChatFilter &filter) {
+				session->api().request(MTPmessages_UpdateDialogFilter(
+					MTP_flags(MTPmessages_UpdateDialogFilter::Flag::f_filter),
+					MTP_int(count),
+					filter.tl()
+				)).done([=] {
+					session->data().chatsFilters().reload();
+				}).send();
+			};
+			strong->uiShow()->show(
+				Box(EditFilterBox, strong, std::move(filter), send, nullptr));
+		}, &st::menuIconShowInFolder);
+	}
+
 	history->owner().chatsFilters().changed(
 	) | rpl::start_with_next([=] {
 		menu->hideMenu();

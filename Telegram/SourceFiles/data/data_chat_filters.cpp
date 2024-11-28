@@ -168,6 +168,12 @@ ChatFilter ChatFilter::withTitle(const QString &title) const {
 	return result;
 }
 
+ChatFilter ChatFilter::withColorIndex(std::optional<uint8> c) const {
+	auto result = *this;
+	result._colorIndex = c;
+	return result;
+}
+
 ChatFilter ChatFilter::withChatlist(bool chatlist, bool hasMyLinks) const {
 	auto result = *this;
 	result._flags &= Flag::RulesMask;
@@ -178,6 +184,14 @@ ChatFilter ChatFilter::withChatlist(bool chatlist, bool hasMyLinks) const {
 		} else {
 			result._flags &= ~Flag::HasMyLinks;
 		}
+	}
+	return result;
+}
+
+ChatFilter ChatFilter::withoutAlways(not_null<History*> history) const {
+	auto result = *this;
+	if (CanRemoveFromChatFilter(result, history)) {
+		result._always.remove(history);
 	}
 	return result;
 }
@@ -277,7 +291,9 @@ const base::flat_set<not_null<History*>> &ChatFilter::never() const {
 	return _never;
 }
 
-bool ChatFilter::contains(not_null<History*> history) const {
+bool ChatFilter::contains(
+		not_null<History*> history,
+		bool ignoreFakeUnread) const {
 	const auto flag = [&] {
 		const auto peer = history->peer;
 		if (const auto user = peer->asUser()) {
@@ -314,7 +330,7 @@ bool ChatFilter::contains(not_null<History*> history) const {
 			&& (!(_flags & Flag::NoRead)
 				|| state.unread
 				|| state.mention
-				|| history->fakeUnreadWhileOpened())
+				|| (!ignoreFakeUnread && history->fakeUnreadWhileOpened()))
 			&& (!(_flags & Flag::NoArchived)
 				|| (history->folderKnown() && !history->folder())))
 		|| _always.contains(history);
@@ -350,8 +366,11 @@ void ChatFilters::clear() {
 	_list.clear();
 }
 
-void ChatFilters::setPreloaded(const QVector<MTPDialogFilter> &result) {
+void ChatFilters::setPreloaded(
+		const QVector<MTPDialogFilter> &result,
+		bool tagsEnabled) {
 	_loadRequestId = -1;
+	_tagsEnabled = tagsEnabled;
 	received(result);
 	crl::on_main(&_owner->session(), [=] {
 		if (_loadRequestId == -1) {
@@ -377,6 +396,7 @@ void ChatFilters::load(bool force) {
 	api.request(_loadRequestId).cancel();
 	_loadRequestId = api.request(MTPmessages_GetDialogFilters(
 	)).done([=](const MTPmessages_DialogFilters &result) {
+		_tagsEnabled = result.data().is_tags_enabled();
 		received(result.data().vfilters().v);
 		_loadRequestId = 0;
 	}).fail([=] {
@@ -388,6 +408,31 @@ void ChatFilters::load(bool force) {
 	}).send();
 }
 
+bool ChatFilters::tagsEnabled() const {
+	return _tagsEnabled.current();
+}
+
+rpl::producer<bool> ChatFilters::tagsEnabledValue() const {
+	return _tagsEnabled.value();
+}
+
+void ChatFilters::requestToggleTags(bool value, Fn<void()> fail) {
+	if (_toggleTagsRequestId) {
+		return;
+	}
+	_toggleTagsRequestId = _owner->session().api().request(
+		MTPmessages_ToggleDialogFilterTags(MTP_bool(value))
+	).done([=](const MTPBool &result) {
+		_tagsEnabled = value;
+		_toggleTagsRequestId = 0;
+	}).fail([=](const MTP::Error &error) {
+		const auto message = error.type();
+		_toggleTagsRequestId = 0;
+		LOG(("API Error: Toggle Tags - %1").arg(message));
+		fail();
+	}).send();
+}
+
 void ChatFilters::received(const QVector<MTPDialogFilter> &list) {
 	auto position = 0;
 	auto changed = false;
@@ -396,7 +441,8 @@ void ChatFilters::received(const QVector<MTPDialogFilter> &list) {
 		if (GetEnhancedBool("hide_all_chats") && parsed.id() == 0 && list.size() > 1) {
 			continue;
 		}
-		const auto b = begin(_list) + position, e = end(_list);
+		const auto b = begin(_list) + position;
+		const auto e = end(_list);
 		const auto i = ranges::find(b, e, parsed.id(), &ChatFilter::id);
 		if (i == e) {
 			applyInsert(std::move(parsed), position);
@@ -625,14 +671,26 @@ bool ChatFilters::applyChange(ChatFilter &filter, ChatFilter &&updated) {
 		|| pinnedChanged
 		|| (filter.title() != updated.title())
 		|| (filter.iconEmoji() != updated.iconEmoji());
-	if (!listUpdated && !chatlistChanged) {
+	const auto colorChanged = filter.colorIndex() != updated.colorIndex();
+	const auto colorExistenceChanged = (!filter.colorIndex())
+		!= (!updated.colorIndex());
+	if (!listUpdated && !chatlistChanged && !colorChanged) {
 		return false;
 	}
+	const auto wasFilter = std::move(filter);
+	filter = std::move(updated);
+	auto entryToRefreshHeight = (Dialogs::Entry*)(nullptr);
 	if (rulesChanged) {
 		const auto filterList = _owner->chatsFilters().chatsList(id);
+		const auto areTagsEnabled = tagsEnabled();
+		const auto tagsExistence = [&](not_null<Dialogs::Row*> row) {
+			return (!areTagsEnabled || entryToRefreshHeight)
+				? false
+				: row->entry()->hasChatsFilterTags(0);
+		};
 		const auto feedHistory = [&](not_null<History*> history) {
-			const auto now = updated.contains(history);
-			const auto was = filter.contains(history);
+			const auto now = filter.contains(history);
+			const auto was = wasFilter.contains(history);
 			if (now != was) {
 				if (now) {
 					history->addToChatList(id, filterList);
@@ -644,7 +702,11 @@ bool ChatFilters::applyChange(ChatFilter &filter, ChatFilter &&updated) {
 		const auto feedList = [&](not_null<const Dialogs::MainList*> list) {
 			for (const auto &entry : *list->indexed()) {
 				if (const auto history = entry->history()) {
+					const auto wasTags = tagsExistence(entry);
 					feedHistory(history);
+					if (wasTags != tagsExistence(entry)) {
+						entryToRefreshHeight = entry->entry();
+					}
 				}
 			}
 		};
@@ -652,20 +714,29 @@ bool ChatFilters::applyChange(ChatFilter &filter, ChatFilter &&updated) {
 		if (const auto folder = _owner->folderLoaded(Data::Folder::kId)) {
 			feedList(folder->chatsList());
 		}
-		if (exceptionsChanged && !updated.always().empty()) {
+		if (exceptionsChanged && !filter.always().empty()) {
 			_exceptionsToLoad.push_back(id);
 			Ui::PostponeCall(&_owner->session(), [=] {
 				_owner->session().api().requestMoreDialogsIfNeeded();
 			});
 		}
 	}
-	filter = std::move(updated);
 	if (pinnedChanged) {
 		const auto filterList = _owner->chatsFilters().chatsList(id);
-		filterList->pinned()->applyList(filter.pinned());
+		filterList->pinned()->applyList(wasFilter.pinned());
 	}
 	if (chatlistChanged) {
 		_isChatlistChanged.fire_copy(id);
+	}
+	if (colorChanged) {
+		_tagColorChanged.fire_copy(TagColorChanged{
+			.filterId = id,
+			.colorExistenceChanged = colorExistenceChanged,
+		});
+	}
+	if (entryToRefreshHeight) {
+		// Trigger a full refresh of height for the main list.
+		entryToRefreshHeight->updateChatListEntryHeight();
 	}
 	return listUpdated;
 }
@@ -807,6 +878,10 @@ rpl::producer<> ChatFilters::changed() const {
 
 rpl::producer<FilterId> ChatFilters::isChatlistChanged() const {
 	return _isChatlistChanged.events();
+}
+
+rpl::producer<TagColorChanged> ChatFilters::tagColorChanged() const {
+	return _tagColorChanged.events();
 }
 
 bool ChatFilters::loadNextExceptions(bool chatsListLoaded) {
@@ -1024,6 +1099,16 @@ void ChatFilters::checkLoadMoreChatsLists() {
 	for (const auto &[id, entry] : _moreChatsData) {
 		loadMoreChatsList(id);
 	}
+}
+
+bool CanRemoveFromChatFilter(
+		const ChatFilter &filter,
+		not_null<History*> history) {
+	using Flag = ChatFilter::Flag;
+	const auto flagsWithoutNoReadNoArchivedNoMuted = filter.flags()
+		& ~(Flag::NoRead | Flag::NoArchived | Flag::NoMuted);
+	return (filter.always().size() > 1 || flagsWithoutNoReadNoArchivedNoMuted)
+		&& filter.contains(history);
 }
 
 } // namespace Data

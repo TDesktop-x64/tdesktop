@@ -7,22 +7,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "boxes/filters/edit_filter_box.h"
 
+#include "apiwrap.h"
+#include "base/event_filter.h"
 #include "boxes/filters/edit_filter_chats_list.h"
 #include "boxes/filters/edit_filter_chats_preview.h"
 #include "boxes/filters/edit_filter_links.h"
 #include "boxes/premium_limits_box.h"
+#include "boxes/premium_preview_box.h"
 #include "chat_helpers/emoji_suggestions_widget.h"
-#include "ui/layers/generic_box.h"
-#include "ui/text/text_utilities.h"
-#include "ui/text/text_options.h"
-#include "ui/widgets/buttons.h"
-#include "ui/widgets/fields/input_field.h"
-#include "ui/wrap/slide_wrap.h"
-#include "ui/effects/panel_animation.h"
-#include "ui/filter_icons.h"
-#include "ui/filter_icon_panel.h"
-#include "ui/painter.h"
-#include "ui/vertical_list.h"
+#include "core/application.h"
+#include "core/core_settings.h"
 #include "data/data_channel.h"
 #include "data/data_chat_filters.h"
 #include "data/data_peer.h"
@@ -30,22 +24,32 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_premium_limits.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
-#include "core/application.h"
-#include "core/core_settings.h"
-#include "settings/settings_common.h"
-#include "base/event_filter.h"
-#include "lang/lang_keys.h"
 #include "history/history.h"
+#include "info/userpic/info_userpic_color_circle_button.h"
+#include "lang/lang_keys.h"
 #include "main/main_session.h"
-#include "window/window_session_controller.h"
+#include "settings/settings_common.h"
+#include "ui/effects/animation_value_f.h"
+#include "ui/effects/animations.h"
+#include "ui/effects/panel_animation.h"
+#include "ui/empty_userpic.h"
+#include "ui/filter_icon_panel.h"
+#include "ui/filter_icons.h"
+#include "ui/layers/generic_box.h"
+#include "ui/painter.h"
+#include "ui/vertical_list.h"
+#include "ui/widgets/buttons.h"
+#include "ui/widgets/fields/input_field.h"
+#include "ui/wrap/slide_wrap.h"
 #include "window/window_controller.h"
-#include "apiwrap.h"
+#include "window/window_session_controller.h"
 #include "styles/style_settings.h"
 #include "styles/style_boxes.h"
+#include "styles/style_dialogs.h"
 #include "styles/style_layers.h"
 #include "styles/style_window.h"
 #include "styles/style_chat.h"
-#include "styles/style_menu_icons.h"
+#include "styles/style_info_userpic_builder.h"
 
 namespace {
 
@@ -336,6 +340,8 @@ void EditFilterBox(
 			const Data::ChatFilter &data,
 			Fn<void(Data::ChatFilter)> next)> saveAnd) {
 	using namespace rpl::mappers;
+	constexpr auto kColorsCount = 8;
+	constexpr auto kNoTag = kColorsCount - 1;
 
 	struct State {
 		rpl::variable<Data::ChatFilter> rules;
@@ -343,6 +349,7 @@ void EditFilterBox(
 		rpl::variable<bool> hasLinks;
 		rpl::variable<bool> chatlist;
 		rpl::variable<bool> creating;
+		rpl::variable<int> colorIndex;
 	};
 	const auto owner = &window->session().data();
 	const auto state = box->lifetime().make_state<State>(State{
@@ -350,6 +357,7 @@ void EditFilterBox(
 		.chatlist = filter.chatlist(),
 		.creating = filter.title().isEmpty(),
 	});
+	state->colorIndex = filter.colorIndex().value_or(kNoTag);
 	state->links = owner->chatsFilters().chatlistLinks(filter.id()),
 	state->hasLinks = state->links.value() | rpl::map([=](const auto &v) {
 		return !v.empty();
@@ -504,6 +512,168 @@ void EditFilterBox(
 	Ui::AddDividerText(excludeInner, tr::lng_filters_exclude_about());
 	Ui::AddSkip(excludeInner);
 
+	{
+		const auto wrap = content->add(
+			object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+				content,
+				object_ptr<Ui::VerticalLayout>(content)));
+		const auto colors = wrap->entity();
+		const auto session = &window->session();
+
+		wrap->toggleOn(
+			rpl::combine(
+				session->premiumPossibleValue(),
+				session->data().chatsFilters().tagsEnabledValue(),
+				Data::AmPremiumValue(session)
+			) | rpl::map([=] (bool possible, bool tagsEnabled, bool premium) {
+				return possible && (tagsEnabled || !premium);
+			}),
+			anim::type::instant);
+
+		const auto isPremium = session->premium();
+		const auto title = Ui::AddSubsectionTitle(
+			colors,
+			tr::lng_filters_tag_color_subtitle());
+		const auto preview = Ui::CreateChild<Ui::RpWidget>(colors);
+		title->geometryValue(
+		) | rpl::start_with_next([=](const QRect &r) {
+			const auto h = st::normalFont->height;
+			preview->setGeometry(
+				colors->x(),
+				r.y() + (r.height() - h) / 2 + st::lineWidth,
+				colors->width(),
+				h);
+		}, preview->lifetime());
+		const auto previewColor = preview->lifetime().make_state<QColor>();
+		const auto previewAlpha = preview->lifetime().make_state<float64>(1);
+		preview->paintRequest() | rpl::start_with_next([=] {
+			auto p = QPainter(preview);
+			p.fillRect(preview->rect(), Qt::transparent);
+			const auto &font = st::dialogRowFilterTagFont;
+			const auto text = name->getLastText().toUpper();
+			p.setFont(font);
+			p.setOpacity(*previewAlpha);
+			const auto roundedWidth = font->width(text) + font->spacew * 3;
+			const auto rect = QRect(
+				preview->width() - roundedWidth - st::boxRowPadding.right(),
+				(st::normalFont->height - font->height) / 2,
+				roundedWidth,
+				font->height);
+			const auto pen = QPen(*previewColor);
+			p.setPen(Qt::NoPen);
+			p.setBrush(anim::with_alpha(pen.color(), .15));
+			{
+				auto hq = PainterHighQualityEnabler(p);
+				const auto radius = font->height / 3.;
+				p.drawRoundedRect(rect, radius, radius);
+			}
+			p.setPen(pen);
+			p.drawText(rect, text, style::al_center);
+			if (p.opacity() < 1) {
+				p.setOpacity(1. - p.opacity());
+				p.setFont(st::normalFont);
+				p.setPen(st::windowSubTextFg);
+				p.drawText(
+					preview->rect() - st::boxRowPadding,
+					tr::lng_filters_tag_color_no(tr::now),
+					style::al_right);
+			}
+		}, preview->lifetime());
+
+		name->changes() | rpl::start_with_next([=] {
+			preview->update();
+		}, preview->lifetime());
+
+		const auto side = st::userpicBuilderEmojiAccentColorSize;
+		const auto line = colors->add(
+			Ui::CreateSkipWidget(colors, side),
+			st::boxRowPadding);
+		auto buttons = std::vector<not_null<UserpicBuilder::CircleButton*>>();
+		const auto animation
+			= line->lifetime().make_state<Ui::Animations::Simple>();
+		const auto palette = [](int i) {
+			return Ui::EmptyUserpic::UserpicColor(i).color2;
+		};
+		for (auto i = 0; i < kColorsCount; ++i) {
+			const auto button = Ui::CreateChild<UserpicBuilder::CircleButton>(
+				line);
+			button->resize(side, side);
+			const auto progress = isPremium
+				? (state->colorIndex.current() == i)
+				: (i == kNoTag);
+			button->setSelectedProgress(progress);
+			const auto color = palette(i);
+			button->setBrush(color);
+			if (progress == 1) {
+				*previewColor = color->c;
+				if (i == kNoTag) {
+					*previewAlpha = 0.;
+				}
+			}
+			buttons.push_back(button);
+		}
+		for (auto i = 0; i < kColorsCount; ++i) {
+			const auto &button = buttons[i];
+			button->setClickedCallback([=] {
+				const auto was = state->colorIndex.current();
+				const auto now = i;
+				if (was != now) {
+					const auto c1 = palette(was);
+					const auto c2 = palette(now);
+					const auto a1 = (was == kNoTag) ? 0. : 1.;
+					const auto a2 = (now == kNoTag) ? 0. : 1.;
+					animation->stop();
+					animation->start([=](float64 progress) {
+						if (was >= 0) {
+							buttons[was]->setSelectedProgress(1. - progress);
+						}
+						buttons[now]->setSelectedProgress(progress);
+						*previewColor = anim::color(c1, c2, progress);
+						*previewAlpha = anim::interpolateF(a1, a2, progress);
+						preview->update();
+					}, 0., 1., st::universalDuration);
+				}
+				state->colorIndex = now;
+			});
+			if (!session->premium()) {
+				button->setClickedCallback([w = window] {
+					ShowPremiumPreviewToBuy(w, PremiumFeature::FilterTags);
+				});
+			}
+		}
+		line->sizeValue() | rpl::start_with_next([=](const QSize &size) {
+			const auto totalWidth = buttons.size() * side;
+			const auto spacing = (size.width() - totalWidth)
+				/ (buttons.size() - 1);
+			for (auto i = 0; i < kColorsCount; ++i) {
+				const auto &button = buttons[i];
+				button->moveToLeft(i * (side + spacing), 0);
+			}
+		}, line->lifetime());
+
+		{
+			const auto last = buttons.back();
+			const auto icon = Ui::CreateChild<Ui::RpWidget>(last);
+			icon->resize(side, side);
+			icon->paintRequest() | rpl::start_with_next([=] {
+				auto p = QPainter(icon);
+				(session->premium()
+					? st::windowFilterSmallRemove.icon
+					: st::historySendDisabledIcon).paintInCenter(
+						p,
+						QRectF(icon->rect()),
+						st::historyPeerUserpicFg->c);
+			}, icon->lifetime());
+			icon->setAttribute(Qt::WA_TransparentForMouseEvents);
+			last->setBrush(st::historyPeerArchiveUserpicBg);
+		}
+
+		Ui::AddSkip(colors);
+		Ui::AddSkip(colors);
+		Ui::AddDividerText(colors, tr::lng_filters_tag_color_about());
+		Ui::AddSkip(colors);
+	}
+
 	const auto collect = [=]() -> std::optional<Data::ChatFilter> {
 		const auto title = name->getLastText().trimmed();
 		const auto rules = data->current();
@@ -520,7 +690,11 @@ void EditFilterBox(
 			window->window().showToast(tr::lng_filters_default(tr::now));
 			return {};
 		}
-		return rules.withTitle(title);
+		const auto rawColorIndex = state->colorIndex.current();
+		const auto colorIndex = (rawColorIndex >= kNoTag
+			? std::nullopt
+			: std::make_optional(rawColorIndex));
+		return rules.withTitle(title).withColorIndex(colorIndex);
 	};
 
 	Ui::AddSubsectionTitle(

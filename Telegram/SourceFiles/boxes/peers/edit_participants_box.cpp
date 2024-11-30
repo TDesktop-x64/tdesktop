@@ -648,7 +648,7 @@ PeerData *ParticipantsAdditionalData::applyParticipant(
 			&& overrideRole != Role::Members) {
 			return logBad();
 		}
-		return applyRegular(data.userId());
+		return applyRegular(data);
 	}
 	case Api::ChatParticipant::Type::Restricted:
 	case Api::ChatParticipant::Type::Banned:
@@ -667,7 +667,7 @@ PeerData *ParticipantsAdditionalData::applyParticipant(
 
 UserData *ParticipantsAdditionalData::applyCreator(
 		const Api::ChatParticipant &data) {
-	if (const auto user = applyRegular(data.userId())) {
+	if (const auto user = applyRegular(data)) {
 		_creator = user;
 		_adminRights[user] = data.rights();
 		if (user->isSelf()) {
@@ -730,14 +730,21 @@ UserData *ParticipantsAdditionalData::applyAdmin(
 	return user;
 }
 
-UserData *ParticipantsAdditionalData::applyRegular(UserId userId) {
-	const auto user = _peer->owner().userLoaded(userId);
+UserData *ParticipantsAdditionalData::applyRegular(const Api::ChatParticipant &data) {
+	const auto user = _peer->owner().userLoaded(data.userId());
 	if (!user) {
 		return nullptr;
 	} else if (const auto chat = _peer->asChat()) {
 		// This can come from saveAdmin or saveRestricted callback.
 		_admins.erase(user);
 		return user;
+	}
+
+	if (data.memberSince()) {
+		_memberSince[user] = data.memberSince();
+	}
+	else {
+		_memberSince.remove(user);
 	}
 
 	_infoNotLoaded.erase(user);
@@ -1677,6 +1684,25 @@ base::unique_qptr<Ui::PopupMenu> ParticipantsBoxController::rowContextMenu(
 			result->addAction(std::move(button));
 		};
 
+		const auto addJoinInfoAction = [&](
+				tr::phrase<lngtag_date> phrase,
+				TimeId since) {
+			auto text = phrase(
+				tr::now,
+				lt_date,
+				Ui::Text::Bold(
+				langDateTimeFull(base::unixtime::parse(since))),
+				Ui::Text::WithEntities);
+			auto button = base::make_unique_q<Ui::Menu::MultilineAction>(
+				result->menu(),
+				result->st().menu,
+				st::historyHasCustomEmoji,
+				st::historyHasCustomEmojiPosition,
+				std::move(text));
+			result->addSeparator();
+			result->addAction(std::move(button));
+		};
+
 		if (const auto by = _additional.restrictedBy(participant)) {
 			if (const auto since = _additional.restrictedSince(participant)) {
 				addInfoAction(
@@ -1691,6 +1717,8 @@ base::unique_qptr<Ui::PopupMenu> ParticipantsBoxController::rowContextMenu(
 				if (const auto since = _additional.adminPromotedSince(user)) {
 					addInfoAction(by, tr::lng_rights_about_by, since);
 				}
+			} else if (const auto since = _additional.memberSince(user)) {
+				addJoinInfoAction(tr::lng_group_invite_joined_status, since);
 			}
 		}
 	});

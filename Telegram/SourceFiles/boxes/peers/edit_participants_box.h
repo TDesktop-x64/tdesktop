@@ -133,7 +133,7 @@ public:
 private:
 	UserData *applyCreator(const Api::ChatParticipant &data);
 	UserData *applyAdmin(const Api::ChatParticipant &data);
-	UserData *applyRegular(UserId userId);
+	UserData *applyRegular(const Api::ChatParticipant &data);
 	PeerData *applyBanned(const Api::ChatParticipant &data);
 	void fillFromChat(not_null<ChatData*> chat);
 	void fillFromChannel(not_null<ChannelData*> channel);

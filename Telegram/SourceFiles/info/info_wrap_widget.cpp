@@ -289,6 +289,7 @@ Dialogs::RowDescriptor WrapWidget::activeChat() const {
 			: Dialogs::RowDescriptor();
 	} else if (key().settingsSelf()
 			|| key().isDownloads()
+			|| key().reactionsContextId()
 			|| key().poll()
 			|| key().statisticsTag().peer) {
 		return Dialogs::RowDescriptor();
@@ -526,14 +527,14 @@ void WrapWidget::showTopBarMenu(bool check) {
 }
 
 bool WrapWidget::requireTopBarSearch() const {
-	if (!_topBar || !_controller->searchFieldController()) {
+	if (!_topBar
+		|| !_controller->searchFieldController()
+		|| (_controller->wrap() == Wrap::Layer)
+		|| (_controller->section().type() == Section::Type::Profile)
+		|| key().isDownloads()) {
 		return false;
-	} else if (_controller->wrap() == Wrap::Layer
-		|| _controller->section().type() == Section::Type::Profile) {
-		return false;
-	} else if (key().isDownloads()) {
-		return false;
-	} else if (hasStackHistory()) {
+	} else if (hasStackHistory()
+		|| _controller->section().type() == Section::Type::RequestsList) {
 		return true;
 	}
 	return false;

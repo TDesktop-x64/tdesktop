@@ -1677,7 +1677,7 @@ base::unique_qptr<Ui::PopupMenu> ParticipantsBoxController::rowContextMenu(
 				std::move(text));
 			if (const auto n = _navigation) {
 				button->setClickedCallback([=] {
-					n->parentController()->show(PrepareShortInfoBox(by, n));
+					n->parentController()->showPeerInfo(by);
 				});
 			}
 			result->addSeparator();

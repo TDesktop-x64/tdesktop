@@ -2807,7 +2807,6 @@ QPointer<Ui::BoxContent> ShowForwardMessagesBox(
 		auto init = [=](not_null<ListBox*> box) {
 			controllerRaw->setSearchNoResultsText(
 				tr::lng_bot_chats_not_found(tr::now));
-			box->setSpecialTabMode(true);
 			const auto chatsFilters = Ui::AddChatFiltersTabsStrip(
 				box,
 				session,

@@ -46,6 +46,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item_helpers.h"
 #include "history/view/history_view_item_preview.h"
 #include "info/bot/earn/info_bot_earn_widget.h"
+#include "info/bot/starref/info_bot_starref_common.h"
 #include "info/channel_statistics/earn/earn_format.h"
 #include "info/channel_statistics/earn/earn_icons.h"
 #include "info/channel_statistics/earn/info_channel_earn_list.h"
@@ -61,6 +62,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "menu/menu_mute.h"
+#include "settings/settings_common.h"
 #include "support/support_helper.h"
 #include "ui/boxes/peer_qr_box.h"
 #include "ui/boxes/report_box_graphics.h"
@@ -877,19 +879,19 @@ rpl::producer<uint64> AddCurrencyAction(
 	return state->balance.value();
 }
 
-rpl::producer<uint64> AddCreditsAction(
+rpl::producer<StarsAmount> AddCreditsAction(
 		not_null<UserData*> user,
 		not_null<Ui::VerticalLayout*> wrap,
 		not_null<Controller*> controller) {
 	struct State final {
-		rpl::variable<uint64> balance;
+		rpl::variable<StarsAmount> balance;
 	};
 	const auto state = wrap->lifetime().make_state<State>();
 	const auto parentController = controller->parentController();
 	const auto wrapButton = AddActionButton(
 		wrap,
 		tr::lng_manage_peer_bot_balance_credits(),
-		state->balance.value() | rpl::map(rpl::mappers::_1 > 0),
+		state->balance.value() | rpl::map(rpl::mappers::_1 > StarsAmount(0)),
 		[=] { parentController->showSection(Info::BotEarn::Make(user)); },
 		nullptr);
 	{
@@ -929,7 +931,7 @@ rpl::producer<uint64> AddCreditsAction(
 	) | rpl::start_with_next([=, &st](
 			int width,
 			const QString &button,
-			uint64 balance) {
+			StarsAmount balance) {
 		const auto available = width
 			- rect::m::sum::h(st.padding)
 			- st.style.font->width(button)
@@ -937,7 +939,7 @@ rpl::producer<uint64> AddCreditsAction(
 		name->setMarkedText(
 			base::duplicate(icon)
 				.append(QChar(' '))
-				.append(Lang::FormatCountDecimal(balance)),
+				.append(Lang::FormatStarsAmountDecimal(balance)),
 			Core::MarkedTextContext{
 				.session = &user->session(),
 				.customEmojiRepaint = [=] { name->update(); },
@@ -1014,6 +1016,7 @@ public:
 	object_ptr<Ui::RpWidget> fill();
 
 private:
+	void addAffiliateProgram(not_null<UserData*> user);
 	void addBalanceActions(not_null<UserData*> user);
 	void addInviteToGroupAction(not_null<UserData*> user);
 	void addShareContactAction(not_null<UserData*> user);
@@ -2135,6 +2138,80 @@ ActionsFiller::ActionsFiller(
 , _peer(peer) {
 }
 
+void ActionsFiller::addAffiliateProgram(not_null<UserData*> user) {
+	if (!user->isBot()) {
+		return;
+	}
+
+	const auto wrap = _wrap->add(
+		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+			_wrap.data(),
+			object_ptr<Ui::VerticalLayout>(_wrap.data())));
+	const auto inner = wrap->entity();
+	auto program = user->session().changes().peerFlagsValue(
+		user,
+		Data::PeerUpdate::Flag::StarRefProgram
+	) | rpl::map([=] {
+		return user->botInfo->starRefProgram;
+	}) | rpl::start_spawning(inner->lifetime());
+	auto commission = rpl::duplicate(
+		program
+	) | rpl::filter([=](StarRefProgram program) {
+		return program.commission > 0;
+	}) | rpl::map([=](StarRefProgram program) {
+		return Info::BotStarRef::FormatCommission(program.commission);
+	});
+	const auto show = _controller->uiShow();
+
+	struct StarRefRecipients {
+		std::vector<not_null<PeerData*>> list;
+		bool requested = false;
+		Fn<void()> open;
+	};
+	const auto recipients = std::make_shared<StarRefRecipients>();
+	recipients->open = [=] {
+		if (!recipients->list.empty()) {
+			const auto program = user->botInfo->starRefProgram;
+			show->show(Info::BotStarRef::JoinStarRefBox(
+				{ user, { program } },
+				user->session().user(),
+				recipients->list));
+		} else if (!recipients->requested) {
+			recipients->requested = true;
+			const auto done = [=](std::vector<not_null<PeerData*>> list) {
+				recipients->list = std::move(list);
+				recipients->open();
+			};
+			Info::BotStarRef::ResolveRecipients(&user->session(), done);
+		}
+	};
+
+	inner->add(EditPeerInfoBox::CreateButton(
+		inner,
+		tr::lng_manage_peer_bot_star_ref(),
+		rpl::duplicate(commission),
+		recipients->open,
+		st::infoSharedMediaCountButton,
+		{ .icon = &st::menuIconSharing, .newBadge = true }));
+	Ui::AddSkip(inner);
+	Ui::AddDividerText(
+		inner,
+		tr::lng_manage_peer_bot_star_ref_about(
+			lt_bot,
+			rpl::single(TextWithEntities{ user->name() }),
+			lt_amount,
+			rpl::duplicate(commission) | Ui::Text::ToWithEntities(),
+			Ui::Text::RichLangValue));
+	Ui::AddSkip(inner);
+
+	wrap->toggleOn(std::move(
+		program
+	) | rpl::map([](StarRefProgram program) {
+		return program.commission > 0;
+	}));
+	wrap->finishAnimating();
+}
+
 void ActionsFiller::addBalanceActions(not_null<UserData*> user) {
 	const auto wrap = _wrap->add(
 		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
@@ -2151,7 +2228,8 @@ void ActionsFiller::addBalanceActions(not_null<UserData*> user) {
 		rpl::combine(
 			std::move(currencyBalance),
 			std::move(creditsBalance)
-		) | rpl::map((rpl::mappers::_1 + rpl::mappers::_2) > 0));
+		) | rpl::map((rpl::mappers::_1 > 0)
+			|| (rpl::mappers::_2 > StarsAmount(0))));
 }
 
 void ActionsFiller::addInviteToGroupAction(not_null<UserData*> user) {
@@ -2399,6 +2477,7 @@ void ActionsFiller::addJoinChannelAction(
 
 void ActionsFiller::fillUserActions(not_null<UserData*> user) {
 	if (user->isBot()) {
+		addAffiliateProgram(user);
 		addBalanceActions(user);
 		addInviteToGroupAction(user);
 	}

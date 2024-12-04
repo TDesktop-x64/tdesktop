@@ -324,8 +324,6 @@ PRIVATE
     boxes/send_gif_with_caption_box.h
     boxes/send_files_box.cpp
     boxes/send_files_box.h
-    boxes/sessions_box.cpp
-    boxes/sessions_box.h
     boxes/share_box.cpp
     boxes/share_box.h
     boxes/star_gift_box.cpp
@@ -474,6 +472,7 @@ PRIVATE
     core/sandbox.h
     core/shortcuts.cpp
     core/shortcuts.h
+    core/stars_amount.h
     core/ui_integration.cpp
     core/ui_integration.h
     core/update_checker.cpp
@@ -923,6 +922,12 @@ PRIVATE
     info/bot/earn/info_bot_earn_list.h
     info/bot/earn/info_bot_earn_widget.cpp
     info/bot/earn/info_bot_earn_widget.h
+    info/bot/starref/info_bot_starref_common.cpp
+    info/bot/starref/info_bot_starref_common.h
+    info/bot/starref/info_bot_starref_join_widget.cpp
+    info/bot/starref/info_bot_starref_join_widget.h
+    info/bot/starref/info_bot_starref_setup_widget.cpp
+    info/bot/starref/info_bot_starref_setup_widget.h
     info/channel_statistics/boosts/create_giveaway_box.cpp
     info/channel_statistics/boosts/create_giveaway_box.h
     info/channel_statistics/boosts/giveaway/giveaway_list_controllers.cpp
@@ -1409,6 +1414,8 @@ PRIVATE
     settings/cloud_password/settings_cloud_password_manage.h
     settings/cloud_password/settings_cloud_password_start.cpp
     settings/cloud_password/settings_cloud_password_start.h
+    settings/settings_active_sessions.cpp
+    settings/settings_active_sessions.h
     settings/settings_advanced.cpp
     settings/settings_advanced.h
     settings/settings_blocked_peers.cpp
@@ -1572,8 +1579,6 @@ PRIVATE
     ui/item_text_options.cpp
     ui/item_text_options.h
     ui/resize_area.h
-    ui/search_field_controller.cpp
-    ui/search_field_controller.h
     ui/unread_badge.cpp
     ui/unread_badge.h
     window/main_window.cpp

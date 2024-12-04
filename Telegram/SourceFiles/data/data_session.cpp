@@ -1432,10 +1432,6 @@ void Session::forgetPassportCredentials() {
 	_passportCredentials = nullptr;
 }
 
-QString Session::nameSortKey(const QString &name) const {
-	return TextUtilities::RemoveAccents(name).toLower();
-}
-
 void Session::setupMigrationViewer() {
 	session().changes().peerUpdates(
 		PeerUpdate::Flag::Migration

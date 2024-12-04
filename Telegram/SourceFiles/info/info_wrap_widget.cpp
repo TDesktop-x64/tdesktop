@@ -64,8 +64,9 @@ const style::InfoTopBar &TopBarStyle(Wrap wrap) {
 
 [[nodiscard]] bool HasCustomTopBar(not_null<const Controller*> controller) {
 	const auto section = controller->section();
-	return (section.type() == Section::Type::Settings)
-		&& section.settingsType()->hasCustomTopBar();
+	return (section.type() == Section::Type::BotStarRef)
+		|| ((section.type() == Section::Type::Settings)
+			&& section.settingsType()->hasCustomTopBar());
 }
 
 [[nodiscard]] Fn<Ui::StringWithNumbers(int)> SelectedTitleForMedia(
@@ -291,6 +292,7 @@ Dialogs::RowDescriptor WrapWidget::activeChat() const {
 			|| key().isDownloads()
 			|| key().reactionsContextId()
 			|| key().poll()
+			|| key().starrefPeer()
 			|| key().statisticsTag().peer) {
 		return Dialogs::RowDescriptor();
 	}

@@ -16,8 +16,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_user.h"
 #include "data/stickers/data_custom_emoji.h"
 #include "info/bot/earn/info_bot_earn_widget.h"
+#include "info/bot/starref/info_bot_starref_common.h"
+#include "info/bot/starref/info_bot_starref_join_widget.h"
 #include "info/channel_statistics/earn/earn_format.h"
 #include "info/info_controller.h"
+#include "info/info_memento.h"
 #include "info/statistics/info_statistics_inner_widget.h" // FillLoading.
 #include "info/statistics/info_statistics_list_controllers.h"
 #include "lang/lang_keys.h"
@@ -125,7 +128,9 @@ void InnerWidget::fill() {
 			return _state.availableBalance;
 		})
 	);
-	auto valueToString = [](uint64 v) { return Lang::FormatCountDecimal(v); };
+	auto valueToString = [](StarsAmount v) {
+		return Lang::FormatStarsAmountDecimal(v);
+	};
 
 	if (data.revenueGraph.chart) {
 		Ui::AddSkip(container);
@@ -149,7 +154,7 @@ void InnerWidget::fill() {
 		Ui::AddSkip(container, st::channelEarnOverviewTitleSkip);
 
 		const auto addOverview = [&](
-				rpl::producer<uint64> value,
+				rpl::producer<StarsAmount> value,
 				const tr::phrase<> &text) {
 			const auto line = container->add(
 				Ui::CreateSkipWidget(container, 0),
@@ -165,7 +170,7 @@ void InnerWidget::fill() {
 				line,
 				std::move(
 					value
-				) | rpl::map([=](uint64 v) {
+				) | rpl::map([=](StarsAmount v) {
 					return v ? ToUsd(v, multiplier, kMinorLength) : QString();
 				}),
 				st::channelEarnOverviewSubMinorLabel);
@@ -242,11 +247,24 @@ void InnerWidget::fill() {
 			rpl::duplicate(dateValue) | rpl::map([=](const QDateTime &dt) {
 				return !dt.isNull() || (!_state.isWithdrawalEnabled);
 			}),
-			rpl::duplicate(availableBalanceValue) | rpl::map([=](uint64 v) {
+			rpl::duplicate(
+				availableBalanceValue
+			) | rpl::map([=](StarsAmount v) {
 				return v ? ToUsd(v, multiplier, kMinorLength) : QString();
 			}));
 	}
-
+	if (BotStarRef::Join::Allowed(peer())) {
+		const auto button = BotStarRef::AddViewListButton(
+			container,
+			tr::lng_credits_summary_earn_title(),
+			tr::lng_credits_summary_earn_about(),
+			true);
+		button->setClickedCallback([=] {
+			_controller->showSection(BotStarRef::Join::Make(peer()));
+		});
+		Ui::AddSkip(container);
+		Ui::AddDivider(container);
+	}
 	fillHistory();
 }
 

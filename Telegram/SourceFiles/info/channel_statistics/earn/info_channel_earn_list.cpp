@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/peers/edit_peer_color_box.h" // AddLevelBadge.
 #include "chat_helpers/stickers_emoji_pack.h"
 #include "core/application.h"
+#include "data/components/credits.h"
 #include "data/data_channel.h"
 #include "data/data_premium_limits.h"
 #include "data/data_session.h"
@@ -24,10 +25,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_user.h"
 #include "data/stickers/data_custom_emoji.h"
 #include "history/view/controls/history_view_webpage_processor.h"
+#include "info/bot/starref/info_bot_starref_join_widget.h"
+#include "info/bot/starref/info_bot_starref_setup_widget.h"
 #include "info/channel_statistics/earn/earn_format.h"
 #include "info/channel_statistics/earn/earn_icons.h"
 #include "info/channel_statistics/earn/info_channel_earn_widget.h"
 #include "info/info_controller.h"
+#include "info/info_memento.h"
 #include "info/profile/info_profile_values.h" // Info::Profile::NameValue.
 #include "info/statistics/info_statistics_inner_widget.h" // FillLoading.
 #include "info/statistics/info_statistics_list_controllers.h"
@@ -252,10 +256,9 @@ void InnerWidget::load() {
 				}
 				const auto &data = d.vstatus().data();
 				auto &e = _state.creditsEarn;
-				e.currentBalance = data.vcurrent_balance().v;
-				e.availableBalance = data.vavailable_balance().v;
-				e.overallRevenue = data.voverall_revenue().v;
-				e.overallRevenue = data.voverall_revenue().v;
+				e.currentBalance = Data::FromTL(data.vcurrent_balance());
+				e.availableBalance = Data::FromTL(data.vavailable_balance());
+				e.overallRevenue = Data::FromTL(data.voverall_revenue());
 				e.isWithdrawalEnabled = data.is_withdrawal_enabled();
 				e.nextWithdrawalAt = data.vnext_withdrawal_at()
 					? base::unixtime::parse(
@@ -359,7 +362,7 @@ void InnerWidget::fill() {
 	//constexpr auto kApproximately = QChar(0x2248);
 	const auto multiplier = data.usdRate;
 
-	const auto creditsToUsdMap = [=](EarnInt c) {
+	const auto creditsToUsdMap = [=](StarsAmount c) {
 		const auto creditsMultiplier = _state.creditsEarn.usdRate
 			* Data::kEarnMultiplier;
 		return c ? ToUsd(c, creditsMultiplier, 0) : QString();
@@ -679,7 +682,7 @@ void InnerWidget::fill() {
 
 		const auto addOverview = [&](
 				rpl::producer<EarnInt> currencyValue,
-				rpl::producer<EarnInt> creditsValue,
+				rpl::producer<StarsAmount> creditsValue,
 				const tr::phrase<> &text,
 				bool showCurrency,
 				bool showCredits) {
@@ -713,8 +716,8 @@ void InnerWidget::fill() {
 
 			const auto creditsLabel = Ui::CreateChild<Ui::FlatLabel>(
 				line,
-				rpl::duplicate(creditsValue) | rpl::map([](EarnInt value) {
-					return QString::number(value);
+				rpl::duplicate(creditsValue) | rpl::map([](StarsAmount value) {
+					return Lang::FormatStarsAmountDecimal(value);
 				}),
 				st::channelEarnOverviewMajorLabel);
 			const auto icon = Ui::CreateSingleStarWidget(
@@ -733,7 +736,7 @@ void InnerWidget::fill() {
 					int available,
 					const QSize &size,
 					const QSize &creditsSize,
-					EarnInt credits) {
+					StarsAmount credits) {
 				const auto skip = st::channelEarnOverviewSubMinorLabelPos.x();
 				line->resize(line->width(), size.height());
 				minorLabel->moveToLeft(
@@ -922,7 +925,7 @@ void InnerWidget::fill() {
 			: tr::lng_channel_earn_balance_about_temp);
 		Ui::AddSkip(container);
 	}
-	if (creditsData.availableBalance > 0) {
+	if (creditsData.availableBalance.value() > 0) {
 		AddHeader(container, tr::lng_bot_earn_balance_title);
 		auto availableBalanceValue = rpl::single(
 			creditsData.availableBalance
@@ -959,6 +962,20 @@ void InnerWidget::fill() {
 				availableBalanceValue
 			) | rpl::map(creditsToUsdMap));
 	}
+
+	if (Info::BotStarRef::Join::Allowed(_peer)) {
+		const auto button = Info::BotStarRef::AddViewListButton(
+			container,
+			tr::lng_credits_summary_earn_title(),
+			tr::lng_credits_summary_earn_about(),
+			true);
+		button->setClickedCallback([=] {
+			_controller->showSection(Info::BotStarRef::Join::Make(_peer));
+		});
+		Ui::AddSkip(container);
+		Ui::AddDivider(container);
+	}
+	Ui::AddSkip(container);
 
 	const auto sectionIndex = container->lifetime().make_state<int>(0);
 	const auto rebuildLists = [=](

@@ -7,10 +7,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "lang/lang_tag.h"
 
+#include "core/stars_amount.h"
 #include "lang/lang_keys.h"
 #include "ui/text/text.h"
 #include "base/qt/qt_common_adapters.h"
 #include "base/qt/qt_string_view.h"
+
+#include <QtCore/QLocale>
 
 namespace Lang {
 namespace {
@@ -942,7 +945,27 @@ ShortenedCount FormatCountToShort(int64 number) {
 }
 
 QString FormatCountDecimal(int64 number) {
-	return QString("%L1").arg(number);
+	return QLocale().toString(number);
+}
+
+QString FormatExactCountDecimal(float64 number) {
+	return QLocale().toString(number, 'f', QLocale::FloatingPointShortest);
+}
+
+ShortenedCount FormatStarsAmountToShort(StarsAmount amount) {
+	const auto attempt = FormatCountToShort(amount.whole());
+	return attempt.shortened ? attempt : ShortenedCount{
+		.string = FormatStarsAmountDecimal(amount),
+	};
+}
+
+QString FormatStarsAmountDecimal(StarsAmount amount) {
+	return FormatExactCountDecimal(amount.value());
+}
+
+QString FormatStarsAmountRounded(StarsAmount amount) {
+	const auto value = amount.value();
+	return FormatExactCountDecimal(base::SafeRound(value * 100.) / 100.);
 }
 
 PluralResult Plural(

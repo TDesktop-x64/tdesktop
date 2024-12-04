@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_photo_media.h"
 #include "data/data_session.h"
 #include "history/view/media/history_view_sticker_player.h"
+#include "info/bot/starref/info_bot_starref_common.h"
 #include "info/userpic/info_userpic_emoji_builder_preview.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
@@ -162,23 +163,23 @@ not_null<RpWidget*> CreateSingleStarWidget(
 
 not_null<MaskedInputField*> AddInputFieldForCredits(
 		not_null<VerticalLayout*> container,
-		rpl::producer<uint64> value) {
+		rpl::producer<StarsAmount> value) {
 	const auto &st = st::botEarnInputField;
 	const auto inputContainer = container->add(
 		CreateSkipWidget(container, st.heightMin));
-	const auto currentValue = rpl::variable<uint64>(
+	const auto currentValue = rpl::variable<StarsAmount>(
 		rpl::duplicate(value));
 	const auto input = CreateChild<NumberInput>(
 		inputContainer,
 		st,
 		tr::lng_bot_earn_out_ph(),
-		QString::number(currentValue.current()),
-		currentValue.current());
+		QString::number(currentValue.current().whole()),
+		currentValue.current().whole());
 	rpl::duplicate(
 		value
-	) | rpl::start_with_next([=](uint64 v) {
-		input->changeLimit(v);
-		input->setText(QString::number(v));
+	) | rpl::start_with_next([=](StarsAmount v) {
+		input->changeLimit(v.whole());
+		input->setText(QString::number(v.whole()));
 	}, input->lifetime());
 	const auto icon = CreateSingleStarWidget(
 		inputContainer,
@@ -545,7 +546,15 @@ Fn<PaintRoundImageCallback(Fn<void()>)> PaintPreviewCallback(
 }
 
 TextWithEntities GenerateEntryName(const Data::CreditsHistoryEntry &entry) {
-	return (entry.floodSkip
+	return (entry.starrefCommission && !entry.starrefAmount)
+		? tr::lng_credits_commission(
+			tr::now,
+			lt_amount,
+			TextWithEntities{
+				Info::BotStarRef::FormatCommission(entry.starrefCommission)
+			},
+			TextWithEntities::Simple)
+		: (entry.floodSkip
 		? tr::lng_credits_box_history_entry_api
 		: entry.reaction
 		? tr::lng_credits_box_history_entry_reaction_name

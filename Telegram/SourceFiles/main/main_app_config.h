@@ -66,6 +66,12 @@ public:
 	[[nodiscard]] int quoteLengthMax() const;
 	[[nodiscard]] int stargiftConvertPeriodMax() const;
 
+	[[nodiscard]] const std::vector<QString> &startRefPrefixes();
+	[[nodiscard]] bool starrefSetupAllowed() const;
+	[[nodiscard]] bool starrefJoinAllowed() const;
+	[[nodiscard]] int starrefCommissionMin() const;
+	[[nodiscard]] int starrefCommissionMax() const;
+
 	void refresh(bool force = false);
 
 private:
@@ -108,6 +114,8 @@ private:
 
 	std::vector<QString> _ignoreRestrictionReasons;
 	rpl::event_stream<std::vector<QString>> _ignoreRestrictionChanges;
+
+	std::vector<QString> _startRefPrefixes;
 
 	rpl::lifetime _lifetime;
 

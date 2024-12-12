@@ -1329,7 +1329,9 @@ HistoryInner::VideoUserpic *HistoryInner::validateVideoUserpic(
 		not_null<PeerData*> peer) {
 	if (!peer->isPremium()
 		|| peer->userpicPhotoUnknown()
-		|| !peer->userpicHasVideo() || GetEnhancedBool("disable_premium_animation")) {
+		|| !peer->userpicHasVideo()
+		|| GetEnhancedBool("disable_premium_animation")
+		|| GetEnhancedBool("screenshot_mode")) {
 		_videoUserpics.remove(peer);
 		return nullptr;
 	}

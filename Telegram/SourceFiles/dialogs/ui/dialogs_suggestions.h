@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "base/object_ptr.h"
+#include "base/timer.h"
 #include "dialogs/ui/top_peers_strip.h"
 #include "ui/effects/animations.h"
 #include "ui/rp_widget.h"
@@ -18,12 +19,21 @@ namespace Data {
 class Thread;
 } // namespace Data
 
+namespace Info {
+class WrapWidget;
+} // namespace Info
+
 namespace Main {
 class Session;
 } // namespace Main
 
+namespace Storage {
+enum class SharedMediaType : signed char;
+} // namespace Storage
+
 namespace Ui {
 class BoxContent;
+class ScrollArea;
 class ElasticScroll;
 class SettingsSlider;
 class VerticalLayout;
@@ -54,6 +64,9 @@ public:
 
 	void selectJump(Qt::Key direction, int pageSize = 0);
 	void chooseRow();
+
+	bool consumeSearchQuery(const QString &query);
+	[[nodiscard]] rpl::producer<> clearSearchQueryRequests() const;
 
 	[[nodiscard]] Data::Thread *updateFromParentDrag(QPoint globalPosition);
 	void dragLeft();
@@ -96,15 +109,26 @@ public:
 	class ObjectListController;
 
 private:
+	using MediaType = Storage::SharedMediaType;
 	enum class Tab : uchar {
 		Chats,
 		Channels,
 		Apps,
+		Media,
+		Downloads,
 	};
 	enum class JumpResult : uchar {
 		NotApplied,
 		Applied,
 		AppliedAndOut,
+	};
+
+	struct Key {
+		Tab tab = Tab::Chats;
+		MediaType mediaType = {};
+
+		friend inline auto operator<=>(Key, Key) = default;
+		friend inline bool operator==(Key, Key) = default;
 	};
 
 	struct ObjectList {
@@ -116,6 +140,11 @@ private:
 		Fn<void()> dragLeft;
 		Fn<bool(not_null<QTouchEvent*>)> processTouch;
 		rpl::event_stream<not_null<PeerData*>> chosen;
+	};
+
+	struct MediaList {
+		Info::WrapWidget *wrap = nullptr;
+		rpl::variable<int> count;
 	};
 
 	void paintEvent(QPaintEvent *e) override;
@@ -160,17 +189,23 @@ private:
 		SearchEmptyIcon icon,
 		rpl::producer<QString> text);
 
-	void switchTab(Tab tab);
+	void switchTab(Key key);
 	void startShownAnimation(bool shown, Fn<void()> finish);
-	void startSlideAnimation(Tab was, Tab now);
+	void startSlideAnimation(Key was, Key now);
+	void ensureContent(Key key);
 	void finishShow();
 
 	void handlePressForChatPreview(PeerId id, Fn<void(bool)> callback);
+	void updateControlsGeometry();
+	void applySearchQuery();
 
 	const not_null<Window::SessionController*> _controller;
 
-	const std::unique_ptr<Ui::SettingsSlider> _tabs;
-	rpl::variable<Tab> _tab = Tab::Chats;
+	const std::unique_ptr<Ui::ScrollArea> _tabsScroll;
+	const not_null<Ui::SettingsSlider*> _tabs;
+	Ui::Animations::Simple _tabsScrollAnimation;
+	const std::vector<Key> _tabKeys;
+	rpl::variable<Key> _key;
 
 	const std::unique_ptr<Ui::ElasticScroll> _chatsScroll;
 	const not_null<Ui::VerticalLayout*> _chatsContent;
@@ -199,6 +234,11 @@ private:
 	Fn<bool(not_null<PeerData*>)> _recentAppsShows;
 	const std::unique_ptr<ObjectList> _recentApps;
 	const std::unique_ptr<ObjectList> _popularApps;
+
+	base::flat_map<Key, MediaList> _mediaLists;
+	rpl::event_stream<> _clearSearchQueryRequests;
+	QString _searchQuery;
+	base::Timer _searchQueryTimer;
 
 	Ui::Animations::Simple _shownAnimation;
 	Fn<void()> _showFinished;

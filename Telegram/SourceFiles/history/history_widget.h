@@ -397,6 +397,7 @@ private:
 	void fileChosen(ChatHelpers::FileChosen &&data);
 
 	void updateFieldSubmitSettings();
+	bool clearMaybeSendStart();
 
 	// Checks if we are too close to the top or to the bottom
 	// in the scroll area and preloads history if needed.
@@ -735,6 +736,7 @@ private:
 	base::flat_set<MsgId> _topicsRequested;
 	TextWithEntities _showAtMsgHighlightPart;
 	int _showAtMsgHighlightPartOffsetHint = 0;
+	bool _showAndMaybeSendStart = false;
 
 	int _firstLoadRequest = 0; // Not real mtpRequestId.
 	int _preloadRequest = 0; // Not real mtpRequestId.

@@ -138,7 +138,9 @@ base::options::toggle CtrlClickChatNewWindow({
 		if (const auto history = row->key().history()) {
 			if (const auto user = history->peer->asUser()) {
 				if (user->botInfo && user->botInfo->hasMainApp) {
-					return user;
+					if (!history->unreadCount() && !history->unreadMark()) {
+						return user;
+					}
 				}
 			}
 		}
@@ -1957,7 +1959,10 @@ const std::vector<Key> &InnerWidget::pinnedChatsOrder() const {
 }
 
 void InnerWidget::checkReorderPinnedStart(QPoint localPosition) {
-	if (!_pressed || _dragging || _state != WidgetState::Default) {
+	if (!_pressed
+		|| _dragging
+		|| (_state != WidgetState::Default)
+		|| _pressedBotApp) {
 		return;
 	} else if (qAbs(localPosition.y() - _dragStart.y())
 		< style::ConvertScale(kStartReorderThreshold)) {

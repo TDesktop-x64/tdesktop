@@ -30,10 +30,6 @@ auto SearchFieldController::createRowView(
 
 	auto field = createField(wrap, st.field).release();
 	field->show();
-	field->cancelled(
-	) | rpl::start_with_next([=] {
-		field->setText(QString());
-	}, field->lifetime());
 
 	auto cancel = CreateChild<Ui::CrossButton>(
 		wrap,
@@ -94,6 +90,10 @@ rpl::producer<QString> SearchFieldController::queryValue() const {
 
 rpl::producer<QString> SearchFieldController::queryChanges() const {
 	return _query.changes();
+}
+
+void SearchFieldController::setQuery(const QString &query) {
+	_query = query;
 }
 
 base::unique_qptr<Ui::InputField> SearchFieldController::createField(

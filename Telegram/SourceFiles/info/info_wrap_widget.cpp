@@ -218,7 +218,8 @@ void WrapWidget::injectActivePeerProfile(not_null<PeerData*> peer) {
 		: _controller->section().type();
 	const auto firstSectionMediaType = [&] {
 		if (firstSectionType == Section::Type::Profile
-			|| firstSectionType == Section::Type::SavedSublists) {
+			|| firstSectionType == Section::Type::SavedSublists
+			|| firstSectionType == Section::Type::Downloads) {
 			return Section::MediaType::kCount;
 		}
 		return hasStackHistory()
@@ -309,7 +310,7 @@ void WrapWidget::forceContentRepaint() {
 }
 
 void WrapWidget::setupTop() {
-	if (HasCustomTopBar(_controller.get())) {
+	if (HasCustomTopBar(_controller.get()) || wrap() == Wrap::Search) {
 		_topBar.destroy();
 		return;
 	}
@@ -382,6 +383,7 @@ void WrapWidget::setupTopBarMenuToggle() {
 	if (!_topBar) {
 		return;
 	}
+	const auto key = _controller->key();
 	const auto section = _controller->section();
 	if (section.type() == Section::Type::Profile
 		&& (wrap() != Wrap::Side || hasStackHistory())) {
@@ -406,6 +408,17 @@ void WrapWidget::setupTopBarMenuToggle() {
 				});
 			}
 		}
+	} else if (key.storiesPeer()
+		&& key.storiesPeer()->isSelf()
+		&& key.storiesTab() == Stories::Tab::Saved) {
+		const auto &st = (wrap() == Wrap::Layer)
+			? st::infoLayerTopBarEdit
+			: st::infoTopBarEdit;
+		const auto button = _topBar->addButton(
+			base::make_unique_q<Ui::IconButton>(_topBar, st));
+		button->addClickHandler([=] {
+			_controller->showSettings(::Settings::Information::Id());
+		});
 	} else if (section.type() == Section::Type::Downloads) {
 		auto &manager = Core::App().downloadManager();
 		rpl::merge(
@@ -437,6 +450,20 @@ void WrapWidget::checkBeforeClose(Fn<void()> close) {
 		_controller->parentController()->hideLayer();
 		close();
 	}));
+}
+
+void WrapWidget::checkBeforeCloseByEscape(Fn<void()> close) {
+	if (_topBar) {
+		_topBar->checkBeforeCloseByEscape([&] {
+			_content->checkBeforeCloseByEscape(crl::guard(this, [=] {
+				WrapWidget::checkBeforeClose(close);
+			}));
+		});
+	} else {
+		_content->checkBeforeCloseByEscape(crl::guard(this, [=] {
+			WrapWidget::checkBeforeClose(close);
+		}));
+	}
 }
 
 void WrapWidget::addTopBarMenuButton() {
@@ -505,7 +532,7 @@ void WrapWidget::showTopBarMenu(bool check) {
 		return;
 	}
 	_topBarMenu = base::make_unique_q<Ui::PopupMenu>(
-		this,
+		QWidget::window(),
 		st::popupMenuExpandedSeparator);
 
 	_topBarMenu->setDestroyedCallback([this] {
@@ -895,13 +922,11 @@ void WrapWidget::resizeEvent(QResizeEvent *e) {
 
 void WrapWidget::keyPressEvent(QKeyEvent *e) {
 	if (e->key() == Qt::Key_Escape || e->key() == Qt::Key_Back) {
-		if (hasStackHistory() || wrap() != Wrap::Layer) {
-			checkBeforeClose([=] { _controller->showBackFromStack(); });
-		} else {
-			checkBeforeClose([=] {
+		checkBeforeCloseByEscape((hasStackHistory() || wrap() != Wrap::Layer)
+			? Fn<void()>([=] { _controller->showBackFromStack(); })
+			: Fn<void()>([=] {
 				_controller->parentController()->hideSpecialLayer();
-			});
-		}
+			}));
 		return;
 	}
 	SectionWidget::keyPressEvent(e);

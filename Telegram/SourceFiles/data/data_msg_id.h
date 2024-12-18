@@ -86,7 +86,9 @@ constexpr auto SpecialMsgIdShift = EndStoryMsgId.bare;
 constexpr auto ShowAtTheEndMsgId = MsgId(SpecialMsgIdShift + 1);
 constexpr auto SwitchAtTopMsgId = MsgId(SpecialMsgIdShift + 2);
 constexpr auto ShowAndStartBotMsgId = MsgId(SpecialMsgIdShift + 4);
+constexpr auto ShowAndMaybeStartBotMsgId = MsgId(SpecialMsgIdShift + 5);
 constexpr auto ShowForChooseMessagesMsgId = MsgId(SpecialMsgIdShift + 6);
+constexpr auto kSearchQueryOffsetHint = -1;
 
 static_assert(SpecialMsgIdShift + 0xFF < 0);
 static_assert(-(SpecialMsgIdShift + 0xFF) > ServerMaxMsgId);
@@ -218,6 +220,15 @@ struct hash<FullStoryId> {
 		return QtPrivate::QHashCombine().operator()(
 			std::hash<BareId>()(value.peer.value),
 			value.story);
+	}
+};
+
+template <>
+struct hash<FullMsgId> {
+	size_t operator()(FullMsgId value) const {
+		return QtPrivate::QHashCombine().operator()(
+			std::hash<BareId>()(value.peer.value),
+			value.msg.bare);
 	}
 };
 

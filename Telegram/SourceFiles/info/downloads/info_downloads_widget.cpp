@@ -65,9 +65,6 @@ Widget::Widget(
 }
 
 bool Widget::showInternal(not_null<ContentMemento*> memento) {
-	if (!controller()->validateMementoPeer(memento)) {
-		return false;
-	}
 	if (auto downloadsMemento = dynamic_cast<Memento*>(memento.get())) {
 		restoreState(downloadsMemento);
 		return true;

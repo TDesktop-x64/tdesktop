@@ -1622,7 +1622,7 @@ void Panel::initLayout() {
 #ifndef Q_OS_MAC
 	_controls->wrap.raise();
 
-	Ui::Platform::TitleControlsLayoutChanged(
+	_controls->controls.layout().changes(
 	) | rpl::start_with_next([=] {
 		// _menuToggle geometry depends on _controls arrangement.
 		crl::on_main(widget(), [=] { updateControlsGeometry(); });

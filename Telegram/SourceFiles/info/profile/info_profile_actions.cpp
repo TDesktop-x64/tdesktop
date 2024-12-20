@@ -1253,18 +1253,18 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 		const auto parent = label->parentWidget();
 		rpl::combine(
 			result->widthValue(),
+			label->geometryValue(),
 			button->sizeValue()
-		) | rpl::start_with_next([=](int, QSize buttonSize) {
+		) | rpl::start_with_next([=](int width, QRect, QSize buttonSize) {
 			const auto s = parent->size();
 			button->moveToRight(
 				rightSkip,
-				(s.height() - buttonSize.height()) / 2);
-			label->resizeToWidth(
-				s.width()
-					- rightSkip
-					- label->geometry().left()
-					- st::lineWidth * 2
-					- buttonSize.width());
+				(parent->height() - buttonSize.height()) / 2);
+			label->resizeToWidth(width
+				- rightSkip
+				- label->geometry().left()
+				- st::lineWidth * 2
+				- buttonSize.width());
 		}, button->lifetime());
 	};
 	const auto controller = _controller->parentController();

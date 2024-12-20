@@ -457,7 +457,7 @@ if customRunCommand:
 stage('patches', """
     git clone https://github.com/desktop-app/patches.git
     cd patches
-    git checkout cf3b896e00
+    git checkout b3d7243fe1
 """)
 
 stage('msys64', """
@@ -1369,25 +1369,27 @@ depends:yasm/yasm
 """)
 
 stage('openal-soft', """
-version: 3
-win:
-    git clone -b wasapi_exact_device_time https://github.com/telegramdesktop/openal-soft.git
+    git clone https://github.com/telegramdesktop/openal-soft.git
     cd openal-soft
+    git checkout 5e9429354d
+win:
     cmake -B build . ^
         -A %WIN32X64% ^
         -D LIBTYPE:STRING=STATIC ^
-        -D FORCE_STATIC_VCRT=ON
+        -D FORCE_STATIC_VCRT=ON ^
+        -D ALSOFT_UTILS=OFF ^
+        -D ALSOFT_EXAMPLES=OFF ^
+        -D ALSOFT_TESTS=OFF
     cmake --build build --config Debug --parallel
 release:
     cmake --build build --config RelWithDebInfo --parallel
 mac:
-    git clone -b coreaudio_device_uid https://github.com/telegramdesktop/openal-soft.git
-    cd openal-soft
     CFLAGS=$UNGUARDED CPPFLAGS=$UNGUARDED cmake -B build . \\
         -D CMAKE_BUILD_TYPE=RelWithDebInfo \\
         -D CMAKE_INSTALL_PREFIX:PATH=$USED_PREFIX \\
         -D ALSOFT_EXAMPLES=OFF \\
         -D ALSOFT_UTILS=OFF \\
+        -D ALSOFT_TESTS=OFF \\
         -D LIBTYPE:STRING=STATIC \\
         -D CMAKE_OSX_DEPLOYMENT_TARGET:STRING=$MACOSX_DEPLOYMENT_TARGET \\
         -D CMAKE_OSX_ARCHITECTURES="x86_64;arm64"
@@ -1639,7 +1641,7 @@ else: # qt > '6'
     stage('qt_' + qt, """
     git clone -b """ + branch + """ https://github.com/qt/qt5.git qt_$QT
     cd qt_$QT
-    git submodule update --init --recursive qtbase qtimageformats qtsvg
+    git submodule update --init --recursive --progress qtbase qtimageformats qtsvg
 depends:patches/qtbase_""" + qt + """/*.patch
     cd qtbase
 mac:

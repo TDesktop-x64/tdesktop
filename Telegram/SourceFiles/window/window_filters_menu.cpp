@@ -375,7 +375,8 @@ base::unique_qptr<Ui::SideBarButton> FiltersMenu::prepareButton(
 					args.icon);
 			});
 			Window::MenuAddMarkAsReadAllChatsAction(
-					_session,
+					&_session->session(),
+					_session->uiShow(),
 					addAction);
 			_popupMenu->popup(QCursor::pos());
 		}, raw->lifetime());

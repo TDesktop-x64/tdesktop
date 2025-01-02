@@ -234,7 +234,7 @@ void FiltersMenu::setupList() {
 		_setup = prepareButton(
 				_container,
 				-1,
-				tr::lng_saved_messages(tr::now),
+				{ TextWithEntities{ tr::lng_saved_messages(tr::now) } },
 				Ui::FilterIcon::SavedMessage);
 	}
 

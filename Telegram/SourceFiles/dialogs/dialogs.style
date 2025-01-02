@@ -31,6 +31,11 @@ ThreeStateIcon {
 	active: icon;
 }
 
+VerifiedBadge {
+	color: color;
+	height: pixels;
+}
+
 ForumTopicIcon {
 	size: pixels;
 	font: font;
@@ -106,8 +111,10 @@ taggedForumDialogRow: DialogRow(forumDialogRow) {
 	height: 96px;
 	tagTop: 77px;
 }
-dialogRowFilterTagSkip : 4px;
-dialogRowFilterTagFont : font(10px);
+dialogRowFilterTagSkip: 4px;
+dialogRowFilterTagStyle: TextStyle(defaultTextStyle) {
+	font: font(10px);
+}
 dialogRowOpenBotTextStyle: semiboldTextStyle;
 dialogRowOpenBotHeight: 20px;
 dialogRowOpenBotRight: 10px;
@@ -399,6 +406,17 @@ dialogsLockIcon: ThreeStateIcon {
 	icon: icon {{ "emoji/premium_lock", dialogsUnreadBgMuted, point(4px, 0px) }};
 	over: icon {{ "emoji/premium_lock", dialogsUnreadBgMutedOver, point(4px, 0px) }};
 	active: icon {{ "emoji/premium_lock", dialogsUnreadBgMutedActive, point(4px, 0px) }};
+}
+
+dialogsVerifiedColors: VerifiedBadge {
+	height: 20px;
+	color: dialogsVerifiedIconBg;
+}
+dialogsVerifiedColorsOver: VerifiedBadge(dialogsVerifiedColors) {
+	color: dialogsVerifiedIconBgOver;
+}
+dialogsVerifiedColorsActive: VerifiedBadge(dialogsVerifiedColors) {
+	color: dialogsVerifiedIconBgActive;
 }
 
 dialogsVerifiedIcon: icon {
@@ -770,4 +788,8 @@ dialogsSearchTagPromoSkip: 6px;
 dialogsPopularAppsPadding: margins(10px, 8px, 10px, 12px);
 dialogsPopularAppsAbout: FlatLabel(boxDividerLabel) {
 	minWidth: 128px;
+}
+
+foldersMenu: Menu(menuWithIcons) {
+	itemPadding: margins(54px, 8px, 44px, 8px);
 }

@@ -7,12 +7,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "api/api_premium.h"
+#include "data/data_star_gift.h"
 #include "ui/abstract_button.h"
 #include "ui/effects/premium_stars_colored.h"
 #include "ui/text/text.h"
 
 class StickerPremiumMark;
+
+namespace Data {
+struct UniqueGift;
+} // namespace Data
 
 namespace HistoryView {
 class StickerPlayer;
@@ -25,6 +29,10 @@ class Session;
 namespace Ui {
 class DynamicImage;
 } // namespace Ui
+
+namespace Ui::Text {
+class CustomEmoji;
+} // namespace Ui::Text
 
 namespace Window {
 class SessionController;
@@ -44,7 +52,7 @@ struct GiftTypePremium {
 };
 
 struct GiftTypeStars {
-	Api::StarGift info;
+	Data::StarGift info;
 	PeerData *from = nullptr;
 	bool userpic = false;
 	bool hidden = false;
@@ -69,8 +77,12 @@ public:
 	[[nodiscard]] virtual std::any textContext() = 0;
 	[[nodiscard]] virtual QSize buttonSize() = 0;
 	[[nodiscard]] virtual QMargins buttonExtend() = 0;
+	[[nodiscard]] virtual auto buttonPatternEmoji(
+		not_null<Data::UniqueGift*> unique,
+		Fn<void()> repaint)
+	-> std::unique_ptr<Ui::Text::CustomEmoji> = 0;
 	[[nodiscard]] virtual QImage background() = 0;
-	[[nodiscard]] virtual DocumentData *lookupSticker(
+	[[nodiscard]] virtual rpl::producer<not_null<DocumentData*>> sticker(
 		const GiftDescriptor &descriptor) = 0;
 	[[nodiscard]] virtual not_null<StickerPremiumMark*> hiddenMark() = 0;
 };
@@ -87,6 +99,11 @@ private:
 	void paintEvent(QPaintEvent *e) override;
 	void resizeEvent(QResizeEvent *e) override;
 
+	void cacheUniqueBackground(
+		not_null<Data::UniqueGift*> unique,
+		int width,
+		int height);
+
 	void setDocument(not_null<DocumentData*> document);
 	[[nodiscard]] bool documentResolved() const;
 
@@ -98,8 +115,12 @@ private:
 	Ui::Text::String _text;
 	Ui::Text::String _price;
 	std::shared_ptr<Ui::DynamicImage> _userpic;
+	QImage _uniqueBackgroundCache;
+	std::unique_ptr<Ui::Text::CustomEmoji> _uniquePatternEmoji;
+	base::flat_map<float64, QImage> _uniquePatternCache;
 	Ui::Premium::ColoredMiniStars _stars;
 	bool _subscribed = false;
+	bool _patterned = false;
 
 	QRect _button;
 	QMargins _extend;
@@ -119,8 +140,13 @@ public:
 	std::any textContext() override;
 	QSize buttonSize() override;
 	QMargins buttonExtend() override;
+	auto buttonPatternEmoji(
+		not_null<Data::UniqueGift*> unique,
+		Fn<void()> repaint)
+	-> std::unique_ptr<Ui::Text::CustomEmoji> override;
 	QImage background() override;
-	DocumentData *lookupSticker(const GiftDescriptor &descriptor) override;
+	rpl::producer<not_null<DocumentData*>> sticker(
+		const GiftDescriptor &descriptor) override;
 	not_null<StickerPremiumMark*> hiddenMark() override;
 
 private:
@@ -132,6 +158,10 @@ private:
 };
 
 [[nodiscard]] DocumentData *LookupGiftSticker(
+	not_null<Main::Session*> session,
+	const GiftDescriptor &descriptor);
+
+[[nodiscard]] rpl::producer<not_null<DocumentData*>> GiftStickerValue(
 	not_null<Main::Session*> session,
 	const GiftDescriptor &descriptor);
 

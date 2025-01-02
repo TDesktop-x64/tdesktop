@@ -32,6 +32,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_chat_invite.h"
 #include "api/api_invite_links.h"
 #include "apiwrap.h"
+#include "ui/unread_badge.h"
 #include "window/notifications_manager.h"
 
 namespace {
@@ -736,6 +737,33 @@ bool ChannelData::canRestrictParticipant(
 	return adminRights() & AdminRight::BanUsers;
 }
 
+void ChannelData::setBotVerifyDetails(Ui::BotVerifyDetails details) {
+	if (!details) {
+		if (_botVerifyDetails) {
+			_botVerifyDetails = nullptr;
+			session().changes().peerUpdated(this, UpdateFlag::VerifyInfo);
+		}
+	} else if (!_botVerifyDetails) {
+		_botVerifyDetails = std::make_unique<Ui::BotVerifyDetails>(details);
+		session().changes().peerUpdated(this, UpdateFlag::VerifyInfo);
+	} else if (*_botVerifyDetails != details) {
+		*_botVerifyDetails = details;
+		session().changes().peerUpdated(this, UpdateFlag::VerifyInfo);
+	}
+}
+
+void ChannelData::setBotVerifyDetailsIcon(DocumentId iconId) {
+	if (!iconId) {
+		setBotVerifyDetails({});
+	} else {
+		auto info = _botVerifyDetails
+			? *_botVerifyDetails
+			: Ui::BotVerifyDetails();
+		info.iconId = iconId;
+		setBotVerifyDetails(info);
+	}
+}
+
 void ChannelData::setAdminRights(ChatAdminRights rights) {
 	if (rights == adminRights()) {
 		return;
@@ -1274,6 +1302,8 @@ void ApplyChannelUpdate(
 			.paidEnabled = update.is_paid_reactions_available(),
 		});
 	}
+	channel->setBotVerifyDetails(
+		ParseBotVerifyDetails(update.vbot_verification()));
 	channel->owner().stories().apply(channel, update.vstories());
 	channel->fullUpdated();
 	channel->setPendingRequestsCount(

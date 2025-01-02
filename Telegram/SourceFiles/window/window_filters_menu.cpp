@@ -13,6 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_main_menu.h"
 #include "window/window_peer_menu.h"
 #include "main/main_session.h"
+#include "core/ui_integration.h"
 #include "data/data_session.h"
 #include "data/data_chat_filters.h"
 #include "data/data_user.h"
@@ -26,6 +27,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/boxes/confirm_box.h"
+#include "ui/power_saving.h"
 #include "ui/ui_utility.h"
 #include "boxes/filters/edit_filter_box.h"
 #include "boxes/premium_limits_box.h"
@@ -48,7 +50,7 @@ FiltersMenu::FiltersMenu(
 : _session(session)
 , _parent(parent)
 , _outer(_parent)
-, _menu(&_outer, QString(), st::windowFiltersMainMenu)
+, _menu(&_outer, TextWithEntities(), st::windowFiltersMainMenu)
 , _scroll(&_outer)
 , _container(
 	_scroll.setOwnedWidget(
@@ -226,7 +228,7 @@ void FiltersMenu::setupList() {
 		_setup = prepareButton(
 				_container,
 				-1,
-				tr::lng_filters_setup(tr::now),
+				{ TextWithEntities{ tr::lng_filters_setup(tr::now) } },
 				Ui::FilterIcon::Edit);
 	} else {
 		_setup = prepareButton(
@@ -265,13 +267,27 @@ base::unique_qptr<Ui::SideBarButton> FiltersMenu::prepareAll() {
 base::unique_qptr<Ui::SideBarButton> FiltersMenu::prepareButton(
 		not_null<Ui::VerticalLayout*> container,
 		FilterId id,
-		const QString &title,
+		Data::ChatFilterTitle title,
 		Ui::FilterIcon icon,
 		bool toBeginning) {
+	const auto isStatic = title.isStatic;
+	const auto makeContext = [=](Fn<void()> update) {
+		return Core::MarkedTextContext{
+			.session = &_session->session(),
+			.customEmojiRepaint = std::move(update),
+			.customEmojiLoopLimit = isStatic ? -1 : 0,
+		};
+	};
+	const auto paused = [=] {
+		return On(PowerSaving::kEmojiChat)
+			|| _session->isGifPausedAtLeastFor(Window::GifPauseReason::Any);
+	};
 	auto prepared = object_ptr<Ui::SideBarButton>(
 		container,
-		id ? title : tr::lng_filters_all(tr::now),
-		st::windowFiltersButton);
+		id ? title.text : TextWithEntities{ tr::lng_filters_all(tr::now) },
+		st::windowFiltersButton,
+		makeContext,
+		paused);
 	auto added = toBeginning
 		? container->insert(0, std::move(prepared))
 		: container->add(std::move(prepared));

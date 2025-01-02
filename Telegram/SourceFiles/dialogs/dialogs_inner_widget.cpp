@@ -22,6 +22,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "core/click_handler_types.h"
 #include "core/shortcuts.h"
+#include "core/ui_integration.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/scroll_area.h"
@@ -228,6 +229,11 @@ struct InnerWidget::PeerSearchResult {
 	mutable Ui::Text::String name;
 	mutable Ui::PeerBadge badge;
 	BasicRow row;
+};
+
+struct InnerWidget::TagCache {
+	Ui::ChatsFilterTagContext context;
+	QImage frame;
 };
 
 Key InnerWidget::FilterResult::key() const {
@@ -1389,8 +1395,18 @@ void InnerWidget::paintPeerSearchResult(
 			Ui::NameTextOptions());
 	}
 
-	// draw chat icon
-	if (const auto chatTypeIcon = Ui::ChatTypeIcon(peer, context)) {
+	if (const auto info = peer->botVerifyDetails()) {
+		if (!result->badge.ready(info)) {
+			result->badge.set(
+				info,
+				peer->owner().customEmojiManager().factory(),
+				[=] { updateSearchResult(peer); });
+		}
+		const auto &st = Ui::VerifiedStyle(context);
+		const auto position = rectForName.topLeft();
+		const auto skip = result->badge.drawVerified(p, position, st);
+		rectForName.setLeft(position.x() + skip + st::dialogsChatTypeSkip);
+	} else if (const auto chatTypeIcon = Ui::ChatTypeIcon(peer, context)) {
 		chatTypeIcon->paint(p, rectForName.topLeft(), context.width);
 		rectForName.setLeft(rectForName.left()
 			+ chatTypeIcon->width()
@@ -1471,112 +1487,6 @@ void InnerWidget::paintSearchTags(
 	const auto position = QPoint(_searchTagsLeft, top);
 	_searchTags->paint(p, position, context.now, context.paused);
 }
-//
-//void InnerWidget::paintSearchInChat(
-//		Painter &p,
-//		const Ui::PaintContext &context) const {
-//	auto height = searchInChatSkip();
-//
-//	auto top = 0;
-//	p.setFont(st::searchedBarFont);
-//	auto fullRect = QRect(0, top, width(), height - top);
-//	p.fillRect(fullRect, currentBg());
-//	if (_searchFromShown) {
-//		p.setPen(st::dialogsTextFg);
-//		p.setTextPalette(st::dialogsSearchFromPalette);
-//		paintSearchInPeer(p, _searchFromShown, _searchFromUserUserpic, top, _searchFromUserText);
-//		p.restoreTextPalette();
-//	}
-//}
-//
-//template <typename PaintUserpic>
-//void InnerWidget::paintSearchInFilter(
-//		Painter &p,
-//		PaintUserpic paintUserpic,
-//		int top,
-//		const style::icon *icon,
-//		const Ui::Text::String &text) const {
-//	const auto savedPen = p.pen();
-//	const auto userpicLeft = st::defaultDialogRow.padding.left();
-//	const auto userpicTop = top
-//		+ (st::dialogsSearchInHeight - st::dialogsSearchInPhotoSize) / 2;
-//	paintUserpic(p, userpicLeft, userpicTop, st::dialogsSearchInPhotoSize);
-//
-//	const auto nameleft = st::defaultDialogRow.padding.left()
-//		+ st::dialogsSearchInPhotoSize
-//		+ st::dialogsSearchInPhotoPadding;
-//	const auto namewidth = width()
-//		- nameleft
-//		- st::defaultDialogRow.padding.left()
-//		- st::defaultDialogRow.padding.right()
-//		- st::dialogsCancelSearch.width;
-//	auto rectForName = QRect(
-//		nameleft,
-//		top + (st::dialogsSearchInHeight - st::semiboldFont->height) / 2,
-//		namewidth,
-//		st::semiboldFont->height);
-//	if (icon) {
-//		icon->paint(p, rectForName.topLeft(), width());
-//		rectForName.setLeft(rectForName.left()
-//			+ icon->width()
-//			+ st::dialogsChatTypeSkip);
-//	}
-//	p.setPen(savedPen);
-//	text.drawLeftElided(
-//		p,
-//		rectForName.left(),
-//		rectForName.top(),
-//		rectForName.width(),
-//		width());
-//}
-//
-//void InnerWidget::paintSearchInPeer(
-//		Painter &p,
-//		not_null<PeerData*> peer,
-//		Ui::PeerUserpicView &userpic,
-//		int top,
-//		const Ui::Text::String &text) const {
-//	const auto paintUserpic = [&](Painter &p, int x, int y, int size) {
-//		peer->paintUserpicLeft(p, userpic, x, y, width(), size);
-//	};
-//	const auto icon = Ui::ChatTypeIcon(peer);
-//	paintSearchInFilter(p, paintUserpic, top, icon, text);
-//}
-//
-//void InnerWidget::paintSearchInSaved(
-//		Painter &p,
-//		int top,
-//		const Ui::Text::String &text) const {
-//	const auto paintUserpic = [&](Painter &p, int x, int y, int size) {
-//		Ui::EmptyUserpic::PaintSavedMessages(p, x, y, width(), size);
-//	};
-//	paintSearchInFilter(p, paintUserpic, top, nullptr, text);
-//}
-//
-//void InnerWidget::paintSearchInReplies(
-//		Painter &p,
-//		int top,
-//		const Ui::Text::String &text) const {
-//	const auto paintUserpic = [&](Painter &p, int x, int y, int size) {
-//		Ui::EmptyUserpic::PaintRepliesMessages(p, x, y, width(), size);
-//	};
-//	paintSearchInFilter(p, paintUserpic, top, nullptr, text);
-//}
-//
-//void InnerWidget::paintSearchInTopic(
-//		Painter &p,
-//		const Ui::PaintContext &context,
-//		not_null<Data::ForumTopic*> topic,
-//		Ui::PeerUserpicView &userpic,
-//		int top,
-//		const Ui::Text::String &text) const {
-//	const auto paintUserpic = [&](Painter &p, int x, int y, int size) {
-//		p.translate(x, y);
-//		topic->paintUserpic(p, userpic, context);
-//		p.translate(-x, -y);
-//	};
-//	paintSearchInFilter(p, paintUserpic, top, nullptr, text);
-//}
 
 void InnerWidget::mouseMoveEvent(QMouseEvent *e) {
 	if (_chatPreviewTouchGlobal || _touchDragStartGlobal) {
@@ -4272,32 +4182,41 @@ QImage *InnerWidget::cacheChatsFilterTag(
 		return nullptr;
 	}
 	const auto key = SerializeFilterTagsKey(filter.id(), more, active);
-	{
-		const auto it = _chatsFilterTags.find(key);
-		if (it != end(_chatsFilterTags)) {
-			return &it->second;
+	auto &entry = _chatsFilterTags[key];
+	if (!entry.frame.isNull()) {
+		if (!entry.context.loading) {
+			return &entry.frame;
+		}
+		for (const auto &[k, emoji] : entry.context.emoji) {
+			if (!emoji->ready()) {
+				return &entry.frame; // Still waiting for emoji.
+			}
 		}
 	}
-	auto roundedText = QString();
+	auto roundedText = TextWithEntities();
 	auto colorIndex = -1;
 	if (filter.id()) {
-		roundedText = filter.title().toUpper();
+		roundedText = filter.title().text;
+		roundedText.text = roundedText.text.toUpper();
 		if (filter.colorIndex()) {
 			colorIndex = *(filter.colorIndex());
 		}
 	} else if (more > 0) {
-		roundedText = QChar('+') + QString::number(more);
+		roundedText.text = QChar('+') + QString::number(more);
 		colorIndex = st::colorIndexBlue;
 	}
-	if (roundedText.isEmpty() || colorIndex < 0) {
+	if (roundedText.empty() || colorIndex < 0) {
 		return nullptr;
 	}
-	return &_chatsFilterTags.emplace(
-		key,
-		Ui::ChatsFilterTag(
-			std::move(roundedText),
-			Ui::EmptyUserpic::UserpicColor(colorIndex).color2->c,
-			active)).first->second;
+	const auto color = Ui::EmptyUserpic::UserpicColor(colorIndex).color2;
+	entry.context.color = color->c;
+	entry.context.active = active;
+	entry.context.textContext = Core::MarkedTextContext{
+		.session = &session(),
+		.customEmojiRepaint = [] {},
+	};
+	entry.frame = Ui::ChatsFilterTag(roundedText, entry.context);
+	return &entry.frame;
 }
 
 bool InnerWidget::chooseHashtag() {

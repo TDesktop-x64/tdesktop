@@ -120,7 +120,8 @@ giftBoxButtonBottom: 12px;
 giftBoxButtonPadding: margins(8px, 4px, 8px, 4px);
 giftBoxPreviewStickerPadding: margins(10px, 12px, 10px, 16px);
 giftBoxPreviewTitlePadding: margins(12px, 4px, 12px, 4px);
-giftBoxPreviewTextPadding: margins(12px, 4px, 12px, 24px);
+giftBoxPreviewTextPadding: margins(12px, 4px, 12px, 4px);
+giftBoxButtonMargin: margins(12px, 8px, 12px, 12px);
 giftBoxStickerTop: 0px;
 giftBoxStickerStarTop: 24px;
 giftBoxStickerSize: size(80px, 80px);
@@ -173,3 +174,25 @@ creditsHistoryEntriesList: PeerList(defaultPeerList) {
 }
 
 subscriptionCreditsBadgePadding: margins(10px, 1px, 8px, 3px);
+
+uniqueGiftModelTop: 20px;
+uniqueGiftTitle: FlatLabel(boxTitle) {
+	align: align(top);
+}
+uniqueGiftTitleTop: 140px;
+uniqueGiftSubtitle: FlatLabel(defaultFlatLabel) {
+	minWidth: 256px;
+	align: align(top);
+}
+uniqueGiftSubtitleTop: 170px;
+uniqueGiftBottom: 20px;
+uniqueCloseButton: IconButton(boxTitleClose) {
+	icon: icon {{ "box_button_close", videoPlayIconFg }};
+	iconOver: icon {{ "box_button_close", videoPlayIconFg }};
+	ripple: RippleAnimation(defaultRippleAnimation) {
+		color: shadowFg;
+	}
+}
+upgradeGiftBox: Box(giftBox) {
+	buttonPadding: margins(22px, 3px, 22px, 22px);
+}

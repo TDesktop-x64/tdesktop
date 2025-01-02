@@ -246,6 +246,8 @@ PRIVATE
     boxes/peers/prepare_short_info_box.h
     boxes/peers/replace_boost_box.cpp
     boxes/peers/replace_boost_box.h
+    boxes/peers/verify_peers_box.cpp
+    boxes/peers/verify_peers_box.h
     boxes/about_box.cpp
     boxes/about_box.h
     boxes/about_sponsored_box.cpp
@@ -332,6 +334,8 @@ PRIVATE
     boxes/sticker_set_box.h
     boxes/stickers_box.cpp
     boxes/stickers_box.h
+    boxes/transfer_gift_box.cpp
+    boxes/transfer_gift_box.h
     boxes/translate_box.cpp
     boxes/translate_box.h
     boxes/url_auth_box.cpp
@@ -630,6 +634,7 @@ PRIVATE
     data/data_shared_media.h
     data/data_sparse_ids.cpp
     data/data_sparse_ids.h
+    data/data_star_gift.h
     data/data_statistics.h
     data/data_stories.cpp
     data/data_stories.h
@@ -800,6 +805,8 @@ PRIVATE
     history/view/media/history_view_story_mention.h
     history/view/media/history_view_theme_document.cpp
     history/view/media/history_view_theme_document.h
+    history/view/media/history_view_unique_gift.cpp
+    history/view/media/history_view_unique_gift.h
     history/view/media/history_view_userpic_suggestion.cpp
     history/view/media/history_view_userpic_suggestion.h
     history/view/media/history_view_web_page.cpp

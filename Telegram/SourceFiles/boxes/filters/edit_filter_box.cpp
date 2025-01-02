@@ -15,8 +15,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/premium_limits_box.h"
 #include "boxes/premium_preview_box.h"
 #include "chat_helpers/emoji_suggestions_widget.h"
+#include "chat_helpers/message_field.h"
 #include "core/application.h"
 #include "core/core_settings.h"
+#include "core/ui_integration.h"
 #include "data/data_channel.h"
 #include "data/data_chat_filters.h"
 #include "data/data_peer.h"
@@ -38,6 +40,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/filter_icons.h"
 #include "ui/layers/generic_box.h"
 #include "ui/painter.h"
+#include "ui/power_saving.h"
 #include "ui/vertical_list.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/fields/input_field.h"
@@ -350,13 +353,17 @@ void EditFilterBox(
 		rpl::variable<bool> hasLinks;
 		rpl::variable<bool> chatlist;
 		rpl::variable<bool> creating;
+		rpl::variable<TextWithEntities> title;
+		rpl::variable<bool> staticTitle;
 		rpl::variable<int> colorIndex;
 	};
 	const auto owner = &window->session().data();
 	const auto state = box->lifetime().make_state<State>(State{
 		.rules = filter,
 		.chatlist = filter.chatlist(),
-		.creating = filter.title().isEmpty(),
+		.creating = filter.title().empty(),
+		.title = filter.titleText(),
+		.staticTitle = filter.staticTitle(),
 	});
 	state->colorIndex = filter.colorIndex().value_or(kNoTag);
 	state->links = owner->chatsFilters().chatlistLinks(filter.id()),
@@ -394,31 +401,69 @@ void EditFilterBox(
 		tr::lng_filters_edit()));
 	box->setCloseByOutsideClick(false);
 
+	const auto session = &window->session();
 	Data::AmPremiumValue(
-		&window->session()
+		session
 	) | rpl::start_with_next([=] {
 		box->closeBox();
 	}, box->lifetime());
 
 	const auto content = box->verticalLayout();
+	const auto current = state->title.current();
 	const auto name = content->add(
 		object_ptr<Ui::InputField>(
 			box,
 			st::windowFilterNameInput,
-			tr::lng_filters_new_name(),
-			filter.title()),
+			Ui::InputField::Mode::SingleLine,
+			tr::lng_filters_new_name()),
 		st::markdownLinkFieldPadding);
+	InitMessageFieldHandlers(window, name, ChatHelpers::PauseReason::Layer);
+	name->setTextWithTags({
+		current.text,
+		TextUtilities::ConvertEntitiesToTextTags(current.entities),
+	}, Ui::InputField::HistoryAction::Clear);
 	name->setMaxLength(kMaxFilterTitleLength);
-	name->setInstantReplaces(Ui::InstantReplaces::Default());
-	name->setInstantReplacesEnabled(
-		Core::App().settings().replaceEmojiValue());
-	Ui::Emoji::SuggestionsController::Init(
-		box->getDelegate()->outerContainer(),
-		name,
-		&window->session());
 
 	const auto nameEditing = box->lifetime().make_state<NameEditing>(
 		NameEditing{ name });
+
+	const auto staticTitle = Ui::CreateChild<Ui::LinkButton>(
+		name,
+		QString());
+	staticTitle->setClickedCallback([=] {
+		state->staticTitle = !state->staticTitle.current();
+	});
+	state->staticTitle.value() | rpl::start_with_next([=](bool value) {
+		staticTitle->setText(value
+			? tr::lng_filters_enable_animations(tr::now)
+			: tr::lng_filters_disable_animations(tr::now));
+		const auto paused = [=] {
+			using namespace Window;
+			return window->isGifPausedAtLeastFor(GifPauseReason::Layer);
+		};
+		name->setCustomTextContext([=](Fn<void()> repaint) {
+			return std::any(Core::MarkedTextContext{
+				.session = session,
+				.customEmojiRepaint = std::move(repaint),
+				.customEmojiLoopLimit = value ? -1 : 0,
+			});
+		}, [paused] {
+			return On(PowerSaving::kEmojiChat) || paused();
+		}, [paused] {
+			return On(PowerSaving::kChatSpoiler) || paused();
+		});
+		name->update();
+	}, staticTitle->lifetime());
+
+	rpl::combine(
+		staticTitle->widthValue(),
+		name->widthValue()
+	) | rpl::start_with_next([=](int inner, int outer) {
+		staticTitle->moveToRight(
+			st::windowFilterStaticTitlePosition.x(),
+			st::windowFilterStaticTitlePosition.y(),
+			outer);
+	}, staticTitle->lifetime());
 
 	state->creating.value(
 	) | rpl::filter(!_1) | rpl::start_with_next([=] {
@@ -430,7 +475,13 @@ void EditFilterBox(
 		if (!nameEditing->settingDefault) {
 			nameEditing->custom = true;
 		}
+		auto entered = name->getTextWithTags();
+		state->title = TextWithEntities{
+			std::move(entered.text),
+			TextUtilities::ConvertTextTagsToEntities(entered.tags),
+		};
 	}, name->lifetime());
+
 	const auto updateDefaultTitle = [=](const Data::ChatFilter &filter) {
 		if (nameEditing->custom) {
 			return;
@@ -442,6 +493,11 @@ void EditFilterBox(
 			nameEditing->settingDefault = false;
 		}
 	};
+
+	state->title.value(
+	) | rpl::start_with_next([=](const TextWithEntities &value) {
+		staticTitle->setVisible(!value.entities.isEmpty());
+	}, staticTitle->lifetime());
 
 	const auto outer = box->getDelegate()->outerContainer();
 	CreateIconSelector(
@@ -545,18 +601,28 @@ void EditFilterBox(
 				colors->width(),
 				h);
 		}, preview->lifetime());
-		const auto previewTag = preview->lifetime().make_state<QImage>();
-		const auto previewAlpha = preview->lifetime().make_state<float64>(1);
+
+		struct TagState {
+			Ui::Animations::Simple animation;
+			Ui::ChatsFilterTagContext context;
+			QImage frame;
+			float64 alpha = 1.;
+		};
+		const auto tag = preview->lifetime().make_state<TagState>();
+		tag->context.textContext = Core::MarkedTextContext{
+			.session = session,
+			.customEmojiRepaint = [] {},
+		};
 		preview->paintRequest() | rpl::start_with_next([=] {
 			auto p = QPainter(preview);
-			p.setOpacity(*previewAlpha);
-			const auto size = previewTag->size() / style::DevicePixelRatio();
+			p.setOpacity(tag->alpha);
+			const auto size = tag->frame.size() / style::DevicePixelRatio();
 			const auto rect = QRect(
 				preview->width() - size.width() - st::boxRowPadding.right(),
 				(st::normalFont->height - size.height()) / 2,
 				size.width(),
 				size.height());
-			p.drawImage(rect.topLeft(), *previewTag);
+			p.drawImage(rect.topLeft(), tag->frame);
 			if (p.opacity() < 1) {
 				p.setOpacity(1. - p.opacity());
 				p.setFont(st::normalFont);
@@ -573,16 +639,20 @@ void EditFilterBox(
 			Ui::CreateSkipWidget(colors, side),
 			st::boxRowPadding);
 		auto buttons = std::vector<not_null<UserpicBuilder::CircleButton*>>();
-		const auto animation
-			= line->lifetime().make_state<Ui::Animations::Simple>();
 		const auto palette = [](int i) {
 			return Ui::EmptyUserpic::UserpicColor(i).color2;
 		};
-		name->changes() | rpl::start_with_next([=] {
-			*previewTag = Ui::ChatsFilterTag(
-				name->getLastText().toUpper(),
-				palette(state->colorIndex.current())->c,
-				false);
+		const auto upperTitle = [=] {
+			auto value = state->title.current();
+			value.text = value.text.toUpper();
+			return value;
+		};
+		state->title.changes(
+		) | rpl::start_with_next([=] {
+			tag->context.color = palette(state->colorIndex.current())->c;
+			tag->frame = Ui::ChatsFilterTag(
+				upperTitle(),
+				tag->context);
 			preview->update();
 		}, preview->lifetime());
 		for (auto i = 0; i < kColorsCount; ++i) {
@@ -596,12 +666,12 @@ void EditFilterBox(
 			const auto color = palette(i);
 			button->setBrush(color);
 			if (progress == 1) {
-				*previewTag = Ui::ChatsFilterTag(
-					name->getLastText().toUpper(),
-					color->c,
-					false);
+				tag->context.color = color->c;
+				tag->frame = Ui::ChatsFilterTag(
+					upperTitle(),
+					tag->context);
 				if (i == kNoTag) {
-					*previewAlpha = 0.;
+					tag->alpha = 0.;
 				}
 			}
 			buttons.push_back(button);
@@ -616,17 +686,17 @@ void EditFilterBox(
 					const auto c2 = palette(now);
 					const auto a1 = (was == kNoTag) ? 0. : 1.;
 					const auto a2 = (now == kNoTag) ? 0. : 1.;
-					animation->stop();
-					animation->start([=](float64 progress) {
+					tag->animation.stop();
+					tag->animation.start([=](float64 progress) {
 						if (was >= 0) {
 							buttons[was]->setSelectedProgress(1. - progress);
 						}
 						buttons[now]->setSelectedProgress(progress);
-						*previewTag = Ui::ChatsFilterTag(
-							name->getLastText().toUpper(),
-							anim::color(c1, c2, progress),
-							false);
-						*previewAlpha = anim::interpolateF(a1, a2, progress);
+						tag->context.color = anim::color(c1, c2, progress);
+						tag->frame = Ui::ChatsFilterTag(
+							upperTitle(),
+							tag->context);
+						tag->alpha = anim::interpolateF(a1, a2, progress);
 						preview->update();
 					}, 0., 1., st::universalDuration);
 				}
@@ -672,9 +742,11 @@ void EditFilterBox(
 	}
 
 	const auto collect = [=]() -> std::optional<Data::ChatFilter> {
-		const auto title = name->getLastText().trimmed();
+		auto title = state->title.current();
+		const auto staticTitle = !title.entities.isEmpty()
+			&& state->staticTitle.current();
 		const auto rules = data->current();
-		if (title.isEmpty()) {
+		if (title.empty()) {
 			name->showError();
 			box->scrollToY(0);
 			return {};
@@ -691,7 +763,9 @@ void EditFilterBox(
 		const auto colorIndex = (rawColorIndex >= kNoTag
 			? std::nullopt
 			: std::make_optional(rawColorIndex));
-		return rules.withTitle(title).withColorIndex(colorIndex);
+		return rules.withTitle(
+			{ std::move(title), staticTitle }
+		).withColorIndex(colorIndex);
 	};
 
 	Ui::AddSubsectionTitle(

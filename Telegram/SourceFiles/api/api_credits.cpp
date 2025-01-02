@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "api/api_credits.h"
 
+#include "api/api_premium.h"
 #include "api/api_statistics_data_deserialize.h"
 #include "api/api_updates.h"
 #include "apiwrap.h"
@@ -73,6 +74,11 @@ constexpr auto kTransactionsLimit = 100;
 		return PeerId(0);
 	}).value;
 	const auto stargift = tl.data().vstargift();
+	const auto nonUniqueGift = stargift
+		? stargift->match([&](const MTPDstarGift &data) {
+			return &data;
+		}, [](const auto &) { return (const MTPDstarGift*)nullptr; })
+		: nullptr;
 	const auto reaction = tl.data().is_reaction();
 	const auto amount = Data::FromTL(tl.data().vstars());
 	const auto starrefAmount = tl.data().vstarref_amount()
@@ -85,6 +91,10 @@ constexpr auto kTransactionsLimit = 100;
 		: 0;
 	const auto incoming = (amount >= StarsAmount());
 	const auto saveActorId = (reaction || !extended.empty()) && incoming;
+	const auto parsedGift = stargift
+		? FromTL(&peer->session(), *stargift)
+		: std::optional<Data::StarGift>();
+	const auto giftStickerId = parsedGift ? parsedGift->document->id : 0;
 	return Data::CreditsHistoryEntry{
 		.id = qs(tl.data().vid()),
 		.title = qs(tl.data().vtitle().value_or_empty()),
@@ -97,10 +107,9 @@ constexpr auto kTransactionsLimit = 100;
 		.barePeerId = saveActorId ? peer->id.value : barePeerId,
 		.bareGiveawayMsgId = uint64(
 			tl.data().vgiveaway_post_id().value_or_empty()),
-		.bareGiftStickerId = (stargift
-			? owner->processDocument(stargift->data().vsticker())->id
-			: 0),
+		.bareGiftStickerId = giftStickerId,
 		.bareActorId = saveActorId ? barePeerId : uint64(0),
+		.uniqueGift = parsedGift ? parsedGift->unique : nullptr,
 		.starrefAmount = starrefAmount,
 		.starrefCommission = starrefCommission,
 		.starrefRecipientId = starrefBarePeerId,
@@ -129,12 +138,13 @@ constexpr auto kTransactionsLimit = 100;
 			? base::unixtime::parse(tl.data().vtransaction_date()->v)
 			: QDateTime(),
 		.successLink = qs(tl.data().vtransaction_url().value_or_empty()),
-		.starsConverted = int(stargift
-			? stargift->data().vconvert_stars().v
+		.starsConverted = int(nonUniqueGift
+			? nonUniqueGift->vconvert_stars().v
 			: 0),
 		.floodSkip = int(tl.data().vfloodskip_number().value_or(0)),
 		.converted = stargift && incoming,
 		.stargift = stargift.has_value(),
+		.giftUpgraded = tl.data().is_stargift_upgrade(),
 		.reaction = tl.data().is_reaction(),
 		.refunded = tl.data().is_refund(),
 		.pending = tl.data().is_pending(),

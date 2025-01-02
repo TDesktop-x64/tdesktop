@@ -223,6 +223,7 @@ private:
 	struct CollapsedRow;
 	struct HashtagResult;
 	struct PeerSearchResult;
+	struct TagCache;
 
 	enum class JumpSkip {
 		PreviousOrBegin,
@@ -581,7 +582,7 @@ private:
 
 	base::flat_map<FilterId, int> _chatsFilterScrollStates;
 
-	std::unordered_map<ChatsFilterTagsKey, QImage> _chatsFilterTags;
+	std::unordered_map<ChatsFilterTagsKey, TagCache> _chatsFilterTags;
 	bool _waitingAllChatListEntryRefreshesForTags = false;
 	rpl::lifetime _handleChatListEntryTagRefreshesLifetime;
 

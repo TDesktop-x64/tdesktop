@@ -113,15 +113,16 @@ void Badge::setContent(Content content) {
 	switch (_content.badge) {
 	case BadgeType::Verified:
 	case BadgeType::Premium: {
-		if (const auto id = _content.emojiStatusId) {
+		const auto id = _content.emojiStatusId;
+		if (id) {
 			_emojiStatus = _session->data().customEmojiManager().create(
 				id,
 				[raw = _view.data()] { raw->update(); },
 				sizeTag());
 			if (_customStatusLoopsLimit > 0) {
 				_emojiStatus = std::make_unique<Ui::Text::LimitedLoopsEmoji>(
-					std::move(_emojiStatus),
-					_customStatusLoopsLimit);
+						std::move(_emojiStatus),
+						_customStatusLoopsLimit);
 			}
 			const auto emoji = Data::FrameSizeFromTag(sizeTag())
 				/ style::DevicePixelRatio();

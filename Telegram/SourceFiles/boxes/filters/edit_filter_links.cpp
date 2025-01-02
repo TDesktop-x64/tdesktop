@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/peers/edit_peer_invite_link.h" // InviteLinkQrBox.
 #include "boxes/peer_list_box.h"
 #include "boxes/premium_limits_box.h"
+#include "core/ui_integration.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
 #include "data/data_chat_filters.h"
@@ -482,7 +483,7 @@ private:
 	const not_null<Window::SessionController*> _window;
 	InviteLinkData _data;
 
-	QString _filterTitle;
+	Data::ChatFilterTitle _filterTitle;
 	base::flat_set<not_null<History*>> _filterChats;
 	base::flat_map<not_null<PeerData*>, QString> _denied;
 	rpl::variable<base::flat_set<not_null<PeerData*>>> _selected;
@@ -535,6 +536,14 @@ void LinkController::addHeader(not_null<Ui::VerticalLayout*> container) {
 	}, verticalLayout->lifetime());
 	verticalLayout->add(std::move(icon.widget));
 
+	const auto isStatic = _filterTitle.isStatic;
+	const auto makeContext = [=](Fn<void()> update) {
+		return Core::MarkedTextContext{
+			.session = &_window->session(),
+			.customEmojiRepaint = update,
+			.customEmojiLoopLimit = isStatic ? -1 : 0,
+		};
+	};
 	verticalLayout->add(
 		object_ptr<Ui::CenterWrap<>>(
 			verticalLayout,
@@ -544,9 +553,13 @@ void LinkController::addHeader(not_null<Ui::VerticalLayout*> container) {
 					? tr::lng_filters_link_no_about(Ui::Text::WithEntities)
 					: tr::lng_filters_link_share_about(
 						lt_folder,
-						rpl::single(Ui::Text::Bold(_filterTitle)),
+						rpl::single(Ui::Text::Wrapped(
+							_filterTitle.text,
+							EntityType::Bold)),
 						Ui::Text::WithEntities)),
-				st::settingsFilterDividerLabel)),
+				st::settingsFilterDividerLabel,
+				st::defaultPopupMenu,
+				makeContext)),
 		st::filterLinkDividerLabelPadding);
 
 	verticalLayout->geometryValue(

@@ -15,6 +15,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_bot.h"
 #include "api/api_text_entities.h"
 #include "api/api_user_names.h"
+#include "chat_helpers/stickers_lottie.h"
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "core/mime_type.h" // Core::IsMimeSticker
@@ -571,6 +572,8 @@ not_null<UserData*> Session::processUser(const MTPUser &data) {
 				| (data.is_stories_hidden() ? Flag::StoriesHidden : Flag())
 				: Flag());
 		result->setFlags((result->flags() & ~flagsMask) | flagsSet);
+		result->setBotVerifyDetailsIcon(
+			data.vbot_verification_icon().value_or_empty());
 		if (minimal) {
 			if (result->input.type() == mtpc_inputPeerEmpty) {
 				result->input = MTP_inputPeerUser(
@@ -1012,6 +1015,8 @@ not_null<PeerData*> Session::processChat(const MTPChat &data) {
 				? Flag::StoriesHidden
 				: Flag());
 		channel->setFlags((channel->flags() & ~flagsMask) | flagsSet);
+		channel->setBotVerifyDetailsIcon(
+			data.vbot_verification_icon().value_or_empty());
 		if (!minimal && storiesState) {
 			result->setStoriesState(!storiesState->maxId
 				? UserData::StoriesState::None
@@ -2748,7 +2753,7 @@ HistoryItem *Session::addNewMessage(
 		MessageFlags localFlags,
 		NewMessageType type) {
 	const auto peerId = PeerFromMessage(data);
-	if (!peerId) {
+	if (!peerId || data.type() == mtpc_messageEmpty) {
 		return nullptr;
 	}
 
@@ -4619,7 +4624,8 @@ void Session::serviceNotification(
 			MTPint(), // stories_max_id
 			MTPPeerColor(), // color
 			MTPPeerColor(), // profile_color
-			MTPint())); // bot_active_users
+			MTPint(), // bot_active_users
+			MTPlong())); // bot_verification_icon
 	}
 	const auto history = this->history(PeerData::kServiceNotificationsId);
 	const auto insert = [=] {
@@ -4677,7 +4683,8 @@ void Session::insertCheckedServiceNotification(
 				MTPint(), // ttl_period
 				MTPint(), // quick_reply_shortcut_id
 				MTPlong(), // effect
-				MTPFactCheck()),
+				MTPFactCheck(),
+				MTPint()), // report_delivery_until_date
 			localFlags,
 			NewMessageType::Unread);
 	}

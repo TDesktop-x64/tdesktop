@@ -110,7 +110,7 @@ void DownloadManagerMtproto::Queue::removeSession(int index) {
 }
 
 DownloadManagerMtproto::DcSessionBalanceData::DcSessionBalanceData()
-: maxWaitedAmount(4 * cNetDownloadChunkSize()) {
+: maxWaitedAmount(kStartWaitedInSession) {
 }
 
 DownloadManagerMtproto::DcBalanceData::DcBalanceData()
@@ -184,10 +184,10 @@ bool DownloadManagerMtproto::trySendNextPart(MTP::DcId dcId, Queue &queue) {
 		const auto proj = [](const DcSessionBalanceData &data) {
 			return (data.requested < data.maxWaitedAmount)
 				? data.requested
-				: 16 * cNetDownloadChunkSize();
+				: kMaxWaitedInSession;
 		};
 		const auto j = ranges::min_element(sessions, ranges::less(), proj);
-		return (j->requested + cNetDownloadChunkSize() <= j->maxWaitedAmount)
+		return (j->requested + kDownloadPartSize <= j->maxWaitedAmount)
 			? (j - begin(sessions))
 			: -1;
 	}();
@@ -240,7 +240,7 @@ void DownloadManagerMtproto::requestSucceeded(
 	auto &data = dc.sessions[index];
 	const auto overloaded = (timeAtRequestStart <= dc.lastSessionRemove)
 		|| (amountAtRequestStart > data.maxWaitedAmount);
-	const auto parts = amountAtRequestStart / cNetDownloadChunkSize();
+	const auto parts = amountAtRequestStart / kDownloadPartSize;
 	const auto duration = (crl::now() - timeAtRequestStart);
 	DEBUG_LOG(("Download (%1,%2) request done, duration: %3, parts: %4%5"
 		).arg(dcId
@@ -260,10 +260,10 @@ void DownloadManagerMtproto::requestSucceeded(
 		return;
 	}
 	if (amountAtRequestStart == data.maxWaitedAmount
-		&& data.maxWaitedAmount < (16 * cNetDownloadChunkSize())) {
+		&& data.maxWaitedAmount < kMaxWaitedInSession) {
 		data.maxWaitedAmount = std::min(
-			data.maxWaitedAmount + cNetDownloadChunkSize(),
-			16 * cNetDownloadChunkSize());
+			data.maxWaitedAmount + kDownloadPartSize,
+			kMaxWaitedInSession);
 		DEBUG_LOG(("Download (%1,%2) increased max waited amount %3."
 			).arg(dcId
 			).arg(index
@@ -350,9 +350,9 @@ void DownloadManagerMtproto::removeSession(MTP::DcId dcId) {
 	auto &session = dc.sessions.back();
 
 	// Make sure we don't send anything to that session while redirecting.
-	session.requested += (16 * cNetDownloadChunkSize()) * kMaxSessionsCount;
+	session.requested += kMaxWaitedInSession * kMaxSessionsCount;
 	queue.removeSession(index);
-	Assert(session.requested == (16 * cNetDownloadChunkSize()) * kMaxSessionsCount);
+	Assert(session.requested == kMaxWaitedInSession * kMaxSessionsCount);
 
 	dc.sessions.pop_back();
 	api().instance().killSession(MTP::downloadDcId(dcId, index));
@@ -512,7 +512,7 @@ void DownloadMtprotoTask::removeSession(int sessionIndex) {
 mtpRequestId DownloadMtprotoTask::sendRequest(
 		const RequestData &requestData) {
 	const auto offset = requestData.offset;
-	const auto limit = cNetDownloadChunkSize();
+	const auto limit = Storage::kDownloadPartSize;
 	const auto shiftedDcId = MTP::downloadDcId(
 		_cdnDcId ? _cdnDcId : dcId(),
 		requestData.sessionIndex);
@@ -807,7 +807,7 @@ void DownloadMtprotoTask::placeSentRequest(
 	const auto amount = _owner->changeRequestedAmount(
 		dcId(),
 		requestData.sessionIndex,
-		cNetDownloadChunkSize());
+		Storage::kDownloadPartSize);
 	const auto &[i, ok1] = _sentRequests.emplace(requestId, requestData);
 	const auto &[j, ok2] = _requestByOffset.emplace(
 		requestData.offset,
@@ -851,7 +851,7 @@ auto DownloadMtprotoTask::finishSentRequest(
 	_owner->changeRequestedAmount(
 		dcId(),
 		result.sessionIndex,
-		-cNetDownloadChunkSize());
+		-Storage::kDownloadPartSize);
 	_sentRequests.erase(it);
 	const auto ok = _requestByOffset.remove(result.offset);
 

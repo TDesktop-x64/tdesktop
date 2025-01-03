@@ -194,14 +194,6 @@ namespace EnhancedSettings {
 			}
 		});
 
-		ReadBoolOption(settings, "net_dl_speed_boost", [&](auto v) {
-			if (v) {
-				SetNetworkDLBoost(true);
-			} else {
-				SetNetworkDLBoost(false);
-			}
-		});
-
 		ReadOption(settings, "bitrate", [&](auto v) {
 			if (v.isDouble()) {
 				int value = v.toInt();
@@ -297,7 +289,6 @@ namespace EnhancedSettings {
 
 		auto settings = QJsonObject();
 		settings.insert(qsl("net_speed_boost"), 0);
-		settings.insert(qsl("net_dl_speed_boost"), false);
 		settings.insert(qsl("show_messages_id"), false);
 		settings.insert(qsl("show_repeater_option"), false);
 		settings.insert(qsl("show_emoji_button_as_text"), false);
@@ -351,7 +342,6 @@ namespace EnhancedSettings {
 
 		auto settings = QJsonObject();
 		settings.insert(qsl("net_speed_boost"), GetEnhancedInt("net_speed_boost"));
-		settings.insert(qsl("net_dl_speed_boost"), GetEnhancedBool("net_dl_speed_boost"));
 		settings.insert(qsl("show_messages_id"), GetEnhancedBool("show_messages_id"));
 		settings.insert(qsl("show_repeater_option"), GetEnhancedBool("show_repeater_option"));
 		settings.insert(qsl("show_emoji_button_as_text"), GetEnhancedBool("show_emoji_button_as_text"));

@@ -152,7 +152,6 @@ DeclareSetting(EnhancedSetting, EnhancedOptions);
 DeclareSetting(int, NetRequestsCount);
 DeclareSetting(int, NetUploadSessionsCount);
 DeclareSetting(int, NetUploadRequestInterval);
-DeclareSetting(int, NetDownloadChunkSize);
 
 inline bool GetEnhancedBool(const QString& key) {
 	if (!gEnhancedOptions.contains(key)) {
@@ -191,14 +190,6 @@ inline void SetNetworkBoost(int boost) {
 	cSetNetRequestsCount(2 + (2 * GetEnhancedInt("net_speed_boost")));
 	cSetNetUploadSessionsCount(2 + (2 * GetEnhancedInt("net_speed_boost")));
 	cSetNetUploadRequestInterval(500 - (100 * GetEnhancedInt("net_speed_boost")));
-}
-
-inline void SetNetworkDLBoost(bool boost) {
-	if (boost) {
-		cSetNetDownloadChunkSize(1024 * 1024);
-	} else {
-		cSetNetDownloadChunkSize(128 * 1024);
-	}
 }
 
 inline bool blockExist(int64 id) {

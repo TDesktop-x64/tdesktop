@@ -47,9 +47,9 @@ void LoaderLocal::load(int64 offset) {
 		fail();
 		return;
 	}
-	auto result = _device->read(cNetDownloadChunkSize());
+	auto result = _device->read(kPartSize);
 	if (result.isEmpty()
-		|| ((result.size() != cNetDownloadChunkSize())
+		|| ((result.size() != kPartSize)
 			&& (offset + result.size() != size()))) {
 		fail();
 		return;

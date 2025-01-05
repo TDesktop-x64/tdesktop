@@ -1571,6 +1571,28 @@ void CopyPostLink(
 	}
 }
 
+void ViewAsJSON(
+	not_null<Window::SessionController*> controller,
+	FullMsgId itemId) {
+	ViewAsJSON(controller->uiShow(), itemId);
+}
+
+void ViewAsJSON(
+	std::shared_ptr<Main::SessionShow> show,
+	FullMsgId itemId) {
+	const auto item = show->session().data().message(itemId);
+	if (!item) {
+		return;
+	}
+	item->history()->session().api().exportMessageAsBase64(item,
+		crl::guard(show, [=](const QString& base64) {
+			File::OpenUrl(u"https://tlv.kokkoro.eu.org/#l=%1&m=%2&td=1"_q.arg(MTP::details::kCurrentLayer).arg(base64));
+			}),
+		crl::guard(show, [=] {
+			show->showToast("error");
+			}));
+}
+
 void CopyStoryLink(
 		std::shared_ptr<Main::SessionShow> show,
 		FullStoryId storyId) {

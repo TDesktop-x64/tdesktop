@@ -6227,6 +6227,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_forward_to_saved_message" = "Forward to Saved";
 "lng_context_repeater" = "Repeater";
 "lng_context_forward" = "Forward";
+"lng_context_view_as_json" = "View As JSON";
 
 "lng_pinned_message_show" = "Show pinned message";
 "lng_pinned_message_hide" = "Hide pinned message";

@@ -1587,10 +1587,10 @@ void ViewAsJSON(
 	item->history()->session().api().exportMessageAsBase64(item,
 		crl::guard(show, [=](const QString& base64) {
 			File::OpenUrl(u"https://tlv.kokkoro.eu.org/#l=%1&m=%2&td=1"_q.arg(MTP::details::kCurrentLayer).arg(base64));
-			}),
+		}),
 		crl::guard(show, [=] {
-			show->showToast("error");
-			}));
+			show->showToast(u"error"_q);
+		}));
 }
 
 void CopyStoryLink(

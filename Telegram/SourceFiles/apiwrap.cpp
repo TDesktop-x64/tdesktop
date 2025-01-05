@@ -740,14 +740,13 @@ void ApiWrap::exportMessageAsBase64(not_null<HistoryItem*> item, Fn<void(const Q
 			MTP_vector<MTPInputMessage>(ids)
 		)).done(requestDone).fail([=](const MTP::Error& error, mtpRequestId requestId) {
 			fail();
-			}).send();
+		}).send();
 	} else {
 		request(MTPmessages_GetMessages(
 			MTP_vector<MTPInputMessage>(ids)
 		)).done(requestDone).fail([=](const MTP::Error& error, mtpRequestId requestId) {
 			fail();
-			})
-			.send();
+		}).send();
 	}
 }
 

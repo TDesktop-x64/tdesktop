@@ -724,6 +724,33 @@ void ApiWrap::finalizeMessageDataRequest(
 	}
 }
 
+void ApiWrap::exportMessageAsBase64(not_null<HistoryItem*> item, Fn<void(const QString&)> done, Fn<void()> fail) {
+	auto ids = QVector<MTPInputMessage>{ MTP_inputMessageID(MTP_int(item->id)) };
+	auto requestDone = [=](
+		const MTPmessages_Messages& result,
+		const MTP::Response& response) {
+			auto buffer = response.reply;
+			QByteArray byteArray(reinterpret_cast<const char*>(buffer.data()), buffer.size() * sizeof(mtpPrime));
+			QString base64String = byteArray.toBase64(QByteArray::Base64UrlEncoding);
+			done(base64String);
+		};
+	if (item->history()->peer->isChannel()) {
+		request(MTPchannels_GetMessages(
+			item->history()->peer->asChannel()->inputChannel,
+			MTP_vector<MTPInputMessage>(ids)
+		)).done(requestDone).fail([=](const MTP::Error& error, mtpRequestId requestId) {
+			fail();
+			}).send();
+	} else {
+		request(MTPmessages_GetMessages(
+			MTP_vector<MTPInputMessage>(ids)
+		)).done(requestDone).fail([=](const MTP::Error& error, mtpRequestId requestId) {
+			fail();
+			})
+			.send();
+	}
+}
+
 QString ApiWrap::exportDirectMessageLink(
 		not_null<HistoryItem*> item,
 		bool inRepliesContext,

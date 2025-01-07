@@ -19,6 +19,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_element.h"
 #include "history/history.h"
 #include "history/history_item.h"
+#include "info/peer_gifts/info_peer_gifts_common.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "settings/settings_credits_graphics.h"
@@ -439,8 +440,6 @@ auto GenerateUniqueGiftMedia(
 			gift->backdrop.textColor,
 			st::chatUniqueTextPadding);
 
-		const auto withButton = !outgoing || item->history()->peer->isSelf();
-
 		auto attributes = std::vector<AttributeTable::Entry>{
 			{ tr::lng_gift_unique_model(tr::now), gift->model.name },
 			{ tr::lng_gift_unique_backdrop(tr::now), gift->backdrop.name },
@@ -448,38 +447,34 @@ auto GenerateUniqueGiftMedia(
 		};
 		push(std::make_unique<AttributeTable>(
 			std::move(attributes),
-			(withButton
-				? st::chatUniqueTextPadding
-				: st::chatUniqueTableAtBottomPadding),
+			st::chatUniqueTextPadding,
 			gift->backdrop.textColor));
 
-		if (withButton) {
-			const auto itemId = parent->data()->fullId();
-			auto link = std::make_shared<LambdaClickHandler>([=](
-					ClickContext context) {
-				const auto my = context.other.value<ClickHandlerContext>();
-				if (const auto controller = my.sessionWindow.get()) {
-					const auto owner = &controller->session().data();
-					if (const auto item = owner->message(itemId)) {
-						if (const auto media = item->media()) {
-							if (const auto gift = media->gift()) {
-								controller->show(Box(
-									Settings::StarGiftViewBox,
-									controller,
-									*gift,
-									item));
-							}
+		const auto itemId = parent->data()->fullId();
+		auto link = std::make_shared<LambdaClickHandler>([=](
+				ClickContext context) {
+			const auto my = context.other.value<ClickHandlerContext>();
+			if (const auto controller = my.sessionWindow.get()) {
+				const auto owner = &controller->session().data();
+				if (const auto item = owner->message(itemId)) {
+					if (const auto media = item->media()) {
+						if (const auto gift = media->gift()) {
+							controller->show(Box(
+								Settings::StarGiftViewBox,
+								controller,
+								*gift,
+								item));
 						}
 					}
 				}
-			});
-			push(std::make_unique<ButtonPart>(
-				tr::lng_sticker_premium_view(tr::now),
-				st::chatUniqueButtonPadding,
-				[=] { parent->repaint(); },
-				std::move(link),
-				anim::with_alpha(gift->backdrop.patternColor, 0.75)));
-		}
+			}
+		});
+		push(std::make_unique<ButtonPart>(
+			tr::lng_sticker_premium_view(tr::now),
+			st::chatUniqueButtonPadding,
+			[=] { parent->repaint(); },
+			std::move(link),
+			anim::with_alpha(gift->backdrop.patternColor, 0.75)));
 	};
 }
 
@@ -490,6 +485,8 @@ Fn<void(Painter&, const Ui::ChatPaintContext &)> UniqueGiftBg(
 		QImage bg;
 		base::flat_map<float64, QImage> cache;
 		std::unique_ptr<Ui::Text::CustomEmoji> pattern;
+		QImage badgeCache;
+		Info::PeerGifts::GiftBadge badgeKey;
 	};
 	const auto state = std::make_shared<State>();
 	state->pattern = view->history()->owner().customEmojiManager().create(
@@ -531,29 +528,28 @@ Fn<void(Painter&, const Ui::ChatPaintContext &)> UniqueGiftBg(
 		Ui::PaintPoints(p, state->cache, state->pattern.get(), *gift, outer);
 		p.setClipping(false);
 
-		p.save();
-		p.translate(inner.topLeft());
-		const auto tag = tr::lng_gift_limited_of_one(tr::now);
-		const auto font = st::semiboldFont;
-		p.setFont(font);
-		p.setPen(Qt::NoPen);
-		const auto twidth = font->width(tag);
-		const auto pos = QPoint(inner.width() - twidth, font->height);
 		const auto add = style::ConvertScale(2);
 		p.setClipRect(
-			-add,
-			-add,
+			inner.x() - add,
+			inner.y() - add,
 			inner.width() + 2 * add,
 			inner.height() + 2 * add);
-		p.translate(pos);
-		p.rotate(45.);
-		p.translate(-pos);
-		p.setPen(Qt::NoPen);
-		p.setBrush(gift->backdrop.patternColor);
-		p.drawRect(-5 * twidth, 0, twidth * 12, font->height);
-		p.setPen(gift->backdrop.textColor);
-		p.drawText(pos - QPoint(0, font->descent), tag);
-		p.restore();
+		auto badge = Info::PeerGifts::GiftBadge{
+			.text = tr::lng_gift_collectible_tag(tr::now),
+			.bg = gift->backdrop.patternColor,
+			.fg = gift->backdrop.textColor,
+		};
+		if (state->badgeCache.isNull() || state->badgeKey != badge) {
+			state->badgeKey = badge;
+			state->badgeCache = ValidateRotatedBadge(badge, add);
+		}
+		const auto badgeRatio = state->badgeCache.devicePixelRatio();
+		const auto badgeWidth = state->badgeCache.width() / badgeRatio;
+		p.drawImage(
+			inner.x() + inner.width() + add - badgeWidth,
+			inner.y() - add,
+			state->badgeCache);
+		p.setClipping(false);
 	};
 }
 

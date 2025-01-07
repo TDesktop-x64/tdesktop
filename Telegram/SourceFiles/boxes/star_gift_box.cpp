@@ -305,9 +305,9 @@ struct PatternPoint {
 };
 [[nodiscard]] const std::vector<PatternPoint> &PatternPoints() {
 	static const auto kSmall = 0.7;
-	static const auto kFaded = 0.5;
+	static const auto kFaded = 0.3;
 	static const auto kLarge = 0.85;
-	static const auto kOpaque = 0.7;
+	static const auto kOpaque = 0.5;
 	static const auto result = std::vector<PatternPoint>{
 		{ { 0.5, 0.066 }, kSmall, kFaded },
 
@@ -973,7 +973,15 @@ struct GiftPriceTabs {
 			const auto w = icon.fadeRight.width();
 			const auto &c = st::boxDividerBg->c;
 			const auto r = QRect(0, 0, w, raw->height());
+			const auto s = std::abs(float64(shift.x()));
+			constexpr auto kF = 0.5;
+			const auto opacityRight = (state->scrollMax - s)
+				/ (icon.fadeRight.width() * kF);
+			p.setOpacity(std::clamp(std::abs(opacityRight), 0., 1.));
 			icon.fadeRight.fill(p, r.translated(raw->width() -  w, 0), c);
+
+			const auto opacityLeft = s / (icon.fadeLeft.width() * kF);
+			p.setOpacity(std::clamp(std::abs(opacityLeft), 0., 1.));
 			icon.fadeLeft.fill(p, r, c);
 		}
 	}, raw->lifetime());
@@ -1520,7 +1528,7 @@ void SendGiftBox(
 		bool sending = false;
 	};
 	const auto state = raw->lifetime().make_state<State>(State{
-		.delegate = Delegate(window),
+		.delegate = Delegate(window, GiftButtonMode::Full),
 	});
 	const auto single = state->delegate.buttonSize();
 	const auto shadow = st::defaultDropdownMenu.wrap.shadow;
@@ -1567,7 +1575,7 @@ void SendGiftBox(
 		for (auto i = 0; i != count; ++i) {
 			const auto button = state->buttons[i].get();
 			const auto &descriptor = gifts.list[order[i]];
-			button->setDescriptor(descriptor);
+			button->setDescriptor(descriptor, GiftButton::Mode::Full);
 
 			const auto last = !((i + 1) % perRow);
 			if (last) {

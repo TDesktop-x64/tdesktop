@@ -79,6 +79,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat_helpers.h"
 #include "styles/style_color_indices.h"
 #include "styles/style_window.h"
+#include "styles/style_media_player.h"
 #include "styles/style_menu_icons.h"
 
 #include <QtWidgets/QApplication>
@@ -151,7 +152,8 @@ base::options::toggle CtrlClickChatNewWindow({
 
 [[nodiscard]] object_ptr<SearchEmpty> MakeSearchEmpty(
 		QWidget *parent,
-		SearchState state) {
+		SearchState state,
+		Fn<void()> resetChatTypeFilter) {
 	const auto query = state.query.trimmed();
 	const auto hashtag = !query.isEmpty() && (query[0] == '#');
 	const auto trimmed = hashtag ? query.mid(1).trimmed() : query;
@@ -165,6 +167,9 @@ base::options::toggle CtrlClickChatNewWindow({
 	const auto waiting = trimmed.isEmpty()
 		&& state.tags.empty()
 		&& !fromPeer;
+	const auto suggestAllChats = !waiting
+		&& state.tab == ChatSearchTab::MyMessages
+		&& state.filter != ChatTypeFilter::All;
 	const auto icon = waiting
 		? SearchEmptyIcon::Search
 		: SearchEmptyIcon::NoResults;
@@ -188,7 +193,10 @@ base::options::toggle CtrlClickChatNewWindow({
 					tr::now,
 					lt_query,
 					trimmed.mid(0, kQueryPreviewLimit)));
-			if (hashtag) {
+			if (suggestAllChats) {
+				text.append("\n\n").append(
+					Ui::Text::Link(tr::lng_search_tab_try_in_all(tr::now)));
+			} else if (hashtag) {
 				text.append("\n").append(
 					tr::lng_search_tab_no_results_retry(tr::now));
 			}
@@ -198,9 +206,27 @@ base::options::toggle CtrlClickChatNewWindow({
 		parent,
 		icon,
 		rpl::single(std::move(text)));
+	if (suggestAllChats) {
+		result->handlerActivated(
+		) | rpl::start_with_next(resetChatTypeFilter, result->lifetime());
+	}
 	result->show();
 	result->resizeToWidth(parent->width());
 	return result;
+}
+
+[[nodiscard]] QString ChatTypeFilterLabel(ChatTypeFilter filter) {
+	switch (filter) {
+	case ChatTypeFilter::All:
+		return tr::lng_search_filter_all(tr::now);
+	case ChatTypeFilter::Private:
+		return tr::lng_search_filter_private(tr::now);
+	case ChatTypeFilter::Groups:
+		return tr::lng_search_filter_group(tr::now);
+	case ChatTypeFilter::Channels:
+		return tr::lng_search_filter_channel(tr::now);
+	}
+	Unexpected("Chat type filter in search results.");
 }
 
 } // namespace
@@ -1194,6 +1220,25 @@ void InnerWidget::paintEvent(QPaintEvent *e) {
 			p.setFont(st::searchedBarFont);
 			p.setPen(st::searchedBarFg);
 			p.drawTextLeft(st::searchedBarPosition.x(), st::searchedBarPosition.y(), width(), text);
+			const auto filterOver = _selectedChatTypeFilter
+				|| _pressedChatTypeFilter;
+			const auto filterFont = filterOver
+				? st::searchedBarFont->underline()
+				: st::searchedBarFont;
+			if (_searchState.tab == ChatSearchTab::MyMessages) {
+				const auto text = ChatTypeFilterLabel(_searchState.filter);
+				if (!_chatTypeFilterWidth) {
+					_chatTypeFilterWidth = filterFont->width(text);
+				}
+				p.setFont(filterFont);
+				p.drawTextLeft(
+					(width()
+						- st::searchedBarPosition.x()
+						- _chatTypeFilterWidth),
+					st::searchedBarPosition.y(),
+					width(),
+					text);
+			}
 			p.translate(0, st::searchedBarHeight);
 
 			auto skip = searchedOffset();
@@ -1412,36 +1457,35 @@ void InnerWidget::paintPeerSearchResult(
 			+ chatTypeIcon->width()
 			+ st::dialogsChatTypeSkip);
 	}
-	const auto badgeWidth = result->badge.drawGetWidth(
-		p,
-		rectForName,
-		result->name.maxWidth(),
-		context.width,
-		{
-			.peer = peer,
-			.verified = (context.active
-				? &st::dialogsVerifiedIconActive
-				: context.selected
-				? &st::dialogsVerifiedIconOver
-				: &st::dialogsVerifiedIcon),
-			.premium = &ThreeStateIcon(
-				st::dialogsPremiumIcon,
-				context.active,
-				context.selected),
-			.scam = (context.active
-				? &st::dialogsScamFgActive
-				: context.selected
-				? &st::dialogsScamFgOver
-				: &st::dialogsScamFg),
-			.premiumFg = (context.active
-				? &st::dialogsVerifiedIconBgActive
-				: context.selected
-				? &st::dialogsVerifiedIconBgOver
-				: &st::dialogsVerifiedIconBg),
-			.customEmojiRepaint = [=] { updateSearchResult(peer); },
-			.now = context.now,
-			.paused = context.paused,
-		});
+	const auto badgeWidth = result->badge.drawGetWidth(p, {
+		.peer = peer,
+		.rectForName = rectForName,
+		.nameWidth = result->name.maxWidth(),
+		.outerWidth = context.width,
+		.verified = (context.active
+			? &st::dialogsVerifiedIconActive
+			: context.selected
+			? &st::dialogsVerifiedIconOver
+			: &st::dialogsVerifiedIcon),
+		.premium = &ThreeStateIcon(
+			st::dialogsPremiumIcon,
+			context.active,
+			context.selected),
+		.scam = (context.active
+			? &st::dialogsScamFgActive
+			: context.selected
+			? &st::dialogsScamFgOver
+			: &st::dialogsScamFg),
+		.premiumFg = (context.active
+			? &st::dialogsVerifiedIconBgActive
+			: context.selected
+			? &st::dialogsVerifiedIconBgOver
+			: &st::dialogsVerifiedIconBg),
+		.customEmojiRepaint = [=] { updateSearchResult(peer); },
+		.now = context.now,
+		.prioritizeVerification = true,
+		.paused = context.paused,
+	});
 	rectForName.setWidth(rectForName.width() - badgeWidth);
 
 	QRect tr(context.st->textLeft, context.st->textTop, namewidth, st::dialogsTextFont->height);
@@ -1711,6 +1755,20 @@ void InnerWidget::selectByMouse(QPoint globalPosition) {
 				_searchedSelected = searchedSelected;
 				updateSelectedRow();
 			}
+			auto selectedChatTypeFilter = false;
+			const auto from = skip - st::searchedBarHeight;
+			if (mouseY <= skip && mouseY >= from) {
+				const auto left = width()
+					- _chatTypeFilterWidth
+					- 2 * st::searchedBarPosition.x();
+				if (_chatTypeFilterWidth > 0 && local.x() >= left) {
+					selectedChatTypeFilter = true;
+				}
+			}
+			if (_selectedChatTypeFilter != selectedChatTypeFilter) {
+				update(0, from, width(), st::searchedBarHeight);
+				_selectedChatTypeFilter = selectedChatTypeFilter;
+			}
 		}
 		if (!inTags && wasSelected != isSelected()) {
 			setCursor(wasSelected ? style::cur_default : style::cur_pointer);
@@ -1752,6 +1810,7 @@ void InnerWidget::mousePressEvent(QMouseEvent *e) {
 	setPreviewPressed(_previewSelected);
 	setSearchedPressed(_searchedSelected);
 	_pressedMorePosts = _selectedMorePosts;
+	_pressedChatTypeFilter = _selectedChatTypeFilter;
 
 	const auto alt = (e->modifiers() & Qt::AltModifier);
 	if (alt && showChatPreview()) {
@@ -2149,6 +2208,8 @@ void InnerWidget::mousePressReleased(
 	setSearchedPressed(-1);
 	const auto pressedMorePosts = _pressedMorePosts;
 	_pressedMorePosts = false;
+	const auto pressedChatTypeFilter = _pressedChatTypeFilter;
+	_pressedChatTypeFilter = false;
 	if (wasDragging) {
 		selectByMouse(globalPosition);
 	}
@@ -2173,7 +2234,9 @@ void InnerWidget::mousePressReleased(
 			|| (searchedPressed >= 0
 				&& searchedPressed == _searchedSelected)
 			|| (pressedMorePosts
-				&& pressedMorePosts == _selectedMorePosts)) {
+				&& pressedMorePosts == _selectedMorePosts)
+			|| (pressedChatTypeFilter
+				&& pressedChatTypeFilter == _selectedChatTypeFilter)) {
 			if (pressedBotApp && (pressed || filteredPressed >= 0)) {
 				const auto &row = pressed
 					? pressed
@@ -2700,6 +2763,7 @@ void InnerWidget::clearSelection() {
 		updateSelectedRow();
 		_collapsedSelected = -1;
 		_selectedMorePosts = false;
+		_selectedChatTypeFilter = false;
 		_selected = nullptr;
 		_filteredSelected
 			= _searchedSelected
@@ -3011,6 +3075,10 @@ void InnerWidget::applySearchState(SearchState state) {
 	if (state.inChat) {
 		onHashtagFilterUpdate(QStringView());
 	}
+	if (state.filter != _searchState.filter) {
+		_chatTypeFilterWidth = 0;
+		update();
+	}
 	_searchState = std::move(state);
 	_searchHashOrCashtag = IsHashOrCashtagSearchQuery(_searchState.query);
 	_searchWithPostsPreview = computeSearchWithPostsPreview();
@@ -3277,6 +3345,11 @@ rpl::producer<> InnerWidget::listBottomReached() const {
 
 rpl::producer<ChatSearchTab> InnerWidget::changeSearchTabRequests() const {
 	return _changeSearchTabRequests.events();
+}
+
+auto InnerWidget::changeSearchFilterRequests() const
+-> rpl::producer<ChatTypeFilter>{
+	return _changeSearchFilterRequests.events();
 }
 
 rpl::producer<> InnerWidget::cancelSearchRequests() const {
@@ -3567,7 +3640,9 @@ void InnerWidget::refreshEmpty() {
 			}
 		} else if (_searchEmptyState != _searchState) {
 			_searchEmptyState = _searchState;
-			_searchEmpty = MakeSearchEmpty(this, _searchState);
+			_searchEmpty = MakeSearchEmpty(this, _searchState, [=] {
+				_changeSearchFilterRequests.fire(ChatTypeFilter::All);
+			});
 			if (_controller->session().data().chatsListLoaded()) {
 				_searchEmpty->animate();
 			}
@@ -4298,7 +4373,7 @@ ChosenRow InnerWidget::computeChosenRow() const {
 }
 
 bool InnerWidget::isUserpicPress() const {
-	return  (_lastRowLocalMouseX >= 0)
+	return (_lastRowLocalMouseX >= 0)
 		&& (_lastRowLocalMouseX < _st->nameLeft)
 		&& (_collapsedSelected < 0
 			|| _collapsedSelected >= _collapsedRows.size());
@@ -4317,6 +4392,24 @@ bool InnerWidget::chooseRow(
 		if (_searchHashOrCashtag != HashOrCashtag::None) {
 			_changeSearchTabRequests.fire(ChatSearchTab::PublicPosts);
 		}
+		return true;
+	} else if (_selectedChatTypeFilter) {
+		_menu = base::make_unique_q<Ui::PopupMenu>(
+			this,
+			st::popupMenuWithIcons);
+		for (const auto tab : {
+			ChatTypeFilter::All,
+			ChatTypeFilter::Private,
+			ChatTypeFilter::Groups,
+			ChatTypeFilter::Channels,
+		}) {
+			_menu->addAction(ChatTypeFilterLabel(tab), [=] {
+				_changeSearchFilterRequests.fire_copy(tab);
+			}, (tab == _searchState.filter)
+				? &st::mediaPlayerMenuCheck
+				: nullptr);
+		}
+		_menu->popup(QCursor::pos());
 		return true;
 	}
 	const auto modifyChosenRow = [&](

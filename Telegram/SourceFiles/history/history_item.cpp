@@ -2530,17 +2530,17 @@ bool HistoryItem::requiresSendInlineRight() const {
 	return Has<HistoryMessageVia>();
 }
 
-std::optional<QString> HistoryItem::errorTextForForward(
+Data::SendError HistoryItem::errorTextForForward(
 		not_null<Data::Thread*> to) const {
 	const auto requiredRight = requiredSendRight();
 	const auto requiresInline = requiresSendInlineRight();
 	const auto peer = to->peer();
 	constexpr auto kInline = ChatRestriction::SendInline;
 	if (const auto error = Data::RestrictionError(peer, requiredRight)) {
-		return *error;
+		return error;
 	} else if (requiresInline && !Data::CanSend(to, kInline)) {
-		return Data::RestrictionError(peer, kInline).value_or(
-			tr::lng_forward_cant(tr::now));
+		const auto forInline = Data::RestrictionError(peer, kInline);
+		return forInline ? forInline : tr::lng_forward_cant(tr::now);
 	} else if (_media
 		&& _media->poll()
 		&& _media->poll()->publicVotes()
@@ -2651,10 +2651,10 @@ bool HistoryItem::canReact() const {
 	if (!isRegular()) {
 		return false;
 	} else if (isService()) {
-		return _flags & MessageFlag::ReactionsAllowed;
+		return (_flags & MessageFlag::ReactionsAllowed);
 	} else if (const auto media = this->media()) {
 		if (media->call()) {
-			return false;
+			return (_flags & MessageFlag::ReactionsAllowed);
 		}
 	}
 	return true;

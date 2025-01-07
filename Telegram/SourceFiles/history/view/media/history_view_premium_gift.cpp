@@ -25,9 +25,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "settings/settings_credits.h" // Settings::CreditsId
-#include "settings/settings_credits_graphics.h"
 #include "settings/settings_credits_graphics.h" // GiftedCreditsBox
 #include "settings/settings_premium.h" // Settings::ShowGiftPremium
+#include "ui/chat/chat_style.h"
 #include "ui/layers/generic_box.h"
 #include "ui/text/text_utilities.h"
 #include "window/window_session_controller.h"
@@ -46,13 +46,23 @@ PremiumGift::PremiumGift(
 PremiumGift::~PremiumGift() = default;
 
 int PremiumGift::top() {
-	return starGift() ? 0 : st::msgServiceGiftBoxStickerTop;
+	return starGift()
+		? st::msgServiceStarGiftStickerTop
+		: st::msgServiceGiftBoxStickerTop;
+}
+
+int PremiumGift::width() {
+	return st::msgServiceStarGiftBoxWidth;
 }
 
 QSize PremiumGift::size() {
-	return QSize(
-		st::msgServiceGiftBoxStickerSize,
-		st::msgServiceGiftBoxStickerSize);
+	return starGift()
+		? QSize(
+			st::msgServiceStarGiftStickerSize,
+			st::msgServiceStarGiftStickerSize)
+		: QSize(
+			st::msgServiceGiftBoxStickerSize,
+			st::msgServiceGiftBoxStickerSize);
 }
 
 QString PremiumGift::title() {
@@ -175,7 +185,7 @@ TextWithEntities PremiumGift::subtitle() {
 
 rpl::producer<QString> PremiumGift::button() {
 	return (starGift() && outgoingGift())
-		? nullptr
+		? tr::lng_sticker_premium_view()
 		: creditsPrize()
 		? tr::lng_view_button_giftcode()
 		: (starGift() && _data.starsUpgradedBySender && !_data.upgraded)
@@ -190,9 +200,6 @@ bool PremiumGift::buttonMinistars() {
 }
 
 ClickHandlerPtr PremiumGift::createViewLink() {
-	if (starGift() && outgoingGift()) {
-		return nullptr;
-	}
 	const auto from = _gift->from();
 	const auto itemId = _parent->data()->fullId();
 	const auto peer = _parent->history()->peer;
@@ -300,20 +307,35 @@ void PremiumGift::draw(
 	}
 }
 
-QString PremiumGift::cornerTagText() {
+QImage PremiumGift::cornerTag(const PaintContext &context) {
+	auto badge = Info::PeerGifts::GiftBadge();
 	if (_data.unique) {
-		return tr::lng_gift_collectible_tag(tr::now);
+		badge = {
+			.text = tr::lng_gift_collectible_tag(tr::now),
+			.bg = _data.unique->backdrop.patternColor,
+			.fg = QColor(255, 255, 255),
+		};
 	} else if (const auto count = _data.limitedCount) {
-		return (count == 1)
-			? tr::lng_gift_limited_of_one(tr::now)
-			: tr::lng_gift_limited_of_count(
-				tr::now,
-				lt_amount,
-				((count % 1000)
-					? Lang::FormatCountDecimal(count)
-					: Lang::FormatCountToShort(count).string));
+		badge = {
+			.text = ((count == 1)
+				? tr::lng_gift_limited_of_one(tr::now)
+				: tr::lng_gift_limited_of_count(
+					tr::now,
+					lt_amount,
+					(((count % 1000) && (count < 10'000))
+						? Lang::FormatCountDecimal(count)
+						: Lang::FormatCountToShort(count).string))),
+			.bg = context.st->msgServiceBg()->c,
+			.fg = context.st->msgServiceFg()->c,
+		};
+	} else {
+		return {};
 	}
-	return QString();
+	if (_badgeCache.isNull() || _badgeKey != badge) {
+		_badgeKey = badge;
+		_badgeCache = ValidateRotatedBadge(badge, 0);
+	}
+	return _badgeCache;
 }
 
 bool PremiumGift::hideServiceText() {
@@ -384,7 +406,7 @@ void PremiumGift::ensureStickerCreated() const {
 		Assert(sticker != nullptr);
 		_sticker.emplace(_parent, document, false, _parent);
 		_sticker->setPlayingOnce(true);
-		_sticker->initSize(st::msgServiceGiftBoxStickerSize);
+		_sticker->initSize(st::msgServiceStarGiftStickerSize);
 		_parent->repaint();
 		return;
 	}

@@ -2502,26 +2502,11 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 			return;
 		}
 
-		const auto error = [&] {
-			for (const auto thread : result) {
-				const auto error = GetErrorTextForSending(
-					thread,
-					{ .forward = &items, .text = &comment });
-				if (!error.isEmpty()) {
-					return std::make_pair(error, thread);
-				}
-			}
-			return std::make_pair(QString(), result.front());
-		}();
-		if (!error.first.isEmpty()) {
-			auto text = TextWithEntities();
-			if (result.size() > 1) {
-				text.append(
-					Ui::Text::Bold(error.second->chatListName())
-				).append("\n\n");
-			}
-			text.append(error.first);
-			Ui::show(Ui::MakeInformBox(text), Ui::LayerOption::KeepOther);
+		const auto error = GetErrorForSending(
+			history->peer,
+			{ .forward = &items });
+		if (error) {
+			Data::ShowSendErrorToast(navigation, history->peer, error);
 			return;
 		}
 
@@ -3039,16 +3024,6 @@ QPointer<Ui::BoxContent> ShowForwardMessagesBox(
 	}, state->box->lifetime());
 
 	return QPointer<Ui::BoxContent>(state->box);
-}
-
-QPointer<Ui::BoxContent> ShowForwardMessagesBox(
-		not_null<Window::SessionNavigation*> navigation,
-		Data::ForwardDraft &&draft,
-		Fn<void()> &&successCallback) {
-	return ShowForwardMessagesBox(
-		navigation->uiShow(),
-		std::move(draft),
-		std::move(successCallback));
 }
 
 QPointer<Ui::BoxContent> ShowForwardMessagesBox(

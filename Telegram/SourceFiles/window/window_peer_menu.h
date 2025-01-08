@@ -145,11 +145,10 @@ Fn<void()> DeleteAndLeaveHandler(
 [[nodiscard]] Api::SendAction prepareSendAction(
 		History *history, Api::SendOptions options);
 
-QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
+void ShowNewForwardMessagesBox(
 	not_null<Window::SessionNavigation*> navigation,
 	MessageIdsList &&items,
-	bool no_quote,
-	FnMut<void()> &&successCallback = nullptr);
+	bool no_quote);
 
 object_ptr<Ui::BoxContent> PrepareChooseRecipientBox(
 	not_null<Main::Session*> session,

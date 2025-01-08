@@ -396,30 +396,16 @@ bool AddForwardSelectedAction(
 	}
 
 	menu->addAction(tr::lng_context_forward_selected(tr::now), [=] {
-		const auto weak = Ui::MakeWeak(list);
-		const auto callback = [=] {
-			if (const auto strong = weak.data()) {
-				strong->cancelSelection();
-			}
-		};
 		Window::ShowNewForwardMessagesBox(
 			request.navigation,
 			ExtractIdsList(request.selectedItems),
-			false,
-			callback);
+			false);
 	}, &st::menuIconForward);
 	menu->addAction(tr::lng_context_forward_selected_no_quote(tr::now), [=] {
-		const auto weak = Ui::MakeWeak(list);
-		const auto callback = [=] {
-			if (const auto strong = weak.data()) {
-				strong->cancelSelection();
-			}
-		};
 		Window::ShowNewForwardMessagesBox(
 				request.navigation,
 				ExtractIdsList(request.selectedItems),
-				true,
-				callback);
+				true);
 	}, &st::menuIconForward);
 	menu->addAction(tr::lng_forward_to_saved_message(tr::now), [=] {
 		const auto weak = Ui::MakeWeak(list);

@@ -1218,16 +1218,10 @@ void ListWidget::forwardItems(MessageIdsList &&items) {
 					{ id.peer, StoryIdFromMsgId(id.msg) }));
 		}
 	} else {
-		auto callback = [weak = Ui::MakeWeak(this)] {
-			if (const auto strong = weak.data()) {
-				strong->clearSelected();
-			}
-		};
-		setActionBoxWeak(Window::ShowNewForwardMessagesBox(
+		Window::ShowNewForwardMessagesBox(
 			_controller,
 			std::move(items),
-			false,
-			std::move(callback)));
+			false);
 	}
 }
 

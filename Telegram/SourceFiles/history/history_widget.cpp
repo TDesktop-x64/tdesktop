@@ -8544,24 +8544,14 @@ void HistoryWidget::forwardSelected() {
 	if (!_list) {
 		return;
 	}
-	const auto weak = Ui::MakeWeak(this);
-	Window::ShowNewForwardMessagesBox(controller(), getSelectedItems(), false, [=] {
-		if (const auto strong = weak.data()) {
-			strong->clearSelected();
-		}
-	});
+	Window::ShowNewForwardMessagesBox(controller(), getSelectedItems(), false);
 }
 
 void HistoryWidget::forwardNoQuoteSelected() {
 	if (!_list) {
 		return;
 	}
-	const auto weak = Ui::MakeWeak(this);
-	Window::ShowNewForwardMessagesBox(controller(), getSelectedItems(), true, [=] {
-		if (const auto strong = weak.data()) {
-			strong->clearSelected();
-		}
-	});
+	Window::ShowNewForwardMessagesBox(controller(), getSelectedItems(), true);
 }
 
 void HistoryWidget::forwardSelectedToSavedMessages() {

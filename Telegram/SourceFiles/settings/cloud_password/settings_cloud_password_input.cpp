@@ -18,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/cloud_password/settings_cloud_password_email_confirm.h"
 #include "settings/cloud_password/settings_cloud_password_hint.h"
 #include "settings/cloud_password/settings_cloud_password_manage.h"
+#include "settings/cloud_password/settings_cloud_password_step.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/text/format_values.h"
 #include "ui/widgets/buttons.h"
@@ -183,7 +184,9 @@ void Input::setupContent() {
 			: hasPassword
 			? tr::lng_settings_cloud_password_manage_password_change()
 			: tr::lng_settings_cloud_password_password_subtitle(),
-		tr::lng_cloud_password_about());
+		isCheck
+			? tr::lng_settings_cloud_password_manage_about1()
+			: tr::lng_cloud_password_about());
 
 	Ui::AddSkip(content, st::settingLocalPasscodeDescriptionBottomSkip);
 

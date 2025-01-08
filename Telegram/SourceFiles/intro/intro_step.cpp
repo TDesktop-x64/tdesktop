@@ -99,7 +99,19 @@ Step::Step(
 
 	_descriptionText.value(
 	) | rpl::start_with_next([=](const TextWithEntities &text) {
-		_description->entity()->setMarkedText(text);
+		const auto label = _description->entity();
+		const auto hasSpoiler = ranges::contains(
+			text.entities,
+			EntityType::Spoiler,
+			&EntityInText::type);
+		if (hasSpoiler) {
+			label->setMarkedText(
+				text,
+				CommonTextContext{ [=] { label->update(); } });
+		} else {
+			label->setMarkedText(text);
+		}
+		label->setAttribute(Qt::WA_TransparentForMouseEvents, hasSpoiler);
 		updateLabelsPosition();
 	}, lifetime());
 }
@@ -282,15 +294,8 @@ void Step::setTitleText(rpl::producer<QString> titleText) {
 	_titleText = std::move(titleText);
 }
 
-void Step::setDescriptionText(
-		rpl::producer<QString> descriptionText) {
-	setDescriptionText(
-		std::move(descriptionText) | Ui::Text::ToWithEntities());
-}
-
-void Step::setDescriptionText(
-		rpl::producer<TextWithEntities> richDescriptionText) {
-	_descriptionText = std::move(richDescriptionText);
+void Step::setDescriptionText(v::text::data &&descriptionText) {
+	_descriptionText = v::text::take_marked(std::move(descriptionText));
 }
 
 void Step::showFinished() {

@@ -567,6 +567,22 @@ void Controller::showTonSite(
 	_menuToggle->hide();
 }
 
+void Controller::showTLViewer(
+	const Webview::StorageId& storageId,
+	QString url) {
+	if (!_webview) {
+		createWebview(storageId);
+	}
+	if (_webview && _webview->widget()) {
+		_webview->navigate(url);
+		activate();
+	}
+	_url = url;
+	_subtitleText = tr::lng_context_view_as_json(tr::now);
+	_windowTitleText = _subtitleText.value();
+	_menuToggle->hide();
+}
+
 QByteArray Controller::fillInChannelValuesScript(
 		base::flat_map<QByteArray, rpl::producer<bool>> inChannelValues) {
 	auto result = QByteArray();
@@ -721,7 +737,8 @@ void Controller::createWebview(const Webview::StorageId &storageId) {
 
 	raw->setNavigationStartHandler([=](const QString &uri, bool newWindow) {
 		if (uri.startsWith(u"http://desktop-app-resource/"_q)
-			|| QUrl(uri).host().toLower().endsWith(u".magic.org"_q)) {
+			|| QUrl(uri).host().toLower().endsWith(u".magic.org"_q)
+			|| uri.startsWith(Iv::kTLViewerUrl.utf16())) {
 			return true;
 		}
 		_events.fire({ .type = Event::Type::OpenLink, .url = uri });

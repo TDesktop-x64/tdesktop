@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "base/const_string.h"
 #include "base/invoke_queued.h"
 #include "base/object_ptr.h"
 #include "base/unique_qptr.h"
@@ -33,6 +34,8 @@ class FadeWrapScaled;
 } // namespace Ui
 
 namespace Iv {
+
+constexpr auto kTLViewerUrl = "https://tdesktop-x64.github.io/tlv/"_cs;
 
 struct Prepared;
 
@@ -78,6 +81,8 @@ public:
 
 	[[nodiscard]] static bool IsGoodTonSiteUrl(const QString &uri);
 	void showTonSite(const Webview::StorageId &storageId, QString uri);
+
+	void showTLViewer(const Webview::StorageId& storageId, QString uri);
 
 	[[nodiscard]] bool active() const;
 	void showJoinedTooltip();

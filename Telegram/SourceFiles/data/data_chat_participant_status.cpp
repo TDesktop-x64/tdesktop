@@ -261,6 +261,7 @@ SendError RestrictionError(
 			}
 		}
 		if (all
+			&& channel
 			&& channel->boostsUnrestrict()
 			&& !channel->unrestrictedByBoosts()) {
 			return SendError({
@@ -410,8 +411,6 @@ void ShowSendErrorToast(
 		std::shared_ptr<ChatHelpers::Show> show,
 		not_null<PeerData*> peer,
 		Data::SendError error) {
-	Expects(peer->isChannel());
-
 	if (!error.boostsToLift) {
 		show->showToast(*error);
 		return;

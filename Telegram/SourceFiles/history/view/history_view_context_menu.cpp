@@ -91,6 +91,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
 #include "spellcheck/spellcheck_types.h"
+#include "iv/iv_instance.h" 
 #include "facades.h"
 #include "apiwrap.h"
 #include "styles/style_chat.h"
@@ -1572,7 +1573,7 @@ void ViewAsJSON(
 	}
 	item->history()->session().api().exportMessageAsBase64(item,
 		crl::guard(show, [=](const QString& base64) {
-			File::OpenUrl(u"https://tlv.kokkoro.eu.org/#l=%1&m=%2&td=1"_q.arg(MTP::details::kCurrentLayer).arg(base64));
+			Core::App().iv().showTLViewer(MTP::details::kCurrentLayer, base64);
 		}),
 		crl::guard(show, [=] {
 			show->showToast(u"error"_q);

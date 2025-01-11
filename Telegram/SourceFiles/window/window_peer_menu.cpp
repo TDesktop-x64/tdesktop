@@ -2456,10 +2456,11 @@ Api::SendAction prepareSendAction(
 }
 
 // Source from share box
-void ShowNewForwardMessagesBox(
+QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 		not_null<Window::SessionNavigation*> navigation,
 		MessageIdsList &&msgIds,
-		bool no_quote) {
+		bool no_quote,
+		FnMut<void()>&& successCallback) {
 	const auto item = navigation->session().data().message(msgIds[0]);
 	const auto history = item->history();
 	const auto owner = &history->owner();
@@ -2493,13 +2494,15 @@ void ShowNewForwardMessagesBox(
 				|| Data::CanSend(thread, ChatRestriction::SendInline))
 			&& (!isGame || !thread->peer()->isBroadcast());
 	};
-	navigation->parentController()->uiShow()->show(Box<ShareBox>(ShareBox::Descriptor{
+	const auto weak = std::make_shared<QPointer<ShareBox>>();
+	*weak = Ui::show(Box<ShareBox>(ShareBox::Descriptor{
 						.session = session,
 						.submitCallback = ShareBox::DefaultForwardCallback(
 						   navigation->parentController()->uiShow(),
 			               history,
 			               msgIds,
-			               no_quote),
+			               no_quote,
+						   std::move(successCallback)),
 						.filterCallback = std::move(filterCallback),
 						.title = no_quote ? tr::lng_title_forward_as_copy() : tr::lng_title_multiple_forward(),
 						.forwardOptions = {
@@ -2509,6 +2512,7 @@ void ShowNewForwardMessagesBox(
 						},
 						.premiumRequiredError = SharePremiumRequiredError(),
 					}), Ui::LayerOption::CloseOther);
+	return weak->data();
 }
 
 QPointer<Ui::BoxContent> ShowForwardMessagesBox(

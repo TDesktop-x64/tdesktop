@@ -8551,14 +8551,24 @@ void HistoryWidget::forwardSelected() {
 	if (!_list) {
 		return;
 	}
-	Window::ShowNewForwardMessagesBox(controller(), getSelectedItems(), false);
+	const auto weak = Ui::MakeWeak(this);
+	Window::ShowNewForwardMessagesBox(controller(), getSelectedItems(), false, [=] {
+		if (const auto strong = weak.data()) {
+			strong->clearSelected();
+		}
+	});
 }
 
 void HistoryWidget::forwardNoQuoteSelected() {
 	if (!_list) {
 		return;
 	}
-	Window::ShowNewForwardMessagesBox(controller(), getSelectedItems(), true);
+	const auto weak = Ui::MakeWeak(this);
+	Window::ShowNewForwardMessagesBox(controller(), getSelectedItems(), true, [=] {
+		if (const auto strong = weak.data()) {
+			strong->clearSelected();
+		}
+	});
 }
 
 void HistoryWidget::forwardSelectedToSavedMessages() {

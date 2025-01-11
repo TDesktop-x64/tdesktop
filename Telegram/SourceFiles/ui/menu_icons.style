@@ -251,3 +251,5 @@ mediaSpeedSuperFastActive: icon {{ "player/speed/audiospeed_menu_2.0", mediaview
 menuIconMakeBig: icon {{ "player/player_fullscreen", menuIconColor }};
 menuIconMakeSmall: icon {{ "player/player_minimize", menuIconColor }};
 menuIconChangeOrder: icon {{ "player/player_order", menuIconColor }};
+
+menuIcon64gJson: icon {{ "menu/64g_json", menuIconColor }};

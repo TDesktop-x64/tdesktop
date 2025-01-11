@@ -107,6 +107,7 @@
     "lng_forward_to_saved_message": "Forward to Saved",
     "lng_context_repeater": "Repeater",
     "lng_context_forward": "Forward",
+    "lng_context_view_as_json": "View As JSON",
 
     "lng_settings_enable_hd_video": "Higher video bitrate",
     "lng_hd_video_hint": "Video bitrate is changed! Rejoin a voice chat if you've already joined.",

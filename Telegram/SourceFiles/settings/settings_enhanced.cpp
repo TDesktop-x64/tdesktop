@@ -320,6 +320,21 @@ namespace Settings {
 			QTimer::singleShot(1 * 1000, []{ Core::Restart(); });
 		}, container->lifetime());
 
+		auto jsonBtn = AddButtonWithIcon(
+			inner,
+			tr::lng_settings_show_view_as_json(),
+			st::settingsButtonNoIcon
+		);
+		jsonBtn->toggleOn(
+			rpl::single(GetEnhancedBool("show_json"))
+		)->toggledChanges(
+		) | rpl::filter([=](bool toggled) {
+			return (toggled != GetEnhancedBool("show_json"));
+		}) | rpl::start_with_next([=](bool toggled) {
+			SetEnhancedValue("show_json", toggled);
+			EnhancedSettings::Write();
+		}, container->lifetime());
+
 		auto hideBtn = AddButtonWithIcon(
 			inner,
 			tr::lng_settings_hide_messages(),

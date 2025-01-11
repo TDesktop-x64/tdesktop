@@ -2833,7 +2833,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				}, &st::menuIconBlock);
 			}
 		}
-		if (item && item->id > 0 && isUponSelected != 2 && isUponSelected != -2) {
+		if (GetEnhancedBool("show_json") && item && item->id > 0 && isUponSelected != 2 && isUponSelected != -2) {
 			_menu->addAction(tr::lng_context_view_as_json(tr::now), [=] {
 				HistoryView::ViewAsJSON(controller, itemId);
 			}, &st::menuIconLink);
@@ -3172,7 +3172,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 		} else if (Element::Moused()) {
 			addSelectMessageAction(Element::Moused()->data());
 		}
-		if (item && item->id > 0 && isUponSelected != 2 && isUponSelected != -2) {
+		if (GetEnhancedBool("show_json") && item && item->id > 0 && isUponSelected != 2 && isUponSelected != -2) {
 			_menu->addAction(tr::lng_context_view_as_json(tr::now), [=] {
 				HistoryView::ViewAsJSON(controller, itemId);
 			}, &st::menuIconLink);

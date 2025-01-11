@@ -6132,6 +6132,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_disable_global_search" = "Disable global search";
 "lng_settings_show_group_sender_avatar" = "Show sender's avatar in groups";
 "lng_settings_show_seconds" = "Time with seconds";
+"lng_settings_show_view_as_json" = "Show View As JSON";
 "lng_settings_hide_counter" = "Hide online users counter";
 "lng_settings_hide_stories" = "Hide Stories";
 "lng_settings_translate_to_tc" = "使用正體中文翻譯訊息";

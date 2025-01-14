@@ -467,7 +467,23 @@ bool AddForwardMessageAction(
 		}
 	}
 	const auto itemId = item->fullId();
-	menu->addAction(tr::lng_context_forward_msg(tr::now), [=] {
+	auto fwdSubmenu = std::make_unique<Ui::PopupMenu>(list, st::popupMenuWithIcons);
+	fwdSubmenu->addAction(tr::lng_context_forward_msg_old(tr::now), [=] {
+		if (const auto item = owner->message(itemId)) {
+			const auto weak = Ui::MakeWeak(list);
+			Window::ShowForwardMessagesBox(
+				request.navigation,
+				(asGroup
+					? owner->itemOrItsGroup(item)
+					: MessageIdsList{ 1, itemId }),
+				[=] {
+					if (const auto strong = weak.data()) {
+						strong->cancelSelection();
+					}
+				});
+		}
+		}, &st::menuIconForward);
+	fwdSubmenu->addAction(tr::lng_context_forward_msg(tr::now), [=] {
 		if (const auto item = owner->message(itemId)) {
 			const auto weak = Ui::MakeWeak(list);
 			Window::ShowNewForwardMessagesBox(
@@ -482,7 +498,7 @@ bool AddForwardMessageAction(
 				});
 		}
 	}, &st::menuIconForward);
-	menu->addAction(tr::lng_context_forward_msg_no_quote(tr::now), [=] {
+	fwdSubmenu->addAction(tr::lng_context_forward_msg_no_quote(tr::now), [=] {
 		if (const auto item = owner->message(itemId)) {
 			const auto weak = Ui::MakeWeak(list);
 			Window::ShowNewForwardMessagesBox(
@@ -498,6 +514,25 @@ bool AddForwardMessageAction(
 				});
 		}
 	}, &st::menuIconForward);
+	if (item->allowsForward()) {
+		fwdSubmenu->addAction(tr::lng_forward_to_saved_message(tr::now), [=] {
+			if (item->id <= 0) return;
+			const auto api = &item->history()->peer->session().api();
+			auto action = Api::SendAction(item->history()->peer->owner().history(api->session().user()->asUser()));
+			action.clearDraft = false;
+			action.generateLocal = false;
+
+			const auto history = item->history()->peer->owner().history(api->session().user()->asUser());
+			auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = MessageIdsList(1, itemId) });
+
+			api->forwardMessages(std::move(resolved), action, [] {
+				Ui::Toast::Show(tr::lng_share_done(tr::now));
+				});
+			}, &st::menuIconFave);
+	}
+	if (!fwdSubmenu->empty()) {
+		menu->addAction(tr::lng_context_forward(tr::now), std::move(fwdSubmenu), &st::menuIconForward);
+	}
 	return true;
 }
 
@@ -544,7 +579,6 @@ void AddRepeaterAction(
 	}
 	const auto itemId = item->fullId();
 	const auto _history = item->history();
-	auto fwdSubmenu = std::make_unique<Ui::PopupMenu>(list, st::popupMenuWithIcons);
 	auto repeatSubmenu = std::make_unique<Ui::PopupMenu>(list, st::popupMenuWithIcons);
 	if ((item->history()->peer->isMegagroup() || item->history()->peer->isChat() || item->history()->peer->isUser())) {
 		if (GetEnhancedBool("show_repeater_option")) {
@@ -640,25 +674,6 @@ void AddRepeaterAction(
 						Api::SendExistingDocument(std::move(message), document);
 					}, &st::menuIconDiscussion);
 				}
-			}
-			if (item->allowsForward()) {
-				fwdSubmenu->addAction(tr::lng_forward_to_saved_message(tr::now), [=] {
-					if (item->id <= 0) return;
-					const auto api = &item->history()->peer->session().api();
-					auto action = Api::SendAction(item->history()->peer->owner().history(api->session().user()->asUser()));
-					action.clearDraft = false;
-					action.generateLocal = false;
-
-					const auto history = item->history()->peer->owner().history(api->session().user()->asUser());
-					auto resolved = history->resolveForwardDraft(Data::ForwardDraft{ .ids = MessageIdsList(1, itemId) });
-
-					api->forwardMessages(std::move(resolved), action, [] {
-						Ui::Toast::Show(tr::lng_share_done(tr::now));
-					});
-				}, &st::menuIconFave);
-			}
-			if (!fwdSubmenu->empty()) {
-				menu->addAction(tr::lng_context_forward(tr::now), std::move(fwdSubmenu), &st::menuIconForward);
 			}
 			if (GetEnhancedBool("show_repeater_option") && !repeatSubmenu->empty()) {
 				menu->addAction(tr::lng_context_repeater(tr::now), std::move(repeatSubmenu), &st::menuIconDiscussion);
@@ -841,6 +856,21 @@ bool AddRescheduleAction(
 		}, box->lifetime());
 	}, &st::menuIconReschedule);
 	return true;
+}
+
+void AddViewJSONAction(
+	not_null<Ui::PopupMenu*> menu,
+	const ContextMenuRequest& request,
+	not_null<ListWidget*> list) {
+	const auto item = request.item;
+	if (!request.selectedItems.empty()) {
+		return;
+	}
+	const auto controller = list->controller();
+	const auto itemId = item->fullId();
+	menu->addAction(tr::lng_context_view_as_json(tr::now), [=] {
+		HistoryView::ViewAsJSON(controller, itemId);
+	}, &st::menuIconLink);
 }
 
 bool AddReplyToMessageAction(
@@ -1248,8 +1278,8 @@ void AddMessageActions(
 		const ContextMenuRequest &request,
 		not_null<ListWidget*> list) {
 	AddPostLinkAction(menu, request);
-	AddForwardAction(menu, request, list);
 	AddMsgsFromUserAction(menu, request, list);
+	AddForwardAction(menu, request, list);
 	AddRepeaterAction(menu, request, list);
 	AddSendNowAction(menu, request, list);
 	AddDeleteAction(menu, request, list);
@@ -1257,6 +1287,7 @@ void AddMessageActions(
 	AddReportAction(menu, request, list);
 	AddSelectionAction(menu, request, list);
 	AddRescheduleAction(menu, request, list);
+	AddViewJSONAction(menu, request, list);
 }
 
 void AddCopyLinkAction(
@@ -1416,11 +1447,12 @@ base::unique_qptr<Ui::PopupMenu> FillContextMenu(
 		list,
 		st::popupMenuWithIcons);
 
-	AddReplyToMessageAction(result, request, list);
-
 	if (hasWhoReactedItem) {
 		AddWhoReactedAction(result, list, item, list->controller());
 	}
+
+	AddReplyToMessageAction(result, request, list);
+
 	if (request.overSelection
 		&& !list->hasCopyRestrictionForSelected()
 		&& !list->getSelectedText().empty()) {

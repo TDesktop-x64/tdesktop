@@ -137,6 +137,7 @@ struct Document {
 	int height = 0;
 
 	Utf8String stickerEmoji;
+	uint64 stickerSetId;
 	Utf8String songPerformer;
 	Utf8String songTitle;
 	int duration = 0;

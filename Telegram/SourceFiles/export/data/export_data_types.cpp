@@ -511,6 +511,9 @@ void ParseAttributes(
 		}, [&](const MTPDdocumentAttributeSticker &data) {
 			result.isSticker = true;
 			result.stickerEmoji = ParseString(data.valt());
+			data.vstickerset().match([&](const MTPDinputStickerSetID &data) {
+				result.stickerSetId = data.vid().v;
+			}, [&](const auto &data) {});
 		}, [&](const MTPDdocumentAttributeCustomEmoji &data) {
 			result.isSticker = true;
 			result.stickerEmoji = ParseString(data.valt());

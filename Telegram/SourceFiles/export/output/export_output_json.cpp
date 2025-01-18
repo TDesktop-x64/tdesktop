@@ -720,6 +720,8 @@ QByteArray SerializeMessage(
 		if (data.isSticker) {
 			pushType("sticker");
 			push("sticker_emoji", data.stickerEmoji);
+			push("sticker_id", Data::NumberToString(data.id));
+			push("sticker_set_id", Data::NumberToString(data.stickerSetId));
 		} else if (data.isVideoMessage) {
 			pushType("video_message");
 		} else if (data.isVoiceMessage) {

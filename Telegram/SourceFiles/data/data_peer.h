@@ -206,8 +206,8 @@ public:
 	bool changeBackgroundEmojiId(DocumentId id);
 
 	void setEmojiStatus(const MTPEmojiStatus &status);
-	void setEmojiStatus(DocumentId emojiStatusId, TimeId until = 0);
-	[[nodiscard]] DocumentId emojiStatusId() const;
+	void setEmojiStatus(EmojiStatusId emojiStatusId, TimeId until = 0);
+	[[nodiscard]] EmojiStatusId emojiStatusId() const;
 
 	[[nodiscard]] bool isUser() const {
 		return peerIsUser(id);
@@ -218,6 +218,7 @@ public:
 	[[nodiscard]] bool isChannel() const {
 		return peerIsChannel(id);
 	}
+	[[nodiscard]] bool isBot() const;
 	[[nodiscard]] bool isSelf() const;
 	[[nodiscard]] bool isVerified() const;
 	[[nodiscard]] bool isPremium() const;
@@ -267,6 +268,8 @@ public:
 	[[nodiscard]] int slowmodeSecondsLeft() const;
 	[[nodiscard]] bool canManageGroupCall() const;
 
+	[[nodiscard]] UserData *asBot();
+	[[nodiscard]] const UserData *asBot() const;
 	[[nodiscard]] UserData *asUser();
 	[[nodiscard]] const UserData *asUser() const;
 	[[nodiscard]] ChatData *asChat();
@@ -381,6 +384,8 @@ public:
 	[[nodiscard]] bool canCreatePolls() const;
 	[[nodiscard]] bool canCreateTopics() const;
 	[[nodiscard]] bool canManageTopics() const;
+	[[nodiscard]] bool canManageGifts() const;
+	[[nodiscard]] bool canTransferGifts() const;
 	[[nodiscard]] bool canExportChatHistory() const;
 
 	// Returns true if about text was changed.
@@ -483,6 +488,8 @@ public:
 	[[nodiscard]] bool hasUnreadStories() const;
 	void setStoriesState(StoriesState state);
 
+	[[nodiscard]] int peerGiftsCount() const;
+
 	const PeerId id;
 	MTPinputPeer input = MTP_inputPeerEmpty();
 
@@ -523,7 +530,7 @@ private:
 	base::flat_set<QString> _nameWords; // for filtering
 	base::flat_set<QChar> _nameFirstLetters;
 
-	DocumentId _emojiStatusId = 0;
+	EmojiStatusId _emojiStatusId;
 	DocumentId _backgroundEmojiId = 0;
 	crl::time _lastFullUpdate = 0;
 

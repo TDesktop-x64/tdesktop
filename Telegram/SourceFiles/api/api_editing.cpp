@@ -283,7 +283,9 @@ mtpRequestId EditTextMessage(
 				return MTP_inputMediaDocument(
 					MTP_flags(flags),
 					document->mtpInput(),
+					MTPInputPhoto(), // video_cover
 					MTP_int(media->ttlSeconds()),
+					MTPint(), // video_timestamp
 					MTPstring()); // query
 			};
 			takeFileReference = [=] { return document->fileReference(); };

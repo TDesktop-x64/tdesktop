@@ -121,6 +121,8 @@ MTPInputMedia PrepareUploadedDocument(
 		ComposeSendingDocumentAttributes(document),
 		MTP_vector<MTPInputDocument>(
 			ranges::to<QVector<MTPInputDocument>>(info.attachedStickers)),
+		MTPInputPhoto(), // video_cover
+		MTP_int(0), // video_timestamp
 		MTP_int(ttlSeconds));
 }
 

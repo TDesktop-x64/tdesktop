@@ -123,9 +123,9 @@ constexpr auto kLinkProtocols = {
 void EditLinkBox(
 		not_null<Ui::GenericBox*> box,
 		std::shared_ptr<Main::SessionShow> show,
-		const QString &startText,
+		const TextWithTags &startText,
 		const QString &startLink,
-		Fn<void(QString, QString)> callback,
+		Fn<void(TextWithTags, QString)> callback,
 		const style::InputField *fieldStyle,
 		Fn<QString(QString)> validate) {
 	Expects(callback != nullptr);
@@ -137,6 +137,7 @@ void EditLinkBox(
 		object_ptr<Ui::InputField>(
 			content,
 			fieldSt,
+			Ui::InputField::Mode::SingleLine,
 			tr::lng_formatting_link_text(),
 			startText),
 		st::markdownLinkFieldPadding);
@@ -181,7 +182,7 @@ void EditLinkBox(
 	url->move(placeholder->pos());
 
 	const auto submit = [=] {
-		const auto linkText = text->getLastText();
+		const auto linkText = text->getTextWithTags();
 		auto linkUrl = validate(url->getLastText());
 		if (QRegularExpression("\\d+").match(url->getLastText()).hasMatch() && url->getLastText().length() <= 10) {
 			const auto uid = url->getLastText().toLongLong();
@@ -248,7 +249,7 @@ void EditLinkBox(
 	box->setWidth(st::boxWidth);
 
 	box->setFocusCallback([=] {
-		if (startText.isEmpty()) {
+		if (startText.text.isEmpty()) {
 			text->setFocusFast();
 		} else {
 			if (!url->empty()) {
@@ -409,7 +410,7 @@ bool EditTextChanged(
 
 Fn<bool(
 	Ui::InputField::EditLinkSelection selection,
-	QString text,
+	TextWithTags text,
 	QString link,
 	EditLinkAction action)> DefaultEditLinkCallback(
 		std::shared_ptr<Main::SessionShow> show,
@@ -418,14 +419,14 @@ Fn<bool(
 	const auto weak = Ui::MakeWeak(field);
 	return [=](
 			EditLinkSelection selection,
-			QString text,
+			TextWithTags text,
 			QString link,
 			EditLinkAction action) {
 		if (action == EditLinkAction::Check) {
 			return Ui::InputField::IsValidMarkdownLink(link)
 				&& !TextUtilities::IsMentionLink(link);
 		}
-		auto callback = [=](const QString &text, const QString &link) {
+		auto callback = [=](const TextWithTags &text, const QString &link) {
 			if (const auto strong = weak.data()) {
 				strong->commitMarkdownLinkEdit(selection, text, link);
 			}
@@ -496,7 +497,7 @@ void InitMessageFieldHandlers(MessageFieldHandlersArgs &&args) {
 
 [[nodiscard]] Fn<bool(
 	Ui::InputField::EditLinkSelection selection,
-	QString text,
+	TextWithTags text,
 	QString link,
 	EditLinkAction action)> FactcheckEditLinkCallback(
 		std::shared_ptr<Main::SessionShow> show,
@@ -504,7 +505,7 @@ void InitMessageFieldHandlers(MessageFieldHandlersArgs &&args) {
 	const auto weak = Ui::MakeWeak(field);
 	return [=](
 			EditLinkSelection selection,
-			QString text,
+			TextWithTags text,
 			QString link,
 			EditLinkAction action) {
 		const auto validate = [=](QString url) {
@@ -519,7 +520,7 @@ void InitMessageFieldHandlers(MessageFieldHandlersArgs &&args) {
 		if (action == EditLinkAction::Check) {
 			return IsGoodFactcheckUrl(link);
 		}
-		auto callback = [=](const QString &text, const QString &link) {
+		auto callback = [=](const TextWithTags &text, const QString &link) {
 			if (const auto strong = weak.data()) {
 				strong->commitMarkdownLinkEdit(selection, text, link);
 			}

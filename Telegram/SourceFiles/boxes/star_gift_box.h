@@ -7,6 +7,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "data/data_star_gift.h"
+
+namespace ChatHelpers {
+class Show;
+} // namespace ChatHelpers
+
 namespace Data {
 struct UniqueGift;
 struct GiftCode;
@@ -16,6 +22,11 @@ struct CreditsHistoryEntry;
 namespace Payments {
 enum class CheckoutResult;
 } // namespace Payments
+
+namespace Settings {
+struct GiftWearBoxStyleOverride;
+struct CreditsEntryBoxStyleOverrides;
+} // namespace Settings
 
 namespace Window {
 class SessionController;
@@ -27,6 +38,7 @@ class CustomEmoji;
 
 namespace Ui {
 
+class PopupMenu;
 class GenericBox;
 class VerticalLayout;
 
@@ -41,6 +53,16 @@ void AddUniqueGiftCover(
 	not_null<VerticalLayout*> container,
 	rpl::producer<Data::UniqueGift> data,
 	rpl::producer<QString> subtitleOverride = nullptr);
+void AddWearGiftCover(
+	not_null<VerticalLayout*> container,
+	const Data::UniqueGift &data,
+	not_null<PeerData*> peer);
+
+void ShowUniqueGiftWearBox(
+	std::shared_ptr<ChatHelpers::Show> show,
+	not_null<PeerData*> peer,
+	const Data::UniqueGift &gift,
+	Settings::GiftWearBoxStyleOverride st);
 
 struct PatternPoint {
 	QPointF position;
@@ -63,8 +85,8 @@ struct StarGiftUpgradeArgs {
 	not_null<Window::SessionController*> controller;
 	base::required<uint64> stargiftId;
 	Fn<void(bool)> ready;
-	not_null<UserData*> user;
-	MsgId itemId = 0;
+	not_null<PeerData*> peer;
+	Data::SavedStarGiftId savedId;
 	int cost = 0;
 	bool canAddSender = false;
 	bool canAddComment = false;
@@ -73,7 +95,10 @@ struct StarGiftUpgradeArgs {
 };
 void ShowStarGiftUpgradeBox(StarGiftUpgradeArgs &&args);
 
-void AddUniqueCloseButton(not_null<GenericBox*> box);
+void AddUniqueCloseButton(
+	not_null<GenericBox*> box,
+	Settings::CreditsEntryBoxStyleOverrides st,
+	Fn<void(not_null<PopupMenu*>)> fillMenu = nullptr);
 
 void RequestStarsFormAndSubmit(
 	not_null<Window::SessionController*> window,
@@ -83,6 +108,6 @@ void RequestStarsFormAndSubmit(
 void ShowGiftTransferredToast(
 	base::weak_ptr<Window::SessionController> weak,
 	not_null<PeerData*> to,
-	const MTPUpdates &result);
+	const Data::UniqueGift &gift);
 
 } // namespace Ui

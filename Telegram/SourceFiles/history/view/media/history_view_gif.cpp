@@ -1490,8 +1490,13 @@ TextState Gif::getStateGrouped(
 	if (!geometry.contains(point)) {
 		return {};
 	}
-	if (fullFeaturedGrouped(sides)) {
-		if (const auto state = cornerStatusTextState(point, request, geometry.topLeft()); state.link) {
+	const auto isFullFeaturedGrouped = fullFeaturedGrouped(sides);
+	if (isFullFeaturedGrouped) {
+		const auto state = cornerStatusTextState(
+			point,
+			request,
+			geometry.topLeft());
+		if (state.link) {
 			return state;
 		}
 	}
@@ -1502,10 +1507,12 @@ TextState Gif::getStateGrouped(
 		? _cancell
 		: _realParent->isSending()
 		? nullptr
-		: (dataLoaded() || _dataMedia->canBePlayed(_realParent))
+		: dataLoaded()
 		? _openl
-		: _data->loading()
+		: (_data->loading() && !isFullFeaturedGrouped)
 		? _cancell
+		: _dataMedia->canBePlayed(_realParent)
+		? _openl
 		: _savel;
 	return TextState(_parent, std::move(link));
 }

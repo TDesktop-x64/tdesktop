@@ -87,6 +87,7 @@ using UpdateFlag = StoryUpdate::Flag;
 	}, [&](const MTPDmediaAreaChannelPost &data) {
 	}, [&](const MTPDmediaAreaUrl &data) {
 	}, [&](const MTPDmediaAreaWeather &data) {
+	}, [&](const MTPDmediaAreaStarGift &data) {
 	}, [&](const MTPDinputMediaAreaChannelPost &data) {
 		LOG(("API Error: Unexpected inputMediaAreaChannelPost from API."));
 	}, [&](const MTPDinputMediaAreaVenue &data) {
@@ -110,6 +111,7 @@ using UpdateFlag = StoryUpdate::Flag;
 	}, [&](const MTPDmediaAreaChannelPost &data) {
 	}, [&](const MTPDmediaAreaUrl &data) {
 	}, [&](const MTPDmediaAreaWeather &data) {
+	}, [&](const MTPDmediaAreaStarGift &data) {
 	}, [&](const MTPDinputMediaAreaChannelPost &data) {
 		LOG(("API Error: Unexpected inputMediaAreaChannelPost from API."));
 	}, [&](const MTPDinputMediaAreaVenue &data) {
@@ -133,6 +135,7 @@ using UpdateFlag = StoryUpdate::Flag;
 		});
 	}, [&](const MTPDmediaAreaUrl &data) {
 	}, [&](const MTPDmediaAreaWeather &data) {
+	}, [&](const MTPDmediaAreaStarGift &data) {
 	}, [&](const MTPDinputMediaAreaChannelPost &data) {
 		LOG(("API Error: Unexpected inputMediaAreaChannelPost from API."));
 	}, [&](const MTPDinputMediaAreaVenue &data) {
@@ -154,6 +157,11 @@ using UpdateFlag = StoryUpdate::Flag;
 			.url = qs(data.vurl()),
 		});
 	}, [&](const MTPDmediaAreaWeather &data) {
+	}, [&](const MTPDmediaAreaStarGift &data) {
+		result.emplace(UrlArea{
+			.area = ParseArea(data.vcoordinates()),
+			.url = u"tg://nft?slug="_q + qs(data.vslug()),
+		});
 	}, [&](const MTPDinputMediaAreaChannelPost &data) {
 		LOG(("API Error: Unexpected inputMediaAreaChannelPost from API."));
 	}, [&](const MTPDinputMediaAreaVenue &data) {
@@ -180,6 +188,7 @@ using UpdateFlag = StoryUpdate::Flag;
 				-274.,
 				1'000'000.)),
 		});
+	}, [&](const MTPDmediaAreaStarGift &data) {
 	}, [&](const MTPDinputMediaAreaChannelPost &data) {
 		LOG(("API Error: Unexpected inputMediaAreaChannelPost from API."));
 	}, [&](const MTPDinputMediaAreaVenue &data) {

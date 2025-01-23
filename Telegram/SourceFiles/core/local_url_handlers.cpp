@@ -1398,6 +1398,21 @@ bool ResolveChatLink(
 	return true;
 }
 
+bool ResolveUniqueGift(
+		Window::SessionController *controller,
+		const Match &match,
+		const QVariant &context) {
+	if (!controller) {
+		return false;
+	}
+	const auto slug = match->captured(1);
+	if (slug.isEmpty()) {
+		return false;
+	}
+	ResolveAndShowUniqueGift(controller->uiShow(), slug);
+	return true;
+}
+
 } // namespace
 
 const std::vector<LocalUrlHandler> &LocalUrlHandlers() {
@@ -1497,6 +1512,10 @@ const std::vector<LocalUrlHandler> &LocalUrlHandlers() {
 		{
 			u"^stars_topup/?\\?(.+)(#|$)"_q,
 			ResolveTopUp
+		},
+		{
+			u"^nft/?\\?slug=([a-zA-Z0-9\\.\\_\\-]+)(&|$)"_q,
+			ResolveUniqueGift
 		},
 		{
 			u"^([^\\?]+)(\\?|#|$)"_q,
@@ -1647,6 +1666,9 @@ QString TryConvertUrlToLocal(QString url) {
 		} else if (const auto chatlinkMatch = regex_match(u"^m/([a-zA-Z0-9\\.\\_\\-]+)(\\?|$)"_q, query, matchOptions)) {
 			const auto slug = chatlinkMatch->captured(1);
 			return u"tg://message?slug="_q + slug;
+		} else if (const auto nftMatch = regex_match(u"^nft/([a-zA-Z0-9\\.\\_\\-]+)(\\?|$)"_q, query, matchOptions)) {
+			const auto slug = nftMatch->captured(1);
+			return u"tg://nft?slug="_q + slug;
 		} else if (const auto privateMatch = regex_match(u"^"
 			"c/(\\-?\\d+)"
 			"("
@@ -1738,6 +1760,53 @@ bool StartUrlRequiresActivate(const QString &url) {
 	return Core::App().passcodeLocked()
 		? true
 		: !InternalPassportLink(url);
+}
+
+void ResolveAndShowUniqueGift(
+		std::shared_ptr<ChatHelpers::Show> show,
+		const QString &slug,
+		::Settings::CreditsEntryBoxStyleOverrides st) {
+	struct Request {
+		base::weak_ptr<Main::Session> weak;
+		QString slug;
+		mtpRequestId id = 0;
+	};
+	static auto request = Request();
+
+	const auto session = &show->session();
+	if (request.weak.get() == session && request.slug == slug) {
+		return;
+	} else if (const auto strong = request.weak.get()) {
+		strong->api().request(request.id).cancel();
+	}
+	request.weak = session;
+	request.slug = slug;
+	const auto clear = [=] {
+		if (request.weak.get() == session && request.slug == slug) {
+			request = {};
+		}
+	};
+	request.id = session->api().request(
+		MTPpayments_GetUniqueStarGift(MTP_string(slug))
+	).done([=](const MTPpayments_UniqueStarGift &result) {
+		clear();
+
+		const auto &data = result.data();
+		session->data().processUsers(data.vusers());
+		if (const auto gift = Api::FromTL(session, data.vgift())) {
+			using namespace ::Settings;
+			show->show(Box(GlobalStarGiftBox, show, *gift, st));
+		}
+	}).fail([=](const MTP::Error &error) {
+		clear();
+		show->showToast(u"Error: "_q + error.type());
+	}).send();
+}
+
+void ResolveAndShowUniqueGift(
+		std::shared_ptr<ChatHelpers::Show> show,
+		const QString &slug) {
+	ResolveAndShowUniqueGift(std::move(show), slug, {});
 }
 
 } // namespace Core

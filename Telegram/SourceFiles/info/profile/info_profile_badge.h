@@ -47,21 +47,11 @@ inline constexpr bool is_flag_type(BadgeType) { return true; }
 
 class Badge final {
 public:
-	Badge(
-		not_null<QWidget*> parent,
-		const style::InfoPeerBadge &st,
-		not_null<PeerData*> peer,
-		EmojiStatusPanel *emojiStatusPanel,
-		Fn<bool()> animationPaused,
-		int customStatusLoopsLimit = 0,
-		base::flags<BadgeType> allowed
-			= base::flags<BadgeType>::from_raw(-1));
-
 	struct Content {
 		BadgeType badge = BadgeType::None;
-		DocumentId emojiStatusId = 0;
+		EmojiStatusId emojiStatusId;
 
-		friend inline constexpr bool operator==(Content, Content) = default;
+		friend inline bool operator==(Content, Content) = default;
 	};
 	Badge(
 		not_null<QWidget*> parent,
@@ -102,5 +92,10 @@ private:
 	rpl::lifetime _lifetime;
 
 };
+
+[[nodiscard]] rpl::producer<Badge::Content> BadgeContentForPeer(
+	not_null<PeerData*> peer);
+[[nodiscard]] rpl::producer<Badge::Content> VerifiedContentForPeer(
+	not_null<PeerData*> peer);
 
 } // namespace Info::Profile

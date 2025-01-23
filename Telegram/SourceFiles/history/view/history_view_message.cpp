@@ -378,7 +378,7 @@ struct Message::CommentsButton {
 };
 
 struct Message::FromNameStatus {
-	DocumentId id = 0;
+	EmojiStatusId id;
 	std::unique_ptr<Ui::Text::CustomEmoji> custom;
 	int skip = 0;
 };
@@ -1789,13 +1789,13 @@ void Message::paintFromName(
 		const auto y = trect.top();
 		auto color = nameFg;
 		color.setAlpha(115);
-		const auto id = from ? from->emojiStatusId() : 0;
+		const auto id = from ? from->emojiStatusId() : EmojiStatusId();
 		if (_fromNameStatus->id != id) {
 			const auto that = const_cast<Message*>(this);
 			_fromNameStatus->custom = id
 				? std::make_unique<Ui::Text::LimitedLoopsEmoji>(
 					history()->owner().customEmojiManager().create(
-						id,
+						Data::EmojiStatusCustomId(id),
 						[=] { that->customEmojiRepaint(); }),
 					kPlayStatusLimit)
 				: nullptr;
@@ -2402,7 +2402,7 @@ void Message::unloadHeavyPart() {
 	_comments = nullptr;
 	if (_fromNameStatus) {
 		_fromNameStatus->custom = nullptr;
-		_fromNameStatus->id = 0;
+		_fromNameStatus->id = EmojiStatusId();
 	}
 }
 

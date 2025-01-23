@@ -69,6 +69,7 @@ enum class ChannelDataFlag : uint64 {
 	PaidMediaAllowed = (1ULL << 33),
 	CanViewCreditsRevenue = (1ULL << 34),
 	SignatureProfiles = (1ULL << 35),
+	StargiftsAvailable = (1ULL << 36),
 };
 inline constexpr bool is_flag_type(ChannelDataFlag) { return true; };
 using ChannelDataFlags = base::flags<ChannelDataFlag>;
@@ -252,6 +253,9 @@ public:
 	}
 	[[nodiscard]] bool viewForumAsMessages() const {
 		return flags() & Flag::ViewAsMessages;
+	}
+	[[nodiscard]] bool stargiftsAvailable() const {
+		return flags() & Flag::StargiftsAvailable;
 	}
 
 	[[nodiscard]] static ChatRestrictionsInfo KickedRestrictedRights(
@@ -453,6 +457,9 @@ public:
 	[[nodiscard]] TimeId slowmodeLastMessage() const;
 	void growSlowmodeLastMessage(TimeId when);
 
+	[[nodiscard]] int peerGiftsCount() const;
+	void setPeerGiftsCount(int count);
+
 	[[nodiscard]] int boostsApplied() const;
 	[[nodiscard]] int boostsUnrestrict() const;
 	[[nodiscard]] bool unrestrictedByBoosts() const;
@@ -525,6 +532,7 @@ private:
 		std::vector<Data::UnavailableReason> &&reasons) override;
 
 	Flags _flags = ChannelDataFlags(Flag::Forbidden);
+	int _peerGiftsCount = 0;
 
 	PtsWaiter _ptsWaiter;
 

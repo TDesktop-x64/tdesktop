@@ -574,16 +574,16 @@ rpl::producer<int> CommonGroupsCountValue(not_null<UserData*> user) {
 	});
 }
 
-rpl::producer<int> SimilarChannelsCountValue(
-		not_null<ChannelData*> channel) {
-	const auto participants = &channel->session().api().chatParticipants();
-	participants->loadSimilarChannels(channel);
-	return rpl::single(channel) | rpl::then(
+rpl::producer<int> SimilarPeersCountValue(
+		not_null<PeerData*> peer) {
+	const auto participants = &peer->session().api().chatParticipants();
+	participants->loadSimilarPeers(peer);
+	return rpl::single(peer) | rpl::then(
 		participants->similarLoaded()
 	) | rpl::filter(
-		rpl::mappers::_1 == channel
+		rpl::mappers::_1 == peer
 	) | rpl::map([=] {
-		const auto &similar = participants->similar(channel);
+		const auto &similar = participants->similar(peer);
 		return int(similar.list.size()) + similar.more;
 	});
 }
@@ -599,12 +599,12 @@ rpl::producer<int> SavedSublistCountValue(
 	return sublist->fullCountValue();
 }
 
-rpl::producer<int> PeerGiftsCountValue(not_null<UserData*> user) {
-	return user->session().changes().peerFlagsValue(
-		user,
+rpl::producer<int> PeerGiftsCountValue(not_null<PeerData*> peer) {
+	return peer->session().changes().peerFlagsValue(
+		peer,
 		UpdateFlag::PeerGifts
 	) | rpl::map([=] {
-		return user->peerGiftsCount();
+		return peer->peerGiftsCount();
 	});
 }
 
@@ -680,9 +680,9 @@ rpl::producer<BadgeType> BadgeValue(not_null<PeerData*> peer) {
 	return rpl::single(BadgeType::None);
 }
 
-rpl::producer<DocumentId> EmojiStatusIdValue(not_null<PeerData*> peer) {
+rpl::producer<EmojiStatusId> EmojiStatusIdValue(not_null<PeerData*> peer) {
 	if (peer->isChat()) {
-		return rpl::single(DocumentId(0));
+		return rpl::single(EmojiStatusId());
 	}
 	return peer->session().changes().peerFlagsValue(
 		peer,

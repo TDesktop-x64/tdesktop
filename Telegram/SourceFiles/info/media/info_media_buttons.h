@@ -131,26 +131,25 @@ inline auto AddCommonGroupsButton(
 	return result;
 }
 
-inline auto AddSimilarChannelsButton(
+inline auto AddSimilarPeersButton(
 		Ui::VerticalLayout *parent,
 		not_null<Window::SessionNavigation*> navigation,
-		not_null<ChannelData*> channel,
+		not_null<PeerData*> peer,
 		Ui::MultiSlideTracker &tracker) {
 	auto result = AddCountedButton(
 		parent,
-		Profile::SimilarChannelsCountValue(channel),
-		[](int count) {
-			return tr::lng_profile_similar_channels(
-				tr::now,
-				lt_count,
-				count);
+		Profile::SimilarPeersCountValue(peer),
+		[=](int count) {
+			return peer->isBroadcast()
+				? tr::lng_profile_similar_channels(tr::now, lt_count, count)
+				: tr::lng_profile_similar_bots(tr::now, lt_count, count);
 		},
 		tracker)->entity();
 	result->addClickHandler([=] {
 		navigation->showSection(
 			std::make_shared<Info::Memento>(
-				channel,
-				Section::Type::SimilarChannels));
+				peer,
+				Section::Type::SimilarPeers));
 	});
 	return result;
 }
@@ -206,11 +205,11 @@ inline auto AddSavedSublistButton(
 inline auto AddPeerGiftsButton(
 		Ui::VerticalLayout *parent,
 		not_null<Window::SessionNavigation*> navigation,
-		not_null<UserData*> user,
+		not_null<PeerData*> peer,
 		Ui::MultiSlideTracker &tracker) {
 	auto result = AddCountedButton(
 		parent,
-		Profile::PeerGiftsCountValue(user),
+		Profile::PeerGiftsCountValue(peer),
 		[](int count) {
 			return tr::lng_profile_peer_gifts(tr::now, lt_count, count);
 		},
@@ -218,7 +217,7 @@ inline auto AddPeerGiftsButton(
 	result->addClickHandler([=] {
 		navigation->showSection(
 			std::make_shared<Info::Memento>(
-				user,
+				peer,
 				Section::Type::PeerGifts));
 	});
 	return result;

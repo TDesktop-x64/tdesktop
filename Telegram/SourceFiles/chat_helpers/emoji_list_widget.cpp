@@ -30,6 +30,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/sticker_set_box.h"
 #include "lang/lang_keys.h"
 #include "layout/layout_position.h"
+#include "data/data_emoji_statuses.h"
 #include "data/data_session.h"
 #include "data/data_changes.h"
 #include "data/data_channel.h"
@@ -134,6 +135,7 @@ struct EmojiListWidget::CustomEmojiInstance {
 };
 
 struct EmojiListWidget::RecentOne {
+	std::shared_ptr<Data::EmojiStatusCollectible> collectible;
 	Ui::Text::CustomEmoji *custom = nullptr;
 	RecentEmojiId id;
 	mutable QImage premiumLock;
@@ -447,6 +449,13 @@ void EmojiColorPicker::drawVariant(QPainter &p, int variant) {
 		w.y() + _innerPosition.y());
 }
 
+std::vector<EmojiStatusId> DocumentListToRecent(
+		const std::vector<DocumentId> &documents) {
+	return documents | ranges::views::transform([](DocumentId id) {
+		return EmojiStatusId{ .documentId = id };
+	}) | ranges::to_vector;
+}
+
 EmojiListWidget::EmojiListWidget(
 	QWidget *parent,
 	not_null<Window::SessionController*> controller,
@@ -509,6 +518,11 @@ EmojiListWidget::EmojiListWidget(
 			if (!_custom.empty()) {
 				refreshCustom();
 			}
+		}, lifetime());
+	} else if (_mode == Mode::EmojiStatus && _features.collectibleStatus) {
+		session().data().emojiStatuses().collectiblesUpdates(
+		) | rpl::start_with_next([=] {
+			refreshCustom();
 		}, lifetime());
 	}
 
@@ -656,7 +670,8 @@ void EmojiListWidget::applyNextSearchQuery() {
 void EmojiListWidget::showPreview() {
 	if (const auto over = std::get_if<OverEmoji>(&_pressed)) {
 		if (const auto custom = lookupCustomEmoji(over)) {
-			_show->showMediaPreview(custom->stickerSetOrigin(), custom);
+			const auto document = custom.document;
+			_show->showMediaPreview(document->stickerSetOrigin(), document);
 			_previewShown = true;
 		}
 	}
@@ -706,7 +721,7 @@ void EmojiListWidget::appendPremiumSearchResults() {
 }
 
 void EmojiListWidget::provideRecent(
-		const std::vector<DocumentId> &customRecentList) {
+		const std::vector<EmojiStatusId> &customRecentList) {
 	clearSelection();
 	fillRecentFrom(customRecentList);
 	resizeToWidth(width());
@@ -1094,7 +1109,8 @@ void EmojiListWidget::fillRecent() {
 	}
 }
 
-void EmojiListWidget::fillRecentFrom(const std::vector<DocumentId> &list) {
+void EmojiListWidget::fillRecentFrom(
+		const std::vector<EmojiStatusId> &list) {
 	const auto test = session().isTestMode();
 	_recent.clear();
 	_recent.reserve(list.size());
@@ -1114,10 +1130,15 @@ void EmojiListWidget::fillRecentFrom(const std::vector<DocumentId> &list) {
 			_recentCustomIds.emplace(fakeId);
 		} else {
 			_recent.push_back({
+				.collectible = id.collectible,
 				.custom = resolveCustomRecent(id),
-				.id = { RecentEmojiDocument{ .id = id, .test = test } },
+				.id = {
+					RecentEmojiDocument{ .id = id.documentId, .test = test },
+				},
 			});
-			_recentCustomIds.emplace(id);
+			_recentCustomIds.emplace(id.collectible
+				? id.collectible->documentId
+				: id.documentId);
 		}
 	}
 }
@@ -1158,8 +1179,12 @@ void EmojiListWidget::fillRecentMenu(
 	const auto over = OverEmoji{ section, index };
 	const auto emoji = lookupOverEmoji(&over);
 	const auto custom = lookupCustomEmoji(&over);
-	if (custom && custom->sticker()) {
-		const auto sticker = custom->sticker();
+	if (custom.collectible) {
+		return;
+	}
+	const auto document = custom.document;
+	if (document && document->sticker()) {
+		const auto sticker = document->sticker();
 		const auto emoji = sticker->alt;
 		const auto setId = sticker->set.id;
 		if (!emoji.isEmpty()) {
@@ -1168,7 +1193,7 @@ void EmojiListWidget::fillRecentMenu(
 				EntityType::CustomEmoji,
 				0,
 				int(emoji.size()),
-				Data::SerializeCustomEmojiId(custom)
+				Data::SerializeCustomEmojiId(document)
 			});
 			addAction(tr::lng_emoji_copy(tr::now), [=] {
 				TextUtilities::SetClipboardText(data);
@@ -1192,8 +1217,8 @@ void EmojiListWidget::fillRecentMenu(
 	auto id = RecentEmojiId{ emoji };
 	if (custom) {
 		id.data = RecentEmojiDocument{
-			.id = custom->id,
-			.test = custom->session().isTestMode(),
+			.id = custom.document->id,
+			.test = custom.document->session().isTestMode(),
 		};
 	}
 	addAction(tr::lng_emoji_remove_recent(tr::now), crl::guard(this, [=] {
@@ -1229,7 +1254,7 @@ void EmojiListWidget::fillEmojiStatusMenu(
 		int section,
 		int index) {
 	const auto chosen = lookupCustomEmoji(index, section);
-	if (!chosen) {
+	if (!chosen || chosen.collectible) {
 		return;
 	}
 	const auto selectWith = [=](TimeId scheduled) {
@@ -1573,12 +1598,14 @@ bool EmojiListWidget::checkPickerHide() {
 	return false;
 }
 
-DocumentData *EmojiListWidget::lookupCustomEmoji(
+EmojiListWidget::ResolvedCustom EmojiListWidget::lookupCustomEmoji(
 		const OverEmoji *over) const {
-	return over ? lookupCustomEmoji(over->index, over->section) : nullptr;
+	return over
+		? lookupCustomEmoji(over->index, over->section)
+		: ResolvedCustom();
 }
 
-DocumentData *EmojiListWidget::lookupCustomEmoji(
+EmojiListWidget::ResolvedCustom EmojiListWidget::lookupCustomEmoji(
 		int index,
 		int section) const {
 	if (_searchMode) {
@@ -1586,22 +1613,30 @@ DocumentData *EmojiListWidget::lookupCustomEmoji(
 			const auto document = std::get_if<RecentEmojiDocument>(
 				&_searchResults[index].id.data);
 			if (document) {
-				return session().data().document(document->id);
+				return { session().data().document(document->id) };
 			}
 		}
-		return nullptr;
+		return {};
 	} else if (section == int(Section::Recent) && index < _recent.size()) {
+		const auto &recent = _recent[index];
+		if (recent.collectible) {
+			return {
+				session().data().document(recent.collectible->documentId),
+				recent.collectible,
+			};
+		}
 		const auto document = std::get_if<RecentEmojiDocument>(
-			&_recent[index].id.data);
+			&recent.id.data);
 		if (document) {
-			return session().data().document(document->id);
+			return { session().data().document(document->id) };
 		}
 	} else if (section >= _staticCount
 		&& index < _custom[section - _staticCount].list.size()) {
 		auto &set = _custom[section - _staticCount];
-		return set.list[index].document;
+		auto &entry = set.list[index];
+		return { entry.document, entry.collectible };
 	}
-	return nullptr;
+	return {};
 }
 
 EmojiPtr EmojiListWidget::lookupOverEmoji(const OverEmoji *over) const {
@@ -1643,9 +1678,11 @@ EmojiChosen EmojiListWidget::lookupChosen(
 }
 
 FileChosen EmojiListWidget::lookupChosen(
-		not_null<DocumentData*> custom,
+		ResolvedCustom custom,
 		const OverEmoji *over,
 		Api::SendOptions options) {
+	Expects(custom.document != nullptr);
+
 	_grabbingChosen = true;
 	const auto guard = gsl::finally([&] { _grabbingChosen = false; });
 	const auto rect = over ? emojiRect(over->section, over->index) : QRect();
@@ -1655,13 +1692,14 @@ FileChosen EmojiListWidget::lookupChosen(
 	) : QRect();
 
 	return {
-		.document = custom,
+		.document = custom.document,
 		.options = options,
 		.messageSendingFrom = {
 			.type = Ui::MessageSendingAnimationFrom::Type::Emoji,
 			.globalStartGeometry = over ? mapToGlobal(emoji) : QRect(),
 			.frame = over ? Ui::GrabWidgetToImage(this, emoji) : QImage(),
 		},
+		.collectible = custom.collectible,
 	};
 }
 
@@ -1751,7 +1789,6 @@ void EmojiListWidget::mouseReleaseEvent(QMouseEvent *e) {
 		const auto id = hasColorButton(button->section)
 			? 0
 			: _custom[button->section - _staticCount].id;
-		const auto usage = ChatHelpers::WindowUsage::PremiumPromo;
 		if (hasColorButton(button->section)) {
 			_pickerSelected = pressed;
 			showPicker();
@@ -1759,7 +1796,7 @@ void EmojiListWidget::mouseReleaseEvent(QMouseEvent *e) {
 			removeSet(id);
 		} else if (hasAddButton(button->section)) {
 			_localSetsManager->install(id);
-		} else if (const auto resolved = _show->resolveWindow(usage)) {
+		} else if (const auto resolved = _show->resolveWindow()) {
 			_jumpedToPremium.fire({});
 			switch (_mode) {
 			case Mode::Full:
@@ -1792,6 +1829,8 @@ void EmojiListWidget::displaySet(uint64 setId) {
 		} else {
 			return;
 		}
+	} else if (setId == Data::Stickers::CollectibleSetId) {
+		return;
 	}
 	const auto &sets = session().data().stickers().sets();
 	auto it = sets.find(setId);
@@ -1830,6 +1869,7 @@ void EmojiListWidget::removeSet(uint64 setId) {
 		Assert(i != end(_custom));
 		const auto removeLocally = !_megagroupSet->canEditEmoji();
 		removeMegagroupSet(removeLocally);
+	} else if (setId == Data::Stickers::CollectibleSetId) {
 	} else if (auto box = MakeConfirmRemoveSetBox(&session(), labelSt, setId)) {
 		checkHideWithBox(std::move(box));
 	}
@@ -1933,6 +1973,8 @@ bool EmojiListWidget::hasRemoveButton(int index) const {
 			return true;
 		}
 		return !set.list.empty() && _megagroupSet->canEditEmoji();
+	} else if (set.id == Data::Stickers::CollectibleSetId) {
+		return false;
 	}
 	return set.canRemove && !set.premiumRequired;
 }
@@ -1962,7 +2004,8 @@ bool EmojiListWidget::hasAddButton(int index) const {
 	const auto &set = _custom[index - _staticCount];
 	return !set.canRemove
 		&& !set.premiumRequired
-		&& set.id != Data::Stickers::MegagroupSetId;
+		&& set.id != Data::Stickers::MegagroupSetId
+		&& set.id != Data::Stickers::CollectibleSetId;
 }
 
 QRect EmojiListWidget::addButtonRect(int index) const {
@@ -1991,8 +2034,9 @@ bool EmojiListWidget::hasButton(int index) const {
 	} else if (index >= _staticCount
 		&& index < _staticCount + _custom.size()) {
 		const auto &custom = _custom[index - _staticCount];
-		return (custom.id != Data::Stickers::MegagroupSetId)
-			|| custom.canRemove;
+		return (custom.id != Data::Stickers::CollectibleSetId)
+			&& ((custom.id != Data::Stickers::MegagroupSetId)
+				|| custom.canRemove);
 	}
 	return false;
 }
@@ -2020,6 +2064,7 @@ QRect EmojiListWidget::buttonRect(
 auto EmojiListWidget::rightButton(int index) const -> const RightButton & {
 	Expects(index >= _staticCount
 		&& index < _staticCount + _custom.size());
+
 	return hasAddButton(index)
 		? _add
 		: _custom[index - _staticCount].canRemove
@@ -2279,11 +2324,12 @@ void EmojiListWidget::refreshCustom() {
 		auto set = std::vector<CustomOne>();
 		set.reserve(list.size());
 		for (const auto document : list) {
-			if (_restrictedCustomList.contains(document->id)) {
+			const auto id = EmojiStatusId{ document->id };
+			if (_restrictedCustomList.contains(id.documentId)) {
 				continue;
 			} else if (const auto sticker = document->sticker()) {
 				set.push_back({
-					.custom = resolveCustomEmoji(document, lookupId),
+					.custom = resolveCustomEmoji(id, document, lookupId),
 					.document = document,
 					.emoji = Ui::Emoji::Find(sticker->alt),
 				});
@@ -2305,6 +2351,7 @@ void EmojiListWidget::refreshCustom() {
 			.premiumRequired = premium && premiumMayBeBought,
 		});
 	};
+	refreshEmojiStatusCollectibles();
 	refreshMegagroupStickers(push, GroupStickersPlace::Visible);
 	for (const auto setId : owner->stickers().emojiSetsOrder()) {
 		push(setId, true);
@@ -2337,18 +2384,17 @@ Fn<void()> EmojiListWidget::repaintCallback(
 }
 
 not_null<Ui::Text::CustomEmoji*> EmojiListWidget::resolveCustomEmoji(
+		EmojiStatusId id,
 		not_null<DocumentData*> document,
 		uint64 setId) {
-	Expects(document->sticker() != nullptr);
-
 	const auto documentId = document->id;
-	const auto i = _customEmoji.find(documentId);
+	const auto i = _customEmoji.find(id);
 	const auto recentOnly = (i != end(_customEmoji)) && i->second.recentOnly;
 	if (i != end(_customEmoji) && !recentOnly) {
 		return i->second.emoji.get();
 	}
 	auto instance = document->owner().customEmojiManager().create(
-		document,
+		Data::EmojiStatusCustomId(id),
 		repaintCallback(documentId, setId),
 		Data::CustomEmojiManager::SizeTag::Large);
 	if (recentOnly) {
@@ -2362,7 +2408,7 @@ not_null<Ui::Text::CustomEmoji*> EmojiListWidget::resolveCustomEmoji(
 		return i->second.emoji.get();
 	}
 	return _customEmoji.emplace(
-		documentId,
+		id,
 		CustomEmojiInstance{ .emoji = std::move(instance) }
 	).first->second.emoji.get();
 }
@@ -2380,29 +2426,76 @@ Ui::Text::CustomEmoji *EmojiListWidget::resolveCustomRecent(
 
 not_null<Ui::Text::CustomEmoji*> EmojiListWidget::resolveCustomRecent(
 		DocumentId documentId) {
-	const auto i = _customRecent.find(documentId);
+	return resolveCustomRecent(EmojiStatusId{ documentId });
+}
+
+not_null<Ui::Text::CustomEmoji*> EmojiListWidget::resolveCustomRecent(
+		EmojiStatusId id) {
+	const auto i = id.collectible
+		? end(_customRecent)
+		: _customRecent.find(id.documentId);
 	if (i != end(_customRecent)) {
 		return i->second.get();
 	}
-	const auto j = _customEmoji.find(documentId);
+	const auto j = _customEmoji.find(id);
 	if (j != end(_customEmoji)) {
 		return j->second.emoji.get();
 	}
+	const auto documentId = id.collectible
+		? id.collectible->documentId
+		: id.documentId;
 	auto repaint = repaintCallback(documentId, RecentEmojiSectionSetId());
-	if (_customRecentFactory) {
+	if (_customRecentFactory && !id.collectible) {
 		return _customRecent.emplace(
-			documentId,
-			_customRecentFactory(documentId, std::move(repaint))
+			id.documentId,
+			_customRecentFactory(id.documentId, std::move(repaint))
 		).first->second.get();
 	}
 	auto custom = session().data().customEmojiManager().create(
-		documentId,
+		Data::EmojiStatusCustomId(id),
 		std::move(repaint),
 		Data::CustomEmojiManager::SizeTag::Large);
 	return _customEmoji.emplace(
-		documentId,
+		id,
 		CustomEmojiInstance{ .emoji = std::move(custom), .recentOnly = true }
 	).first->second.emoji.get();
+}
+
+void EmojiListWidget::refreshEmojiStatusCollectibles() {
+	if (_mode != Mode::EmojiStatus || !_features.collectibleStatus) {
+		return;
+	}
+	const auto type = Data::EmojiStatuses::Type::Collectibles;
+	const auto &list = session().data().emojiStatuses().list(type);
+	const auto setId = Data::Stickers::CollectibleSetId;
+	auto set = std::vector<CustomOne>();
+	set.reserve(list.size());
+	for (const auto &status : list) {
+		const auto documentId = status.collectible
+			? status.collectible->documentId
+			: status.documentId;
+		const auto document = session().data().document(documentId);
+		const auto sticker = document->sticker();
+		set.push_back({
+			.collectible = status.collectible,
+			.custom = resolveCustomEmoji(status, document, setId),
+			.document = document,
+			.emoji = sticker ? Ui::Emoji::Find(sticker->alt) : nullptr,
+		});
+	}
+	if (set.empty()) {
+		return;
+	}
+	const auto collectibles = session().data().stickers().collectibleSet();
+	_custom.push_back({
+		.id = setId,
+		.set = collectibles,
+		.thumbnailDocument = nullptr,
+		.title = collectibles->title,
+		.list = std::move(set),
+		.canRemove = false,
+		.premiumRequired = !session().premium(),
+	});
 }
 
 void EmojiListWidget::refreshMegagroupStickers(
@@ -2639,8 +2732,11 @@ void EmojiListWidget::setSelected(OverState newSelected) {
 	} else if (_previewShown && _pressed != _selected) {
 		if (const auto over = std::get_if<OverEmoji>(&_selected)) {
 			if (const auto custom = lookupCustomEmoji(over)) {
+				const auto document = custom.document;
 				_pressed = _selected;
-				_show->showMediaPreview(custom->stickerSetOrigin(), custom);
+				_show->showMediaPreview(
+					document->stickerSetOrigin(),
+					document);
 			}
 		}
 	}

@@ -911,6 +911,7 @@ searchInChatPeerList: PeerList(defaultPeerList) {
 }
 searchInChatTagsPadding: margins(6px, 0px, 6px, 0px);
 
+msgServiceGiftPreview: 172px;
 msgServiceGiftBoxSize: size(236px, 231px); // Plus msgServiceGiftBoxTopSkip.
 msgServiceGiftBoxRadius: 20px;
 msgServiceGiftBoxTopSkip: 4px;
@@ -1211,6 +1212,7 @@ botDownloadCancel: IconButton {
 chatUniqueGiftBorder: 4px;
 
 chatUniqueStickerPadding: margins(10px, 30px, 10px, 9px);
+chatUniquePreviewPadding: margins(10px, 30px, 10px, 32px);
 chatUniqueTitle: TextStyle(defaultTextStyle) {
 	font: font(16px semibold);
 }
@@ -1219,3 +1221,5 @@ chatUniqueTextPadding: margins(12px, 2px, 12px, 8px);
 chatUniqueTableSkip: 9px;
 chatUniqueRowSkip: 4px;
 chatUniqueButtonPadding: margins(12px, 4px, 12px, 16px);
+
+markupWebview: icon {{ "chat/markup_webview", windowFg }};

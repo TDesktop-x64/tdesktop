@@ -18,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "history/history_item.h"
 #include "main/main_session.h"
+#include "media/audio/media_audio_local_cache.h"
 #include "lang/lang_keys.h"
 #include "base/weak_ptr.h"
 #include "window/notifications_utilities.h"
@@ -167,17 +168,14 @@ GLib::Variant AnyVectorToVariant(const std::vector<std::any> &value) {
 class NotificationData final : public base::has_weak_ptr {
 public:
 	using NotificationId = Window::Notifications::Manager::NotificationId;
+	using Info = Window::Notifications::NativeManager::NotificationInfo;
 
 	NotificationData(
 		not_null<Manager*> manager,
 		XdgNotifications::NotificationsProxy proxy,
 		NotificationId id);
 
-	[[nodiscard]] bool init(
-		const QString &title,
-		const QString &subtitle,
-		const QString &msg,
-		Window::Notifications::Manager::DisplayOptions options);
+	[[nodiscard]] bool init(const Info &info);
 
 	NotificationData(const NotificationData &other) = delete;
 	NotificationData &operator=(const NotificationData &other) = delete;
@@ -193,6 +191,8 @@ public:
 private:
 	const not_null<Manager*> _manager;
 	NotificationId _id;
+
+	//Media::Audio::LocalDiskCache _sounds;
 
 	Gio::Application _application;
 	Gio::Notification _notification;
@@ -222,6 +222,7 @@ NotificationData::NotificationData(
 	NotificationId id)
 : _manager(manager)
 , _id(id)
+//, _sounds(cWorkingDir() + u"tdata/audio_cache"_q)
 , _application(UseGNotification()
 		? Gio::Application::get_default()
 		: nullptr)
@@ -232,18 +233,18 @@ NotificationData::NotificationData(
 , _imageKey(GetImageKey()) {
 }
 
-bool NotificationData::init(
-		const QString &title,
-		const QString &subtitle,
-		const QString &msg,
-		Window::Notifications::Manager::DisplayOptions options) {
+bool NotificationData::init(const Info &info) {
+	const auto &title = info.title;
+	const auto &subtitle = info.subtitle;
+	//const auto sound = info.sound ? info.sound() : Media::Audio::LocalSound();
+	//const auto path = sound ? _sounds.path(sound) : QString();
 	if (_application) {
 		_notification = Gio::Notification::new_(
 			subtitle.isEmpty()
 				? title.toStdString()
 				: subtitle.toStdString() + " (" + title.toStdString() + ')');
 
-		_notification.set_body(msg.toStdString());
+		_notification.set_body(info.message.toStdString());
 
 		_notification.set_icon(
 			Gio::ThemedIcon::new_(base::IconName().toStdString()));
@@ -270,7 +271,7 @@ bool NotificationData::init(
 			"app.notification-activate",
 			idVariant);
 
-		if (!options.hideMarkAsRead) {
+		if (!info.options.hideMarkAsRead) {
 			_notification.add_button_with_target(
 				tr::lng_context_mark_read(tr::now).toStdString(),
 				"app.notification-mark-as-read",
@@ -284,27 +285,28 @@ bool NotificationData::init(
 		return false;
 	}
 
+	const auto &text = info.message;
 	if (HasCapability("body-markup")) {
 		_title = title.toStdString();
 
 		_body = subtitle.isEmpty()
-			? msg.toHtmlEscaped().toStdString()
+			? text.toHtmlEscaped().toStdString()
 			: u"<b>%1</b>\n%2"_q.arg(
 				subtitle.toHtmlEscaped(),
-				msg.toHtmlEscaped()).toStdString();
+				text.toHtmlEscaped()).toStdString();
 	} else {
 		_title = subtitle.isEmpty()
 			? title.toStdString()
 			: subtitle.toStdString() + " (" + title.toStdString() + ')';
 
-		_body = msg.toStdString();
+		_body = text.toStdString();
 	}
 
 	if (HasCapability("actions")) {
 		_actions.push_back("default");
 		_actions.push_back(tr::lng_open_link(tr::now).toStdString());
 
-		if (!options.hideMarkAsRead) {
+		if (!info.options.hideMarkAsRead) {
 			// icon name according to https://specifications.freedesktop.org/icon-naming-spec/icon-naming-spec-latest.html
 			_actions.push_back("mail-mark-read");
 			_actions.push_back(
@@ -312,7 +314,7 @@ bool NotificationData::init(
 		}
 
 		if (HasCapability("inline-reply")
-				&& !options.hideReplyButton) {
+				&& !info.options.hideReplyButton) {
 			_actions.push_back("inline-reply");
 			_actions.push_back(
 				tr::lng_notification_reply(tr::now).toStdString());
@@ -555,14 +557,8 @@ public:
 	void init(XdgNotifications::NotificationsProxy proxy);
 
 	void showNotification(
-		not_null<PeerData*> peer,
-		MsgId topicRootId,
-		Ui::PeerUserpicView &userpicView,
-		MsgId msgId,
-		const QString &title,
-		const QString &subtitle,
-		const QString &msg,
-		DisplayOptions options);
+		NotificationInfo &&info,
+		Ui::PeerUserpicView &userpicView);
 	void clearAll();
 	void clearFromItem(not_null<HistoryItem*> item);
 	void clearFromTopic(not_null<Data::ForumTopic*> topic);
@@ -778,32 +774,24 @@ void Manager::Private::init(XdgNotifications::NotificationsProxy proxy) {
 }
 
 void Manager::Private::showNotification(
-		not_null<PeerData*> peer,
-		MsgId topicRootId,
-		Ui::PeerUserpicView &userpicView,
-		MsgId msgId,
-		const QString &title,
-		const QString &subtitle,
-		const QString &msg,
-		DisplayOptions options) {
+		NotificationInfo &&info,
+		Ui::PeerUserpicView &userpicView) {
+	const auto peer = info.peer;
+	const auto options = info.options;
 	const auto key = ContextId{
 		.sessionId = peer->session().uniqueId(),
 		.peerId = peer->id,
-		.topicRootId = topicRootId,
+		.topicRootId = info.topicRootId,
 	};
 	const auto notificationId = NotificationId{
 		.contextId = key,
-		.msgId = msgId,
+		.msgId = info.itemId,
 	};
 	auto notification = std::make_unique<NotificationData>(
 		_manager,
 		_proxy,
 		notificationId);
-	const auto inited = notification->init(
-		title,
-		subtitle,
-		msg,
-		options);
+	const auto inited = notification->init(info);
 	if (!inited) {
 		return;
 	}
@@ -815,7 +803,7 @@ void Manager::Private::showNotification(
 
 	auto i = _notifications.find(key);
 	if (i != end(_notifications)) {
-		auto j = i->second.find(msgId);
+		auto j = i->second.find(info.itemId);
 		if (j != end(i->second)) {
 			auto oldNotification = std::move(j->second);
 			i->second.erase(j);
@@ -829,7 +817,7 @@ void Manager::Private::showNotification(
 			base::flat_map<MsgId, Notification>()).first;
 	}
 	const auto j = i->second.emplace(
-		msgId,
+		info.itemId,
 		std::move(notification)).first;
 	j->second->show();
 }
@@ -945,23 +933,9 @@ void Manager::clearNotification(NotificationId id) {
 Manager::~Manager() = default;
 
 void Manager::doShowNativeNotification(
-		not_null<PeerData*> peer,
-		MsgId topicRootId,
-		Ui::PeerUserpicView &userpicView,
-		MsgId msgId,
-		const QString &title,
-		const QString &subtitle,
-		const QString &msg,
-		DisplayOptions options) {
-	_private->showNotification(
-		peer,
-		topicRootId,
-		userpicView,
-		msgId,
-		title,
-		subtitle,
-		msg,
-		options);
+		NotificationInfo &&info,
+		Ui::PeerUserpicView &userpicView) {
+	_private->showNotification(std::move(info), userpicView);
 }
 
 void Manager::doClearAllFast() {

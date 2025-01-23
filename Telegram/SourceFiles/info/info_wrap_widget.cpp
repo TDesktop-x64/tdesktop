@@ -442,6 +442,11 @@ void WrapWidget::setupTopBarMenuToggle() {
 				addTopBarMenuButton();
 			}
 		}, _topBar->lifetime());
+	} else if (section.type() == Section::Type::PeerGifts
+		&& key.peer()
+		&& key.peer()->isChannel()
+		&& key.peer()->canManageGifts()) {
+		addTopBarMenuButton();
 	}
 }
 
@@ -498,7 +503,7 @@ void WrapWidget::addProfileCallsButton() {
 
 	const auto peer = key().peer();
 	const auto user = peer ? peer->asUser() : nullptr;
-	if (!user || user->sharedMediaInfo()) {
+	if (!user || user->sharedMediaInfo() || user->isInaccessible()) {
 		return;
 	}
 

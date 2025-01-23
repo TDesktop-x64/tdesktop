@@ -8,7 +8,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/transfer_gift_box.h"
 
 #include "apiwrap.h"
+#include "api/api_credits.h"
+#include "api/api_cloud_password.h"
 #include "base/unixtime.h"
+#include "boxes/passcode_box.h"
+#include "data/data_session.h"
 #include "data/data_star_gift.h"
 #include "data/data_user.h"
 #include "boxes/filters/edit_filter_chats_list.h" // CreatePe...tionSubtitle.
@@ -21,12 +25,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/boxes/confirm_box.h"
 #include "ui/layers/generic_box.h"
 #include "ui/text/text_utilities.h"
+#include "ui/basic_click_handlers.h"
 #include "ui/empty_userpic.h"
 #include "ui/painter.h"
 #include "ui/vertical_list.h"
 #include "window/window_session_controller.h"
 #include "styles/style_boxes.h" // peerListSingleRow.
 #include "styles/style_dialogs.h" // recentPeersSpecialName.
+#include "styles/style_layers.h" // boxLabel.
 
 namespace {
 
@@ -41,13 +47,15 @@ public:
 	Controller(
 		not_null<Window::SessionController*> window,
 		std::shared_ptr<Data::UniqueGift> gift,
-		Fn<void(not_null<PeerData*>)> choose);
+		Data::SavedStarGiftId savedId,
+		Fn<void(not_null<PeerData*>, Fn<void()>)> choose);
+
+	void init(not_null<PeerListBox*> box);
 
 	void noSearchSubmit();
 
 private:
 	void prepareViewHook() override;
-	void setupExportOption();
 
 	bool overrideKeyboardNavigation(
 		int direction,
@@ -58,34 +66,150 @@ private:
 		not_null<UserData*> user) override;
 	void rowClicked(not_null<PeerListRow*> row) override;
 
+	const not_null<Window::SessionController*> _window;
 	const std::shared_ptr<Data::UniqueGift> _gift;
-	const Fn<void(not_null<PeerData*>)> _choose;
+	const Data::SavedStarGiftId _giftId;
+	const Fn<void(not_null<PeerData*>, Fn<void()>)> _choose;
 	ExportOption _exportOption;
+	QPointer<PeerListBox> _box;
 
 };
 
+void ConfirmExportBox(
+		not_null<Ui::GenericBox*> box,
+		std::shared_ptr<Data::UniqueGift> gift,
+		Fn<void(Fn<void()> close)> confirmed) {
+	box->setTitle(tr::lng_gift_transfer_confirm_title());
+	box->addRow(object_ptr<Ui::FlatLabel>(
+		box,
+		tr::lng_gift_transfer_confirm_text(
+			lt_name,
+			rpl::single(Ui::Text::Bold(UniqueGiftName(*gift))),
+			Ui::Text::WithEntities),
+		st::boxLabel));
+	box->addButton(tr::lng_gift_transfer_confirm_button(), [=] {
+		confirmed([weak = Ui::MakeWeak(box)] {
+			if (const auto strong = weak.data()) {
+				strong->closeBox();
+			}
+		});
+	});
+	box->addButton(tr::lng_cancel(), [=] {
+		box->closeBox();
+	});
+}
+
+void ExportOnBlockchain(
+		not_null<Window::SessionController*> window,
+		not_null<Ui::RpWidget*> parent,
+		std::shared_ptr<Data::UniqueGift> gift,
+		Data::SavedStarGiftId giftId,
+		Fn<void()> boxShown,
+		Fn<void()> wentToUrl) {
+	struct State {
+		bool loading = false;
+		rpl::lifetime lifetime;
+	};
+	const auto state = std::make_shared<State>();
+	const auto session = &window->session();
+	const auto show = window->uiShow();
+	session->api().cloudPassword().reload();
+	session->api().request(
+		MTPpayments_GetStarGiftWithdrawalUrl(
+			Api::InputSavedStarGiftId(giftId),
+			MTP_inputCheckPasswordEmpty())
+	).fail([=](const MTP::Error &error) {
+		auto box = PrePasswordErrorBox(
+			error.type(),
+			session,
+			TextWithEntities{
+				tr::lng_gift_transfer_password_about(tr::now),
+			});
+		if (box) {
+			show->show(std::move(box));
+			boxShown();
+			return;
+		}
+		state->lifetime = session->api().cloudPassword().state(
+		) | rpl::take(
+			1
+		) | rpl::start_with_next([=](const Core::CloudPasswordState &pass) {
+			auto fields = PasscodeBox::CloudFields::From(pass);
+			fields.customTitle = tr::lng_gift_transfer_password_title();
+			fields.customDescription
+				= tr::lng_gift_transfer_password_description(tr::now);
+			fields.customSubmitButton = tr::lng_passcode_submit();
+			fields.customCheckCallback = crl::guard(parent, [=](
+					const Core::CloudPasswordResult &result,
+					QPointer<PasscodeBox> box) {
+				using ExportUrl = MTPpayments_StarGiftWithdrawalUrl;
+				session->api().request(
+					MTPpayments_GetStarGiftWithdrawalUrl(
+						Api::InputSavedStarGiftId(giftId),
+						result.result)
+				).done([=](const ExportUrl &result) {
+					UrlClickHandler::Open(qs(result.data().vurl()));
+					wentToUrl();
+					if (box) {
+						box->closeBox();
+					}
+				}).fail([=](const MTP::Error &error) {
+					const auto message = error.type();
+					if (box && !box->handleCustomCheckError(message)) {
+						show->showToast(message);
+					}
+				}).send();
+			});
+			show->show(Box<PasscodeBox>(session, fields));
+			boxShown();
+		});
+	}).send();
+}
+
 [[nodiscard]] ExportOption MakeExportOption(
 		not_null<Window::SessionController*> window,
+		not_null<PeerListBox*> box,
+		std::shared_ptr<Data::UniqueGift> gift,
+		Data::SavedStarGiftId giftId,
 		TimeId when) {
+	struct State {
+		bool exporting = false;
+	};
+	const auto state = std::make_shared<State>();
 	const auto activate = [=] {
 		const auto now = base::unixtime::now();
+		const auto weak = Ui::MakeWeak(box);
 		const auto left = (when > now) ? (when - now) : 0;
 		const auto hours = left ? std::max((left + 1800) / 3600, 1) : 0;
+		if (!hours) {
+			window->show(Box(ConfirmExportBox, gift, [=](Fn<void()> close) {
+				if (state->exporting) {
+					return;
+				}
+				state->exporting = true;
+				ExportOnBlockchain(window, box, gift, giftId, [=] {
+					state->exporting = false;
+					close();
+				}, [=] {
+					if (const auto strong = weak.data()) {
+						strong->closeBox();
+					}
+					close();
+				});
+			}));
+			return;
+		}
 		window->show(Ui::MakeInformBox({
-			.text = (!hours
-				? tr::lng_gift_transfer_unlocks_update_about()
-				: tr::lng_gift_transfer_unlocks_about(
-					lt_when,
-					((hours >= 24)
-						? tr::lng_gift_transfer_unlocks_when_days(
-							lt_count,
-							rpl::single((hours / 24) * 1.))
-						: tr::lng_gift_transfer_unlocks_when_hours(
-							lt_count,
-							rpl::single(hours * 1.))))),
-			.title = (!hours
-				? tr::lng_gift_transfer_unlocks_update_title()
-				: tr::lng_gift_transfer_unlocks_title()),
+			.text = tr::lng_gift_transfer_unlocks_about(
+				lt_when,
+				((hours >= 24)
+					? tr::lng_gift_transfer_unlocks_when_days(
+						lt_count,
+						rpl::single((hours / 24) * 1.))
+					: tr::lng_gift_transfer_unlocks_when_hours(
+						lt_count,
+						rpl::single(hours * 1.)))),
+			.title = tr::lng_gift_transfer_unlocks_title(),
 		}));
 	};
 
@@ -130,10 +254,14 @@ private:
 
 		const style::PeerListItem &computeSt(
 				const style::PeerListItem &st) const override {
-			return _available ? st::recentPeersSpecialName : st;
+			_st = st;
+			_st.namePosition.setY(
+				st::recentPeersSpecialName.namePosition.y());
+			return _available ? _st : st;
 		}
 
 	private:
+		mutable style::PeerListItem _st;
 		bool _available = false;
 
 	};
@@ -228,15 +356,24 @@ private:
 Controller::Controller(
 	not_null<Window::SessionController*> window,
 	std::shared_ptr<Data::UniqueGift> gift,
-	Fn<void(not_null<PeerData*>)> choose)
+	Data::SavedStarGiftId giftId,
+	Fn<void(not_null<PeerData*>, Fn<void()>)> choose)
 : ContactsBoxController(&window->session())
+, _window(window)
 , _gift(std::move(gift))
+, _giftId(giftId)
 , _choose(std::move(choose)) {
-	if (const auto when = _gift->exportAt) {
-		_exportOption = MakeExportOption(window, when);
-	}
-	if (_exportOption.content) {
+	if (_gift->exportAt) {
 		setStyleOverrides(&st::peerListSmallSkips);
+	}
+}
+
+void Controller::init(not_null<PeerListBox*> box) {
+	_box = box;
+	if (const auto when = _gift->exportAt) {
+		_exportOption = MakeExportOption(_window, box, _gift, _giftId, when);
+		delegate()->peerListSetAboveWidget(std::move(_exportOption.content));
+		delegate()->peerListRefreshRows();
 	}
 }
 
@@ -258,11 +395,6 @@ void Controller::prepareViewHook() {
 	delegate()->peerListSetTitle(tr::lng_gift_transfer_title(
 		lt_name,
 		rpl::single(UniqueGiftName(*_gift))));
-	setupExportOption();
-}
-
-void Controller::setupExportOption() {
-	delegate()->peerListSetAboveWidget(std::move(_exportOption.content));
 }
 
 std::unique_ptr<PeerListRow> Controller::createRow(
@@ -277,14 +409,18 @@ std::unique_ptr<PeerListRow> Controller::createRow(
 }
 
 void Controller::rowClicked(not_null<PeerListRow*> row) {
-	_choose(row->peer());
+	_choose(row->peer(), [parentBox = _box] {
+		if (const auto strong = parentBox.data()) {
+			strong->closeBox();
+		}
+	});
 }
 
 void TransferGift(
 		not_null<Window::SessionController*> window,
 		not_null<PeerData*> to,
 		std::shared_ptr<Data::UniqueGift> gift,
-		MsgId messageId,
+		Data::SavedStarGiftId savedId,
 		Fn<void(Payments::CheckoutResult)> done) {
 	Expects(to->isUser());
 
@@ -293,33 +429,37 @@ void TransferGift(
 	auto formDone = [=](
 			Payments::CheckoutResult result,
 			const MTPUpdates *updates) {
-		if (result == Payments::CheckoutResult::Paid && updates) {
+		done(result);
+		if (result == Payments::CheckoutResult::Paid) {
 			if (const auto strong = weak.get()) {
-				Ui::ShowGiftTransferredToast(strong, to, *updates);
+				strong->session().data().notifyGiftUpdate({
+					.id = savedId,
+					.action = Data::GiftUpdate::Action::Transfer,
+				});
+				Ui::ShowGiftTransferredToast(strong, to, *gift);
 			}
 		}
-		done(result);
 	};
 	if (gift->starsForTransfer <= 0) {
 		session->api().request(MTPpayments_TransferStarGift(
-			MTP_int(messageId.bare),
-			to->asUser()->inputUser
+			Api::InputSavedStarGiftId(savedId),
+			to->input
 		)).done([=](const MTPUpdates &result) {
 			session->api().applyUpdates(result);
 			formDone(Payments::CheckoutResult::Paid, &result);
 		}).fail([=](const MTP::Error &error) {
+			formDone(Payments::CheckoutResult::Failed, nullptr);
 			if (const auto strong = weak.get()) {
 				strong->showToast(error.type());
 			}
-			formDone(Payments::CheckoutResult::Failed, nullptr);
 		}).send();
 		return;
 	}
 	Ui::RequestStarsFormAndSubmit(
 		window,
 		MTP_inputInvoiceStarGiftTransfer(
-			MTP_int(messageId.bare),
-			to->asUser()->inputUser),
+			Api::InputSavedStarGiftId(savedId),
+			to->input),
 		std::move(formDone));
 }
 
@@ -327,7 +467,8 @@ void ShowTransferToBox(
 		not_null<Window::SessionController*> controller,
 		not_null<PeerData*> peer,
 		std::shared_ptr<Data::UniqueGift> gift,
-		MsgId msgId) {
+		Data::SavedStarGiftId savedId,
+		Fn<void()> closeParentBox) {
 	const auto stars = gift->starsForTransfer;
 	controller->show(Box([=](not_null<Ui::GenericBox*> box) {
 		box->setTitle(tr::lng_gift_transfer_title(
@@ -353,16 +494,24 @@ void ShowTransferToBox(
 			state->sent = true;
 			const auto weak = Ui::MakeWeak(box);
 			const auto done = [=](Payments::CheckoutResult result) {
-				if (result != Payments::CheckoutResult::Paid) {
+				if (result == Payments::CheckoutResult::Cancelled) {
+					closeParentBox();
+					if (const auto strong = weak.data()) {
+						strong->closeBox();
+					}
+				} else if (result != Payments::CheckoutResult::Paid) {
 					state->sent = false;
 				} else {
-					controller->showPeerHistory(peer);
+					if (savedId.isUser()) {
+						controller->showPeerHistory(peer);
+					}
+					closeParentBox();
 					if (const auto strong = weak.data()) {
 						strong->closeBox();
 					}
 				}
 			};
-			TransferGift(controller, peer, gift, msgId, done);
+			TransferGift(controller, peer, gift, savedId, done);
 		};
 
 		Ui::ConfirmBox(box, {
@@ -395,15 +544,18 @@ void ShowTransferToBox(
 void ShowTransferGiftBox(
 		not_null<Window::SessionController*> window,
 		std::shared_ptr<Data::UniqueGift> gift,
-		MsgId msgId) {
+		Data::SavedStarGiftId savedId) {
 	auto controller = std::make_unique<Controller>(
 		window,
 		gift,
-		[=](not_null<PeerData*> peer) {
-			ShowTransferToBox(window, peer, gift, msgId);
+		savedId,
+		[=](not_null<PeerData*> peer, Fn<void()> done) {
+			ShowTransferToBox(window, peer, gift, savedId, done);
 		});
 	const auto controllerRaw = controller.get();
 	auto initBox = [=](not_null<PeerListBox*> box) {
+		controllerRaw->init(box);
+
 		box->addButton(tr::lng_cancel(), [=] { box->closeBox(); });
 
 		box->noSearchSubmits() | rpl::start_with_next([=] {

@@ -66,6 +66,8 @@ struct CreditsHistoryEntry final {
 	uint64 bareGiftStickerId = 0;
 	uint64 bareGiftOwnerId = 0;
 	uint64 bareActorId = 0;
+	uint64 bareGiftListPeerId = 0;
+	uint64 giftSavedId = 0;
 	uint64 stargiftId = 0;
 	std::shared_ptr<UniqueGift> uniqueGift;
 	StarsAmount starrefAmount;
@@ -89,6 +91,7 @@ struct CreditsHistoryEntry final {
 	bool giftUpgraded : 1 = false;
 	bool savedToProfile : 1 = false;
 	bool fromGiftsList : 1 = false;
+	bool fromGiftSlug : 1 = false;
 	bool soldOutInfo : 1 = false;
 	bool canUpgradeGift : 1 = false;
 	bool hasGiftComment : 1 = false;

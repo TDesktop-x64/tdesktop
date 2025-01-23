@@ -1017,7 +1017,7 @@ void TabbedSelector::setCurrentPeer(PeerData *peer) {
 }
 
 void TabbedSelector::provideRecentEmoji(
-		const std::vector<DocumentId> &customRecentList) {
+		const std::vector<EmojiStatusId> &customRecentList) {
 	for (const auto &tab : _tabs) {
 		if (tab.type() == SelectorTab::Emoji) {
 			const auto emoji = static_cast<EmojiListWidget*>(tab.widget());
@@ -1061,8 +1061,7 @@ void TabbedSelector::checkRestrictedPeer() {
 				st::stickersRestrictedLabel);
 			const auto lifting = error.boostsToLift;
 			_restrictedLabel->setClickHandlerFilter([=](auto...) {
-				const auto window = show->resolveWindow(
-					ChatHelpers::WindowUsage::PremiumPromo);
+				const auto window = show->resolveWindow();
 				window->resolveBoostState(peer->asChannel(), lifting);
 				return false;
 			});

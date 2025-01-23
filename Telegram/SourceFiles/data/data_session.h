@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "dialogs/dialogs_main_list.h"
 #include "data/data_groups.h"
 #include "data/data_cloud_file.h"
+#include "data/data_star_gift.h"
 #include "history/history_location_manager.h"
 #include "base/timer.h"
 
@@ -71,6 +72,7 @@ class BusinessInfo;
 struct ReactionId;
 struct UnavailableReason;
 struct CreditsStatusSlice;
+struct UniqueGift;
 
 struct RepliesReadTillUpdate {
 	FullMsgId id;
@@ -83,10 +85,11 @@ struct GiftUpdate {
 		Save,
 		Unsave,
 		Convert,
+		Transfer,
 		Delete,
 	};
 
-	FullMsgId itemId;
+	Data::SavedStarGiftId id;
 	Action action = {};
 };
 
@@ -336,7 +339,7 @@ public:
 	void notifyPinnedDialogsOrderUpdated();
 	[[nodiscard]] rpl::producer<> pinnedDialogsOrderUpdated() const;
 
-	using CreditsSubsRebuilder = rpl::event_stream<Data::CreditsStatusSlice>;
+	using CreditsSubsRebuilder = rpl::event_stream<CreditsStatusSlice>;
 	using CreditsSubsRebuilderPtr = std::shared_ptr<CreditsSubsRebuilder>;
 	[[nodiscard]] CreditsSubsRebuilderPtr createCreditsSubsRebuilder();
 	[[nodiscard]] CreditsSubsRebuilderPtr activeCreditsSubsRebuilder() const;
@@ -422,7 +425,7 @@ public:
 	[[nodiscard]] const std::vector<Dialogs::Key> &pinnedChatsOrder(
 		FilterId filterId) const;
 	[[nodiscard]] const std::vector<Dialogs::Key> &pinnedChatsOrder(
-		not_null<Data::SavedMessages*> saved) const;
+		not_null<SavedMessages*> saved) const;
 	void setChatPinned(Dialogs::Key key, FilterId filterId, bool pinned);
 	void setPinnedFromEntryList(Dialogs::Key key, bool pinned);
 	void clearPinnedChats(Folder *folder);
@@ -430,7 +433,7 @@ public:
 		Folder *folder,
 		const QVector<MTPDialogPeer> &list);
 	void applyPinnedTopics(
-		not_null<Data::Forum*> forum,
+		not_null<Forum*> forum,
 		const QVector<MTPint> &list);
 	void reorderTwoPinnedChats(
 		FilterId filterId,
@@ -624,6 +627,7 @@ public:
 		WebPageCollage &&collage,
 		std::unique_ptr<Iv::Data> iv,
 		std::unique_ptr<WebPageStickerSet> stickerSet,
+		std::shared_ptr<UniqueGift> uniqueGift,
 		int duration,
 		const QString &author,
 		bool hasLargeMedia,
@@ -908,6 +912,7 @@ private:
 		WebPageCollage &&collage,
 		std::unique_ptr<Iv::Data> iv,
 		std::unique_ptr<WebPageStickerSet> stickerSet,
+		std::shared_ptr<UniqueGift> uniqueGift,
 		int duration,
 		const QString &author,
 		bool hasLargeMedia,

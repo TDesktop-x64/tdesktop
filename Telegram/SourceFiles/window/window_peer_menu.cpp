@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "window/window_peer_menu.h"
 
+#include "base/call_delayed.h"
 #include "menu/menu_check_item.h"
 #include "boxes/share_box.h"
 #include "boxes/star_gift_box.h"
@@ -315,7 +316,7 @@ private:
 	void addNewMembers();
 	void addDeleteContact();
 	void addTTLSubmenu(bool addSeparator);
-	void addGiftPremium();
+	void addSendGift();
 	void addPinnedMessages();
 	void addFirstMessage();
 	void addViewChannel();
@@ -1213,7 +1214,7 @@ void Filler::addCreatePoll() {
 
 void Filler::addThemeEdit() {
 	const auto user = _peer->asUser();
-	if (!user || user->isBot()) {
+	if (!user || user->isInaccessible()) {
 		return;
 	}
 	const auto controller = _controller;
@@ -1243,22 +1244,29 @@ void Filler::addTTLSubmenu(bool addSeparator) {
 	}
 }
 
-void Filler::addGiftPremium() {
+void Filler::addSendGift() {
 	const auto user = _peer->asUser();
-	if (!user
-		|| user->isInaccessible()
-		|| user->isSelf()
-		|| user->isBot()
-		|| user->isNotificationsUser()
-		|| user->isRepliesChat()
-		|| user->isVerifyCodes()
-		|| !user->session().premiumCanBuy()) {
+	const auto channel = _peer->asBroadcast();
+	if (!user && !channel) {
+		return;
+	} else if (user
+		&& (user->isInaccessible()
+			|| user->isSelf()
+			|| user->isBot()
+			|| user->isNotificationsUser()
+			|| user->isRepliesChat()
+			|| user->isVerifyCodes()
+			|| !user->session().premiumCanBuy())) {
+		return;
+	} else if (channel
+		&& (channel->isForbidden() || !channel->stargiftsAvailable())) {
 		return;
 	}
 
+	const auto peer = _peer;
 	const auto navigation = _controller;
 	_addAction(tr::lng_profile_gift_premium(tr::now), [=] {
-		Ui::ShowStarGiftBox(navigation, user);
+		Ui::ShowStarGiftBox(navigation, peer);
 	}, &st::menuIconGiftPremium);
 }
 
@@ -1518,9 +1526,9 @@ void Filler::fillProfileActions() {
 	addNewContact();
 	addShareContact();
 	addEditContact();
-	addGiftPremium();
 	addBotToGroup();
 	addNewMembers();
+	addSendGift();
 	addViewStatistics();
 	addStoryArchive();
 	addManageChat();
@@ -1627,7 +1635,9 @@ void PeerMenuUnhidePinnedMessage(not_null<PeerData*> peer) {
 }
 
 void PeerMenuExportChat(not_null<PeerData*> peer) {
-	Core::App().exportManager().start(peer);
+	base::call_delayed(st::defaultPopupMenu.showDuration, [=] {
+		Core::App().exportManager().start(peer);
+	});
 }
 
 void PeerMenuDeleteContact(

@@ -1185,7 +1185,7 @@ void PeerData::setEmojiStatus(EmojiStatusId emojiStatusId, TimeId until) {
 
 EmojiStatusId PeerData::emojiStatusId() const {
 	if (GetEnhancedBool("screenshot_mode")) {
-		return 0;
+		return EmojiStatusId();
 	}
 	return _emojiStatusId;
 }

@@ -684,7 +684,7 @@ Cover::Cover(
 		refreshNameGeometry(width());
 	}, _name->lifetime());
 
-	_verify->setPremiumClickCallback([=] {
+	_verified->setPremiumClickCallback([=] {
 		if (_peer->id == PeerId(1021739447)) {
 			Ui::Toast::Show("64Gram developer account");
 		}

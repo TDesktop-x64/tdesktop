@@ -558,7 +558,7 @@ const QString &readAutoupdatePrefixRaw() {
 	//		return AutoupdatePrefix(value);
 	//	}
 	//}
-	return AutoupdatePrefix("https://updates.64gr.am");
+	return AutoupdatePrefix("https://updates-internal.64gr.am");
 }
 
 void writeAutoupdatePrefix(const QString &prefix) {

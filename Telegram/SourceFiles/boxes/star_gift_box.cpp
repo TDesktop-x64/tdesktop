@@ -99,8 +99,8 @@ namespace Ui {
 namespace {
 
 constexpr auto kPriceTabAll = 0;
-constexpr auto kPriceTabLimited = -1;
-constexpr auto kPriceTabInStock = -2;
+constexpr auto kPriceTabLimited = -2;
+constexpr auto kPriceTabInStock = -1;
 constexpr auto kGiftMessageLimit = 255;
 constexpr auto kSentToastDuration = 3 * crl::time(1000);
 constexpr auto kSwitchUpgradeCoverInterval = 3 * crl::time(1000);
@@ -255,18 +255,26 @@ auto GenerateGiftMedia(
 			replacing,
 			sticker,
 			st::giftBoxPreviewStickerPadding));
-		const auto title = v::match(descriptor, [&](GiftTypePremium gift) {
+		auto title = v::match(descriptor, [&](GiftTypePremium gift) {
 			return tr::lng_action_gift_premium_months(
 				tr::now,
 				lt_count,
-				gift.months);
+				gift.months,
+				Text::Bold);
 		}, [&](const GiftTypeStars &gift) {
 			return recipient->isSelf()
-				? tr::lng_action_gift_self_subtitle(tr::now)
+				? tr::lng_action_gift_self_subtitle(tr::now, Text::Bold)
 				: tr::lng_action_gift_got_subtitle(
 					tr::now,
 					lt_user,
-					recipient->session().user()->shortName());
+					TextWithEntities()
+						.append(Text::SingleCustomEmoji(
+							recipient->owner().customEmojiManager(
+								).peerUserpicEmojiData(
+									recipient->session().user())))
+						.append(' ')
+						.append(recipient->session().user()->shortName()),
+					Text::Bold);
 		});
 		auto textFallback = v::match(descriptor, [&](GiftTypePremium gift) {
 			return tr::lng_action_gift_premium_about(
@@ -298,15 +306,20 @@ auto GenerateGiftMedia(
 		auto description = data.text.empty()
 			? std::move(textFallback)
 			: data.text;
-		pushText(Text::Bold(title), st::giftBoxPreviewTitlePadding);
+		const auto context = Core::MarkedTextContext{
+			.session = &parent->history()->session(),
+			.customEmojiRepaint = [parent] { parent->repaint(); },
+		};
+		pushText(
+			std::move(title),
+			st::giftBoxPreviewTitlePadding,
+			{},
+			context);
 		pushText(
 			std::move(description),
 			st::giftBoxPreviewTextPadding,
 			{},
-			Core::MarkedTextContext{
-				.session = &parent->history()->session(),
-				.customEmojiRepaint = [parent] { parent->repaint(); },
-			});
+			context);
 
 		push(HistoryView::MakeGenericButtonPart(
 			(data.upgraded
@@ -2358,7 +2371,7 @@ void ShowUniqueGiftWearBox(
 				object_ptr<Ui::FlatLabel>(
 					raw,
 					std::move(text),
-					st.infoAbout ? *st.infoAbout : st::boxDividerLabel),
+					st.infoAbout ? *st.infoAbout : st::upgradeGiftSubtext),
 				st::settingsPremiumRowAboutPadding);
 			object_ptr<Info::Profile::FloatingIcon>(
 				raw,
@@ -2590,7 +2603,7 @@ void UpgradeBox(
 			object_ptr<Ui::FlatLabel>(
 				raw,
 				std::move(text),
-				st::boxDividerLabel),
+				st::upgradeGiftSubtext),
 			st::settingsPremiumRowAboutPadding);
 		object_ptr<Info::Profile::FloatingIcon>(
 			raw,

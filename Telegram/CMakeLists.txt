@@ -963,6 +963,7 @@ PRIVATE
     info/global_media/info_global_media_inner_widget.h
     info/global_media/info_global_media_provider.cpp
     info/global_media/info_global_media_provider.h
+    info/media/info_media_buttons.cpp
     info/media/info_media_buttons.h
     info/media/info_media_common.cpp
     info/media/info_media_common.h
@@ -1209,6 +1210,8 @@ PRIVATE
     media/streaming/media_streaming_video_track.h
     media/view/media_view_group_thumbs.cpp
     media/view/media_view_group_thumbs.h
+    media/view/media_view_open_common.cpp
+    media/view/media_view_open_common.h
     media/view/media_view_overlay_opengl.cpp
     media/view/media_view_overlay_opengl.h
     media/view/media_view_overlay_raster.cpp
@@ -1227,7 +1230,6 @@ PRIVATE
     media/view/media_view_playback_controls.h
     media/view/media_view_playback_progress.cpp
     media/view/media_view_playback_progress.h
-    media/view/media_view_open_common.h
     media/system_media_controls_manager.h
     media/system_media_controls_manager.cpp
     menu/menu_antispam_validator.cpp
@@ -1479,6 +1481,8 @@ PRIVATE
     settings/settings_privacy_security.h
     settings/settings_scale_preview.cpp
     settings/settings_scale_preview.h
+    settings/settings_shortcuts.cpp
+    settings/settings_shortcuts.h
     settings/settings_type.h
     settings/settings_websites.cpp
     settings/settings_websites.h

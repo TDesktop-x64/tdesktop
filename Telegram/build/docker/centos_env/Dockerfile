@@ -1,7 +1,8 @@
 {%- set GIT = "https://github.com" -%}
 {%- set GIT_FREEDESKTOP = GIT ~ "/gitlab-freedesktop-mirrors" -%}
 {%- set GIT_UPDATE_M4 = "git submodule set-url m4 https://gitlab.freedesktop.org/xorg/util/xcb-util-m4 && git config -f .gitmodules submodule.m4.shallow true && git submodule init && git submodule update" -%}
-{%- set QT = "6.8.1" -%}
+{%- set TOOLSET = "gcc-toolset-12" -%}
+{%- set QT = "6.8.2" -%}
 {%- set QT_TAG = "v" ~ QT -%}
 {%- set CFLAGS_DEBUG = "$CFLAGS -O0 -fno-lto -U_FORTIFY_SOURCE" -%}
 {%- set LibrariesPath = "/usr/src/Libraries" -%}
@@ -10,28 +11,29 @@
 
 FROM rockylinux:8 AS builder
 ENV LANG C.UTF-8
-ENV LIBRARY_PATH /usr/local/lib64:/usr/local/lib:/lib64:/lib:/usr/lib64:/usr/lib
+ENV PATH /opt/rh/{{ TOOLSET }}/root/usr/bin:$PATH
+ENV LIBRARY_PATH /opt/rh/{{ TOOLSET }}/root/usr/lib64:/opt/rh/{{ TOOLSET }}/root/usr/lib:/usr/local/lib64:/usr/local/lib:/lib64:/lib:/usr/lib64:/usr/lib
 ENV LD_LIBRARY_PATH $LIBRARY_PATH
-ENV PKG_CONFIG_PATH /usr/local/lib64/pkgconfig:/usr/local/lib/pkgconfig:/usr/local/share/pkgconfig
+ENV PKG_CONFIG_PATH /opt/rh/{{ TOOLSET }}/root/usr/lib64/pkgconfig:/opt/rh/{{ TOOLSET }}/root/usr/lib/pkgconfig:/usr/local/lib64/pkgconfig:/usr/local/lib/pkgconfig:/usr/local/share/pkgconfig
 
 RUN dnf -y install epel-release \
 	&& dnf config-manager --set-enabled powertools \
 	&& dnf -y install cmake autoconf automake libtool pkgconfig make patch git \
-		python3.11-pip python3.11-devel gperf flex bison clang lld nasm yasm \
-		file which perl-open perl-XML-Parser perl-IPC-Cmd xorg-x11-util-macros \
-		gcc-toolset-12-gcc gcc-toolset-12-gcc-c++ gcc-toolset-12-binutils \
-		gcc-toolset-12-libasan-devel libffi-devel fontconfig-devel freetype-devel \
-		libX11-devel alsa-lib-devel pulseaudio-libs-devel mesa-libGL-devel \
-		mesa-libEGL-devel mesa-libgbm-devel libdrm-devel vulkan-devel libva-devel \
-		libvdpau-devel glib2-devel at-spi2-core-devel gtk3-devel boost1.78-devel fmt-devel \
+		python3.11-pip python3.11-devel gperf flex bison clang clang-tools-extra \
+		lld nasm yasm file which perl-open perl-XML-Parser perl-IPC-Cmd \
+		xorg-x11-util-macros {{ TOOLSET }}-gcc {{ TOOLSET }}-gcc-c++ \
+		{{ TOOLSET }}-binutils {{ TOOLSET }}-gdb {{ TOOLSET }}-libasan-devel \
+		libffi-devel fontconfig-devel freetype-devel libX11-devel wayland-devel \
+		alsa-lib-devel pulseaudio-libs-devel mesa-libGL-devel mesa-libEGL-devel \
+		mesa-libgbm-devel libdrm-devel vulkan-devel libva-devel libvdpau-devel \
+		glib2-devel at-spi2-core-devel gtk3-devel boost1.78-devel fmt-devel \
 	&& dnf clean all
 
-SHELL [ "bash", "-c", ". /opt/rh/gcc-toolset-12/enable; exec bash -c \"$@\"", "-s"]
+RUN python3 -m pip install meson ninja
+RUN echo set debuginfod enabled on > /opt/rh/{{ TOOLSET }}/root/etc/gdbinit.d/00-debuginfod.gdb
+RUN adduser user
 
 WORKDIR {{ LibrariesPath }}
-
-RUN python3 -m pip install meson ninja
-
 ENV AR gcc-ar
 ENV RANLIB gcc-ranlib
 ENV NM gcc-nm
@@ -42,7 +44,7 @@ FROM builder AS patches
 RUN git init patches \
 	&& cd patches \
 	&& git remote add origin {{ GIT }}/desktop-app/patches.git \
-	&& git fetch --depth=1 origin 140cd1837ed200946d6248e9f4cada52452178c1 \
+	&& git fetch --depth=1 origin 61bbacab28d377d0a2771cc87e008554e2f23ffb \
 	&& git reset --hard FETCH_HEAD \
 	&& rm -rf .git
 
@@ -460,8 +462,10 @@ RUN git clone -b 1.19.0 --depth=1 {{ GIT_FREEDESKTOP }}/wayland.git \
 		-Ddocumentation=false \
 		-Ddtd_validation=false \
 		-Dicon_directory=/usr/share/icons \
-	&& meson compile -C build \
-	&& DESTDIR="{{ LibrariesPath }}/wayland-cache" meson install -C build \
+	&& meson compile -C build src/wayland-scanner \
+	&& mkdir -p "{{ LibrariesPath }}/wayland-cache/usr/local/bin" "{{ LibrariesPath }}/wayland-cache/usr/local/lib64/pkgconfig" \
+	&& cp build/src/wayland-scanner "{{ LibrariesPath }}/wayland-cache/usr/local/bin" \
+	&& sed 's@bindir=${prefix}/bin@bindir=${prefix}/local/bin@;s/1.21.0/1.19.0/' /usr/lib64/pkgconfig/wayland-scanner.pc > "{{ LibrariesPath }}/wayland-cache/usr/local/lib64/pkgconfig/wayland-scanner.pc" \
 	&& cd .. \
 	&& rm -rf wayland
 
@@ -868,6 +872,6 @@ ENV QT {{ QT }}
 ENV BOOST_INCLUDEDIR /usr/include/boost1.78
 ENV BOOST_LIBRARYDIR /usr/lib64/boost1.78
 
+USER user
 VOLUME [ "/usr/src/tdesktop" ]
-ENTRYPOINT [ "scl", "enable", "gcc-toolset-12", "--" ]
 CMD [ "/usr/src/tdesktop/Telegram/build/docker/centos_env/build.sh" ]

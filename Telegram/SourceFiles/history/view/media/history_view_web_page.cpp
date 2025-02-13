@@ -76,15 +76,11 @@ constexpr auto kSponsoredUserpicLines = 2;
 	const auto spoiler = false;
 	for (const auto &item : data.items) {
 		if (const auto document = std::get_if<DocumentData*>(&item)) {
-			const auto hasQualitiesList = false;
-			const auto skipPremiumEffect = false;
-			result.push_back(std::make_unique<Data::MediaFile>(
-				parent,
-				*document,
-				skipPremiumEffect,
-				hasQualitiesList,
-				spoiler,
-				/*ttlSeconds = */0));
+			using MediaFile = Data::MediaFile;
+			using Args = MediaFile::Args;
+			const auto data = *document;
+			result.push_back(
+				std::make_unique<Data::MediaFile>(parent, data, Args{}));
 		} else if (const auto photo = std::get_if<PhotoData*>(&item)) {
 			result.push_back(std::make_unique<Data::MediaPhoto>(
 				parent,
@@ -313,12 +309,12 @@ void WebPage::setupAdditionalData() {
 			UrlClickHandler::Open(link);
 		});
 		if (!_attach) {
-			const auto maybePhoto = details.mediaPhotoId
-				? session->data().photo(details.mediaPhotoId).get()
-				: nullptr;
 			const auto maybeDocument = details.mediaDocumentId
 				? session->data().document(
 					details.mediaDocumentId).get()
+				: nullptr;
+			const auto maybePhoto = (!maybeDocument && details.mediaPhotoId)
+				? session->data().photo(details.mediaPhotoId).get()
 				: nullptr;
 			_attach = CreateAttach(
 				_parent,
@@ -524,7 +520,9 @@ QSize WebPage::countOptimalSize() {
 		_attach = CreateAttach(
 			_parent,
 			_data->document,
-			_data->photo,
+			((!_data->document || _data->photoIsVideoCover)
+				? _data->photo
+				: nullptr),
 			_collage,
 			_data->url);
 	}

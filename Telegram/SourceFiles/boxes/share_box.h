@@ -105,6 +105,7 @@ public:
 		std::shared_ptr<Ui::Show> show,
 		not_null<History*> history,
 		MessageIdsList msgIds,
+		std::optional<TimeId> videoTimestamp = {},
 		bool no_quote = false,
 		FnMut<void()>&& successCallback = nullptr);
 
@@ -115,8 +116,10 @@ public:
 		FilterCallback filterCallback;
 		object_ptr<Ui::RpWidget> bottomWidget = { nullptr };
 		rpl::producer<QString> copyLinkText;
+		rpl::producer<QString> titleOverride;
 		ShareBoxStyleOverrides st;
 		rpl::producer<QString> title;
+		std::optional<TimeId> videoTimestamp;
 		struct {
 			int sendersCount = 0;
 			int captionsCount = 0;

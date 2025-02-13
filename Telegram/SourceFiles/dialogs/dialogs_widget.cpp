@@ -1250,6 +1250,7 @@ void Widget::setupShortcuts() {
 			});
 			request->check(Command::ShowChatMenu, 1) && request->handle([=] {
 				if (_inner) {
+					Window::ActivateWindow(controller());
 					_inner->showPeerMenu();
 				}
 				return true;

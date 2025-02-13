@@ -49,6 +49,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_chat_filters.h"
 #include "data/data_replies_list.h"
 #include "data/data_peer_values.h"
+#include "data/data_web_page.h"
 #include "passport/passport_form_controller.h"
 #include "chat_helpers/tabbed_selector.h"
 #include "chat_helpers/emoji_interactions.h"
@@ -88,6 +89,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "support/support_helper.h"
 #include "storage/file_upload.h"
 #include "storage/download_manager_mtproto.h"
+#include "storage/storage_account.h"
 #include "window/themes/window_theme.h"
 #include "window/window_peer_menu.h"
 #include "window/window_session_controller_link_info.h"
@@ -754,6 +756,7 @@ void SessionNavigation::showPeerByLinkResolved(
 			});
 		} else {
 			const auto draft = info.text;
+			params.videoTimestamp = info.videoTimestamp;
 			crl::on_main(this, [=] {
 				if (peer->isUser() && !draft.isEmpty()) {
 					Data::SetChatLinkDraft(peer, { draft });
@@ -1189,6 +1192,40 @@ void SessionNavigation::showByInitialId(
 	case SeparateType::Chat:
 		showThread(id.thread, msgId, instant);
 		break;
+	case SeparateType::SharedMedia: {
+		Assert(id.sharedMedia != SeparateSharedMediaType::None);
+		clearSectionStack(instant);
+		const auto type = (id.sharedMedia == SeparateSharedMediaType::Photos)
+			? Storage::SharedMediaType::Photo
+			: (id.sharedMedia == SeparateSharedMediaType::Videos)
+			? Storage::SharedMediaType::Video
+			: (id.sharedMedia == SeparateSharedMediaType::Files)
+			? Storage::SharedMediaType::File
+			: (id.sharedMedia == SeparateSharedMediaType::Audio)
+			? Storage::SharedMediaType::MusicFile
+			: (id.sharedMedia == SeparateSharedMediaType::Links)
+			? Storage::SharedMediaType::Link
+			: (id.sharedMedia == SeparateSharedMediaType::Voices)
+			? Storage::SharedMediaType::RoundVoiceFile
+			: (id.sharedMedia == SeparateSharedMediaType::GIF)
+			? Storage::SharedMediaType::GIF
+			: Storage::SharedMediaType::Photo;
+		const auto topicRootId = id.sharedMediaTopicRootId();
+		const auto peer = id.sharedMediaPeer();
+		const auto topic = topicRootId
+			? peer->forumTopicFor(topicRootId)
+			: nullptr;
+		if (topicRootId && !topic) {
+			break;
+		}
+		showSection(
+			topicRootId
+				? std::make_shared<Info::Memento>(topic, type)
+				: std::make_shared<Info::Memento>(peer, type),
+			instant);
+		parent->widget()->setMaximumWidth(st::maxWidthSharedMediaWindow);
+		break;
+	}
 	case SeparateType::SavedSublist:
 		showSection(
 			std::make_shared<HistoryView::SublistMemento>(id.sublist()),
@@ -1813,6 +1850,9 @@ const rpl::variable<Data::Forum*> &SessionController::shownForum() const {
 }
 
 void SessionController::setActiveChatEntry(Dialogs::RowDescriptor row) {
+	if (windowId().type == SeparateType::SharedMedia) {
+		return;
+	}
 	const auto was = _activeChatEntry.current().key.history();
 	const auto now = row.key.history();
 	if (was && was != now) {
@@ -2777,16 +2817,30 @@ void SessionController::openDocument(
 		not_null<DocumentData*> document,
 		bool showInMediaView,
 		MessageContext message,
-		const Data::StoriesContext *stories) {
+		const Data::StoriesContext *stories,
+		std::optional<TimeId> videoTimestampOverride) {
 	const auto item = session().data().message(message.id);
 	if (openSharedStory(item) || openFakeItemStory(message.id, stories)) {
 		return;
 	} else if (showInMediaView) {
-		_window->openInMediaView(Media::View::OpenRequest(
+		using namespace Media::View;
+		const auto saved = session().local().mediaLastPlaybackPosition(
+			document->id);
+		const auto timestamp = item ? ExtractVideoTimestamp(item) : 0;
+		const auto usedTimestamp = videoTimestampOverride
+			? ((*videoTimestampOverride) * crl::time(1000))
+			: saved
+			? saved
+			: timestamp
+			? (timestamp * crl::time(1000))
+			: crl::time();
+		_window->openInMediaView(OpenRequest(
 			this,
 			document,
 			item,
-			message.topicRootId));
+			message.topicRootId,
+			false,
+			usedTimestamp));
 		return;
 	}
 	Data::ResolveDocument(this, document, item, message.topicRootId);

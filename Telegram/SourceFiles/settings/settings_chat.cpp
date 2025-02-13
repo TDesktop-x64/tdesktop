@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/settings_advanced.h"
 #include "settings/settings_privacy_security.h"
 #include "settings/settings_experimental.h"
+#include "settings/settings_shortcuts.h"
 #include "boxes/abstract_box.h"
 #include "boxes/peers/edit_peer_color_box.h"
 #include "boxes/connection_box.h"
@@ -1003,13 +1004,23 @@ void SetupMessages(
 		Core::App().saveSettingsDelayed();
 	}, inner->lifetime());
 
-	Ui::AddSkip(inner, st::settingsCheckboxesSkip);
+	Ui::AddSkip(inner);
 }
 
 void SetupArchive(
 		not_null<Window::SessionController*> controller,
-		not_null<Ui::VerticalLayout*> container) {
+		not_null<Ui::VerticalLayout*> container,
+		Fn<void(Type)> showOther) {
 	Ui::AddSkip(container);
+
+	AddButtonWithIcon(
+		container,
+		tr::lng_settings_shortcuts(),
+		st::settingsButton,
+		{ &st::menuIconShortcut }
+	)->addClickHandler([=] {
+		showOther(Shortcuts::Id());
+	});
 
 	PreloadArchiveSettings(&controller->session());
 	AddButtonWithIcon(
@@ -1796,7 +1807,7 @@ void Chat::setupContent(not_null<Window::SessionController*> controller) {
 	SetupMessages(controller, content);
 	Ui::AddDivider(content);
 	SetupSensitiveContent(controller, content, std::move(updateOnTick));
-	SetupArchive(controller, content);
+	SetupArchive(controller, content, showOtherMethod());
 
 	Ui::ResizeFitChild(this, content);
 }

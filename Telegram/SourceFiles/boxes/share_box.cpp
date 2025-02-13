@@ -1497,6 +1497,7 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 		std::shared_ptr<Ui::Show> show,
 		not_null<History*> history,
 		MessageIdsList msgIds,
+		std::optional<TimeId> videoTimestamp,
 		bool no_quote,
 		FnMut<void()>&& successCallback) {
 	struct State final {
@@ -1542,6 +1543,9 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 					: Flag(0))
 				| ((forwardOptions == Data::ForwardOptions::NoNamesAndCaptions)
 					? Flag::f_drop_media_captions
+				: Flag(0))
+			| (videoTimestamp.has_value()
+				? Flag::f_video_timestamp
 					: Flag(0));
 		}
 
@@ -1601,7 +1605,7 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 						MTP_int(options.scheduled),
 						MTP_inputPeerEmpty(), // send_as
 						Data::ShortcutIdToMTP(session, options.shortcutId),
-						MTPint() // video_timestamp
+						MTP_int(videoTimestamp.value_or(0))
 				)).done([=](const MTPUpdates &updates, mtpRequestId reqId) {
 					threadHistory->session().api().applyUpdates(updates);
 					state->requests.remove(reqId);

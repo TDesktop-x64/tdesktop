@@ -44,6 +44,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "dialogs/ui/dialogs_message_view.h"
 #include "history/history.h"
 #include "history/history_item.h"
+#include "history/history_item_components.h"
 #include "history/history_item_helpers.h"
 #include "history/view/history_view_item_preview.h"
 #include "info/bot/earn/info_bot_earn_widget.h"
@@ -69,6 +70,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/boxes/peer_qr_box.h"
 #include "ui/boxes/report_box_graphics.h"
 #include "ui/controls/userpic_button.h"
+#include "ui/effects/toggle_arrow.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
 #include "ui/ui_utility.h"
@@ -93,6 +95,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_settings.h" // settingsButtonRightSkip.
+#include "styles/style_window.h" // mainMenuToggleFourStrokes.
 
 #include <QtGui/QGuiApplication>
 #include <QtGui/QClipboard>
@@ -519,6 +522,8 @@ base::options::toggle ShowPeerIdBelowAbout({
 			dayHoursTextValue(state->day.value())
 		) | rpl::after_next(recount),
 		st::infoHoursValue);
+	const auto timingArrow = Ui::CreateChild<Ui::RpWidget>(openedWrap);
+	timingArrow->resize(Size(timing->st().style.font->height));
 	timing->setAttribute(Qt::WA_TransparentForMouseEvents);
 	state->opened.value() | rpl::start_with_next([=](bool value) {
 		opened->setTextColorOverride(value
@@ -532,7 +537,8 @@ base::options::toggle ShowPeerIdBelowAbout({
 		timing->sizeValue()
 	) | rpl::start_with_next([=](int width, int h1, QSize size) {
 		opened->moveToLeft(0, 0, width);
-		timing->moveToRight(0, 0, width);
+		timingArrow->moveToRight(0, 0, width);
+		timing->moveToRight(timingArrow->width(), 0, width);
 
 		const auto margins = opened->getMargins();
 		const auto added = margins.top() + margins.bottom();
@@ -545,10 +551,7 @@ base::options::toggle ShowPeerIdBelowAbout({
 		tr::lng_info_hours_label(),
 		st::infoLabel);
 	label->setAttribute(Qt::WA_TransparentForMouseEvents);
-	const auto link = Ui::CreateChild<Ui::LinkButton>(
-		labelWrap,
-		QString());
-	rpl::combine(
+	auto linkText = rpl::combine(
 		state->nonTrivial.value(),
 		state->hours.value(),
 		state->mine.value(),
@@ -563,10 +566,12 @@ base::options::toggle ShowPeerIdBelowAbout({
 			: my
 			? tr::lng_info_hours_my_time()
 			: tr::lng_info_hours_local_time();
-	}) | rpl::flatten_latest(
-	) | rpl::start_with_next([=](const QString &text) {
-		link->setText(text);
-	}, link->lifetime());
+	}) | rpl::flatten_latest();
+	const auto link = Ui::CreateChild<Ui::RoundButton>(
+		labelWrap,
+		std::move(linkText),
+		st::defaultTableSmallButton);
+	link->setTextTransform(Ui::RoundButton::TextTransform::NoTransform);
 	link->setClickedCallback([=] {
 		state->myTimezone = !state->myTimezone.current();
 		state->expanded = true;
@@ -590,6 +595,38 @@ base::options::toggle ShowPeerIdBelowAbout({
 			inner,
 			object_ptr<Ui::VerticalLayout>(inner)));
 	other->toggleOn(state->expanded.value(), anim::type::normal);
+	constexpr auto kSlideDuration = float64(st::slideWrapDuration);
+	other->setDuration(kSlideDuration);
+	{
+		const auto arrowAnimation
+			= other->lifetime().make_state<Ui::Animations::Basic>();
+		arrowAnimation->init([=] {
+			timingArrow->update();
+			if (!other->animating()) {
+				arrowAnimation->stop();
+			}
+		});
+		timingArrow->paintRequest() | rpl::start_with_next([=] {
+			auto p = QPainter(timingArrow);
+			const auto progress = other->animating()
+				? (crl::now() - arrowAnimation->started()) / kSlideDuration
+				: 1.;
+
+			const auto path = Ui::ToggleUpDownArrowPath(
+				timingArrow->width() / 2,
+				timingArrow->height() / 2,
+				st::infoHoursArrowSize,
+				st::mainMenuToggleFourStrokes,
+				other->toggled() ? progress : 1 - progress);
+
+			auto hq = PainterHighQualityEnabler(p);
+			p.fillPath(path, timing->st().textFg);
+		}, timingArrow->lifetime());
+		state->expanded.value() | rpl::start_with_next([=] {
+			arrowAnimation->start();
+		}, other->lifetime());
+	}
+
 	other->finishAnimating();
 	const auto days = other->entity();
 
@@ -1628,6 +1665,10 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupPersonalChannel(
 				&& user->personalChannelMessageId();
 		}));
 		messageChannelWrap->finishAnimating();
+		messageChannelWrap->toggledValue(
+		) | rpl::filter(rpl::mappers::_1) | rpl::start_with_next([=] {
+			messageChannelWrap->resizeToWidth(messageChannelWrap->width());
+		}, messageChannelWrap->lifetime());
 
 		const auto clear = [=] {
 			while (messageChannelWrap->entity()->count()) {
@@ -1724,12 +1765,12 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupPersonalChannel(
 				}
 			}, preview->lifetime());
 
-			line->sizeValue(
+			line->sizeValue() | rpl::filter_size(
 			) | rpl::start_with_next([=](const QSize &size) {
 				const auto left = stLabeled.left();
 				const auto right = st::infoPersonalChannelDateSkip;
 				const auto top = stLabeled.top();
-				date->moveToRight(right, top);
+				date->moveToRight(right, top, size.width());
 
 				name->resizeToWidth(size.width()
 					- left
@@ -1760,14 +1801,9 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupPersonalChannel(
 						st::infoProfileLabeledPadding.bottom()));
 			}
 			{
-				const auto button = Ui::CreateChild<Ui::RippleButton>(
+				const auto button = Ui::CreateSimpleRectButton(
 					messageChannelWrap->entity(),
 					st::defaultRippleAnimation);
-				button->paintRequest(
-				) | rpl::start_with_next([=](const QRect &rect) {
-					auto p = QPainter(button);
-					button->paintRipple(p, 0, 0);
-				}, button->lifetime());
 				inner->geometryValue(
 				) | rpl::start_with_next([=](const QRect &rect) {
 					button->setGeometry(rect);
@@ -1779,6 +1815,8 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupPersonalChannel(
 						msg);
 				});
 				button->lower();
+				inner->lifetime().make_state<base::unique_qptr<Ui::RpWidget>>(
+					button);
 			}
 			inner->setAttribute(Qt::WA_TransparentForMouseEvents);
 			Ui::AddSkip(messageChannelWrap->entity());
@@ -2344,7 +2382,7 @@ void ActionsFiller::addDeleteContactAction(not_null<UserData*> user) {
 void ActionsFiller::addFastButtonsMode(not_null<UserData*> user) {
 	Expects(user->isBot());
 
-	const auto helper = &user->session().supportHelper();
+	const auto bots = &user->session().fastButtonsBots();
 	const auto button = _wrap->add(object_ptr<Ui::SettingsButton>(
 		_wrap,
 		rpl::single(u"Fast buttons mode"_q),
@@ -2358,17 +2396,17 @@ void ActionsFiller::addFastButtonsMode(not_null<UserData*> user) {
 	AddDivider(_wrap);
 	AddSkip(_wrap);
 
-	button->toggleOn(helper->fastButtonModeValue(user));
+	button->toggleOn(bots->enabledValue(user));
 	button->toggledValue(
 	) | rpl::filter([=](bool value) {
-		return value != helper->fastButtonMode(user);
+		return value != bots->enabled(user);
 	}) | rpl::start_with_next([=](bool value) {
-		helper->setFastButtonMode(user, value);
+		bots->setEnabled(user, value);
 	}, button->lifetime());
 }
 
 void ActionsFiller::addBotCommandActions(not_null<UserData*> user) {
-	if (user->session().supportMode()) {
+	if (FastButtonsMode()) {
 		addFastButtonsMode(user);
 	}
 	const auto window = _controller->parentController();

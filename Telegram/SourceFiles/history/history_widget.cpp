@@ -22,6 +22,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/moderate_messages_box.h"
 #include "boxes/premium_limits_box.h"
 #include "boxes/premium_preview_box.h"
+#include "boxes/star_gift_box.h"
 #include "boxes/peers/edit_peer_permissions_box.h" // ShowAboutGigagroup.
 #include "boxes/peers/edit_peer_requests_box.h"
 #include "core/file_utilities.h"
@@ -384,6 +385,7 @@ HistoryWidget::HistoryWidget(
 	_joinChannel->addClickHandler([=] { joinChannel(); });
 	_muteUnmute->addClickHandler([=] { toggleMuteUnmute(); });
 	_discuss->addClickHandler([=] { goToDiscussionGroup(); });
+	setupGiftToChannelButton();
 	_reportMessages->addClickHandler([=] { reportSelectedMessages(); });
 	_field->submits(
 	) | rpl::start_with_next([=](Qt::KeyboardModifiers modifiers) {
@@ -2033,6 +2035,7 @@ void HistoryWidget::setupShortcuts() {
 			return true;
 		});
 		request->check(Command::ShowChatMenu, 1) && request->handle([=] {
+			Window::ActivateWindow(controller());
 			_topBar->showPeerMenu();
 			return true;
 		});
@@ -2053,6 +2056,20 @@ void HistoryWidget::setupShortcuts() {
 			});
 		}
 	}, lifetime());
+}
+
+void HistoryWidget::setupGiftToChannelButton() {
+	_giftToChannel = Ui::CreateChild<Ui::IconButton>(
+		_muteUnmute.data(),
+		st::historyGiftToChannel);
+	_muteUnmute->widthValue() | rpl::start_with_next([=](int width) {
+		_giftToChannel->moveToRight(0, 0);
+	}, _giftToChannel->lifetime());
+	_giftToChannel->setClickedCallback([=] {
+		if (_peer) {
+			Ui::ShowStarGiftBox(controller(), _peer);
+		}
+	});
 }
 
 void HistoryWidget::pushReplyReturn(not_null<HistoryItem*> item) {
@@ -2213,15 +2230,12 @@ bool HistoryWidget::insideJumpToEndInsteadOfToUnread() const {
 }
 
 void HistoryWidget::showHistory(
-		const PeerId &peerId,
+		PeerId peerId,
 		MsgId showAtMsgId,
-		const TextWithEntities &highlightPart,
-		int highlightPartOffsetHint) {
-
+		const Window::SectionShow &params) {
 	_pinnedClickedId = FullMsgId();
 	_minPinnedId = std::nullopt;
-	_showAtMsgHighlightPart = {};
-	_showAtMsgHighlightPartOffsetHint = 0;
+	_showAtMsgParams = {};
 
 	const auto wasState = controller()->dialogsEntryStateCurrent();
 	const auto startBot = (showAtMsgId == ShowAndStartBotMsgId);
@@ -2271,16 +2285,10 @@ void HistoryWidget::showHistory(
 						).arg(_history->inboxReadTillId().bare
 						).arg(Logs::b(_history->loadedAtBottom())
 						).arg(showAtMsgId.bare));
-					delayedShowAt(
-						showAtMsgId,
-						highlightPart,
-						highlightPartOffsetHint);
+					delayedShowAt(showAtMsgId, params);
 				} else if (_showAtMsgId != showAtMsgId) {
 					clearAllLoadRequests();
-					setMsgId(
-						showAtMsgId,
-						highlightPart,
-						highlightPartOffsetHint);
+					setMsgId(showAtMsgId, params);
 					firstLoadMessages();
 					doneShow();
 				}
@@ -2300,10 +2308,7 @@ void HistoryWidget::showHistory(
 					_cornerButtons.skipReplyReturn(skipId);
 				}
 
-				setMsgId(
-					showAtMsgId,
-					highlightPart,
-					highlightPartOffsetHint);
+				setMsgId(showAtMsgId, params);
 				if (_historyInited) {
 					DEBUG_LOG(("JumpToEnd(%1, %2, %3): "
 						"Showing instant at %4."
@@ -2408,8 +2413,7 @@ void HistoryWidget::showHistory(
 	clearInlineBot();
 
 	_showAtMsgId = showAtMsgId;
-	_showAtMsgHighlightPart = highlightPart;
-	_showAtMsgHighlightPartOffsetHint = highlightPartOffsetHint;
+	_showAtMsgParams = params;
 	_historyInited = false;
 	_contactStatus = nullptr;
 	_businessBotStatus = nullptr;
@@ -2437,6 +2441,8 @@ void HistoryWidget::showHistory(
 			) | rpl::start_with_next([=] {
 				updateControlsGeometry();
 			}, _businessBotStatus->bar().lifetime());
+		} else if (const auto channel = _peer->asChannel()) {
+			_giftToChannel->setVisible(channel->stargiftsAvailable());
 		}
 		orderWidgets();
 		controller()->tabbedSelector()->setCurrentPeer(_peer);
@@ -2915,14 +2921,12 @@ void HistoryWidget::refreshSilentToggle() {
 }
 
 void HistoryWidget::setupFastButtonMode() {
-	if (!session().supportMode()) {
-		return;
-	}
 	const auto field = _field->rawTextEdit();
 	base::install_event_filter(field, [=](not_null<QEvent*> e) {
 		if (e->type() != QEvent::KeyPress
 			|| !_history
-			|| !session().supportHelper().fastButtonMode(_history->peer)
+			|| !FastButtonsMode()
+			|| !session().fastButtonsBots().enabled(_history->peer)
 			|| !_field->getLastText().isEmpty()) {
 			return base::EventFilterResult::Continue;
 		}
@@ -2939,7 +2943,6 @@ void HistoryWidget::setupFastButtonMode() {
 		if (!link) {
 			return base::EventFilterResult::Continue;
 		}
-		const auto id = item->fullId();
 		ActivateClickHandler(window(), link, {
 			Qt::LeftButton,
 			QVariant::fromValue(ClickHandlerContext{
@@ -3676,10 +3679,7 @@ void HistoryWidget::messagesReceived(
 		}
 
 		_delayedShowAtRequest = 0;
-		setMsgId(
-			_delayedShowAtMsgId,
-			_delayedShowAtMsgHighlightPart,
-			_delayedShowAtMsgHighlightPartOffsetHint);
+		setMsgId(_delayedShowAtMsgId, _delayedShowAtMsgParams);
 		historyLoaded();
 	}
 	if (session().supportMode()) {
@@ -3931,15 +3931,11 @@ void HistoryWidget::loadMessagesDown() {
 
 void HistoryWidget::delayedShowAt(
 		MsgId showAtMsgId,
-		const TextWithEntities &highlightPart,
-		int highlightPartOffsetHint) {
+		const Window::SectionShow &params) {
 	if (!_history) {
 		return;
 	}
-	if (_delayedShowAtMsgHighlightPart != highlightPart) {
-		_delayedShowAtMsgHighlightPart = highlightPart;
-	}
-	_delayedShowAtMsgHighlightPartOffsetHint = highlightPartOffsetHint;
+	_delayedShowAtMsgParams = params;
 	if (_delayedShowAtRequest && _delayedShowAtMsgId == showAtMsgId) {
 		return;
 	}
@@ -4074,7 +4070,10 @@ void HistoryWidget::preloadHistoryIfNeeded() {
 		preloadHistoryByScroll();
 		checkReplyReturns();
 	}
-	if (clearMaybeSendStart() && !_history->isDisplayedEmpty()) {
+	const auto hasNonEmpty = _history->findFirstNonEmpty();
+	const auto readyForBotStart = hasNonEmpty
+		|| (_history->loadedAtTop() && _history->loadedAtBottom());
+	if (readyForBotStart && clearMaybeSendStart() && hasNonEmpty) {
 		sendBotStartCommand();
 	}
 }
@@ -4586,12 +4585,8 @@ PeerData *HistoryWidget::peer() const {
 // Sometimes _showAtMsgId is set directly.
 void HistoryWidget::setMsgId(
 		MsgId showAtMsgId,
-		const TextWithEntities &highlightPart,
-		int highlightPartOffsetHint) {
-	if (_showAtMsgHighlightPart != highlightPart) {
-		_showAtMsgHighlightPart = highlightPart;
-	}
-	_showAtMsgHighlightPartOffsetHint = highlightPartOffsetHint;
+		const Window::SectionShow &params) {
+	_showAtMsgParams = params;
 	if (_showAtMsgId != showAtMsgId) {
 		_showAtMsgId = showAtMsgId;
 		if (_history) {
@@ -6356,8 +6351,8 @@ int HistoryWidget::countInitialScrollTop() {
 
 			enqueueMessageHighlight({
 				item,
-				base::take(_showAtMsgHighlightPart),
-				base::take(_showAtMsgHighlightPartOffsetHint),
+				base::take(_showAtMsgParams.highlightPart),
+				base::take(_showAtMsgParams.highlightPartOffsetHint),
 			});
 			const auto result = itemTopForHighlight(view);
 			createUnreadBarIfBelowVisibleArea(result);
@@ -6574,6 +6569,22 @@ void HistoryWidget::updateHistoryGeometry(
 	}
 	const auto toY = std::clamp(newScrollTop, 0, _scroll->scrollTopMax());
 	synteticScrollToY(toY);
+	if (initial && _showAtMsgId) {
+		const auto timestamp = base::take(_showAtMsgParams.videoTimestamp);
+		if (timestamp.has_value()) {
+			const auto item = session().data().message(_peer, _showAtMsgId);
+			const auto media = item ? item->media() : nullptr;
+			const auto document = media ? media->document() : nullptr;
+			if (document && document->isVideoFile()) {
+				controller()->openDocument(
+					document,
+					true,
+					{ item->fullId() },
+					nullptr,
+					timestamp);
+			}
+		}
+	}
 }
 
 void HistoryWidget::revealItemsCallback() {
@@ -6675,7 +6686,7 @@ void HistoryWidget::startMessageSendingAnimation(
 void HistoryWidget::updateListSize() {
 	Expects(_list != nullptr);
 
-	_list->recountHistoryGeometry();
+	_list->recountHistoryGeometry(!_historyInited);
 	auto washidden = _scroll->isHidden();
 	if (washidden) {
 		_scroll->show();
@@ -8497,8 +8508,15 @@ void HistoryWidget::fullInfoUpdated() {
 		handlePeerUpdate();
 		checkSuggestToGigagroup();
 
-		if (clearMaybeSendStart() && !_history->isDisplayedEmpty()) {
+		const auto hasNonEmpty = _history->findFirstNonEmpty();
+		const auto readyForBotStart = hasNonEmpty
+			|| (_history->loadedAtTop() && _history->loadedAtBottom());
+		if (readyForBotStart && clearMaybeSendStart() && hasNonEmpty) {
 			sendBotStartCommand();
+		}
+
+		if (const auto channel = _peer->asChannel()) {
+			_giftToChannel->setVisible(channel->stargiftsAvailable());
 		}
 	}
 	if (updateCmdStartShown()) {

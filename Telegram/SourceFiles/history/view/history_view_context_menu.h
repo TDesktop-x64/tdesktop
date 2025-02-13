@@ -60,11 +60,13 @@ base::unique_qptr<Ui::PopupMenu> FillContextMenu(
 void CopyPostLink(
 	not_null<Window::SessionController*> controller,
 	FullMsgId itemId,
-	Context context);
+	Context context,
+	std::optional<TimeId> videoTimestamp = {});
 void CopyPostLink(
 	std::shared_ptr<Main::SessionShow> show,
 	FullMsgId itemId,
-	Context context);
+	Context context,
+	std::optional<TimeId> videoTimestamp = {});
 void ViewAsJSON(
 	not_null<Window::SessionController*> controller,
 	FullMsgId itemId);

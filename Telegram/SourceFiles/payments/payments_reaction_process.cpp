@@ -22,6 +22,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item.h"
 #include "lang/lang_keys.h"
 #include "main/session/session_show.h"
+#include "main/session/send_as_peers.h"
 #include "main/main_app_config.h"
 #include "main/main_session.h"
 #include "payments/ui/payments_reaction_box.h"
@@ -45,7 +46,7 @@ void TryAddingPaidReaction(
 		FullMsgId itemId,
 		base::weak_ptr<HistoryView::Element> weakView,
 		int count,
-		std::optional<bool> anonymous,
+		std::optional<PeerId> shownPeer,
 		std::shared_ptr<Ui::Show> show,
 		Fn<void(bool)> finished) {
 	const auto checkItem = [=] {
@@ -66,7 +67,7 @@ void TryAddingPaidReaction(
 		if (result == Settings::SmallBalanceResult::Success
 			|| result == Settings::SmallBalanceResult::Already) {
 			if (const auto item = checkItem()) {
-				item->addPaidReaction(count, anonymous);
+				item->addPaidReaction(count, shownPeer);
 				if (const auto view = count ? weakView.get() : nullptr) {
 					const auto history = view->history();
 					history->owner().notifyViewPaidReactionSent(view);
@@ -105,7 +106,7 @@ void TryAddingPaidReaction(
 		not_null<HistoryItem*> item,
 		HistoryView::Element *view,
 		int count,
-		std::optional<bool> anonymous,
+		std::optional<PeerId> shownPeer,
 		std::shared_ptr<Ui::Show> show,
 		Fn<void(bool)> finished) {
 	TryAddingPaidReaction(
@@ -113,7 +114,7 @@ void TryAddingPaidReaction(
 		item->fullId(),
 		view,
 		count,
-		anonymous,
+		shownPeer,
 		std::move(show),
 		std::move(finished));
 }
@@ -140,26 +141,26 @@ void ShowPaidReactionDetails(
 
 	struct State {
 		QPointer<Ui::BoxContent> selectBox;
-		bool ignoreAnonymousSwitch = false;
+		bool ignoreShownPeerSwitch = false;
 		bool sending = false;
 	};
 	const auto state = std::make_shared<State>();
 	session->credits().load(true);
 
 	const auto weakView = base::make_weak(view);
-	const auto send = [=](int count, bool anonymous, auto resend) -> void {
+	const auto send = [=](int count, PeerId shownPeer, auto resend) -> void {
 		Expects(count >= 0);
 
 		const auto finish = [=](bool success) {
 			state->sending = false;
 			if (success && count > 0) {
-				state->ignoreAnonymousSwitch = true;
+				state->ignoreShownPeerSwitch = true;
 				if (const auto strong = state->selectBox.data()) {
 					strong->closeBox();
 				}
 			}
 		};
-		if (state->sending || (!count && state->ignoreAnonymousSwitch)) {
+		if (state->sending || (!count && state->ignoreShownPeerSwitch)) {
 			return;
 		} else if (const auto item = session->data().message(itemId)) {
 			state->sending = true;
@@ -167,7 +168,7 @@ void ShowPaidReactionDetails(
 				item,
 				weakView.get(),
 				count,
-				anonymous,
+				shownPeer,
 				show,
 				finish);
 		}
@@ -206,38 +207,49 @@ void ShowPaidReactionDetails(
 			.photo = (peer
 				? Ui::MakeUserpicThumbnail(peer)
 				: Ui::MakeHiddenAuthorThumbnail()),
+			.barePeerId = peer ? uint64(peer->id.value) : 0,
 			.count = int(entry.count),
 			.click = peer ? open : Fn<void()>(),
 			.my = (entry.my == 1),
 		});
 	};
-	const auto topPaid = item->topPaidReactionsWithLocal();
-	top.reserve(topPaid.size() + 2);
-	for (const auto &entry : topPaid) {
-		add(entry);
-		if (entry.my) {
-			auto copy = entry;
-			copy.peer = entry.peer ? nullptr : session->user().get();
-			add(copy);
-		}
-	}
-	if (!ranges::contains(top, true, &Ui::PaidReactionTop::my)) {
-		auto entry = Data::MessageReactionsTopPaid{
-			.peer = session->user(),
-			.count = 0,
-			.my = true,
-		};
-		add(entry);
-		entry.peer = nullptr;
-		add(entry);
-		if (session->api().globalPrivacy().paidReactionAnonymousCurrent()) {
-			std::swap(top.front(), top.back());
-		}
-	}
-	ranges::sort(top, ranges::greater(), &Ui::PaidReactionTop::count);
-
 	const auto linked = item->discussionPostOriginalSender();
 	const auto channel = (linked ? linked : item->history()->peer.get());
+	const auto channels = session->sendAsPeers().paidReactionList(channel);
+	const auto topPaid = item->topPaidReactionsWithLocal();
+	top.reserve(topPaid.size() + 2 + channels.size());
+	for (const auto &entry : topPaid) {
+		add(entry);
+	}
+	auto myAdded = base::flat_set<uint64>();
+	const auto i = ranges::find(top, true, &Ui::PaidReactionTop::my);
+	if (i != end(top)) {
+		myAdded.emplace(i->barePeerId);
+	}
+	const auto myCount = uint32((i != end(top)) ? i->count : 0);
+	const auto myAdd = [&](PeerData *peer) {
+		const auto barePeerId = peer ? uint64(peer->id.value) : 0;
+		if (!myAdded.emplace(barePeerId).second) {
+			return;
+		}
+		add(Data::MessageReactionsTopPaid{
+			.peer = peer,
+			.count = myCount,
+			.my = true,
+		});
+	};
+	const auto globalPrivacy = &session->api().globalPrivacy();
+	const auto shown = globalPrivacy->paidReactionShownPeerCurrent();
+	const auto owner = &session->data();
+	const auto shownPeer = shown ? owner->peer(shown).get() : nullptr;
+	myAdd(shownPeer);
+	myAdd(session->user());
+	myAdd(nullptr);
+	for (const auto &channel : channels) {
+		myAdd(channel);
+	}
+	ranges::stable_sort(top, ranges::greater(), &Ui::PaidReactionTop::count);
+
 	state->selectBox = show->show(Ui::MakePaidReactionBox({
 		.chosen = chosen,
 		.max = max,
@@ -245,8 +257,8 @@ void ShowPaidReactionDetails(
 		.channel = channel->name(),
 		.submit = std::move(submitText),
 		.balanceValue = session->credits().balanceValue(),
-		.send = [=](int count, bool anonymous) {
-			send(count, anonymous, send);
+		.send = [=](int count, uint64 barePeerId) {
+			send(count, PeerId(barePeerId), send);
 		},
 	}));
 

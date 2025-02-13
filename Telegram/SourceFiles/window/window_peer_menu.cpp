@@ -1217,6 +1217,9 @@ void Filler::addThemeEdit() {
 	if (!user || user->isInaccessible()) {
 		return;
 	}
+	if (user->meRequiresPremiumToWrite() && !user->session().premium()) {
+		return;
+	}
 	const auto controller = _controller;
 	_addAction(
 		tr::lng_chat_theme_wallpaper(tr::now),
@@ -1253,6 +1256,7 @@ void Filler::addSendGift() {
 		&& (user->isInaccessible()
 			|| user->isSelf()
 			|| user->isBot()
+			|| user->isServiceUser()
 			|| user->isNotificationsUser()
 			|| user->isRepliesChat()
 			|| user->isVerifyCodes()

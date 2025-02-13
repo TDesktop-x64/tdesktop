@@ -28,6 +28,7 @@ namespace {
 constexpr auto kCountLimit = 256; // How many shortcuts can be in json file.
 
 rpl::event_stream<not_null<Request*>> RequestsStream;
+bool Paused/* = false*/;
 
 const auto AutoRepeatCommands = base::flat_set<Command>{
 	Command::MediaPrevious,
@@ -115,49 +116,15 @@ const auto CommandByName = base::flat_map<QString, Command>{
 	{ u"fast_copy"_q         , Command::FastCopy },
 };
 
-const auto CommandNames = base::flat_map<Command, QString>{
-	{ Command::Close          , u"close_telegram"_q },
-	{ Command::Lock           , u"lock_telegram"_q },
-	{ Command::Minimize       , u"minimize_telegram"_q },
-	{ Command::Quit           , u"quit_telegram"_q },
-	{ Command::GlobalSearch   , qsl("global_search") },
-
-	{ Command::MediaPlay      , u"media_play"_q },
-	{ Command::MediaPause     , u"media_pause"_q },
-	{ Command::MediaPlayPause , u"media_playpause"_q },
-	{ Command::MediaStop      , u"media_stop"_q },
-	{ Command::MediaPrevious  , u"media_previous"_q },
-	{ Command::MediaNext      , u"media_next"_q },
-
-	{ Command::Search         , u"search"_q },
-
-	{ Command::ChatPrevious   , u"previous_chat"_q },
-	{ Command::ChatNext       , u"next_chat"_q },
-	{ Command::ChatFirst      , u"first_chat"_q },
-	{ Command::ChatLast       , u"last_chat"_q },
-	{ Command::ChatSelf       , u"self_chat"_q },
-
-	{ Command::FolderPrevious , u"previous_folder"_q },
-	{ Command::FolderNext     , u"next_folder"_q },
-	{ Command::ShowAllChats   , u"all_chats"_q },
-
-	{ Command::ShowFolder1    , u"folder1"_q },
-	{ Command::ShowFolder2    , u"folder2"_q },
-	{ Command::ShowFolder3    , u"folder3"_q },
-	{ Command::ShowFolder4    , u"folder4"_q },
-	{ Command::ShowFolder5    , u"folder5"_q },
-	{ Command::ShowFolder6    , u"folder6"_q },
-	{ Command::ShowFolderLast , u"last_folder"_q },
-
-	{ Command::ShowArchive    , u"show_archive"_q },
-	{ Command::ShowContacts   , u"show_contacts"_q },
-
-	{ Command::ReadChat       , u"read_chat"_q },
-
-	{ Command::ShowChatMenu   , u"show_chat_menu"_q },
-
-	{ Command::FastForward    , u"fast_forward"_q },
-	{ Command::FastCopy       , u"fast_copy"_q },
+const base::flat_map<Command, QString> &CommandNames() {
+	static const auto result = [&] {
+		auto result = base::flat_map<Command, QString>();
+		for (const auto &[name, command] : CommandByName) {
+			result.emplace(command, name);
+		}
+		return result;
+	}();
+	return result;
 };
 
 [[maybe_unused]] constexpr auto kNoValue = {
@@ -182,19 +149,39 @@ public:
 
 	[[nodiscard]] const QStringList &errors() const;
 
+	[[nodiscard]] auto keysDefaults() const
+		-> base::flat_map<QKeySequence, base::flat_set<Command>>;
+	[[nodiscard]] auto keysCurrents() const
+		-> base::flat_map<QKeySequence, base::flat_set<Command>>;
+
+	void change(
+		QKeySequence was,
+		QKeySequence now,
+		Command command,
+		std::optional<Command> restore);
+	void resetToDefaults();
+
 private:
 	void fillDefaults();
 	void writeDefaultFile();
+	void writeCustomFile();
 	bool readCustomFile();
 
 	void set(const QString &keys, Command command, bool replace = false);
+	void set(const QKeySequence &result, Command command, bool replace);
 	void remove(const QString &keys);
+	void remove(const QKeySequence &keys);
 	void unregister(base::unique_qptr<QAction> shortcut);
+
+	void pruneListened();
 
 	QStringList _errors;
 
 	base::flat_map<QKeySequence, base::unique_qptr<QAction>> _shortcuts;
 	base::flat_multi_map<not_null<QObject*>, Command> _commandByObject;
+	std::vector<QPointer<QWidget>> _listened;
+
+	base::flat_map<QKeySequence, base::flat_set<Command>> _defaults;
 
 	base::flat_set<QAction*> _mediaShortcuts;
 	base::flat_set<QAction*> _supportShortcuts;
@@ -285,6 +272,54 @@ const QStringList &Manager::errors() const {
 	return _errors;
 }
 
+auto Manager::keysDefaults() const
+-> base::flat_map<QKeySequence, base::flat_set<Command>> {
+	return _defaults;
+}
+
+auto Manager::keysCurrents() const
+-> base::flat_map<QKeySequence, base::flat_set<Command>> {
+	auto result = base::flat_map<QKeySequence, base::flat_set<Command>>();
+	for (const auto &[keys, command] : _shortcuts) {
+		auto i = _commandByObject.findFirst(command);
+		const auto end = _commandByObject.end();
+		for (; i != end && (i->first == command); ++i) {
+			result[keys].emplace(i->second);
+		}
+	}
+	return result;
+}
+
+void Manager::change(
+		QKeySequence was,
+		QKeySequence now,
+		Command command,
+		std::optional<Command> restore) {
+	if (!was.isEmpty()) {
+		remove(was);
+	}
+	if (!now.isEmpty()) {
+		set(now, command, true);
+	}
+	if (restore) {
+		Assert(!was.isEmpty());
+		set(was, *restore, true);
+	}
+	writeCustomFile();
+}
+
+void Manager::resetToDefaults() {
+	while (!_shortcuts.empty()) {
+		remove(_shortcuts.begin()->first);
+	}
+	for (const auto &[sequence, commands] : _defaults) {
+		for (const auto command : commands) {
+			set(sequence, command, false);
+		}
+	}
+	writeCustomFile();
+}
+
 std::vector<Command> Manager::lookup(not_null<QObject*> object) const {
 	auto result = std::vector<Command>();
 	auto i = _commandByObject.findFirst(object);
@@ -308,8 +343,20 @@ void Manager::toggleSupport(bool toggled) {
 }
 
 void Manager::listen(not_null<QWidget*> widget) {
+	pruneListened();
+	_listened.push_back(widget.get());
 	for (const auto &[keys, shortcut] : _shortcuts) {
 		widget->addAction(shortcut.get());
+	}
+}
+
+void Manager::pruneListened() {
+	for (auto i = begin(_listened); i != end(_listened);) {
+		if (i->data()) {
+			++i;
+		} else {
+			i = _listened.erase(i);
+		}
 	}
 }
 
@@ -448,10 +495,12 @@ void Manager::fillDefaults() {
 
 	set(u"ctrl+r"_q, Command::ReadChat);
 
-	set(u"ctrl+="_q, Command::ShowChatMenu);
+	set(u"ctrl+\\"_q, Command::ShowChatMenu);
 	
 	set(u"alt+f"_q, Command::FastForward);
 	set(u"alt+c"_q, Command::FastCopy);
+	
+	_defaults = keysCurrents();
 }
 
 void Manager::writeDefaultFile() {
@@ -477,8 +526,8 @@ void Manager::writeDefaultFile() {
 		auto i = _commandByObject.findFirst(object);
 		const auto end = _commandByObject.end();
 		for (; i != end && i->first == object; ++i) {
-			const auto j = CommandNames.find(i->second);
-			if (j != CommandNames.end()) {
+			const auto j = CommandNames().find(i->second);
+			if (j != CommandNames().end()) {
 				QJsonObject entry;
 				entry.insert(u"keys"_q, sequence.toString().toLower());
 				entry.insert(u"command"_q, j->second);
@@ -499,6 +548,55 @@ void Manager::writeDefaultFile() {
 		}
 	}
 
+	auto document = QJsonDocument();
+	document.setArray(shortcuts);
+	file.write(document.toJson(QJsonDocument::Indented));
+}
+
+void Manager::writeCustomFile() {
+	auto shortcuts = QJsonArray();
+	for (const auto &[sequence, shortcut] : _shortcuts) {
+		const auto object = shortcut.get();
+		auto i = _commandByObject.findFirst(object);
+		const auto end = _commandByObject.end();
+		for (; i != end && i->first == object; ++i) {
+			const auto d = _defaults.find(sequence);
+			if (d == _defaults.end() || !d->second.contains(i->second)) {
+				const auto j = CommandNames().find(i->second);
+				if (j != CommandNames().end()) {
+					QJsonObject entry;
+					entry.insert(u"keys"_q, sequence.toString().toLower());
+					entry.insert(u"command"_q, j->second);
+					shortcuts.append(entry);
+				}
+			}
+		}
+	}
+	for (const auto &[sequence, command] : _defaults) {
+		if (!_shortcuts.contains(sequence)) {
+			QJsonObject entry;
+			entry.insert(u"keys"_q, sequence.toString().toLower());
+			entry.insert(u"command"_q, QJsonValue());
+			shortcuts.append(entry);
+		}
+	}
+
+	if (shortcuts.isEmpty()) {
+		WriteDefaultCustomFile();
+		return;
+	}
+
+	auto file = QFile(CustomFilePath());
+	if (!file.open(QIODevice::WriteOnly)) {
+		LOG(("Shortcut Warning: could not write custom shortcuts file."));
+		return;
+	}
+	const char *customHeader = R"HEADER(
+// This is a list of changed shortcuts for Telegram Desktop
+// You can edit them in Settings > Chat Settings > Keyboard Shortcuts.
+
+)HEADER";
+	file.write(customHeader);
 
 	auto document = QJsonDocument();
 	document.setArray(shortcuts);
@@ -515,8 +613,15 @@ void Manager::set(const QString &keys, Command command, bool replace) {
 		_errors.push_back(u"Could not derive key sequence '%1'!"_q.arg(keys));
 		return;
 	}
+	set(result, command, replace);
+}
+
+void Manager::set(
+		const QKeySequence &keys,
+		Command command,
+		bool replace) {
 	auto shortcut = base::make_unique_q<QAction>();
-	shortcut->setShortcut(result);
+	shortcut->setShortcut(keys);
 	shortcut->setShortcutContext(Qt::ApplicationShortcut);
 	if (!AutoRepeatCommands.contains(command)) {
 		shortcut->setAutoRepeat(false);
@@ -527,20 +632,26 @@ void Manager::set(const QString &keys, Command command, bool replace) {
 		shortcut->setEnabled(false);
 	}
 	auto object = shortcut.get();
-	auto i = _shortcuts.find(result);
+	auto i = _shortcuts.find(keys);
 	if (i == end(_shortcuts)) {
-		i = _shortcuts.emplace(result, std::move(shortcut)).first;
+		i = _shortcuts.emplace(keys, std::move(shortcut)).first;
 	} else if (replace) {
 		unregister(std::exchange(i->second, std::move(shortcut)));
 	} else {
 		object = i->second.get();
 	}
 	_commandByObject.emplace(object, command);
-	if (!shortcut && isMediaShortcut) {
-		_mediaShortcuts.emplace(i->second.get());
-	}
-	if (!shortcut && isSupportShortcut) {
-		_supportShortcuts.emplace(i->second.get());
+	if (!shortcut) { // Added the new one.
+		if (isMediaShortcut) {
+			_mediaShortcuts.emplace(i->second.get());
+		}
+		if (isSupportShortcut) {
+			_supportShortcuts.emplace(i->second.get());
+		}
+		pruneListened();
+		for (const auto &widget : _listened) {
+			widget->addAction(i->second.get());
+		}
 	}
 }
 
@@ -554,7 +665,11 @@ void Manager::remove(const QString &keys) {
 		_errors.push_back(u"Could not derive key sequence '%1'!"_q.arg(keys));
 		return;
 	}
-	const auto i = _shortcuts.find(result);
+	remove(result);
+}
+
+void Manager::remove(const QKeySequence &keys) {
+	const auto i = _shortcuts.find(keys);
 	if (i != end(_shortcuts)) {
 		unregister(std::move(i->second));
 		_shortcuts.erase(i);
@@ -563,7 +678,7 @@ void Manager::remove(const QString &keys) {
 
 void Manager::unregister(base::unique_qptr<QAction> shortcut) {
 	if (shortcut) {
-		_commandByObject.erase(shortcut.get());
+		_commandByObject.removeAll(shortcut.get());
 		_mediaShortcuts.erase(shortcut.get());
 		_supportShortcuts.erase(shortcut.get());
 	}
@@ -609,7 +724,9 @@ bool Launch(Command command) {
 }
 
 bool Launch(std::vector<Command> commands) {
-	if (auto handler = RequestHandler(std::move(commands))) {
+	if (Paused) {
+		return false;
+	} else if (auto handler = RequestHandler(std::move(commands))) {
 		return handler();
 	}
 	return false;
@@ -639,6 +756,69 @@ void ToggleMediaShortcuts(bool toggled) {
 
 void ToggleSupportShortcuts(bool toggled) {
 	Data.toggleSupport(toggled);
+}
+
+void Pause() {
+	Paused = true;
+}
+
+void Unpause() {
+	Paused = false;
+}
+
+auto KeysDefaults()
+-> base::flat_map<QKeySequence, base::flat_set<Command>> {
+	return Data.keysDefaults();
+}
+
+auto KeysCurrents()
+-> base::flat_map<QKeySequence, base::flat_set<Command>> {
+	return Data.keysCurrents();
+}
+
+void Change(
+		QKeySequence was,
+		QKeySequence now,
+		Command command,
+		std::optional<Command> restore) {
+	Data.change(was, now, command, restore);
+}
+
+void ResetToDefaults() {
+	Data.resetToDefaults();
+}
+
+bool AllowWithoutModifiers(int key) {
+	const auto service = {
+		Qt::Key_Escape,
+		Qt::Key_Tab,
+		Qt::Key_Backtab,
+		Qt::Key_Backspace,
+		Qt::Key_Return,
+		Qt::Key_Enter,
+		Qt::Key_Insert,
+		Qt::Key_Delete,
+		Qt::Key_Pause,
+		Qt::Key_Print,
+		Qt::Key_SysReq,
+		Qt::Key_Clear,
+		Qt::Key_Home,
+		Qt::Key_End,
+		Qt::Key_Left,
+		Qt::Key_Up,
+		Qt::Key_Right,
+		Qt::Key_Down,
+		Qt::Key_PageUp,
+		Qt::Key_PageDown,
+		Qt::Key_Shift,
+		Qt::Key_Control,
+		Qt::Key_Meta,
+		Qt::Key_Alt,
+		Qt::Key_CapsLock,
+		Qt::Key_NumLock,
+		Qt::Key_ScrollLock,
+	};
+	return (key >= 0x80) && !ranges::contains(service, key);
 }
 
 void Finish() {

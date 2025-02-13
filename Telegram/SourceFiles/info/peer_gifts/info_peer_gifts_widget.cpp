@@ -343,11 +343,11 @@ void InnerWidget::validateButtons() {
 		}
 		const auto giftId = _entries[index].gift.info.id;
 		const auto manageId = _entries[index].gift.manageId;
+		const auto &descriptor = _entries[index].descriptor;
 		const auto already = ranges::find(_views, giftId, &View::giftId);
 		if (already != end(_views)) {
 			views.push_back(base::take(*already));
 		} else {
-			const auto &descriptor = _entries[index].descriptor;
 			const auto unused = ranges::find_if(_views, [&](const View &v) {
 				return v.button && !idUsed(v.giftId, column, row);
 			});
@@ -358,16 +358,16 @@ void InnerWidget::validateButtons() {
 				button->show();
 				views.push_back({ .button = std::move(button) });
 			}
-			auto &view = views.back();
-			const auto callback = [=] {
-				showGift(index);
-			};
-			view.index = index;
-			view.manageId = manageId;
-			view.giftId = giftId;
-			view.button->setDescriptor(descriptor, mode);
-			view.button->setClickedCallback(callback);
 		}
+		auto &view = views.back();
+		const auto callback = [=] {
+			showGift(index);
+		};
+		view.index = index;
+		view.manageId = manageId;
+		view.giftId = giftId;
+		view.button->setDescriptor(descriptor, mode);
+		view.button->setClickedCallback(callback);
 		return true;
 	};
 	for (auto j = fromRow; j != tillRow; ++j) {
@@ -630,24 +630,26 @@ void Widget::fillTopBarMenu(const Ui::Menu::MenuCallback &addAction) {
 		});
 	}, filter.skipUnique ? nullptr : &st::mediaPlayerMenuCheck);
 
-	addAction({ .isSeparator = true });
+	if (_inner->peer()->canManageGifts() && _inner->peer()->isChannel()) {
+		addAction({ .isSeparator = true });
 
-	addAction(tr::lng_peer_gifts_filter_saved(tr::now), [=] {
-		change([](Filter &filter) {
-			filter.skipSaved = !filter.skipSaved;
-			if (filter.skipSaved && filter.skipUnsaved) {
-				filter.skipUnsaved = false;
-			}
-		});
-	}, filter.skipSaved ? nullptr : &st::mediaPlayerMenuCheck);
-	addAction(tr::lng_peer_gifts_filter_unsaved(tr::now), [=] {
-		change([](Filter &filter) {
-			filter.skipUnsaved = !filter.skipUnsaved;
-			if (filter.skipSaved && filter.skipUnsaved) {
-				filter.skipSaved = false;
-			}
-		});
-	}, filter.skipUnsaved ? nullptr : &st::mediaPlayerMenuCheck);
+		addAction(tr::lng_peer_gifts_filter_saved(tr::now), [=] {
+			change([](Filter &filter) {
+				filter.skipSaved = !filter.skipSaved;
+				if (filter.skipSaved && filter.skipUnsaved) {
+					filter.skipUnsaved = false;
+				}
+			});
+		}, filter.skipSaved ? nullptr : &st::mediaPlayerMenuCheck);
+		addAction(tr::lng_peer_gifts_filter_unsaved(tr::now), [=] {
+			change([](Filter &filter) {
+				filter.skipUnsaved = !filter.skipUnsaved;
+				if (filter.skipSaved && filter.skipUnsaved) {
+					filter.skipSaved = false;
+				}
+			});
+		}, filter.skipUnsaved ? nullptr : &st::mediaPlayerMenuCheck);
+	}
 }
 
 rpl::producer<QString> Widget::title() {

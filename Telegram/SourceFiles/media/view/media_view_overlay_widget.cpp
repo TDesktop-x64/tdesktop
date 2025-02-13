@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_attached_stickers.h"
 #include "api/api_peer_photo.h"
 #include "base/qt/qt_common_adapters.h"
+#include "base/timer_rpl.h"
 #include "lang/lang_keys.h"
 #include "menu/menu_sponsored.h"
 #include "boxes/premium_preview_box.h"
@@ -50,6 +51,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "media/view/media_view_pip.h"
 #include "media/view/media_view_overlay_raster.h"
 #include "media/view/media_view_overlay_opengl.h"
+#include "media/stories/media_stories_share.h"
 #include "media/stories/media_stories_view.h"
 #include "media/streaming/media_streaming_document.h"
 #include "media/streaming/media_streaming_player.h"
@@ -1651,7 +1653,9 @@ void OverlayWidget::fillContextMenuActions(
 	if (!hasCopyMediaRestriction()) {
 		if ((_document && documentContentShown()) || (_photo && _photoMedia->loaded())) {
 			addAction(
-				tr::lng_mediaview_copy(tr::now),
+				((_document && _streamed)
+					? tr::lng_mediaview_copy_frame(tr::now)
+					: tr::lng_mediaview_copy(tr::now)),
 				[=] { copyMedia(); },
 				&st::mediaMenuIconCopy);
 		}
@@ -1668,6 +1672,31 @@ void OverlayWidget::fillContextMenuActions(
 			tr::lng_mediaview_forward(tr::now),
 			[=] { forwardMedia(); },
 			&st::mediaMenuIconForward);
+		if (canShareAtTime()) {
+			const auto now = [=] {
+				return tr::lng_mediaview_share_at_time(
+					tr::now,
+					lt_time,
+					Stories::FormatShareAtTime(shareAtVideoTimestamp()));
+			};
+			const auto action = addAction(
+				now(),
+				[=] { shareAtTime(); },
+				&st::mediaMenuIconShare);
+			struct State {
+				rpl::variable<QString> text;
+				rpl::lifetime lifetime;
+			};
+			const auto state = Ui::CreateChild<State>(action);
+			state->text = rpl::single(
+				rpl::empty
+			) | rpl::then(
+				base::timer_each(120)
+			) | rpl::map(now);
+			state->text.changes() | rpl::start_with_next([=](QString value) {
+				action->setText(value);
+			}, state->lifetime);
+		}
 	}
 	if (story && story->canShare()) {
 		addAction(tr::lng_mediaview_forward(tr::now), [=] {
@@ -2304,11 +2333,22 @@ void OverlayWidget::assignMediaPointer(DocumentData *document) {
 			_quality = Core::App().settings().videoQuality();
 			_chosenQuality = _document->chooseQuality(_message, _quality);
 			_documentMedia = _document->createMediaView();
-			_documentMedia->goodThumbnailWanted();
-			_documentMedia->thumbnailWanted(fileOrigin());
+			_videoCover = LookupVideoCover(_document, _message);
+			if (_videoCover) {
+				_videoCoverMedia = _videoCover->createMediaView();
+				_videoCoverMedia->wanted(
+					Data::PhotoSize::Large,
+					fileOrigin());
+			} else {
+				_videoCoverMedia = nullptr;
+				_documentMedia->goodThumbnailWanted();
+				_documentMedia->thumbnailWanted(fileOrigin());
+			}
 		} else {
 			_chosenQuality = nullptr;
 			_documentMedia = nullptr;
+			_videoCover = nullptr;
+			_videoCoverMedia = nullptr;
 		}
 		_documentLoadingTo = QString();
 	}
@@ -2322,6 +2362,8 @@ void OverlayWidget::assignMediaPointer(not_null<PhotoData*> photo) {
 	_document = nullptr;
 	_documentMedia = nullptr;
 	_documentLoadingTo = QString();
+	_videoCover = nullptr;
+	_videoCoverMedia = nullptr;
 	if (_photo != photo) {
 		_flip = {};
 		_photo = photo;
@@ -2641,6 +2683,33 @@ void OverlayWidget::handleDocumentClick() {
 		}
 		_reShow = false;
 	}
+}
+
+bool OverlayWidget::canShareAtTime() const {
+	const auto media = _message ? _message->media() : nullptr;
+	return _document
+		&& media
+		&& _streamed
+		&& (_document == media->document())
+		&& _document->isVideoFile()
+		&& !media->webpage();
+}
+
+TimeId OverlayWidget::shareAtVideoTimestamp() const {
+	return _streamedPosition / crl::time(1000);
+}
+
+void OverlayWidget::shareAtTime() {
+	if (!canShareAtTime()) {
+		return;
+	}
+	if (!_streamed->instance.player().paused()
+		&& !_streamed->instance.player().finished()) {
+		playbackPauseResume();
+	}
+	const auto show = uiShow();
+	const auto timestamp = shareAtVideoTimestamp();
+	show->show(Stories::PrepareShareAtTimeBox(show, _message, timestamp));
 }
 
 void OverlayWidget::downloadMedia() {
@@ -3945,13 +4014,19 @@ void OverlayWidget::initStreamingThumbnail() {
 		}
 		return thumbnail;
 	};
-	const auto good = _document
+	const auto good = _videoCover
+		? _videoCoverMedia->image(Data::PhotoSize::Large)
+		: _document
 		? _documentMedia->goodThumbnail()
 		: _photoMedia->image(Data::PhotoSize::Large);
-	const auto thumbnail = _document
+	const auto thumbnail = _videoCover
+		? _videoCoverMedia->image(Data::PhotoSize::Small)
+		: _document
 		? _documentMedia->thumbnail()
 		: computePhotoThumbnail();
-	const auto blurred = _document
+	const auto blurred = _videoCover
+		? _videoCoverMedia->thumbnailInline()
+		: _document
 		? _documentMedia->thumbnailInline()
 		: _photoMedia->thumbnailInline();
 	const auto size = _photo

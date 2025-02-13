@@ -302,6 +302,7 @@ private:
 
 	void refreshRightBadge();
 	void validateFromNameText(PeerData *from) const;
+	void validateForwardedNameText(HistoryItem* item) const;
 	void ensureFromNameStatusLink(not_null<PeerData*> peer) const;
 
 	mutable std::unique_ptr<RightAction> _rightAction;

@@ -2515,6 +2515,7 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 						   navigation->parentController()->uiShow(),
 			               history,
 			               msgIds,
+			               TimeId(0),
 			               no_quote,
 						   std::move(successCallback)),
 						.filterCallback = std::move(filterCallback),

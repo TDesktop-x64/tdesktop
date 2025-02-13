@@ -609,7 +609,9 @@ void Gif::draw(Painter &p, const PaintContext &context) const {
 		validateThumbCache({ usew, painth }, isRound, rounding);
 		p.drawImage(rthumb, _thumbCache);
 	}
-	paintTimestampMark(p, rthumb, rounding);
+	if (!isRound) {
+		paintTimestampMark(p, rthumb, rounding);
+	}
 
 	if (revealed < 1.) {
 		p.setOpacity(1. - revealed);
@@ -1889,7 +1891,7 @@ void Gif::updateStatusText() const {
 	const auto round = activeRoundStreamed();
 	const auto own = activeOwnStreamed();
 	if (round || (own && _data->isVideoFile())) {
-		const auto frozen = !own->frozenFrame.isNull();
+		const auto frozen = own && !own->frozenFrame.isNull();
 		const auto streamed = round ? round : &own->instance;
 		const auto state = streamed->player().prepareLegacyState();
 		if (state.length) {

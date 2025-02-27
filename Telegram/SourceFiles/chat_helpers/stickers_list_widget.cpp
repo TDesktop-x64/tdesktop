@@ -2258,6 +2258,10 @@ uint16_t getRecentDisplayLimit() {
 		case 3: return 80;
 		case 4: return 100;
 		case 5: return 120;
+		case 6: return 140;
+		case 7: return 160;
+		case 8: return 180;
+		case 9: return 200;
 		default: return kRecentDisplayLimit;
 	}
 }

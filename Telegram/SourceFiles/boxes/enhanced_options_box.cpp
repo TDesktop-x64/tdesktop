@@ -273,6 +273,14 @@ QString RecentDisplayLimitController::Label(int limit) {
 			return QString("100");
 		case 5:
 			return QString("120");
+		case 6:
+			return QString("140");
+		case 7:
+			return QString("160");
+		case 8:
+			return QString("180");
+		case 9:
+			return QString("200");
 		default:
 			return tr::lng_settings_recent_display_limit_default(tr::now);
 	}

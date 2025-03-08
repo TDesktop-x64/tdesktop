@@ -77,6 +77,14 @@ const auto CommandByName = base::flat_map<QString, Command>{
 	{ u"first_chat"_q        , Command::ChatFirst },
 	{ u"last_chat"_q         , Command::ChatLast },
 	{ u"self_chat"_q         , Command::ChatSelf },
+	{ u"pinned_chat1"_q      , Command::ChatPinned1 },
+	{ u"pinned_chat2"_q      , Command::ChatPinned2 },
+	{ u"pinned_chat3"_q      , Command::ChatPinned3 },
+	{ u"pinned_chat4"_q      , Command::ChatPinned4 },
+	{ u"pinned_chat5"_q      , Command::ChatPinned5 },
+	{ u"pinned_chat6"_q      , Command::ChatPinned6 },
+	{ u"pinned_chat7"_q      , Command::ChatPinned7 },
+	{ u"pinned_chat8"_q      , Command::ChatPinned8 },
 
 	{ u"previous_folder"_q   , Command::FolderPrevious },
 	{ u"next_folder"_q       , Command::FolderNext },
@@ -171,6 +179,7 @@ private:
 	void set(const QKeySequence &result, Command command, bool replace);
 	void remove(const QString &keys);
 	void remove(const QKeySequence &keys);
+	void remove(const QKeySequence &keys, Command command);
 	void unregister(base::unique_qptr<QAction> shortcut);
 
 	void pruneListened();
@@ -296,7 +305,7 @@ void Manager::change(
 		Command command,
 		std::optional<Command> restore) {
 	if (!was.isEmpty()) {
-		remove(was);
+		remove(was, command);
 	}
 	if (!now.isEmpty()) {
 		set(now, command, true);
@@ -400,6 +409,7 @@ bool Manager::readCustomFile() {
 		const auto entry = (*i).toObject();
 		const auto keys = entry.constFind(u"keys"_q);
 		const auto command = entry.constFind(u"command"_q);
+		const auto removed = entry.constFind(u"removed"_q);
 		if (keys == entry.constEnd()
 			|| command == entry.constEnd()
 			|| !(*keys).isString()
@@ -413,7 +423,11 @@ bool Manager::readCustomFile() {
 			const auto name = (*command).toString();
 			const auto i = CommandByName.find(name);
 			if (i != end(CommandByName)) {
-				set((*keys).toString(), i->second, true);
+				if (removed != entry.constEnd() && removed->toBool()) {
+					remove((*keys).toString(), i->second);
+				} else {
+					set((*keys).toString(), i->second, true);
+				}
 			} else {
 				LOG(("Shortcut Warning: "
 					"could not find shortcut command handler '%1'"
@@ -572,12 +586,36 @@ void Manager::writeCustomFile() {
 			}
 		}
 	}
-	for (const auto &[sequence, command] : _defaults) {
-		if (!_shortcuts.contains(sequence)) {
+	const auto has = [&](not_null<QObject*> shortcut, Command command) {
+		for (auto i = _commandByObject.findFirst(shortcut)
+			; i != end(_commandByObject) && i->first == shortcut
+			; ++i) {
+			if (i->second == command) {
+				return true;
+			}
+		}
+		return false;
+	};
+	for (const auto &[sequence, commands] : _defaults) {
+		const auto i = _shortcuts.find(sequence);
+		if (i == end(_shortcuts)) {
 			QJsonObject entry;
 			entry.insert(u"keys"_q, sequence.toString().toLower());
 			entry.insert(u"command"_q, QJsonValue());
 			shortcuts.append(entry);
+			continue;
+		}
+		for (const auto command : commands) {
+			if (!has(i->second.get(), command)) {
+				const auto j = CommandNames().find(command);
+				if (j != CommandNames().end()) {
+					QJsonObject entry;
+					entry.insert(u"keys"_q, sequence.toString().toLower());
+					entry.insert(u"command"_q, j->second);
+					entry.insert(u"removed"_q, true);
+					shortcuts.append(entry);
+				}
+			}
 		}
 	}
 
@@ -673,6 +711,17 @@ void Manager::remove(const QKeySequence &keys) {
 	if (i != end(_shortcuts)) {
 		unregister(std::move(i->second));
 		_shortcuts.erase(i);
+	}
+}
+
+void Manager::remove(const QKeySequence &keys, Command command) {
+	const auto i = _shortcuts.find(keys);
+	if (i != end(_shortcuts)) {
+		_commandByObject.remove(i->second.get(), command);
+		if (!_commandByObject.contains(i->second.get())) {
+			unregister(std::move(i->second));
+			_shortcuts.erase(i);
+		}
 	}
 }
 

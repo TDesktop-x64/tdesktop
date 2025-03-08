@@ -44,6 +44,7 @@ namespace Info::PeerGifts {
 struct GiftTypePremium {
 	int64 cost = 0;
 	QString currency;
+	int stars = 0;
 	int months = 0;
 	int discountPercent = 0;
 
@@ -55,7 +56,9 @@ struct GiftTypePremium {
 struct GiftTypeStars {
 	Data::StarGift info;
 	PeerData *from = nullptr;
+	TimeId date = 0;
 	bool userpic = false;
+	bool pinned = false;
 	bool hidden = false;
 	bool mine = false;
 
@@ -101,7 +104,8 @@ enum class GiftButtonMode {
 class GiftButtonDelegate {
 public:
 	[[nodiscard]] virtual TextWithEntities star() = 0;
-	[[nodiscard]] virtual std::any textContext() = 0;
+	[[nodiscard]] virtual TextWithEntities ministar() = 0;
+	[[nodiscard]] virtual Ui::Text::MarkedContext textContext() = 0;
 	[[nodiscard]] virtual QSize buttonSize() = 0;
 	[[nodiscard]] virtual QMargins buttonExtend() = 0;
 	[[nodiscard]] virtual auto buttonPatternEmoji(
@@ -124,9 +128,14 @@ public:
 	void setDescriptor(const GiftDescriptor &descriptor, Mode mode);
 	void setGeometry(QRect inner, QMargins extend);
 
+	[[nodiscard]] rpl::producer<QPoint> contextMenuRequests() const {
+		return _contextMenuRequests.events();
+	}
+
 private:
 	void paintEvent(QPaintEvent *e) override;
 	void resizeEvent(QResizeEvent *e) override;
+	void contextMenuEvent(QContextMenuEvent *e) override;
 
 	void cacheUniqueBackground(
 		not_null<Data::UniqueGift*> unique,
@@ -139,10 +148,12 @@ private:
 	void unsubscribe();
 
 	const not_null<GiftButtonDelegate*> _delegate;
+	rpl::event_stream<QPoint> _contextMenuRequests;
 	QImage _hiddenBgCache;
 	GiftDescriptor _descriptor;
 	Ui::Text::String _text;
 	Ui::Text::String _price;
+	Ui::Text::String _byStars;
 	std::shared_ptr<Ui::DynamicImage> _userpic;
 	QImage _uniqueBackgroundCache;
 	std::unique_ptr<Ui::Text::CustomEmoji> _uniquePatternEmoji;
@@ -169,7 +180,8 @@ public:
 	~Delegate();
 
 	TextWithEntities star() override;
-	std::any textContext() override;
+	TextWithEntities ministar() override;
+	Ui::Text::MarkedContext textContext() override;
 	QSize buttonSize() override;
 	QMargins buttonExtend() override;
 	auto buttonPatternEmoji(

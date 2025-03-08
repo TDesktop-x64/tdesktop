@@ -179,6 +179,7 @@ private:
 
 	bool updateBottomInfo();
 
+	void initPaidInformation();
 	void initLogEntryOriginal();
 	void initPsa();
 	void fromNameUpdated(int width) const;

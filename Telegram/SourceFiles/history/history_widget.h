@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/controls/history_view_compose_media_edit_manager.h"
 #include "history/view/history_view_corner_buttons.h"
 #include "history/history_drag_area.h"
+#include "history/history_item_helpers.h"
 #include "history/history_view_highlight_manager.h"
 #include "history/history_view_top_toast.h"
 #include "history/history.h"
@@ -69,6 +70,7 @@ class PinnedBar;
 class GroupCallBar;
 class RequestsBar;
 struct PreparedList;
+struct PreparedBundle;
 class SendFilesWay;
 class SendAsButton;
 class SpoilerAnimation;
@@ -98,6 +100,7 @@ namespace HistoryView {
 class StickerToast;
 class PaidReactionToast;
 class TopBarWidget;
+class PaysStatus;
 class ContactStatus;
 class BusinessBotStatus;
 class Element;
@@ -115,6 +118,7 @@ class TTLButton;
 class WebpageProcessor;
 class CharactersLimitLabel;
 class PhotoEditSpoilerManager;
+struct VoiceToSend;
 } // namespace HistoryView::Controls
 
 class BotKeyboard;
@@ -324,6 +328,7 @@ protected:
 private:
 	using TabbedPanel = ChatHelpers::TabbedPanel;
 	using TabbedSelector = ChatHelpers::TabbedSelector;
+	using VoiceToSend = HistoryView::Controls::VoiceToSend;
 	enum ScrollChangeType {
 		ScrollChangeNone,
 
@@ -361,6 +366,11 @@ private:
 	std::optional<bool> cornerButtonsDownShown() override;
 	bool cornerButtonsUnreadMayBeShown() override;
 	bool cornerButtonsHas(HistoryView::CornerButtonType type) override;
+
+	[[nodiscard]] bool checkSendPayment(
+		int messagesCount,
+		int starsApproved,
+		Fn<void(int)> withPaymentApproved);
 
 	void checkSuggestToGigagroup();
 	void processReply();
@@ -407,6 +417,7 @@ private:
 
 	[[nodiscard]] Api::SendAction prepareSendAction(
 		Api::SendOptions options) const;
+	void sendVoice(const VoiceToSend &data);
 	void send(Api::SendOptions options);
 	void sendWithModifiers(Qt::KeyboardModifiers modifiers);
 	void sendScheduled(Api::SendOptions initialOptions);
@@ -475,7 +486,9 @@ private:
 		std::optional<bool> compress) const;
 	bool showSendMessageError(
 		const TextWithTags &textWithTags,
-		bool ignoreSlowmodeCountdown);
+		bool ignoreSlowmodeCountdown,
+		Fn<void(int starsApproved)> withPaymentApproved = nullptr,
+		int starsApproved = 0);
 
 	void sendingFilesConfirmed(
 		Ui::PreparedList &&list,
@@ -483,6 +496,13 @@ private:
 		TextWithTags &&caption,
 		Api::SendOptions options,
 		bool ctrlShiftEnter);
+	void sendingFilesConfirmed(
+		std::shared_ptr<Ui::PreparedBundle> bundle,
+		Api::SendOptions options);
+
+	void sendBotCommand(
+		const Bot::SendCommandRequest &request,
+		Api::SendOptions options);
 
 	void uploadFile(const QByteArray &fileContent, SendMediaType type);
 	void itemRemoved(not_null<const HistoryItem*> item);
@@ -776,6 +796,7 @@ private:
 
 	Webrtc::RecordAvailability _recordAvailability = {};
 
+	std::unique_ptr<HistoryView::PaysStatus> _paysStatus;
 	std::unique_ptr<HistoryView::ContactStatus> _contactStatus;
 	std::unique_ptr<HistoryView::BusinessBotStatus> _businessBotStatus;
 
@@ -871,6 +892,8 @@ private:
 	bool _inGrab = false;
 
 	int _topDelta = 0;
+
+	SendPaymentHelper _sendPayment;
 
 	rpl::event_stream<> _cancelRequests;
 

@@ -308,7 +308,7 @@ public:
 	void finishForwarding(const SendAction &action);
 	void forwardMessages(
 		Data::ResolvedForwardDraft &&draft,
-		const SendAction &action,
+		SendAction action,
 		FnMut<void()> &&successCallback = nullptr);
 	void shareContact(
 		const QString &phone,
@@ -370,7 +370,7 @@ public:
 	void sendInlineResult(
 		not_null<UserData*> bot,
 		not_null<InlineBots::Result*> data,
-		const SendAction &action,
+		SendAction action,
 		std::optional<MsgId> localMessageId,
 		Fn<void(bool)> done = nullptr);
 	void sendMessageFail(

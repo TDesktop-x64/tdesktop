@@ -149,6 +149,7 @@ EmojiButton {
 
 SendButton {
 	inner: IconButton;
+	stars: RoundButton;
 	record: icon;
 	recordOver: icon;
 	round: icon;
@@ -855,6 +856,10 @@ historyComposeButton: FlatButton {
 		color: historyComposeButtonBgRipple;
 	}
 }
+historyComposeButtonText: FlatLabel(defaultFlatLabel) {
+	style: semiboldTextStyle;
+	textFg: windowActiveTextFg;
+}
 historyGiftToChannel: IconButton(defaultIconButton) {
 	width: 46px;
 	height: 46px;
@@ -912,6 +917,10 @@ historyBusinessBotSettings: IconButton(defaultIconButton) {
 	ripple: defaultRippleAnimationBgOver;
 	height: 58px;
 	width: 48px;
+}
+paysStatusLabel: FlatLabel(historyBusinessBotStatus) {
+	align: align(top);
+	minWidth: 240px;
 }
 
 historyReplyCancelIcon: icon {{ "box_button_close", historyReplyCancelFg }};
@@ -1288,6 +1297,12 @@ historySend: SendButton {
 	inner: IconButton(historyAttach) {
 		icon: historySendIcon;
 		iconOver: historySendIconOver;
+	}
+	stars: RoundButton(defaultActiveButton) {
+		height: 28px;
+		padding: margins(0px, 0px, 6px, 0px);
+		textTop: 5px;
+		width: -8px;
 	}
 	record: historyRecordVoice;
 	recordOver: historyRecordVoiceOver;

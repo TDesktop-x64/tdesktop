@@ -103,6 +103,7 @@ struct HistoryItemCommonFields {
 	FullReplyTo replyTo;
 	TimeId date = 0;
 	BusinessShortcutId shortcutId = 0;
+	int starsPaid = 0;
 	UserId viaBotId = 0;
 	QString postAuthor;
 	uint64 groupedId = 0;
@@ -320,6 +321,9 @@ public:
 	}
 	[[nodiscard]] bool hideEditedBadge() const {
 		return (_flags & MessageFlag::HideEdited);
+	}
+	[[nodiscard]] bool hideDisplayDate() const {
+		return (_flags & MessageFlag::HideDisplayDate);
 	}
 	[[nodiscard]] bool isLocal() const {
 		return _flags & MessageFlag::Local;
@@ -548,6 +552,7 @@ public:
 	// content uses the color of the original sender.
 	[[nodiscard]] PeerData *contentColorsFrom() const;
 	[[nodiscard]] uint8 contentColorIndex() const;
+	[[nodiscard]] int starsPaid() const;
 
 	[[nodiscard]] std::unique_ptr<HistoryView::Element> createView(
 		not_null<HistoryView::ElementDelegate*> delegate,
@@ -692,6 +697,7 @@ private:
 	TimeId _date = 0;
 	TimeId _ttlDestroyAt = 0;
 	int _boostsApplied = 0;
+	int _starsPaid = 0;
 	BusinessShortcutId _shortcutId = 0;
 
 	MessageGroupId _groupId = MessageGroupId();

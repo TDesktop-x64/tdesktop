@@ -62,8 +62,13 @@ creditsBoxButtonLabel: FlatLabel(defaultFlatLabel) {
 	style: semiboldTextStyle;
 }
 
-starIconSmall: icon{{ "payments/small_star", windowFg }};
-starIconSmallPadding: margins(0px, -3px, 0px, 0px);
+starIconEmoji: IconEmoji {
+	icon: icon{{ "payments/premium_emoji", creditsBg1 }};
+	padding: margins(4px, 1px, 4px, 0px);
+}
+starIconEmojiColored: IconEmoji(starIconEmoji) {
+	useIconColor: true;
+}
 
 creditsHistoryEntryTypeAds: icon {{ "folders/folders_channels", premiumButtonFg }};
 
@@ -119,10 +124,17 @@ giftBoxGiftHeight: 164px;
 giftBoxGiftSmall: 108px;
 giftBoxGiftRadius: 12px;
 giftBoxGiftBadgeFont: font(10px semibold);
+giftBoxByStarsStyle: TextStyle(defaultTextStyle) {
+	font: font(10px);
+}
+giftBoxByStarsSkip: 2px;
+giftBoxByStarsStarTop: 3px;
 giftBoxPremiumIconSize: 64px;
 giftBoxPremiumIconTop: 10px;
 giftBoxPremiumTextTop: 84px;
+giftBoxPremiumTextTopByStars: 78px;
 giftBoxButtonBottom: 12px;
+giftBoxButtonBottomByStars: 18px;
 giftBoxButtonPadding: margins(8px, 4px, 8px, 4px);
 giftBoxPreviewStickerPadding: margins(10px, 12px, 10px, 16px);
 giftBoxPreviewTitlePadding: margins(12px, 4px, 12px, 4px);
@@ -131,6 +143,7 @@ giftBoxButtonMargin: margins(12px, 8px, 12px, 12px);
 giftBoxStickerTop: 0px;
 giftBoxStickerStarTop: 24px;
 giftBoxSmallStickerTop: 16px;
+giftBoxStickerTopByStars: -4px;
 giftBoxStickerSize: size(80px, 80px);
 giftBoxUserpicSize: 24px;
 giftBoxUserpicSkip: 2px;
@@ -165,6 +178,7 @@ giftListAboutMargin: margins(12px, 24px, 12px, 24px);
 giftBoxEmojiToggleTop: 7px;
 giftBoxLimitTop: 28px;
 giftBoxLockMargins: margins(-2px, 1px, 0px, 0px);
+giftBoxPinIcon: icon {{ "dialogs/dialogs_pinned", premiumButtonFg }};
 
 creditsHistoryEntriesList: PeerList(defaultPeerList) {
 	padding: margins(

@@ -85,13 +85,11 @@ void GiftButton::setDescriptor(const GiftDescriptor &descriptor, Mode mode) {
 	unsubscribe();
 	v::match(descriptor, [&](const GiftTypePremium &data) {
 		const auto months = data.months;
-		const auto years = (months % 12) ? 0 : months / 12;
 		_text = Ui::Text::String(st::giftBoxGiftHeight / 4);
 		_text.setMarkedText(
 			st::defaultTextStyle,
-			Ui::Text::Bold(years
-				? tr::lng_years(tr::now, lt_count, years)
-				: tr::lng_months(tr::now, lt_count, months)
+			Ui::Text::Bold(
+				tr::lng_months(tr::now, lt_count, months)
 			).append('\n').append(
 				tr::lng_gift_premium_label(tr::now)
 			));
@@ -101,6 +99,18 @@ void GiftButton::setDescriptor(const GiftDescriptor &descriptor, Mode mode) {
 				data.cost,
 				data.currency,
 				true));
+		if (const auto stars = data.stars) {
+			const auto starsText = Lang::FormatCountDecimal(stars);
+			_byStars.setMarkedText(
+				st::giftBoxByStarsStyle,
+				tr::lng_gift_premium_by_stars(
+					tr::now,
+					lt_amount,
+					_delegate->ministar().append(' ' + starsText),
+					Ui::Text::WithEntities),
+				kMarkupTextOptions,
+				_delegate->textContext());
+		}
 		_userpic = nullptr;
 		if (!_stars) {
 			_stars.emplace(this, true, starsType);
@@ -129,7 +139,7 @@ void GiftButton::setDescriptor(const GiftDescriptor &descriptor, Mode mode) {
 			(unique
 				? tr::lng_gift_price_unique(tr::now, Ui::Text::WithEntities)
 				: _delegate->star().append(
-					' ' + QString::number(data.info.stars))),
+					' ' + Lang::FormatCountDecimal(data.info.stars))),
 			kMarkupTextOptions,
 			_delegate->textContext());
 		if (!_stars) {
@@ -170,7 +180,9 @@ void GiftButton::setDescriptor(const GiftDescriptor &descriptor, Mode mode) {
 		QSize(buttonw, buttonh)
 	).marginsAdded(st::giftBoxButtonPadding);
 	const auto skipy = _delegate->buttonSize().height()
-		- st::giftBoxButtonBottom
+		- (_byStars.isEmpty()
+			? st::giftBoxButtonBottom
+			: st::giftBoxButtonBottomByStars)
 		- inner.height();
 	const auto skipx = (width() - inner.width()) / 2;
 	const auto outer = (width() - 2 * skipx);
@@ -236,6 +248,12 @@ void GiftButton::resizeEvent(QResizeEvent *e) {
 			_stars->setCenter(_button - QMargins(padding, 0, padding, 0));
 		}
 	}
+}
+
+void GiftButton::contextMenuEvent(QContextMenuEvent *e) {
+	_contextMenuRequests.fire_copy((e->reason() == QContextMenuEvent::Mouse)
+		? e->globalPos()
+		: QCursor::pos());
 }
 
 void GiftButton::cacheUniqueBackground(
@@ -355,7 +373,9 @@ void GiftButton::paintEvent(QPaintEvent *e) {
 					? st::giftBoxSmallStickerTop
 					: _text.isEmpty()
 					? st::giftBoxStickerStarTop
-					: st::giftBoxStickerTop),
+					: _byStars.isEmpty()
+					? st::giftBoxStickerTop
+					: st::giftBoxStickerTopByStars),
 				size.width(),
 				size.height()),
 			frame);
@@ -367,7 +387,9 @@ void GiftButton::paintEvent(QPaintEvent *e) {
 				? st::giftBoxSmallStickerTop
 				: _text.isEmpty()
 				? st::giftBoxStickerStarTop
-				: st::giftBoxStickerTop));
+				: _byStars.isEmpty()
+				? st::giftBoxStickerTop
+				: st::giftBoxStickerTopByStars));
 		_delegate->hiddenMark()->paint(
 			p,
 			frame,
@@ -441,6 +463,24 @@ void GiftButton::paintEvent(QPaintEvent *e) {
 			position.y() - rubberOut,
 			cached);
 	}
+
+	v::match(_descriptor, [](const GiftTypePremium &) {
+	}, [&](const GiftTypeStars &data) {
+		if (unique && data.pinned) {
+			auto hq = PainterHighQualityEnabler(p);
+			const auto &icon = st::giftBoxPinIcon;
+			const auto skip = st::giftBoxUserpicSkip;
+			const auto add = (st::giftBoxUserpicSize - icon.width()) / 2;
+			p.setPen(Qt::NoPen);
+			p.setBrush(unique->backdrop.patternColor);
+			const auto rect = QRect(
+				QPoint(_extend.left() + skip, _extend.top() + skip),
+				QSize(icon.width() + 2 * add, icon.height() + 2 * add));
+			p.drawEllipse(rect);
+			icon.paintInCenter(p, rect);
+		}
+	});
+
 	if (!_button.isEmpty()) {
 		p.setBrush(unique
 			? QBrush(QColor(255, 255, 255, .2 * 255))
@@ -473,8 +513,9 @@ void GiftButton::paintEvent(QPaintEvent *e) {
 	if (!_text.isEmpty()) {
 		p.setPen(st::windowFg);
 		_text.draw(p, {
-			.position = (position
-				+ QPoint(0, st::giftBoxPremiumTextTop)),
+			.position = (position + QPoint(0, _byStars.isEmpty()
+				? st::giftBoxPremiumTextTop
+				: st::giftBoxPremiumTextTopByStars)),
 			.availableWidth = singlew,
 			.align = style::al_top,
 		});
@@ -492,6 +533,17 @@ void GiftButton::paintEvent(QPaintEvent *e) {
 				+ QPoint(padding.left(), padding.top())),
 			.availableWidth = _price.maxWidth(),
 		});
+
+		if (!_byStars.isEmpty()) {
+			p.setPen(st::creditsFg);
+			_byStars.draw(p, {
+				.position = QPoint(
+					position.x(),
+					_button.y() + _button.height() + st::giftBoxByStarsSkip),
+				.availableWidth = singlew,
+				.align = style::al_top,
+			});
+		}
 	}
 }
 
@@ -515,11 +567,14 @@ TextWithEntities Delegate::star() {
 	return owner->customEmojiManager().creditsEmoji();
 }
 
-std::any Delegate::textContext() {
-	return Core::MarkedTextContext{
-		.session = &_window->session(),
-		.customEmojiRepaint = [] {},
-	};
+TextWithEntities Delegate::ministar() {
+	const auto owner = &_window->session().data();
+	const auto top = st::giftBoxByStarsStarTop;
+	return owner->customEmojiManager().ministarEmoji({ 0, top, 0, 0 });
+}
+
+Ui::Text::MarkedContext Delegate::textContext() {
+	return Core::TextContext({ .session = &_window->session() });
 }
 
 QSize Delegate::buttonSize() {

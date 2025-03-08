@@ -86,7 +86,7 @@ enum { // Local Storage Keys
 	lskSavedGifsOld = 0x0e, // no data
 	lskSavedGifs = 0x0f, // no data
 	lskStickersKeys = 0x10, // no data
-	lskTrustedBots = 0x11, // no data
+	lskTrustedPeers = 0x11, // no data
 	lskFavedStickers = 0x12, // no data
 	lskExportSettings = 0x13, // no data
 	lskBackgroundOld = 0x14, // no data
@@ -220,7 +220,7 @@ base::flat_set<QString> Account::collectGoodNames() const {
 		_legacyBackgroundKeyDay,
 		_recentHashtagsAndBotsKey,
 		_exportSettingsKey,
-		_trustedBotsKey,
+		_trustedPeersKey,
 		_installedMasksKey,
 		_recentMasksKey,
 		_archivedMasksKey,
@@ -308,7 +308,7 @@ Account::ReadMapResult Account::readMapWith(
 	base::flat_map<PeerId, FileKey> draftsMap;
 	base::flat_map<PeerId, FileKey> draftCursorsMap;
 	base::flat_map<PeerId, bool> draftsNotReadMap;
-	quint64 locationsKey = 0, reportSpamStatusesKey = 0, trustedBotsKey = 0;
+	quint64 locationsKey = 0, reportSpamStatusesKey = 0, trustedPeersKey = 0;
 	quint64 recentStickersKeyOld = 0;
 	quint64 installedStickersKey = 0, featuredStickersKey = 0, recentStickersKey = 0, favedStickersKey = 0, archivedStickersKey = 0;
 	quint64 installedMasksKey = 0, recentMasksKey = 0, archivedMasksKey = 0;
@@ -371,8 +371,8 @@ Account::ReadMapResult Account::readMapWith(
 			map.stream >> reportSpamStatusesKey;
 			ClearKey(reportSpamStatusesKey, _basePath);
 		} break;
-		case lskTrustedBots: {
-			map.stream >> trustedBotsKey;
+		case lskTrustedPeers: {
+			map.stream >> trustedPeersKey;
 		} break;
 		case lskRecentStickersOld: {
 			map.stream >> recentStickersKeyOld;
@@ -459,7 +459,7 @@ Account::ReadMapResult Account::readMapWith(
 	_draftsNotReadMap = draftsNotReadMap;
 
 	_locationsKey = locationsKey;
-	_trustedBotsKey = trustedBotsKey;
+	_trustedPeersKey = trustedPeersKey;
 	_recentStickersKeyOld = recentStickersKeyOld;
 	_installedStickersKey = installedStickersKey;
 	_featuredStickersKey = featuredStickersKey;
@@ -573,7 +573,7 @@ void Account::writeMap() {
 	if (!_draftsMap.empty()) mapSize += sizeof(quint32) * 2 + _draftsMap.size() * sizeof(quint64) * 2;
 	if (!_draftCursorsMap.empty()) mapSize += sizeof(quint32) * 2 + _draftCursorsMap.size() * sizeof(quint64) * 2;
 	if (_locationsKey) mapSize += sizeof(quint32) + sizeof(quint64);
-	if (_trustedBotsKey) mapSize += sizeof(quint32) + sizeof(quint64);
+	if (_trustedPeersKey) mapSize += sizeof(quint32) + sizeof(quint64);
 	if (_recentStickersKeyOld) mapSize += sizeof(quint32) + sizeof(quint64);
 	if (_installedStickersKey || _featuredStickersKey || _recentStickersKey || _archivedStickersKey) {
 		mapSize += sizeof(quint32) + 4 * sizeof(quint64);
@@ -619,8 +619,8 @@ void Account::writeMap() {
 	if (_locationsKey) {
 		mapData.stream << quint32(lskLocations) << quint64(_locationsKey);
 	}
-	if (_trustedBotsKey) {
-		mapData.stream << quint32(lskTrustedBots) << quint64(_trustedBotsKey);
+	if (_trustedPeersKey) {
+		mapData.stream << quint32(lskTrustedPeers) << quint64(_trustedPeersKey);
 	}
 	if (_recentStickersKeyOld) {
 		mapData.stream << quint32(lskRecentStickersOld) << quint64(_recentStickersKeyOld);
@@ -693,7 +693,7 @@ void Account::reset() {
 	_draftsMap.clear();
 	_draftCursorsMap.clear();
 	_draftsNotReadMap.clear();
-	_locationsKey = _trustedBotsKey = 0;
+	_locationsKey = _trustedPeersKey = 0;
 	_recentStickersKeyOld = 0;
 	_installedStickersKey = 0;
 	_featuredStickersKey = 0;
@@ -3147,126 +3147,198 @@ void Account::readSelf(
 	}
 }
 
-void Account::writeTrustedBots() {
-	if (_trustedBots.empty()) {
-		if (_trustedBotsKey) {
-			ClearKey(_trustedBotsKey, _basePath);
-			_trustedBotsKey = 0;
+void Account::writeTrustedPeers() {
+	if (_trustedPeers.empty() && _trustedPayPerMessage.empty()) {
+		if (_trustedPeersKey) {
+			ClearKey(_trustedPeersKey, _basePath);
+			_trustedPeersKey = 0;
 			writeMapDelayed();
 		}
 		return;
 	}
-	if (!_trustedBotsKey) {
-		_trustedBotsKey = GenerateKey(_basePath);
+	if (!_trustedPeersKey) {
+		_trustedPeersKey = GenerateKey(_basePath);
 		writeMapQueued();
 	}
-	quint32 size = sizeof(qint32) + _trustedBots.size() * sizeof(quint64);
+	quint32 size = sizeof(qint32)
+		+ _trustedPeers.size() * sizeof(quint64)
+		+ sizeof(qint32)
+		+ _trustedPayPerMessage.size() * (sizeof(quint64) + sizeof(qint32));
 	EncryptedDescriptor data(size);
-	data.stream << qint32(_trustedBots.size());
-	for (const auto &[peerId, mask] : _trustedBots) {
-		// value: 8 bit mask, 56 bit bot peer_id.
+	data.stream << qint32(_trustedPeers.size());
+	for (const auto &[peerId, mask] : _trustedPeers) {
+		// value: 8 bit mask, 56 bit peer_id.
 		auto value = SerializePeerId(peerId);
 		Assert((value >> 56) == 0);
 		value |= (quint64(mask) << 56);
 		data.stream << value;
 	}
+	data.stream << qint32(_trustedPayPerMessage.size());
+	for (const auto &[peerId, stars] : _trustedPayPerMessage) {
+		data.stream << SerializePeerId(peerId) << qint32(stars);
+	}
 
-	FileWriteDescriptor file(_trustedBotsKey, _basePath);
+	FileWriteDescriptor file(_trustedPeersKey, _basePath);
 	file.writeEncrypted(data, _localKey);
 }
 
-void Account::readTrustedBots() {
-	if (_trustedBotsRead) {
+void Account::readTrustedPeers() {
+	if (_trustedPeersRead) {
 		return;
 	}
-	_trustedBotsRead = true;
-	if (!_trustedBotsKey) {
+	_trustedPeersRead = true;
+	if (!_trustedPeersKey) {
 		return;
 	}
 
 	FileReadDescriptor trusted;
-	if (!ReadEncryptedFile(trusted, _trustedBotsKey, _basePath, _localKey)) {
-		ClearKey(_trustedBotsKey, _basePath);
-		_trustedBotsKey = 0;
+	if (!ReadEncryptedFile(trusted, _trustedPeersKey, _basePath, _localKey)) {
+		ClearKey(_trustedPeersKey, _basePath);
+		_trustedPeersKey = 0;
 		writeMapDelayed();
 		return;
 	}
 
-	qint32 size = 0;
-	trusted.stream >> size;
-	for (int i = 0; i < size; ++i) {
+	qint32 trustedCount = 0;
+	trusted.stream >> trustedCount;
+	for (int i = 0; i < trustedCount; ++i) {
 		auto value = quint64();
 		trusted.stream >> value;
-		const auto mask = base::flags<BotTrustFlag>::from_raw(
+		const auto mask = base::flags<PeerTrustFlag>::from_raw(
 			uchar(value >> 56));
 		const auto peerIdSerialized = value & ~(0xFFULL << 56);
 		const auto peerId = DeserializePeerId(peerIdSerialized);
-		_trustedBots.emplace(peerId, mask);
+		_trustedPeers.emplace(peerId, mask);
 	}
-}
-
-void Account::markBotTrustedOpenGame(PeerId botId) {
-	if (isBotTrustedOpenGame(botId)) {
+	if (trusted.stream.atEnd()) {
 		return;
 	}
-	const auto i = _trustedBots.find(botId);
-	if (i == end(_trustedBots)) {
-		_trustedBots.emplace(botId, BotTrustFlag());
-	} else {
-		i->second &= ~BotTrustFlag::NoOpenGame;
+	qint32 payPerMessageCount = 0;
+	trusted.stream >> payPerMessageCount;
+	const auto owner = _owner->sessionExists()
+		? &_owner->session().data()
+		: nullptr;
+	for (int i = 0; i < payPerMessageCount; ++i) {
+		auto value = quint64();
+		auto stars = qint32();
+		trusted.stream >> value >> stars;
+		const auto peerId = DeserializePeerId(value);
+		const auto peer = owner ? owner->peerLoaded(peerId) : nullptr;
+		const auto now = peer ? peer->starsPerMessage() : stars;
+		if (now > 0 && now <= stars) {
+			_trustedPayPerMessage.emplace(peerId, stars);
+		}
 	}
-	writeTrustedBots();
+	if (_trustedPayPerMessage.size() != payPerMessageCount) {
+		writeTrustedPeers();
+	}
 }
 
-bool Account::isBotTrustedOpenGame(PeerId botId) {
-	readTrustedBots();
-	const auto i = _trustedBots.find(botId);
-	return (i != end(_trustedBots))
-		&& ((i->second & BotTrustFlag::NoOpenGame) == 0);
-}
-
-void Account::markBotTrustedPayment(PeerId botId) {
-	if (isBotTrustedPayment(botId)) {
+void Account::markPeerTrustedOpenGame(PeerId peerId) {
+	if (isPeerTrustedOpenGame(peerId)) {
 		return;
 	}
-	const auto i = _trustedBots.find(botId);
-	if (i == end(_trustedBots)) {
-		_trustedBots.emplace(
-			botId,
-			BotTrustFlag::NoOpenGame | BotTrustFlag::Payment);
+	const auto i = _trustedPeers.find(peerId);
+	if (i == end(_trustedPeers)) {
+		_trustedPeers.emplace(peerId, PeerTrustFlag());
 	} else {
-		i->second |= BotTrustFlag::Payment;
+		i->second &= ~PeerTrustFlag::NoOpenGame;
 	}
-	writeTrustedBots();
+	writeTrustedPeers();
 }
 
-bool Account::isBotTrustedPayment(PeerId botId) {
-	readTrustedBots();
-	const auto i = _trustedBots.find(botId);
-	return (i != end(_trustedBots))
-		&& ((i->second & BotTrustFlag::Payment) != 0);
+bool Account::isPeerTrustedOpenGame(PeerId peerId) {
+	readTrustedPeers();
+	const auto i = _trustedPeers.find(peerId);
+	return (i != end(_trustedPeers))
+		&& ((i->second & PeerTrustFlag::NoOpenGame) == 0);
 }
 
-void Account::markBotTrustedOpenWebView(PeerId botId) {
-	if (isBotTrustedOpenWebView(botId)) {
+void Account::markPeerTrustedPayment(PeerId peerId) {
+	if (isPeerTrustedPayment(peerId)) {
 		return;
 	}
-	const auto i = _trustedBots.find(botId);
-	if (i == end(_trustedBots)) {
-		_trustedBots.emplace(
-			botId,
-			BotTrustFlag::NoOpenGame | BotTrustFlag::OpenWebView);
+	const auto i = _trustedPeers.find(peerId);
+	if (i == end(_trustedPeers)) {
+		_trustedPeers.emplace(
+			peerId,
+			PeerTrustFlag::NoOpenGame | PeerTrustFlag::Payment);
 	} else {
-		i->second |= BotTrustFlag::OpenWebView;
+		i->second |= PeerTrustFlag::Payment;
 	}
-	writeTrustedBots();
+	writeTrustedPeers();
 }
 
-bool Account::isBotTrustedOpenWebView(PeerId botId) {
-	readTrustedBots();
-	const auto i = _trustedBots.find(botId);
-	return (i != end(_trustedBots))
-		&& ((i->second & BotTrustFlag::OpenWebView) != 0);
+bool Account::isPeerTrustedPayment(PeerId peerId) {
+	readTrustedPeers();
+	const auto i = _trustedPeers.find(peerId);
+	return (i != end(_trustedPeers))
+		&& ((i->second & PeerTrustFlag::Payment) != 0);
+}
+
+void Account::markPeerTrustedOpenWebView(PeerId peerId) {
+	if (isPeerTrustedOpenWebView(peerId)) {
+		return;
+	}
+	const auto i = _trustedPeers.find(peerId);
+	if (i == end(_trustedPeers)) {
+		_trustedPeers.emplace(
+			peerId,
+			PeerTrustFlag::NoOpenGame | PeerTrustFlag::OpenWebView);
+	} else {
+		i->second |= PeerTrustFlag::OpenWebView;
+	}
+	writeTrustedPeers();
+}
+
+bool Account::isPeerTrustedOpenWebView(PeerId peerId) {
+	readTrustedPeers();
+	const auto i = _trustedPeers.find(peerId);
+	return (i != end(_trustedPeers))
+		&& ((i->second & PeerTrustFlag::OpenWebView) != 0);
+}
+
+void Account::markPeerTrustedPayForMessage(
+		PeerId peerId,
+		int starsPerMessage) {
+	if (isPeerTrustedPayForMessage(peerId, starsPerMessage)) {
+		return;
+	}
+	const auto i = _trustedPayPerMessage.find(peerId);
+	if (i == end(_trustedPayPerMessage)) {
+		_trustedPayPerMessage.emplace(peerId, starsPerMessage);
+	} else {
+		i->second = starsPerMessage;
+	}
+	writeTrustedPeers();
+}
+
+bool Account::isPeerTrustedPayForMessage(
+		PeerId peerId,
+		int starsPerMessage) {
+	if (starsPerMessage <= 0) {
+		return true;
+	}
+	readTrustedPeers();
+	const auto i = _trustedPayPerMessage.find(peerId);
+	return (i != end(_trustedPayPerMessage))
+		&& (i->second >= starsPerMessage);
+}
+
+bool Account::peerTrustedPayForMessageRead() const {
+	return _trustedPeersRead;
+}
+
+bool Account::hasPeerTrustedPayForMessageEntry(PeerId peerId) const {
+	return _trustedPayPerMessage.contains(peerId);
+}
+
+void Account::clearPeerTrustedPayForMessage(PeerId peerId) {
+	const auto i = _trustedPayPerMessage.find(peerId);
+	if (i != end(_trustedPayPerMessage)) {
+		_trustedPayPerMessage.erase(i);
+		writeTrustedPeers();
+	}
 }
 
 void Account::enforceModernStorageIdBots() {

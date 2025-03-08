@@ -27,6 +27,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "chat_helpers/tabbed_panel.h"
 #include "chat_helpers/tabbed_selector.h"
 #include "core/ui_integration.h"
+#include "data/data_changes.h"
 #include "data/data_channel.h"
 #include "data/data_credits.h"
 #include "data/data_document.h"
@@ -80,6 +81,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/shadow.h"
+#include "ui/wrap/slide_wrap.h"
 #include "window/themes/window_theme.h"
 #include "window/section_widget.h"
 #include "window/window_session_controller.h"
@@ -106,6 +108,7 @@ constexpr auto kSentToastDuration = 3 * crl::time(1000);
 constexpr auto kSwitchUpgradeCoverInterval = 3 * crl::time(1000);
 constexpr auto kCrossfadeDuration = crl::time(400);
 constexpr auto kUpgradeDoneToastDuration = 4 * crl::time(1000);
+constexpr auto kGiftsPreloadTimeout = 3 * crl::time(1000);
 
 using namespace HistoryView;
 using namespace Info::PeerGifts;
@@ -126,6 +129,7 @@ struct GiftDetails {
 	uint64 randomId = 0;
 	bool anonymous = false;
 	bool upgraded = false;
+	bool byStars = false;
 };
 
 class PreviewDelegate final : public DefaultElementDelegate {
@@ -227,7 +231,7 @@ auto GenerateGiftMedia(
 				TextWithEntities text,
 				QMargins margins = {},
 				const base::flat_map<uint16, ClickHandlerPtr> &links = {},
-				const std::any &context = {}) {
+				Ui::Text::MarkedContext context = {}) {
 			if (text.empty()) {
 				return;
 			}
@@ -236,7 +240,7 @@ auto GenerateGiftMedia(
 				margins,
 				st::defaultTextStyle,
 				links,
-				context));
+				std::move(context)));
 		};
 
 		const auto sticker = [=] {
@@ -306,10 +310,10 @@ auto GenerateGiftMedia(
 		auto description = data.text.empty()
 			? std::move(textFallback)
 			: data.text;
-		const auto context = Core::MarkedTextContext{
+		const auto context = Core::TextContext({
 			.session = &parent->history()->session(),
-			.customEmojiRepaint = [parent] { parent->repaint(); },
-		};
+			.repaint = [parent] { parent->repaint(); },
+		});
 		pushText(
 			std::move(title),
 			st::giftBoxPreviewTitlePadding,
@@ -495,7 +499,14 @@ void PreviewWrap::prepare(rpl::producer<GiftDetails> details) {
 	std::move(details) | rpl::start_with_next([=](GiftDetails details) {
 		const auto &descriptor = details.descriptor;
 		const auto cost = v::match(descriptor, [&](GiftTypePremium data) {
-			return FillAmountAndCurrency(data.cost, data.currency, true);
+			const auto stars = (details.byStars && data.stars)
+				? data.stars
+				: (data.currency == kCreditsCurrency)
+				? data.cost
+				: 0;
+			return stars
+				? tr::lng_gift_stars_title(tr::now, lt_count, stars)
+				: FillAmountAndCurrency(data.cost, data.currency, true);
 		}, [&](GiftTypeStars data) {
 			const auto stars = data.info.stars
 				+ (details.upgraded ? data.info.starsToUpgrade : 0);
@@ -622,14 +633,27 @@ void PreviewWrap::paintEvent(QPaintEvent *e) {
 			list.reserve(options.size());
 			auto minMonthsGift = GiftTypePremium();
 			for (const auto &option : options) {
-				list.push_back({
-					.cost = option.cost,
-					.currency = option.currency,
-					.months = option.months,
-				});
-				if (!minMonthsGift.months
-					|| option.months < minMonthsGift.months) {
-					minMonthsGift = list.back();
+				if (option.currency != kCreditsCurrency) {
+					list.push_back({
+						.cost = option.cost,
+						.currency = option.currency,
+						.months = option.months,
+					});
+					if (!minMonthsGift.months
+						|| option.months < minMonthsGift.months) {
+						minMonthsGift = list.back();
+					}
+				}
+			}
+			for (const auto &option : options) {
+				if (option.currency == kCreditsCurrency) {
+					const auto i = ranges::find(
+						list,
+						option.months,
+						&GiftTypePremium::months);
+					if (i != end(list)) {
+						i->stars = option.cost;
+					}
 				}
 			}
 			for (auto &gift : list) {
@@ -735,15 +759,11 @@ void PreviewWrap::paintEvent(QPaintEvent *e) {
 	}
 	auto &manager = session->data().customEmojiManager();
 	auto result = Text::String();
-	const auto context = Core::MarkedTextContext{
-		.session = session,
-		.customEmojiRepaint = [] {},
-	};
 	result.setMarkedText(
 		st::semiboldTextStyle,
 		manager.creditsEmoji().append(QString::number(price)),
 		kMarkupTextOptions,
-		context);
+		Core::TextContext({ .session = session }));
 	return result;
 }
 
@@ -1103,16 +1123,35 @@ void SendGift(
 		std::shared_ptr<Api::PremiumGiftCodeOptions> api,
 		const GiftDetails &details,
 		Fn<void(Payments::CheckoutResult)> done) {
+	const auto processNonPanelPaymentFormFactory
+		= Payments::ProcessNonPanelPaymentFormFactory(window, done);
 	v::match(details.descriptor, [&](const GiftTypePremium &gift) {
-		auto invoice = api->invoice(1, gift.months);
-		invoice.purpose = Payments::InvoicePremiumGiftCodeUsers{
-			.users = { peer->asUser() },
-			.message = details.text,
-		};
-		Payments::CheckoutProcess::Start(std::move(invoice), done);
+		if (details.byStars && gift.stars) {
+			auto invoice = Payments::InvoicePremiumGiftCode{
+				.purpose = Payments::InvoicePremiumGiftCodeUsers{
+					.users = { peer->asUser() },
+					.message = details.text,
+				},
+				.currency = Ui::kCreditsCurrency,
+				.randomId = details.randomId,
+				.amount = uint64(gift.stars),
+				.storeQuantity = 1,
+				.users = 1,
+				.months = gift.months,
+			};
+			Payments::CheckoutProcess::Start(
+				std::move(invoice),
+				done,
+				processNonPanelPaymentFormFactory);
+		} else {
+			auto invoice = api->invoice(1, gift.months);
+			invoice.purpose = Payments::InvoicePremiumGiftCodeUsers{
+				.users = { peer->asUser() },
+				.message = details.text,
+			};
+			Payments::CheckoutProcess::Start(std::move(invoice), done);
+		}
 	}, [&](const GiftTypeStars &gift) {
-		const auto processNonPanelPaymentFormFactory
-			= Payments::ProcessNonPanelPaymentFormFactory(window, done);
 		Payments::CheckoutProcess::Start(Payments::InvoiceStarGift{
 			.giftId = gift.info.id,
 			.randomId = details.randomId,
@@ -1279,12 +1318,6 @@ void AddUpgradeButton(
 	button->toggleOn(rpl::single(false))->toggledValue(
 	) | rpl::start_with_next(toggled, button->lifetime());
 
-	const auto makeContext = [session](Fn<void()> update) {
-		return Core::MarkedTextContext{
-			.session = session,
-			.customEmojiRepaint = std::move(update),
-		};
-	};
 	auto star = session->data().customEmojiManager().creditsEmoji();
 	const auto label = Ui::CreateChild<Ui::FlatLabel>(
 		button,
@@ -1296,7 +1329,7 @@ void AddUpgradeButton(
 			Text::WithEntities),
 		st::boxLabel,
 		st::defaultPopupMenu,
-		std::move(makeContext));
+		Core::TextContext({ .session = session }));
 	label->show();
 	label->setAttribute(Qt::WA_TransparentForMouseEvents);
 	button->widthValue() | rpl::start_with_next([=](int outer) {
@@ -1424,6 +1457,7 @@ void SendGiftBox(
 
 	struct State {
 		rpl::variable<GiftDetails> details;
+		rpl::variable<bool> messageAllowed;
 		std::shared_ptr<Data::DocumentMedia> media;
 		bool submitting = false;
 	};
@@ -1432,13 +1466,25 @@ void SendGiftBox(
 		.descriptor = descriptor,
 		.randomId = base::RandomValue<uint64>(),
 	};
+	peer->updateFull();
+	state->messageAllowed = peer->session().changes().peerFlagsValue(
+		peer,
+		Data::PeerUpdate::Flag::StarsPerMessage
+	) | rpl::map([=] {
+		return peer->starsPerMessageChecked() == 0;
+	});
 
 	auto cost = state->details.value(
 	) | rpl::map([session](const GiftDetails &details) {
 		return v::match(details.descriptor, [&](const GiftTypePremium &data) {
-			if (data.currency == kCreditsCurrency) {
+			const auto stars = (details.byStars && data.stars)
+				? data.stars
+				: (data.currency == kCreditsCurrency)
+				? data.cost
+				: 0;
+			if (stars) {
 				return CreditsEmojiSmall(session).append(
-					Lang::FormatCountDecimal(std::abs(data.cost)));
+					Lang::FormatCountDecimal(std::abs(stars)));
 			}
 			return TextWithEntities{
 				FillAmountAndCurrency(data.cost, data.currency),
@@ -1462,10 +1508,17 @@ void SendGiftBox(
 		peer,
 		state->details.value()));
 
+	const auto messageWrap = container->add(
+		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+			container,
+			object_ptr<Ui::VerticalLayout>(container)));
+	messageWrap->toggleOn(state->messageAllowed.value());
+	messageWrap->finishAnimating();
+	const auto messageInner = messageWrap->entity();
 	const auto limit = StarGiftMessageLimit(session);
 	const auto text = AddPartInput(
 		window,
-		container,
+		messageInner,
 		box->getDelegate()->outerContainer(),
 		tr::lng_gift_send_message(),
 		QString(),
@@ -1509,7 +1562,6 @@ void SendGiftBox(
 		text,
 		session,
 		{ .suggestCustomEmoji = true, .allowCustomWithoutPremium = allow });
-
 	if (stars) {
 		const auto cost = stars->info.starsToUpgrade;
 		if (cost > 0 && !peer->isSelf()) {
@@ -1551,20 +1603,73 @@ void SendGiftBox(
 		}, container->lifetime());
 		AddSkip(container);
 	}
-	v::match(descriptor, [&](const GiftTypePremium &) {
-		AddDividerText(container, tr::lng_gift_send_premium_about(
+	v::match(descriptor, [&](const GiftTypePremium &data) {
+		AddDividerText(messageInner, tr::lng_gift_send_premium_about(
 			lt_user,
 			rpl::single(peer->shortName())));
+
+		if (const auto byStars = data.stars) {
+			const auto star = Ui::Text::IconEmoji(&st::starIconEmojiColored);
+			AddSkip(container);
+			container->add(
+				object_ptr<SettingsButton>(
+					container,
+					tr::lng_gift_send_pay_with_stars(
+						lt_amount,
+						rpl::single(base::duplicate(star).append(Lang::FormatCountDecimal(byStars))),
+						Ui::Text::WithEntities),
+						st::settingsButtonNoIcon)
+			)->toggleOn(rpl::single(false))->toggledValue(
+			) | rpl::start_with_next([=](bool toggled) {
+				auto now = state->details.current();
+				now.byStars = toggled;
+				state->details = std::move(now);
+			}, container->lifetime());
+			AddSkip(container);
+
+			const auto balance = AddDividerText(
+				container,
+				tr::lng_gift_send_stars_balance(
+					lt_amount,
+					peer->session().credits().balanceValue(
+					) | rpl::map([=](StarsAmount amount) {
+						return base::duplicate(star).append(
+							Lang::FormatStarsAmountDecimal(amount));
+					}),
+					lt_link,
+					tr::lng_gift_send_stars_balance_link(
+					) | Ui::Text::ToLink(),
+					Ui::Text::WithEntities));
+			struct State {
+				Settings::BuyStarsHandler buyStars;
+				rpl::variable<bool> loading;
+			};
+			const auto state = balance->lifetime().make_state<State>();
+			state->loading = state->buyStars.loadingValue();
+			balance->setClickHandlerFilter([=](const auto &...) {
+				if (!state->loading.current()) {
+					state->buyStars.handler(window->uiShow())();
+				}
+				return false;
+			});
+		}
 	}, [&](const GiftTypeStars &) {
 		AddDividerText(container, peer->isSelf()
 			? tr::lng_gift_send_anonymous_self()
 			: peer->isBroadcast()
 			? tr::lng_gift_send_anonymous_about_channel()
-			: tr::lng_gift_send_anonymous_about(
-				lt_user,
-				rpl::single(peer->shortName()),
-				lt_recipient,
-				rpl::single(peer->shortName())));
+			: rpl::conditional(
+				state->messageAllowed.value(),
+				tr::lng_gift_send_anonymous_about(
+					lt_user,
+					rpl::single(peer->shortName()),
+					lt_recipient,
+					rpl::single(peer->shortName())),
+				tr::lng_gift_send_anonymous_about_paid(
+					lt_user,
+					rpl::single(peer->shortName()),
+					lt_recipient,
+					rpl::single(peer->shortName()))));
 	});
 
 	const auto buttonWidth = st::boxWideWidth
@@ -1575,13 +1680,20 @@ void SendGiftBox(
 			return;
 		}
 		state->submitting = true;
-		const auto details = state->details.current();
+		auto details = state->details.current();
+		if (!state->messageAllowed.current()) {
+			details.text = {};
+		}
 		const auto weak = MakeWeak(box);
 		const auto done = [=](Payments::CheckoutResult result) {
 			if (result == Payments::CheckoutResult::Paid) {
+				if (details.byStars
+					|| v::is<GiftTypeStars>(details.descriptor)) {
+					window->session().credits().load(true);
+				}
 				const auto copy = state->media;
 				window->showPeerHistory(peer);
-				ShowSentToast(window, descriptor, details);
+				ShowSentToast(window, details.descriptor, details);
 			}
 			if (const auto strong = weak.data()) {
 				box->closeBox();
@@ -1813,6 +1925,8 @@ void GiftBox(
 	box->setNoContentMargin(true);
 	box->setCustomCornersFilling(RectPart::FullTop);
 	box->addButton(tr::lng_create_group_back(), [=] { box->closeBox(); });
+
+	window->session().credits().load();
 
 	FillBg(box);
 
@@ -2070,7 +2184,66 @@ void ChooseStarGiftRecipient(
 void ShowStarGiftBox(
 		not_null<Window::SessionController*> controller,
 		not_null<PeerData*> peer) {
-	controller->show(Box(GiftBox, controller, peer));
+	struct Session {
+		PeerData *peer = nullptr;
+		bool premiumGiftsReady = false;
+		bool starsGiftsReady = false;
+		rpl::lifetime lifetime;
+	};
+	static auto Map = base::flat_map<not_null<Main::Session*>, Session>();
+
+	const auto session = &controller->session();
+	auto i = Map.find(session);
+	if (i == end(Map)) {
+		i = Map.emplace(session).first;
+		session->lifetime().add([=] { Map.remove(session); });
+	} else if (i->second.peer == peer) {
+		return;
+	}
+	i->second = Session{ .peer = peer };
+
+	const auto weak = base::make_weak(controller);
+	const auto show = [=] {
+		Map[session] = Session();
+		if (const auto strong = weak.get()) {
+			strong->show(Box(GiftBox, strong, peer));
+		}
+	};
+
+	base::timer_once(
+		kGiftsPreloadTimeout
+	) | rpl::start_with_next(show, i->second.lifetime);
+
+	const auto user = peer->asUser();
+	if (user && !user->isSelf()) {
+		GiftsPremium(
+			session,
+			peer
+		) | rpl::start_with_next([=](PremiumGiftsDescriptor &&gifts) {
+			if (!gifts.list.empty()) {
+				auto &entry = Map[session];
+				entry.premiumGiftsReady = true;
+				if (entry.starsGiftsReady) {
+					show();
+				}
+			}
+		}, i->second.lifetime);
+	} else {
+		i->second.premiumGiftsReady = true;
+	}
+
+	GiftsStars(
+		session,
+		peer
+	) | rpl::start_with_next([=](std::vector<GiftTypeStars> &&gifts) {
+		if (!gifts.empty()) {
+			auto &entry = Map[session];
+			entry.starsGiftsReady = true;
+			if (entry.premiumGiftsReady) {
+				show();
+			}
+		}
+	}, i->second.lifetime);
 }
 
 void AddUniqueGiftCover(

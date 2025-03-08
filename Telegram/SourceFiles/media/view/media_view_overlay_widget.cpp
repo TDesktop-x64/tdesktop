@@ -1515,6 +1515,9 @@ void OverlayWidget::refreshCaptionGeometry() {
 	if (_caption.isEmpty() && (!_stories || !_stories->repost())) {
 		_captionRect = QRect();
 		return;
+	} else if (_fullScreenVideo) {
+		_captionRect = QRect();
+		return;
 	}
 
 	if (_groupThumbs && _groupThumbs->hiding()) {
@@ -3348,12 +3351,12 @@ void OverlayWidget::refreshCaption() {
 		}
 		update(captionGeometry());
 	};
-	const auto context = Core::MarkedTextContext{
+	const auto context = Core::TextContext({
 		.session = (_stories
 			? _storiesSession
 			: &_message->history()->session()),
-		.customEmojiRepaint = captionRepaint,
-	};
+		.repaint = captionRepaint,
+	});
 	_caption.setMarkedText(
 		st::mediaviewCaptionStyle,
 		(base.isEmpty()
@@ -6115,7 +6118,7 @@ void OverlayWidget::updateOver(QPoint pos) {
 		auto textState = _saveMsgText.getState(pos - _saveMsg.topLeft() - QPoint(st::mediaviewSaveMsgPadding.left(), st::mediaviewSaveMsgPadding.top()), _saveMsg.width() - st::mediaviewSaveMsgPadding.left() - st::mediaviewSaveMsgPadding.right());
 		lnk = textState.link;
 		lnkhost = this;
-	} else if (_captionRect.contains(pos)) {
+	} else if (_captionRect.contains(pos) && !_fullScreenVideo) {
 		auto request = Ui::Text::StateRequestElided();
 		const auto lineHeight = st::mediaviewCaptionStyle.font->height;
 		request.lines = _captionRect.height() / lineHeight;

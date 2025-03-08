@@ -16,6 +16,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_unread_things.h"
 #include "ui/boxes/confirm_box.h"
 #include "boxes/delete_messages_box.h"
+#include "boxes/send_credits_box.h"
 #include "boxes/send_files_box.h"
 #include "boxes/share_box.h"
 #include "boxes/edit_caption_box.h"
@@ -129,6 +130,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mtproto/mtproto_config.h"
 #include "lang/lang_keys.h"
 #include "settings/business/settings_quick_replies.h"
+#include "settings/settings_credits_graphics.h"
 #include "storage/localimageloader.h"
 #include "storage/storage_account.h"
 #include "storage/file_upload.h"
@@ -147,6 +149,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/chat/chat_theme.h"
 #include "ui/chat/chat_style.h"
 #include "ui/chat/continuous_scroll.h"
+#include "ui/widgets/checkbox.h"
 #include "ui/widgets/elastic_scroll.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/item_text_options.h"
@@ -495,6 +498,11 @@ HistoryWidget::HistoryWidget(
 		moveFieldControls();
 	}, lifetime());
 
+	_send->widthValue() | rpl::skip(1) | rpl::start_with_next([=] {
+		updateFieldSize();
+		moveFieldControls();
+	}, _send->lifetime());
+
 	_keyboard->sendCommandRequests(
 	) | rpl::start_with_next([=](Bot::SendCommandRequest r) {
 		sendBotCommand(r);
@@ -542,6 +550,7 @@ HistoryWidget::HistoryWidget(
 		session().attachWebView().attachBotsUpdates(),
 		session().changes().peerUpdates(
 			Data::PeerUpdate::Flag::Rights
+			| Data::PeerUpdate::Flag::StarsPerMessage
 		) | rpl::filter([=](const Data::PeerUpdate &update) {
 			return update.peer == _peer;
 		}) | rpl::to_empty
@@ -785,7 +794,7 @@ HistoryWidget::HistoryWidget(
 	) | rpl::start_with_next([=](UserData::Flags::Change change) {
 		if (change.diff & UserData::Flag::Premium) {
 			if (const auto user = _peer ? _peer->asUser() : nullptr) {
-				if (user->meRequiresPremiumToWrite()) {
+				if (user->requiresPremiumToWrite()) {
 					handlePeerUpdate();
 				}
 			}
@@ -809,6 +818,7 @@ HistoryWidget::HistoryWidget(
 		| PeerUpdateFlag::MessagesTTL
 		| PeerUpdateFlag::ChatThemeEmoji
 		| PeerUpdateFlag::FullInfo
+		| PeerUpdateFlag::StarsPerMessage
 	) | rpl::filter([=](const Data::PeerUpdate &update) {
 		return (update.peer.get() == _peer);
 	}) | rpl::map([](const Data::PeerUpdate &update) {
@@ -816,6 +826,7 @@ HistoryWidget::HistoryWidget(
 	}) | rpl::start_with_next([=](Data::PeerUpdate::Flags flags) {
 		if (flags & PeerUpdateFlag::Rights) {
 			updateFieldPlaceholder();
+			updateSendButtonType();
 			_preview->checkNow(false);
 
 			const auto was = (_sendAs != nullptr);
@@ -842,6 +853,10 @@ HistoryWidget::HistoryWidget(
 				}
 				return;
 			}
+		}
+		if (flags & PeerUpdateFlag::StarsPerMessage) {
+			updateFieldPlaceholder();
+			updateSendButtonType();
 		}
 		if (flags & PeerUpdateFlag::BotStartToken) {
 			updateControlsVisibility();
@@ -881,7 +896,9 @@ HistoryWidget::HistoryWidget(
 		}
 		if (flags & PeerUpdateFlag::FullInfo) {
 			fullInfoUpdated();
-			if (const auto channel = _peer->asChannel()) {
+			if (_peer->starsPerMessageChecked()) {
+				session().credits().load();
+			} else if (const auto channel = _peer->asChannel()) {
 				if (channel->allowedReactions().paidEnabled) {
 					session().credits().load();
 				}
@@ -1115,19 +1132,8 @@ void HistoryWidget::initVoiceRecordBar() {
 	}, lifetime());
 
 	_voiceRecordBar->sendVoiceRequests(
-	) | rpl::start_with_next([=](const auto &data) {
-		if (!canWriteMessage() || data.bytes.isEmpty() || !_history) {
-			return;
-		}
-
-		auto action = prepareSendAction(data.options);
-		session().api().sendVoiceMessage(
-			data.bytes,
-			data.waveform,
-			data.duration,
-			data.video,
-			action);
-		_voiceRecordBar->clearListenState();
+	) | rpl::start_with_next([=](const VoiceToSend &data) {
+		sendVoice(data);
 	}, lifetime());
 
 	_voiceRecordBar->cancelRequests(
@@ -1709,6 +1715,9 @@ void HistoryWidget::orderWidgets() {
 	}
 	if (_contactStatus) {
 		_contactStatus->bar().raise();
+	}
+	if (_paysStatus) {
+		_paysStatus->bar().raise();
 	}
 	if (_translateBar) {
 		_translateBar->raise();
@@ -2403,6 +2412,7 @@ void HistoryWidget::showHistory(
 		setHistory(nullptr);
 		_list = nullptr;
 		_peer = nullptr;
+		_sendPayment.clear();
 		_topicsRequested.clear();
 		_canSendMessages = false;
 		_canSendTexts = false;
@@ -2432,6 +2442,7 @@ void HistoryWidget::showHistory(
 	_showAtMsgId = showAtMsgId;
 	_showAtMsgParams = params;
 	_historyInited = false;
+	_paysStatus = nullptr;
 	_contactStatus = nullptr;
 	_businessBotStatus = nullptr;
 
@@ -2452,6 +2463,14 @@ void HistoryWidget::showHistory(
 
 		refreshGiftToChannelShown();
 		if (const auto user = _peer->asUser()) {
+			_paysStatus = std::make_unique<PaysStatus>(
+				controller(),
+				this,
+				user);
+			_paysStatus->bar().heightValue(
+			) | rpl::start_with_next([=] {
+				updateControlsGeometry();
+			}, _paysStatus->bar().lifetime());
 			_businessBotStatus = std::make_unique<BusinessBotStatus>(
 				controller(),
 				this,
@@ -2529,6 +2548,12 @@ void HistoryWidget::showHistory(
 		_scroll->hide();
 		_list = _scroll->setOwnedWidget(
 			object_ptr<HistoryInner>(this, _scroll, controller(), _history));
+		_list->sendIntroSticker(
+		) | rpl::start_with_next([=](not_null<DocumentData*> sticker) {
+			sendExistingDocument(
+				sticker,
+				Api::MessageToSend(prepareSendAction({})));
+		}, _list->lifetime());
 		_list->show();
 
 		if (const auto channel = _peer->asChannel()) {
@@ -3041,16 +3066,13 @@ bool HistoryWidget::contentOverlapped(const QRect &globalRect) {
 }
 
 bool HistoryWidget::canWriteMessage() const {
-	if (!_history || !_canSendMessages) {
-		return false;
-	}
-	if (isBlocked() || isJoinChannel() || isMuteUnmute() || isBotStart()) {
-		return false;
-	}
-	if (isSearching()) {
-		return false;
-	}
-	return true;
+	return _history
+		&& _canSendMessages
+		&& !isBlocked()
+		&& !isJoinChannel()
+		&& !isMuteUnmute()
+		&& !isBotStart()
+		&& !isSearching();
 }
 
 void HistoryWidget::updateControlsVisibility() {
@@ -3096,6 +3118,9 @@ void HistoryWidget::updateControlsVisibility() {
 	}
 	if (_requestsBar) {
 		_requestsBar->show();
+	}
+	if (_paysStatus) {
+		_paysStatus->show();
 	}
 	if (_contactStatus) {
 		_contactStatus->show();
@@ -4191,7 +4216,7 @@ void HistoryWidget::checkReplyReturns() {
 }
 
 void HistoryWidget::cancelInlineBot() {
-	auto &textWithTags = _field->getTextWithTags();
+	const auto &textWithTags = _field->getTextWithTags();
 	if (textWithTags.text.size() > _inlineBotUsername.size() + 2) {
 		setFieldText(
 			{ '@' + _inlineBotUsername + ' ', TextWithTags::Tags() },
@@ -4351,6 +4376,9 @@ void HistoryWidget::hideChildWidgets() {
 	if (_chooseTheme) {
 		_chooseTheme->hide();
 	}
+	if (_paysStatus) {
+		_paysStatus->hide();
+	}
 	if (_contactStatus) {
 		_contactStatus->hide();
 	}
@@ -4386,6 +4414,34 @@ Api::SendAction HistoryWidget::prepareSendAction(
 	return result;
 }
 
+void HistoryWidget::sendVoice(const VoiceToSend &data) {
+	if (!canWriteMessage() || data.bytes.isEmpty() || !_history) {
+		return;
+	}
+
+	const auto withPaymentApproved = [=](int approved) {
+		auto copy = data;
+		copy.options.starsApproved = approved;
+		sendVoice(copy);
+	};
+	const auto checked = checkSendPayment(
+		1 + int(_forwardPanel->items().size()),
+		data.options.starsApproved,
+		withPaymentApproved);
+	if (!checked) {
+		return;
+	}
+
+	auto action = prepareSendAction(data.options);
+	session().api().sendVoiceMessage(
+		data.bytes,
+		data.waveform,
+		data.duration,
+		data.video,
+		action);
+	_voiceRecordBar->clearListenState();
+}
+
 void HistoryWidget::send(Api::SendOptions options) {
 	if (!_history) {
 		return;
@@ -4394,9 +4450,7 @@ void HistoryWidget::send(Api::SendOptions options) {
 		return;
 	} else if (!options.scheduled && showSlowmodeError()) {
 		return;
-	}
-
-	if (_voiceRecordBar->isListenState()) {
+	} else if (_voiceRecordBar->isListenState()) {
 		_voiceRecordBar->requestToSendWithOptions(options);
 		return;
 	}
@@ -4410,9 +4464,16 @@ void HistoryWidget::send(Api::SendOptions options) {
 	message.webPage = _preview->draft();
 
 	const auto ignoreSlowmodeCountdown = (options.scheduled != 0);
+	const auto withPaymentApproved = [=](int approved) {
+		auto copy = options;
+		copy.starsApproved = approved;
+		send(copy);
+	};
 	if (showSendMessageError(
 			message.textWithTags,
-			ignoreSlowmodeCountdown)) {
+			ignoreSlowmodeCountdown,
+			withPaymentApproved,
+			options.starsApproved)) {
 		return;
 	}
 
@@ -4470,6 +4531,8 @@ void HistoryWidget::sendScheduled(Api::SendOptions initialOptions) {
 SendMenu::Details HistoryWidget::sendMenuDetails() const {
 	const auto type = !_peer
 		? SendMenu::Type::Disabled
+		: _peer->starsPerMessageChecked()
+		? SendMenu::Type::SilentOnly
 		: _peer->isSelf()
 		? SendMenu::Type::Reminder
 		: HistoryView::CanScheduleUntilOnline(_peer)
@@ -4748,6 +4811,19 @@ FullMsgId HistoryWidget::cornerButtonsCurrentId() {
 		: FullMsgId();
 }
 
+bool HistoryWidget::checkSendPayment(
+		int messagesCount,
+		int starsApproved,
+		Fn<void(int)> withPaymentApproved) {
+	return _peer
+		&& _sendPayment.check(
+			controller(),
+			_peer,
+			messagesCount,
+			starsApproved,
+			std::move(withPaymentApproved));
+}
+
 void HistoryWidget::checkSuggestToGigagroup() {
 	const auto group = _peer ? _peer->asMegagroup() : nullptr;
 	if (!group || !group->owner().suggestToGigagroup(group)) {
@@ -4913,10 +4989,29 @@ void HistoryWidget::mouseReleaseEvent(QMouseEvent *e) {
 }
 
 void HistoryWidget::sendBotCommand(const Bot::SendCommandRequest &request) {
-// replyTo != 0 from ReplyKeyboardMarkup, == 0 from command links
+	sendBotCommand(request, {});
+}
+
+void HistoryWidget::sendBotCommand(
+		const Bot::SendCommandRequest &request,
+		Api::SendOptions options) {
+	// replyTo != 0 from ReplyKeyboardMarkup, == 0 from command links
 	if (_peer != request.peer.get()) {
 		return;
 	} else if (showSlowmodeError()) {
+		return;
+	}
+
+	const auto withPaymentApproved = [=](int approved) {
+		auto copy = options;
+		copy.starsApproved = approved;
+		sendBotCommand(request, copy);
+	};
+	const auto checked = checkSendPayment(
+		1,
+		options.starsApproved,
+		withPaymentApproved);
+	if (!checked) {
 		return;
 	}
 
@@ -4929,7 +5024,7 @@ void HistoryWidget::sendBotCommand(const Bot::SendCommandRequest &request) {
 		? request.command
 		: Bot::WrapCommandInChat(_peer, request.command, request.context);
 
-	auto message = Api::MessageToSend(prepareSendAction({}));
+	auto message = Api::MessageToSend(prepareSendAction(options));
 	message.textWithTags = { toSend, TextWithTags::Tags() };
 	message.action.replyTo = request.replyTo
 		? ((!_peer->isUser()/* && (botStatus == 0 || botStatus == 2)*/)
@@ -5155,19 +5250,30 @@ void HistoryWidget::updateSendButtonType() {
 	using Type = Ui::SendButton::Type;
 
 	const auto type = computeSendButtonType();
-	_send->setType(type);
-
 	// This logic is duplicated in RepliesWidget.
 	const auto disabledBySlowmode = _peer
 		&& _peer->slowmodeApplied()
 		&& (_history->latestSendingMessage() != nullptr);
-
 	const auto delay = [&] {
 		return (type != Type::Cancel && type != Type::Save && _peer)
 			? _peer->slowmodeSecondsLeft()
 			: 0;
 	}();
-	_send->setSlowmodeDelay(delay);
+	const auto perMessage = _peer ? _peer->starsPerMessageChecked() : 0;
+	const auto messages = !_peer
+		? 0
+		: _voiceRecordBar->isListenState()
+		? 1
+		: ComputeSendingMessagesCount(_history, {
+			.forward = &_forwardPanel->items(),
+			.text = &_field->getTextWithTags(),
+		});
+	const auto stars = perMessage ? (perMessage * messages) : 0;
+	_send->setState({
+		.type = (delay > 0) ? Type::Slowmode : type,
+		.slowmodeDelay = delay,
+		.starsToSend = stars,
+	});
 	_send->setDisabled(disabledBySlowmode
 		&& (type == Type::Send
 			|| type == Type::Record
@@ -5781,6 +5887,9 @@ void HistoryWidget::fieldFocused() {
 }
 
 void HistoryWidget::updateFieldPlaceholder() {
+	_voiceRecordBar->setPauseInsteadSend(_history
+		&& _history->peer->starsPerMessageChecked() > 0);
+
 	if (!_editMsgId && _inlineBot && !_inlineLookingUpBot) {
 		_field->setPlaceholder(
 			rpl::single(_inlineBot->botInfo->inlinePlaceholder.mid(1)),
@@ -5789,14 +5898,21 @@ void HistoryWidget::updateFieldPlaceholder() {
 	}
 
 	_field->setPlaceholder([&]() -> rpl::producer<QString> {
+		const auto peer = _history ? _history->peer.get() : nullptr;
 		if (_editMsgId) {
 			return tr::lng_edit_message_text();
-		} else if (!_history) {
+		} else if (!peer) {
 			return tr::lng_message_ph();
 		} else if ((_kbShown || _keyboard->forceReply())
 			&& !_keyboard->placeholder().isEmpty()) {
 			return rpl::single(_keyboard->placeholder());
-		} else if (const auto channel = _history->peer->asChannel()) {
+		} else if (const auto stars = peer->starsPerMessageChecked()) {
+			return tr::lng_message_paid_ph(
+				lt_amount,
+				tr::lng_prize_credits_amount(
+					lt_count,
+					rpl::single(stars * 1.)));
+		} else if (const auto channel = peer->asChannel()) {
 			const auto topic = resolveReplyToTopic();
 			const auto topicRootId = topic
 				? topic->rootId()
@@ -5913,24 +6029,31 @@ Data::ForumTopic *HistoryWidget::resolveReplyToTopic() {
 
 bool HistoryWidget::showSendMessageError(
 		const TextWithTags &textWithTags,
-		bool ignoreSlowmodeCountdown) {
+		bool ignoreSlowmodeCountdown,
+		Fn<void(int starsApproved)> withPaymentApproved,
+		int starsApproved) {
 	if (!_canSendMessages) {
 		return false;
 	}
 	const auto topicRootId = resolveReplyToTopicRootId();
-	const auto error = GetErrorForSending(
-		_peer,
-		{
-			.topicRootId = topicRootId,
-			.forward = &_forwardPanel->items(),
-			.text = &textWithTags,
-			.ignoreSlowmodeCountdown = ignoreSlowmodeCountdown,
-		});
-	if (!error) {
-		return false;
+	auto request = SendingErrorRequest{
+		.topicRootId = topicRootId,
+		.forward = &_forwardPanel->items(),
+		.text = &textWithTags,
+		.ignoreSlowmodeCountdown = ignoreSlowmodeCountdown,
+	};
+	request.messagesCount = ComputeSendingMessagesCount(_history, request);
+	const auto error = GetErrorForSending(_peer, request);
+	if (error) {
+		Data::ShowSendErrorToast(controller(), _peer, error);
+		return true;
 	}
-	Data::ShowSendErrorToast(controller(), _peer, error);
-	return true;
+
+	return withPaymentApproved
+		&& !checkSendPayment(
+			request.messagesCount,
+			starsApproved,
+			withPaymentApproved);
 }
 
 bool HistoryWidget::confirmSendingFiles(const QStringList &files) {
@@ -6027,27 +6150,52 @@ void HistoryWidget::sendingFilesConfirmed(
 	if (showSendingFilesError(list, compress)) {
 		return;
 	}
+
 	auto groups = DivideByGroups(
 		std::move(list),
 		way,
 		_peer->slowmodeApplied());
+	auto bundle = PrepareFilesBundle(
+		std::move(groups),
+		way,
+		std::move(caption),
+		ctrlShiftEnter);
+	sendingFilesConfirmed(std::move(bundle), options);
+}
+
+void HistoryWidget::sendingFilesConfirmed(
+		std::shared_ptr<Ui::PreparedBundle> bundle,
+		Api::SendOptions options) {
+	const auto withPaymentApproved = [=](int approved) {
+		auto copy = options;
+		copy.starsApproved = approved;
+		sendingFilesConfirmed(bundle, copy);
+	};
+	const auto checked = checkSendPayment(
+		bundle->totalCount,
+		options.starsApproved,
+		withPaymentApproved);
+	if (!checked) {
+		return;
+	}
+
+	const auto compress = bundle->way.sendImagesAsPhotos();
 	const auto type = compress ? SendMediaType::Photo : SendMediaType::File;
 	auto action = prepareSendAction(options);
 	action.clearDraft = false;
-	if ((groups.size() != 1 || !groups.front().sentWithCaption())
-		&& !caption.text.isEmpty()) {
+	if (bundle->sendComment) {
 		auto message = Api::MessageToSend(action);
-		message.textWithTags = base::take(caption);
+		message.textWithTags = base::take(bundle->caption);
 		session().api().sendMessage(std::move(message));
 	}
-	for (auto &group : groups) {
+	for (auto &group : bundle->groups) {
 		const auto album = (group.type != Ui::AlbumType::None)
 			? std::make_shared<SendingAlbum>()
 			: nullptr;
 		session().api().sendFiles(
 			std::move(group.list),
 			type,
-			base::take(caption),
+			base::take(bundle->caption),
 			album,
 			action);
 	}
@@ -6253,8 +6401,13 @@ void HistoryWidget::updateControlsGeometry() {
 		_translateBar->move(0, translateTop);
 		_translateBar->resizeToWidth(width());
 	}
-	const auto contactStatusTop = translateTop
+	const auto paysStatusTop = translateTop
 		+ (_translateBar ? _translateBar->height() : 0);
+	if (_paysStatus) {
+		_paysStatus->bar().move(0, paysStatusTop);
+	}
+	const auto contactStatusTop = paysStatusTop
+		+ (_paysStatus ? _paysStatus->bar().height() : 0);
 	if (_contactStatus) {
 		_contactStatus->bar().move(0, contactStatusTop);
 	}
@@ -6504,6 +6657,9 @@ void HistoryWidget::updateHistoryGeometry(
 	}
 	if (_requestsBar) {
 		newScrollHeight -= _requestsBar->height();
+	}
+	if (_paysStatus) {
+		newScrollHeight -= _paysStatus->bar().height();
 	}
 	if (_contactStatus) {
 		newScrollHeight -= _contactStatus->bar().height();
@@ -6927,6 +7083,7 @@ void HistoryWidget::botCallbackSent(not_null<HistoryItem*> item) {
 int HistoryWidget::computeMaxFieldHeight() const {
 	const auto available = height()
 		- _topBar->height()
+		- (_paysStatus ? _paysStatus->bar().height() : 0)
 		- (_contactStatus ? _contactStatus->bar().height() : 0)
 		- (_businessBotStatus ? _businessBotStatus->bar().height() : 0)
 		- (_sponsoredMessageBar ? _sponsoredMessageBar->height() : 0)
@@ -7296,10 +7453,21 @@ void HistoryWidget::sendInlineResult(InlineBots::ResultSelected result) {
 		return;
 	} else if (showSlowmodeError()) {
 		return;
+	} else if (const auto error = result.result->getErrorOnSend(_history)) {
+		Data::ShowSendErrorToast(controller(), _peer, error);
+		return;
 	}
 
-	if (const auto error = result.result->getErrorOnSend(_history)) {
-		Data::ShowSendErrorToast(controller(), _peer, error);
+	const auto withPaymentApproved = [=](int approved) {
+		auto copy = result;
+		copy.options.starsApproved = approved;
+		sendInlineResult(copy);
+	};
+	const auto checked = checkSendPayment(
+		1,
+		result.options.starsApproved,
+		withPaymentApproved);
+	if (!checked) {
 		return;
 	}
 
@@ -7310,7 +7478,7 @@ void HistoryWidget::sendInlineResult(InlineBots::ResultSelected result) {
 	action.generateLocal = true;
 	session().api().sendInlineResult(
 		result.bot,
-		result.result,
+		result.result.get(),
 		action,
 		result.messageSendingFrom.localId);
 
@@ -8000,6 +8168,18 @@ bool HistoryWidget::sendExistingDocument(
 		|| ShowSendPremiumError(controller(), document)) {
 		return false;
 	}
+	const auto withPaymentApproved = [=](int approved) {
+		auto copy = messageToSend;
+		copy.action.options.starsApproved = approved;
+		sendExistingDocument(document, std::move(copy), localId);
+	};
+	const auto checked = checkSendPayment(
+		1,
+		messageToSend.action.options.starsApproved,
+		withPaymentApproved);
+	if (!checked) {
+		return false;
+	}
 
 	Api::SendExistingDocument(
 		std::move(messageToSend),
@@ -8034,6 +8214,19 @@ bool HistoryWidget::sendExistingPhoto(
 	} else if (!_peer || !_canSendMessages) {
 		return false;
 	} else if (showSlowmodeError()) {
+		return false;
+	}
+
+	const auto withPaymentApproved = [=](int approved) {
+		auto copy = options;
+		copy.starsApproved = approved;
+		sendExistingPhoto(photo, copy);
+	};
+	const auto checked = checkSendPayment(
+		1,
+		options.starsApproved,
+		withPaymentApproved);
+	if (!checked) {
 		return false;
 	}
 
@@ -8839,10 +9032,10 @@ void HistoryWidget::messageDataReceived(
 }
 
 void HistoryWidget::updateReplyEditText(not_null<HistoryItem*> item) {
-	const auto context = Core::MarkedTextContext{
+	const auto context = Core::TextContext({
 		.session = &session(),
-		.customEmojiRepaint = [=] { updateField(); },
-	};
+		.repaint = [=] { updateField(); },
+	});
 	_replyEditMsgText.setMarkedText(
 		st::defaultTextStyle,
 		((_editMsgId || _replyTo.quote.empty())
@@ -8928,11 +9121,10 @@ void HistoryWidget::updateReplyToName() {
 	} else if (!_replyEditMsg && (_replyTo || !_kbReplyTo)) {
 		return;
 	}
-	const auto context = Core::MarkedTextContext{
+	const auto context = Core::TextContext({
 		.session = &_history->session(),
-		.customEmojiRepaint = [] {},
 		.customEmojiLoopLimit = 1,
-	};
+	});
 	const auto to = _replyEditMsg ? _replyEditMsg : _kbReplyTo;
 	const auto replyToQuote = _replyTo && !_replyTo.quote.empty();
 	_replyToName.setMarkedText(

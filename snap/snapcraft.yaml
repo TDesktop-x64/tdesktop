@@ -94,7 +94,6 @@ parts:
       - libasound2-dev
       - libavif-dev
       - libboost-regex-dev
-      - libfmt-dev
       - libgirepository1.0-dev
       - libglib2.0-dev
       - libheif-dev
@@ -278,15 +277,15 @@ parts:
       - -DJPEGXL_ENABLE_SKCMS=OFF
     stage:
       - -./usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/libbrotli*
+      - -./usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/libhwy*
     prime:
       - -./usr/bin
       - -./usr/include
+      - -./usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/cmake
       - -./usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/pkgconfig
       - -./usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/*.a
       - -./usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/*.so
       - -./usr/share
-    after:
-      - patches
 
   qt:
     plugin: nil
@@ -402,15 +401,16 @@ parts:
       - -./usr/doc
       - -./usr/include
       - -./usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/cmake
-      - -./usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/metatypes
       - -./usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/pkgconfig
       - -./usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/*.a
       - -./usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/*.la
       - -./usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/*.prl
       - -./usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/*.so
       - -./usr/libexec
+      - -./usr/metatypes
       - -./usr/mkspecs
       - -./usr/modules
+      - -./**/objects-*
     after:
       - libjxl
       - patches

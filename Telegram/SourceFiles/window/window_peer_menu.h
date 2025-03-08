@@ -15,6 +15,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 class History;
 
+namespace Api {
+struct SendOptions;
+} // namespace Api
+
 namespace Ui {
 class RpWidget;
 class BoxContent;
@@ -157,7 +161,9 @@ object_ptr<Ui::BoxContent> PrepareChooseRecipientBox(
 	rpl::producer<QString> titleOverride = nullptr,
 	FnMut<void()> &&successCallback = nullptr,
 	InlineBots::PeerTypes typesRestriction = 0,
-	Fn<void(std::vector<not_null<Data::Thread*>>)> sendMany = nullptr);
+	Fn<void(
+		std::vector<not_null<Data::Thread*>>,
+		Api::SendOptions)> sendMany = nullptr);
 QPointer<Ui::BoxContent> ShowChooseRecipientBox(
 	not_null<Window::SessionNavigation*> navigation,
 	FnMut<bool(not_null<Data::Thread*>)> &&chosen,

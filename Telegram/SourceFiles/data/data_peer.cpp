@@ -50,6 +50,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_element.h"
 #include "history/history_item.h"
 #include "storage/file_download.h"
+#include "storage/storage_account.h"
 #include "storage/storage_facade.h"
 #include "storage/storage_shared_media.h"
 #include <QRandomGenerator>
@@ -64,6 +65,28 @@ using UpdateFlag = Data::PeerUpdate::Flag;
 [[nodiscard]] const std::vector<QString> &IgnoredReasons(
 		not_null<Main::Session*> session) {
 	return session->appConfig().ignoredRestrictionReasons();
+}
+
+[[nodiscard]] int ParseRegistrationDate(const QString &text) {
+	// MM.YYYY
+	if (text.size() != 7 || text[2] != '.') {
+		return 0;
+	}
+	const auto month = text.mid(0, 2).toInt();
+	const auto year = text.mid(3, 4).toInt();
+	return (year > 2012 && year < 2100 && month > 0 && month <= 12)
+		? (year * 100) + month
+		: 0;
+}
+
+[[nodiscard]] int RegistrationYear(int date) {
+	const auto year = date / 100;
+	return (year > 2012 && year < 2100) ? year : 0;
+}
+
+[[nodiscard]] int RegistrationMonth(int date) {
+	const auto month = date % 100;
+	return (month > 0 && month <= 12) ? month : 0;
 }
 
 } // namespace
@@ -344,6 +367,17 @@ not_null<Ui::EmptyUserpic*> PeerData::ensureEmptyUserpic() const {
 
 void PeerData::invalidateEmptyUserpic() {
 	_userpicEmpty = nullptr;
+}
+
+void PeerData::checkTrustedPayForMessage() {
+	if (!_checkedTrustedPayForMessage
+		&& !starsPerMessage()
+		&& session().local().peerTrustedPayForMessageRead()) {
+		_checkedTrustedPayForMessage = 1;
+		if (session().local().hasPeerTrustedPayForMessageEntry(id)) {
+			session().local().clearPeerTrustedPayForMessage(id);
+		}
+	}
 }
 
 ClickHandlerPtr PeerData::createOpenLink() {
@@ -731,7 +765,9 @@ void PeerData::checkFolder(FolderId folderId) {
 
 void PeerData::clearBusinessBot() {
 	if (const auto details = _barDetails.get()) {
-		if (details->requestChatDate) {
+		if (details->requestChatDate
+			|| details->paysPerMessage
+			|| !details->phoneCountryCode.isEmpty()) {
 			details->businessBot = nullptr;
 			details->businessBotManageUrl = QString();
 		} else {
@@ -774,12 +810,27 @@ void PeerData::saveTranslationDisabled(bool disabled) {
 
 void PeerData::setBarSettings(const MTPPeerSettings &data) {
 	data.match([&](const MTPDpeerSettings &data) {
-		if (!data.vbusiness_bot_id() && !data.vrequest_chat_title()) {
+		const auto wasPaysPerMessage = paysPerMessage();
+		if (!data.vbusiness_bot_id()
+			&& !data.vrequest_chat_title()
+			&& !data.vcharge_paid_message_stars()
+			&& !data.vphone_country()
+			&& !data.vregistration_month()
+			&& !data.vname_change_date()
+			&& !data.vphoto_change_date()) {
 			_barDetails = nullptr;
 		} else if (!_barDetails) {
 			_barDetails = std::make_unique<PeerBarDetails>();
 		}
 		if (_barDetails) {
+			_barDetails->phoneCountryCode
+				= qs(data.vphone_country().value_or_empty());
+			_barDetails->registrationDate = ParseRegistrationDate(
+				data.vregistration_month().value_or_empty());
+			_barDetails->nameChangeDate
+				= data.vname_change_date().value_or_empty();
+			_barDetails->photoChangeDate
+				= data.vphoto_change_date().value_or_empty();
 			_barDetails->requestChatTitle
 				= qs(data.vrequest_chat_title().value_or_empty());
 			_barDetails->requestChatDate
@@ -789,6 +840,8 @@ void PeerData::setBarSettings(const MTPPeerSettings &data) {
 				: nullptr;
 			_barDetails->businessBotManageUrl
 				= qs(data.vbusiness_bot_manage_url().value_or_empty());
+			_barDetails->paysPerMessage
+				= data.vcharge_paid_message_stars().value_or_empty();
 		}
 		using Flag = PeerBarSetting;
 		setBarSettings((data.is_add_contact() ? Flag::AddContact : Flag())
@@ -812,8 +865,35 @@ void PeerData::setBarSettings(const MTPPeerSettings &data) {
 			| (data.is_business_bot_can_reply()
 				? Flag::BusinessBotCanReply
 				: Flag()));
+		if (wasPaysPerMessage != paysPerMessage()) {
+			session().changes().peerUpdated(
+				this,
+				UpdateFlag::PaysPerMessage);
+		}
 	});
 }
+
+int PeerData::paysPerMessage() const {
+	return _barDetails ? _barDetails->paysPerMessage : 0;
+}
+
+void PeerData::clearPaysPerMessage() {
+	if (const auto details = _barDetails.get()) {
+		if (details->paysPerMessage) {
+			if (details->businessBot
+				|| details->requestChatDate
+				|| !details->phoneCountryCode.isEmpty()) {
+				details->paysPerMessage = 0;
+			} else {
+				_barDetails = nullptr;
+			}
+			session().changes().peerUpdated(
+				this,
+				UpdateFlag::PaysPerMessage);
+		}
+	}
+}
+
 QString PeerData::requestChatTitle() const {
 	return _barDetails ? _barDetails->requestChatTitle : QString();
 }
@@ -828,6 +908,28 @@ UserData *PeerData::businessBot() const {
 
 QString PeerData::businessBotManageUrl() const {
 	return _barDetails ? _barDetails->businessBotManageUrl : QString();
+}
+
+QString PeerData::phoneCountryCode() const {
+	return _barDetails ? _barDetails->phoneCountryCode : QString();
+}
+
+int PeerData::registrationMonth() const {
+	return _barDetails
+		? RegistrationMonth(_barDetails->registrationDate)
+		: 0;
+}
+
+int PeerData::registrationYear() const {
+	return _barDetails ? RegistrationYear(_barDetails->registrationDate) : 0;
+}
+
+TimeId PeerData::nameChangeDate() const {
+	return _barDetails ? _barDetails->nameChangeDate : 0;
+}
+
+TimeId PeerData::photoChangeDate() const {
+	return _barDetails ? _barDetails->photoChangeDate : 0;
 }
 
 bool PeerData::changeColorIndex(
@@ -1366,7 +1468,7 @@ Data::RestrictionCheckResult PeerData::amRestricted(
 		}
 	};
 	if (const auto user = asUser()) {
-		if (user->meRequiresPremiumToWrite() && !user->session().premium()) {
+		if (user->requiresPremiumToWrite() && !user->session().premium()) {
 			return Result::Explicit();
 		}
 		return (right == ChatRestriction::SendVoiceMessages
@@ -1483,6 +1585,24 @@ bool PeerData::canManageGroupCall() const {
 			|| (group->adminRights() & ChatAdminRight::ManageCall);
 	}
 	return false;
+}
+
+int PeerData::starsPerMessage() const {
+	if (const auto user = asUser()) {
+		return user->starsPerMessage();
+	} else if (const auto channel = asChannel()) {
+		return channel->starsPerMessage();
+	}
+	return 0;
+}
+
+int PeerData::starsPerMessageChecked() const {
+	if (const auto channel = asChannel()) {
+		return (channel->adminRights() || channel->amCreator())
+			? 0
+			: channel->starsPerMessage();
+	}
+	return starsPerMessage();
 }
 
 Data::GroupCall *PeerData::groupCall() const {

@@ -167,12 +167,19 @@ public:
 		const QByteArray& serialized,
 		int32 streamVersion);
 
-	void markBotTrustedOpenGame(PeerId botId);
-	[[nodiscard]] bool isBotTrustedOpenGame(PeerId botId);
-	void markBotTrustedPayment(PeerId botId);
-	[[nodiscard]] bool isBotTrustedPayment(PeerId botId);
-	void markBotTrustedOpenWebView(PeerId botId);
-	[[nodiscard]] bool isBotTrustedOpenWebView(PeerId botId);
+	void markPeerTrustedOpenGame(PeerId peerId);
+	[[nodiscard]] bool isPeerTrustedOpenGame(PeerId peerId);
+	void markPeerTrustedPayment(PeerId peerId);
+	[[nodiscard]] bool isPeerTrustedPayment(PeerId peerId);
+	void markPeerTrustedOpenWebView(PeerId peerId);
+	[[nodiscard]] bool isPeerTrustedOpenWebView(PeerId peerId);
+	void markPeerTrustedPayForMessage(PeerId peerId, int starsPerMessage);
+	[[nodiscard]] bool isPeerTrustedPayForMessage(
+		PeerId peerId,
+		int starsPerMessage);
+	[[nodiscard]] bool peerTrustedPayForMessageRead() const;
+	[[nodiscard]] bool hasPeerTrustedPayForMessageEntry(PeerId peerId) const;
+	void clearPeerTrustedPayForMessage(PeerId peerId);
 
 	void enforceModernStorageIdBots();
 	[[nodiscard]] Webview::StorageId resolveStorageIdBots();
@@ -203,12 +210,12 @@ private:
 		IncorrectPasscode,
 		Failed,
 	};
-	enum class BotTrustFlag : uchar {
+	enum class PeerTrustFlag : uchar {
 		NoOpenGame        = (1 << 0),
 		Payment           = (1 << 1),
 		OpenWebView       = (1 << 2),
 	};
-	friend inline constexpr bool is_flag_type(BotTrustFlag) { return true; };
+	friend inline constexpr bool is_flag_type(PeerTrustFlag) { return true; };
 
 	[[nodiscard]] base::flat_set<QString> collectGoodNames() const;
 	[[nodiscard]] auto prepareReadSettingsContext() const
@@ -261,8 +268,8 @@ private:
 		Data::StickersSetFlags readingFlags = 0);
 	void importOldRecentStickers();
 
-	void readTrustedBots();
-	void writeTrustedBots();
+	void readTrustedPeers();
+	void writeTrustedPeers();
 
 	void readMediaLastPlaybackPositions();
 	void writeMediaLastPlaybackPositions();
@@ -295,7 +302,7 @@ private:
 	Fn<std::optional<QByteArray>()> _downloadsSerialize;
 
 	FileKey _locationsKey = 0;
-	FileKey _trustedBotsKey = 0;
+	FileKey _trustedPeersKey = 0;
 	FileKey _installedStickersKey = 0;
 	FileKey _featuredStickersKey = 0;
 	FileKey _recentStickersKey = 0;
@@ -324,8 +331,9 @@ private:
 	qint32 _cacheTotalTimeLimit = 0;
 	qint32 _cacheBigFileTotalTimeLimit = 0;
 
-	base::flat_map<PeerId, base::flags<BotTrustFlag>> _trustedBots;
-	bool _trustedBotsRead = false;
+	base::flat_map<PeerId, base::flags<PeerTrustFlag>> _trustedPeers;
+	base::flat_map<PeerId, int> _trustedPayPerMessage;
+	bool _trustedPeersRead = false;
 	bool _readingUserSettings = false;
 	bool _recentHashtagsAndBotsWereRead = false;
 	bool _searchSuggestionsRead = false;

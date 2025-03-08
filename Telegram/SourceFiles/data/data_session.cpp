@@ -534,14 +534,22 @@ not_null<UserData*> Session::processUser(const MTPUser &data) {
 			| Flag::BotInlineGeo
 			| Flag::Premium
 			| Flag::Support
-			| Flag::SomeRequirePremiumToWrite
-			| Flag::RequirePremiumToWriteKnown
+			| Flag::HasRequirePremiumToWrite
+			| Flag::HasStarsPerMessage
+			| Flag::MessageMoneyRestrictionsKnown
 			| (!minimal
 				? Flag::Contact
 				| Flag::MutualContact
 				| Flag::DiscardMinPhoto
 				| Flag::StoriesHidden
 				: Flag());
+		const auto hasRequirePremiumToWrite
+			= data.is_contact_require_premium();
+		const auto hasStarsPerMessage
+			= data.vsend_paid_messages_stars().has_value();
+		if (!hasStarsPerMessage) {
+			result->setStarsPerMessage(0);
+		}
 		const auto storiesState = minimal
 			? std::optional<Data::Stories::PeerSourceState>()
 			: data.is_stories_unavailable()
@@ -556,13 +564,24 @@ not_null<UserData*> Session::processUser(const MTPUser &data) {
 			| (data.is_bot_inline_geo() ? Flag::BotInlineGeo : Flag())
 			| (data.is_premium() ? Flag::Premium : Flag())
 			| (data.is_support() ? Flag::Support : Flag())
-			| (data.is_contact_require_premium()
-				? (Flag::SomeRequirePremiumToWrite
-					| (result->someRequirePremiumToWrite()
-						? (result->requirePremiumToWriteKnown()
-							? Flag::RequirePremiumToWriteKnown
+			| (hasRequirePremiumToWrite
+				? (Flag::HasRequirePremiumToWrite
+					| (result->hasRequirePremiumToWrite()
+						? (result->messageMoneyRestrictionsKnown()
+							? Flag::MessageMoneyRestrictionsKnown
 							: Flag())
 						: Flag()))
+				: Flag())
+			| (hasStarsPerMessage
+				? (Flag::HasStarsPerMessage
+					| (result->hasStarsPerMessage()
+						? (result->messageMoneyRestrictionsKnown()
+							? Flag::MessageMoneyRestrictionsKnown
+							: Flag())
+						: Flag()))
+				: Flag())
+			| ((!hasRequirePremiumToWrite && !hasStarsPerMessage)
+				? Flag::MessageMoneyRestrictionsKnown
 				: Flag())
 			| (!minimal
 				? (data.is_contact() ? Flag::Contact : Flag())
@@ -1027,6 +1046,8 @@ not_null<PeerData*> Session::processChat(const MTPChat &data) {
 		}
 
 		channel->setPhoto(data.vphoto());
+		channel->setStarsPerMessage(
+			data.vsend_paid_messages_stars().value_or_empty());
 
 		if (wasInChannel != channel->amIn()) {
 			flags |= UpdateFlag::ChannelAmIn;
@@ -4659,7 +4680,8 @@ void Session::serviceNotification(
 			MTPPeerColor(), // color
 			MTPPeerColor(), // profile_color
 			MTPint(), // bot_active_users
-			MTPlong())); // bot_verification_icon
+			MTPlong(), // bot_verification_icon
+			MTPlong())); // send_paid_messages_stars
 	}
 	const auto history = this->history(PeerData::kServiceNotificationsId);
 	const auto insert = [=] {
@@ -4718,7 +4740,8 @@ void Session::insertCheckedServiceNotification(
 				MTPint(), // quick_reply_shortcut_id
 				MTPlong(), // effect
 				MTPFactCheck(),
-				MTPint()), // report_delivery_until_date
+				MTPint(), // report_delivery_until_date
+				MTPlong()), // paid_message_stars
 			localFlags,
 			NewMessageType::Unread);
 	}

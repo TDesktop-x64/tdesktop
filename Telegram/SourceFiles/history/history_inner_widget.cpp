@@ -2258,7 +2258,8 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			this,
 			leaderOrSelf,
 			_controller);
-		_menu->addSeparator(&st::expandedMenuSeparator);
+	} else if (leaderOrSelf) {
+		HistoryView::MaybeAddWhenEditedForwardedAction(_menu, leaderOrSelf);
 	}
 
 	const auto addItemActions = [&](
@@ -3202,10 +3203,6 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				HistoryView::ViewAsJSON(controller, itemId);
 			}, &st::menuIconLink);
 		}
-	}
-
-	if (leaderOrSelf) {
-		HistoryView::MaybeAddWhenEditedForwardedAction(_menu, leaderOrSelf);
 	}
 
 	if (_dragStateItem) {

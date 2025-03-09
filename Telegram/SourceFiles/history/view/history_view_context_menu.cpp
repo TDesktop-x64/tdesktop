@@ -1818,6 +1818,7 @@ void AddWhoReactedAction(
 		}
 	};
 	if (item->history()->peer->isUser()) {
+		AddWhenEditedForwardedActionHelper(menu, item, false);
 		menu->addAction(Ui::WhenReadContextAction(
 			menu.get(),
 			Api::WhoReacted(item, context, st::defaultWhoRead, whoReadIds),
@@ -1829,6 +1830,7 @@ void AddWhoReactedAction(
 			Data::ReactedMenuFactory(&controller->session()),
 			participantChosen,
 			showAllChosen));
+		AddWhenEditedForwardedActionHelper(menu, item, true);
 	}
 }
 

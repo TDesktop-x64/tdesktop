@@ -759,4 +759,9 @@ void ActivateWindow(not_null<SessionController*> controller);
 	not_null<SessionController*> controller,
 	GifPauseReason level);
 
+bool CheckAndJumpToNearChatsFilter(
+	not_null<SessionController*> controller,
+	bool isNext,
+	bool jump);
+
 } // namespace Window

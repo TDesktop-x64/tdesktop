@@ -22,6 +22,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/info_controller.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
+#include "ui/controls/swipe_handler.h"
 #include "ui/widgets/scroll_area.h"
 #include "ui/widgets/fields/input_field.h"
 #include "ui/wrap/padding_wrap.h"
@@ -76,6 +77,8 @@ ContentWidget::ContentWidget(
 	) | rpl::start_with_next([this] {
 		updateControlsGeometry();
 	}, lifetime());
+
+	setupSwipeReply();
 }
 
 void ContentWidget::resizeEvent(QResizeEvent *e) {
@@ -379,6 +382,37 @@ rpl::producer<bool> ContentWidget::desiredBottomShadowVisibility() {
 
 not_null<Ui::ScrollArea*> ContentWidget::scroll() const {
 	return _scroll.data();
+}
+
+void ContentWidget::setupSwipeReply() {
+	Ui::Controls::SetupSwipeHandler(this, _scroll.data(), [=](
+			Ui::Controls::SwipeContextData data) {
+		if (data.translation > 0) {
+			if (!_swipeBackData.callback) {
+				_swipeBackData = Ui::Controls::SetupSwipeBack(
+					this,
+					[]() -> std::pair<QColor, QColor> {
+						return {
+							st::historyForwardChooseBg->c,
+							st::historyForwardChooseFg->c,
+						};
+					});
+			}
+			_swipeBackData.callback(data);
+			return;
+		} else if (_swipeBackData.lifetime) {
+			_swipeBackData = {};
+		}
+	}, [=](int, Qt::LayoutDirection direction) {
+		return (direction == Qt::RightToLeft && _controller->hasBackButton())
+			? Ui::Controls::DefaultSwipeBackHandlerFinishData([=] {
+				checkBeforeClose(crl::guard(this, [=] {
+					_controller->parentController()->hideLayer();
+					_controller->showBackFromStack();
+				}));
+			})
+			: Ui::Controls::SwipeHandlerFinishData();
+	}, nullptr);
 }
 
 Key ContentMemento::key() const {

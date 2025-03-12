@@ -73,6 +73,7 @@ enum class Command {
 	MediaViewerFullscreen,
 
 	ShowChatMenu,
+	ShowChatPreview,
 
 	SupportReloadTemplates,
 	SupportToggleMuted,

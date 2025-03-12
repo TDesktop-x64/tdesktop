@@ -35,6 +35,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/chat/more_chats_bar.h"
 #include "ui/controls/download_bar.h"
 #include "ui/controls/jump_down_button.h"
+#include "ui/controls/swipe_handler.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
 #include "ui/ui_utility.h"
@@ -668,12 +669,106 @@ Widget::Widget(
 		setupDownloadBar();
 		setupShortcuts(controller);
 	}
+	setupSwipeBack();
 
 	if (session().settings().dialogsFiltersEnabled()
 		&& (Core::App().settings().chatFiltersHorizontal()
 			|| !controller->enoughSpaceForFilters())) {
 		toggleFiltersMenu(true);
 	}
+}
+
+void Widget::setupSwipeBack() {
+	const auto isMainList = [=] {
+		const auto current = controller()->activeChatsFilterCurrent();
+		const auto &chatsFilters = session().data().chatsFilters();
+		if (chatsFilters.has()) {
+			return chatsFilters.defaultId() == current;
+		}
+		return !current;
+	};
+	Ui::Controls::SetupSwipeHandler(_scroll.data(), _scroll.data(), [=](
+			Ui::Controls::SwipeContextData data) {
+		if (data.translation != 0) {
+			if (!_swipeBackData.callback) {
+				_swipeBackData = Ui::Controls::SetupSwipeBack(
+					this,
+					[]() -> std::pair<QColor, QColor> {
+						return {
+							st::historyForwardChooseBg->c,
+							st::historyForwardChooseFg->c,
+						};
+					},
+					_swipeBackMirrored,
+					_swipeBackIconMirrored);
+			}
+			_swipeBackData.callback(data);
+			return;
+		} else {
+			if (_swipeBackData.lifetime) {
+				_swipeBackData = {};
+			}
+		}
+	}, [=](int, Qt::LayoutDirection direction) {
+		_swipeBackIconMirrored = false;
+		_swipeBackMirrored = false;
+		if (_childListShown.current()) {
+			return Ui::Controls::SwipeHandlerFinishData();
+		}
+		const auto isRightToLeft = direction == Qt::RightToLeft;
+		if (controller()->openedFolder().current()) {
+			if (!isRightToLeft) {
+				return Ui::Controls::SwipeHandlerFinishData();
+			}
+			return Ui::Controls::DefaultSwipeBackHandlerFinishData([=] {
+				_swipeBackData = {};
+				if (controller()->openedFolder().current()) {
+					if (!controller()->windowId().folder()) {
+						controller()->closeFolder();
+					}
+				}
+			});
+		}
+		if (controller()->shownForum().current()) {
+			if (!isRightToLeft) {
+				return Ui::Controls::SwipeHandlerFinishData();
+			}
+			const auto id = controller()->windowId();
+			const auto initial = id.forum();
+			if (initial) {
+				return Ui::Controls::SwipeHandlerFinishData();
+			}
+			return Ui::Controls::DefaultSwipeBackHandlerFinishData([=] {
+				_swipeBackData = {};
+				if (const auto forum = controller()->shownForum().current()) {
+					controller()->closeForum();
+				}
+			});
+		}
+		if (isRightToLeft && isMainList()) {
+			_swipeBackIconMirrored = true;
+			return Ui::Controls::DefaultSwipeBackHandlerFinishData([=] {
+				_swipeBackIconMirrored = false;
+				_swipeBackData = {};
+				if (isMainList()) {
+					showMainMenu();
+				}
+			});
+		}
+		if (_chatFilters && session().data().chatsFilters().has()) {
+			_swipeBackMirrored = !isRightToLeft;
+			using namespace Window;
+			const auto next = !isRightToLeft;
+			if (CheckAndJumpToNearChatsFilter(controller(), next, false)) {
+				return Ui::Controls::DefaultSwipeBackHandlerFinishData([=] {
+					_swipeBackData = {};
+					CheckAndJumpToNearChatsFilter(controller(), next, true);
+				});
+			}
+		}
+		return Ui::Controls::SwipeHandlerFinishData();
+	}, nullptr);
+
 }
 
 void Widget::chosenRow(const ChosenRow &row) {
@@ -1252,6 +1347,14 @@ void Widget::setupShortcuts() {
 				if (_inner) {
 					Window::ActivateWindow(controller());
 					_inner->showPeerMenu();
+				}
+				return true;
+			});
+			request->check(Command::ShowChatPreview, 1)
+			&& request->handle([=] {
+				if (_inner) {
+					Window::ActivateWindow(controller());
+					return _inner->showChatPreview();
 				}
 				return true;
 			});

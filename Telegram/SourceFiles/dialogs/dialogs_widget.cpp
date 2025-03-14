@@ -687,7 +687,7 @@ void Widget::setupSwipeBack() {
 		}
 		return !current;
 	};
-	Ui::Controls::SetupSwipeHandler(_scroll.data(), _scroll.data(), [=](
+	Ui::Controls::SetupSwipeHandler(_inner, _scroll.data(), [=](
 			Ui::Controls::SwipeContextData data) {
 		if (data.translation != 0) {
 			if (!_swipeBackData.callback) {
@@ -767,7 +767,7 @@ void Widget::setupSwipeBack() {
 			}
 		}
 		return Ui::Controls::SwipeHandlerFinishData();
-	}, nullptr);
+	});
 
 }
 

@@ -304,7 +304,7 @@ std::unique_ptr<Data::Media> HistoryItem::CreateMedia(
 		return document->match([&](const MTPDdocument &document) -> Result {
 			const auto list = media.valt_documents();
 			const auto owner = &item->history()->owner();
-			const auto data = owner->processDocument(document);
+			const auto data = owner->processDocument(document, list);
 			using Args = Data::MediaFile::Args;
 			return std::make_unique<Data::MediaFile>(item, data, Args{
 				.ttlSeconds = media.vttl_seconds().value_or_empty(),
@@ -2464,7 +2464,8 @@ bool HistoryItem::canDeleteForEveryone(TimeId now) const {
 	} else if (const auto user = peer->asUser()) {
 		// Bots receive all messages and there is no sense in revoking them.
 		// See https://github.com/telegramdesktop/tdesktop/issues/3818
-		if (user->isBot() && !user->isSupport()) {
+		if ((user->isBot() && !user->isSupport())
+			|| user->isInaccessible()) {
 			return false;
 		}
 	}

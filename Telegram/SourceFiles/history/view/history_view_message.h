@@ -276,6 +276,10 @@ private:
 	[[nodiscard]] int visibleMediaTextLength() const;
 	[[nodiscard]] bool needInfoDisplay() const;
 	[[nodiscard]] bool invertMedia() const;
+	[[nodiscard]] bool hasFastReply() const;
+	[[nodiscard]] bool hasFastForward() const;
+	[[nodiscard]] bool displayFastReply() const;
+	[[nodiscard]] bool displayFastForward() const;
 
 	[[nodiscard]] bool isPinnedContext() const;
 

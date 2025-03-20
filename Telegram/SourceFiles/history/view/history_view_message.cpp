@@ -337,13 +337,23 @@ int KeyboardStyle::minButtonWidth(
 	return result;
 }
 
+QString FastForwardText() {
+	return u"Forward"_q;
+}
+
 QString FastReplyText() {
 	return tr::lng_fast_reply(tr::now);
+}
+
+bool ShowFastForwardFor(const QString &username) {
+	return !username.compare(u"ReviewInsightsBot"_q, Qt::CaseInsensitive)
+		|| !username.compare(u"reviews_bot"_q, Qt::CaseInsensitive);
 }
 
 QString FastForwardText() {
 	return tr::lng_selected_forward(tr::now);
 }
+
 
 [[nodiscard]] ClickHandlerPtr MakeTopicButtonLink(
 		not_null<Data::ForumTopic*> topic,
@@ -977,7 +987,9 @@ QSize Message::performCountOptimalSize() {
 					namew += st::msgServiceFont->spacew + via->maxWidth
 						+ (_fromNameStatus ? st::msgServiceFont->spacew : 0);
 				}
-				const auto replyWidth = hasFastReply()
+				const auto replyWidth = hasFastForward()
+					? st::msgFont->width(FastForwardText())
+					: hasFastReply()
 					? st::msgFont->width(FastReplyText())
 					: 0;
 				if (!_rightBadge.isEmpty()) {
@@ -1801,10 +1813,12 @@ void Message::paintFromName(
 	}
 	const auto badgeWidth = _rightBadge.isEmpty() ? 0 : _rightBadge.maxWidth();
 	const auto replyWidth = [&] {
-		if (isUnderCursor() && (displayFastReply() || displayFastForward())) {
-			return st::msgFont->width(displayFastForward()
-				? FastForwardText()
-				: FastReplyText());
+		if (isUnderCursor()) {
+			if (displayFastForward()) {
+				return st::msgFont->width(FastForwardText());
+			} else if (displayFastReply()) {
+				return st::msgFont->width(FastReplyText());
+			}
 		}
 		return 0;
 	}();
@@ -1906,7 +1920,7 @@ void Message::paintFromName(
 			p.drawText(
 				trect.left() + trect.width() - rightWidth,
 				trect.top() + st::msgFont->ascent,
-				text);
+				hasFastForward() ? FastForwardText() : FastReplyText());
 		} else {
 			const auto shift = QPoint(trect.width() - rightWidth, 0);
 			const auto pen = !_rightBadgeHasBoosts
@@ -2819,10 +2833,12 @@ bool Message::getStateFromName(
 		return false;
 	}
 	const auto replyWidth = [&] {
-		if (isUnderCursor() && (displayFastReply() || displayFastForward())) {
-			return st::msgFont->width(displayFastForward()
-				? FastForwardText()
-				: FastReplyText());
+		if (isUnderCursor()) {
+			if (displayFastForward()) {
+				return st::msgFont->width(FastForwardText());
+			} else if (displayFastReply()) {
+				return st::msgFont->width(FastReplyText());
+			}
 		}
 		return 0;
 	}();
@@ -3874,6 +3890,22 @@ bool Message::hasFastReply() const {
 	return !hasOutLayout() && (peer->isChat() || peer->isMegagroup());
 }
 
+bool Message::hasFastForward() const {
+	if (context() != Context::History) {
+		return false;
+	}
+	const auto item = data();
+	const auto from = item->from()->asUser();
+	if (!from || !from->isBot() || !ShowFastForwardFor(from->username())) {
+		return false;
+	}
+	const auto peer = item->history()->peer;
+	if (!peer->isChat() && !peer->isMegagroup()) {
+		return false;
+	}
+	return !hasOutLayout();
+}
+
 bool Message::displayFastReply() const {
 	const auto canSendAnything = [&] {
 		const auto item = data();
@@ -3891,11 +3923,8 @@ bool Message::displayFastReply() const {
 }
 
 bool Message::displayFastForward() const {
-	const auto peer = data()->history()->peer;
-	return (peer->isChat() || peer->isMegagroup())
-		&& data()->isRegular()
+	return hasFastForward()
 		&& data()->allowsForward()
-		&& base::IsCtrlPressed()
 		&& !delegate()->elementInSelectionMode(this).inSelectionMode;
 }
 
@@ -4167,9 +4196,22 @@ ClickHandlerPtr Message::fastReplyLink() const {
 		return _fastReplyLink;
 	}
 	const auto itemId = data()->fullId();
-	_fastReplyLink = std::make_shared<LambdaClickHandler>([=] {
-		delegate()->elementReplyTo({ itemId });
-	});
+	const auto sessionId = data()->history()->session().uniqueId();
+	_fastReplyLink = hasFastForward()
+		? std::make_shared<LambdaClickHandler>([=](ClickContext context) {
+			const auto controller = ExtractController(context);
+			const auto session = controller
+				? &controller->session()
+				: nullptr;
+			if (!session || session->uniqueId() != sessionId) {
+				return;
+			} else if (const auto item = session->data().message(itemId)) {
+				FastShareMessage(controller, item);
+			}
+		})
+		: std::make_shared<LambdaClickHandler>(crl::guard(this, [=] {
+			delegate()->elementReplyTo({ itemId });
+		}));
 	return _fastReplyLink;
 }
 
@@ -4270,7 +4312,9 @@ void Message::updateMediaInBubbleState() {
 
 void Message::fromNameUpdated(int width) const {
 	const auto item = data();
-	const auto replyWidth = hasFastReply()
+	const auto replyWidth = hasFastForward()
+		? st::msgFont->width(FastForwardText())
+		: hasFastReply()
 		? st::msgFont->width(FastReplyText())
 		: 0;
 	if (!_rightBadge.isEmpty()) {

@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/object_ptr.h"
 #include "base/timer.h"
 #include "dialogs/dialogs_key.h"
+#include "dialogs/ui/dialogs_quick_action_context.h"
 #include "data/data_messages.h"
 #include "ui/dragging_scroll_manager.h"
 #include "ui/effects/animations.h"
@@ -25,6 +26,10 @@ namespace MTP {
 class Error;
 } // namespace MTP
 
+namespace Lottie {
+class Icon;
+} // namespace Lottie
+
 namespace Main {
 class Session;
 } // namespace Main
@@ -34,6 +39,9 @@ class IconButton;
 class PopupMenu;
 class FlatLabel;
 struct ScrollToRequest;
+namespace Controls {
+enum class QuickDialogAction;
+} // namespace Controls
 } // namespace Ui
 
 namespace Window {
@@ -210,6 +218,12 @@ public:
 
 	[[nodiscard]] rpl::producer<UserId> openBotMainAppRequests() const;
 
+	void setSwipeContextData(
+		int64 key,
+		std::optional<Ui::Controls::SwipeContextData> data);
+	[[nodiscard]] int64 calcSwipeKey(int top);
+	void prepareQuickAction(int64 key, Dialogs::Ui::QuickDialogAction);
+
 protected:
 	void visibleTopBottomUpdated(
 		int visibleTop,
@@ -340,6 +354,7 @@ private:
 	void repaintDialogRowCornerStatus(not_null<History*> history);
 
 	bool addBotAppRipple(QPoint origin, Fn<void()> updateCallback);
+	bool addQuickActionRipple(not_null<Row*> row, Fn<void()> updateCallback);
 
 	void setupShortcuts();
 	RowDescriptor computeJump(
@@ -469,6 +484,9 @@ private:
 
 	void saveChatsFilterScrollState(FilterId filterId);
 	void restoreChatsFilterScrollState(FilterId filterId);
+
+	[[nodiscard]] not_null<Ui::QuickActionContext*> ensureQuickAction(
+		int64 key);
 
 	[[nodiscard]] bool lookupIsInBotAppButton(
 		Row *row,
@@ -612,6 +630,9 @@ private:
 	rpl::event_stream<QString> _completeHashtagRequests;
 	rpl::event_stream<> _refreshHashtagsRequests;
 	rpl::event_stream<UserId> _openBotMainAppRequests;
+
+	using QuickActionPtr = std::unique_ptr<Ui::QuickActionContext>;
+	base::flat_map<int64, QuickActionPtr> _quickActions;
 
 	RowDescriptor _chatPreviewRow;
 	bool _chatPreviewScheduled = false;

@@ -718,19 +718,8 @@ void PreviewWrap::paintEvent(QPaintEvent *e) {
 			for (auto &gift : gifts) {
 				list.push_back({ .info = gift });
 			}
-			ranges::sort(list, [](
-					const GiftTypeStars &a,
-					const GiftTypeStars &b) {
-				if (!a.info.limitedCount && !b.info.limitedCount) {
-					return a.info.stars <= b.info.stars;
-				} else if (!a.info.limitedCount) {
-					return true;
-				} else if (!b.info.limitedCount) {
-					return false;
-				} else if (a.info.limitedLeft != b.info.limitedLeft) {
-					return a.info.limitedLeft > b.info.limitedLeft;
-				}
-				return a.info.stars <= b.info.stars;
+			ranges::stable_sort(list, [](const auto &a, const auto &b) {
+				return a.info.soldOut < b.info.soldOut;
 			});
 
 			auto &map = Map[session];
@@ -1736,7 +1725,7 @@ void SendGiftBox(
 		bool sending = false;
 	};
 	const auto state = raw->lifetime().make_state<State>(State{
-		.delegate = Delegate(window, GiftButtonMode::Full),
+		.delegate = Delegate(&window->session(), GiftButtonMode::Full),
 	});
 	const auto single = state->delegate.buttonSize();
 	const auto shadow = st::defaultDropdownMenu.wrap.shadow;

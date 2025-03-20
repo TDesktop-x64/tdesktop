@@ -706,7 +706,6 @@ void ChooseFromFile(
 void SetupStickersEmoji(
 		not_null<Window::SessionController*> controller,
 		not_null<Ui::VerticalLayout*> container) {
-	Ui::AddDivider(container);
 	Ui::AddSkip(container);
 
 	Ui::AddSubsectionTitle(container, tr::lng_settings_stickers_emoji());
@@ -1273,6 +1272,72 @@ void SetupChatBackground(
 	}, adaptive->lifetime());
 }
 
+void SetupChatListSwipe(
+		not_null<Window::SessionController*> controller,
+		not_null<Ui::VerticalLayout*> container) {
+	Ui::AddDivider(container);
+	Ui::AddSkip(container);
+	Ui::AddSubsectionTitle(
+		container,
+		tr::lng_settings_quick_dialog_action_title());
+
+	using Type = Dialogs::Ui::QuickDialogAction;
+	const auto group = std::make_shared<Ui::RadioenumGroup<Type>>(
+		Core::App().settings().quickDialogAction());
+	group->setChangedCallback([=](Type value) {
+		Core::App().settings().setQuickDialogAction(value);
+		Core::App().saveSettings();
+	});
+	container->add(
+		object_ptr<Ui::SettingsButton>(
+			container,
+			group->value() | rpl::map([](Type value) {
+				return ((value == Dialogs::Ui::QuickDialogAction::Mute)
+					? tr::lng_settings_quick_dialog_action_mute
+					: (value == Dialogs::Ui::QuickDialogAction::Pin)
+					? tr::lng_settings_quick_dialog_action_pin
+					: (value == Dialogs::Ui::QuickDialogAction::Read)
+					? tr::lng_settings_quick_dialog_action_read
+					: (value == Dialogs::Ui::QuickDialogAction::Archive)
+					? tr::lng_settings_quick_dialog_action_archive
+					: tr::lng_settings_quick_dialog_action_disabled)();
+			}) | rpl::flatten_latest(),
+			st::settingsButtonNoIcon)
+	)->setClickedCallback([=] {
+		controller->uiShow()->showBox(Box([=](not_null<Ui::GenericBox*> box) {
+			box->setTitle(tr::lng_settings_quick_dialog_action_title());
+			const auto addRadio = [&](Type value, tr::phrase<> phrase) {
+				box->verticalLayout()->add(
+					object_ptr<Ui::Radioenum<Type>>(
+						box->verticalLayout(),
+						group,
+						value,
+						phrase(tr::now),
+						st::settingsSendType),
+					st::settingsSendTypePadding);
+			};
+			addRadio(Type::Mute, tr::lng_settings_quick_dialog_action_mute);
+			addRadio(Type::Pin, tr::lng_settings_quick_dialog_action_pin);
+			addRadio(Type::Read, tr::lng_settings_quick_dialog_action_read);
+			addRadio(
+				Type::Archive,
+				tr::lng_settings_quick_dialog_action_archive);
+			addRadio(
+				Type::Delete,
+				tr::lng_settings_quick_dialog_action_delete);
+			addRadio(
+				Type::Disabled,
+				tr::lng_settings_quick_dialog_action_disabled);
+			box->addButton(tr::lng_box_ok(), [=] { box->closeBox(); });
+		}));
+	});
+	Ui::AddSkip(container);
+	Ui::AddDividerText(
+		container,
+		tr::lng_settings_quick_dialog_action_about());
+	Ui::AddSkip(container);
+}
+
 void SetupDefaultThemes(
 		not_null<Window::Controller*> window,
 		not_null<Ui::VerticalLayout*> container) {
@@ -1803,6 +1868,7 @@ void Chat::setupContent(not_null<Window::SessionController*> controller) {
 	SetupThemeSettings(controller, content);
 	SetupCloudThemes(controller, content);
 	SetupChatBackground(controller, content);
+	SetupChatListSwipe(controller, content);
 	SetupStickersEmoji(controller, content);
 	SetupMessages(controller, content);
 	Ui::AddDivider(content);

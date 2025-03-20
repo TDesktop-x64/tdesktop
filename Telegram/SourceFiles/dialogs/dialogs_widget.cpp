@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "dialogs/dialogs_widget.h"
 
+#include "base/call_delayed.h"
 #include "base/qt/qt_key_modifiers.h"
 #include "base/options.h"
 #include "dialogs/ui/chat_search_in.h"
@@ -15,6 +16,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "dialogs/ui/dialogs_suggestions.h"
 #include "dialogs/dialogs_inner_widget.h"
 #include "dialogs/dialogs_search_from_controllers.h"
+#include "dialogs/dialogs_quick_action.h"
 #include "dialogs/dialogs_key.h"
 #include "history/history.h"
 #include "history/history_item.h"
@@ -690,32 +692,71 @@ void Widget::setupSwipeBack() {
 	Ui::Controls::SetupSwipeHandler(_inner, _scroll.data(), [=](
 			Ui::Controls::SwipeContextData data) {
 		if (data.translation != 0) {
-			if (!_swipeBackData.callback) {
-				_swipeBackData = Ui::Controls::SetupSwipeBack(
-					this,
-					[]() -> std::pair<QColor, QColor> {
-						return {
-							st::historyForwardChooseBg->c,
-							st::historyForwardChooseFg->c,
-						};
-					},
-					_swipeBackMirrored,
-					_swipeBackIconMirrored);
+			if (data.translation < 0
+				&& _inner
+				&& (Core::App().settings().quickDialogAction()
+					!= Ui::QuickDialogAction::Disabled)) {
+				_inner->setSwipeContextData(data.msgBareId, std::move(data));
+			} else {
+				if (!_swipeBackData.callback) {
+					_swipeBackData = Ui::Controls::SetupSwipeBack(
+						this,
+						[]() -> std::pair<QColor, QColor> {
+							return {
+								st::historyForwardChooseBg->c,
+								st::historyForwardChooseFg->c,
+							};
+						},
+						_swipeBackMirrored,
+						_swipeBackIconMirrored);
+				}
+				_swipeBackData.callback(data);
 			}
-			_swipeBackData.callback(data);
 			return;
 		} else {
 			if (_swipeBackData.lifetime) {
 				_swipeBackData = {};
 			}
+			if (_inner) {
+				_inner->setSwipeContextData(data.msgBareId, std::nullopt);
+				_inner->update();
+			}
 		}
-	}, [=](int, Qt::LayoutDirection direction) {
+	}, [=](int top, Qt::LayoutDirection direction) {
 		_swipeBackIconMirrored = false;
 		_swipeBackMirrored = false;
 		if (_childListShown.current()) {
 			return Ui::Controls::SwipeHandlerFinishData();
 		}
 		const auto isRightToLeft = direction == Qt::RightToLeft;
+		const auto action = Core::App().settings().quickDialogAction();
+		const auto isDisabled = action == Ui::QuickDialogAction::Disabled;
+		if (!isRightToLeft && _inner) {
+			if (const auto key = _inner->calcSwipeKey(top);
+					key && !isDisabled) {
+				_inner->prepareQuickAction(key, action);
+				return Ui::Controls::SwipeHandlerFinishData{
+					.callback = [=, session = &session()] {
+						auto callback = [=, peerId = PeerId(key)] {
+							const auto peer = session->data().peer(peerId);
+							PerformQuickDialogAction(
+								controller(),
+								peer,
+								action,
+								_inner->filterId());
+						};
+						base::call_delayed(
+							st::slideWrapDuration,
+							session,
+							std::move(callback));
+					},
+					.msgBareId = key,
+					.speedRatio = 1.,
+					.reachRatioDuration = crl::time(st::slideWrapDuration),
+					.provideReachOutRatio = true,
+				};
+			}
+		}
 		if (controller()->openedFolder().current()) {
 			if (!isRightToLeft) {
 				return Ui::Controls::SwipeHandlerFinishData();
@@ -755,7 +796,7 @@ void Widget::setupSwipeBack() {
 				}
 			});
 		}
-		if (_chatFilters && session().data().chatsFilters().has()) {
+		if (session().data().chatsFilters().has() && isDisabled) {
 			_swipeBackMirrored = !isRightToLeft;
 			using namespace Window;
 			const auto next = !isRightToLeft;

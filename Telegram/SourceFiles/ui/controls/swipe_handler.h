@@ -22,7 +22,9 @@ struct SwipeHandlerFinishData {
 	Fn<void(void)> callback;
 	int64 msgBareId = 0;
 	float64 speedRatio = 1.0;
+	crl::time reachRatioDuration = 0;
 	bool keepRatioWithinRange = false;
+	bool provideReachOutRatio = false;
 };
 
 using Scroll = std::variant<

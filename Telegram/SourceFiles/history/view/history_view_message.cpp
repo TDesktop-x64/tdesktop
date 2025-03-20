@@ -337,10 +337,6 @@ int KeyboardStyle::minButtonWidth(
 	return result;
 }
 
-QString FastForwardText() {
-	return u"Forward"_q;
-}
-
 QString FastReplyText() {
 	return tr::lng_fast_reply(tr::now);
 }

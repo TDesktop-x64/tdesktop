@@ -1552,10 +1552,6 @@ bool Element::unwrapped() const {
 	return true;
 }
 
-	return false;
-}
-
-bool Element::displayFastForward() const {
 std::optional<QSize> Element::rightActionSize() const {
 	return std::nullopt;
 }

@@ -61,15 +61,13 @@ private:
 
 } // namespace
 
-void SetupSwipeHandler(
-		not_null<Ui::RpWidget*> widget,
-		Scroll scroll,
-		Fn<void(SwipeContextData)> update,
-		Fn<SwipeHandlerFinishData(int, Qt::LayoutDirection)> generateFinish,
-		rpl::producer<bool> dontStart,
-		rpl::lifetime *onLifetime) {
+void SetupSwipeHandler(SwipeHandlerArgs &&args) {
 	static constexpr auto kThresholdWidth = 50;
 	static constexpr auto kMaxRatio = 1.5;
+
+	const auto widget = std::move(args.widget);
+	const auto scroll = std::move(args.scroll);
+	const auto update = std::move(args.update);
 
 	struct UpdateArgs {
 		QPoint globalCursor;
@@ -78,7 +76,7 @@ void SetupSwipeHandler(
 		bool touch = false;
 	};
 	struct State {
-		base::unique_qptr<QObject> filter;
+		base::unique_qptr<QObject> filterContext;
 		Ui::Animations::Simple animationReach;
 		Ui::Animations::Simple animationEnd;
 		SwipeContextData data;
@@ -98,11 +96,13 @@ void SetupSwipeHandler(
 
 		rpl::lifetime lifetime;
 	};
-	auto &useLifetime = onLifetime ? *onLifetime : widget->lifetime();
+	auto &useLifetime = args.onLifetime
+		? *(args.onLifetime)
+		: args.widget->lifetime();
 	const auto state = useLifetime.make_state<State>();
-	if (dontStart) {
+	if (args.dontStart) {
 		std::move(
-			dontStart
+			args.dontStart
 		) | rpl::start_with_next([=](bool dontStart) {
 			state->dontStart = dontStart;
 		}, state->lifetime);
@@ -188,7 +188,7 @@ void SetupSwipeHandler(
 		state->data.reachRatio = value;
 		update(state->data);
 	};
-	const auto updateWith = [=](UpdateArgs args) {
+	const auto updateWith = [=, generateFinish = args.init](UpdateArgs args) {
 		const auto fillFinishByTop = [&] {
 			if (!args.delta.x()) {
 				LOG(("SKIPPING fillFinishByTop."));
@@ -376,8 +376,8 @@ void SetupSwipeHandler(
 		return base::EventFilterResult::Continue;
 	};
 	widget->setAttribute(Qt::WA_AcceptTouchEvents);
-	state->filter = base::make_unique_q<QObject>(
-		base::install_event_filter(widget, filter));
+	state->filterContext = base::make_unique_q<QObject>(nullptr);
+	base::install_event_filter(state->filterContext.get(), widget, filter);
 }
 
 SwipeBackResult SetupSwipeBack(

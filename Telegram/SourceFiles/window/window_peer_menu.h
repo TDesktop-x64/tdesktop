@@ -91,7 +91,9 @@ void MenuAddMarkAsReadChatListAction(
 
 void PeerMenuHidePinnedMessage(not_null<PeerData*> peer);
 void PeerMenuUnhidePinnedMessage(not_null<PeerData*> peer);
-void PeerMenuExportChat(not_null<PeerData*> peer);
+void PeerMenuExportChat(
+	not_null<Window::SessionController*> controller,
+	not_null<PeerData*> peer);
 void PeerMenuDeleteContact(
 	not_null<Window::SessionController*> controller,
 	not_null<UserData*> user);
@@ -227,5 +229,6 @@ void MarkAsReadThread(not_null<Data::Thread*> thread);
 void AddSeparatorAndShiftUp(const PeerMenuCallback &addAction);
 
 [[nodiscard]] bool IsArchived(not_null<History*> history);
+[[nodiscard]] bool CanArchive(History *history, PeerData *peer);
 
 } // namespace Window

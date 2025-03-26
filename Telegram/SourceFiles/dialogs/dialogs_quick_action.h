@@ -32,9 +32,7 @@ void PerformQuickDialogAction(
 	FilterId filterId);
 
 [[nodiscard]] QString ResolveQuickDialogLottieIconName(
-	not_null<PeerData*> peer,
-	Ui::QuickDialogAction action,
-	FilterId filterId);
+	Ui::QuickDialogActionLabel action);
 
 [[nodiscard]] Ui::QuickDialogActionLabel ResolveQuickDialogLabel(
 	not_null<History*> history,
@@ -52,6 +50,8 @@ void DrawQuickAction(
 	QPainter &p,
 	const QRect &rect,
 	not_null<Lottie::Icon*> icon,
-	Ui::QuickDialogActionLabel label);
+	Ui::QuickDialogActionLabel label,
+	float64 iconRatio = 1.,
+	bool twoLines = false);
 
 } // namespace Dialogs

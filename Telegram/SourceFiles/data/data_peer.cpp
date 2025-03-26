@@ -1384,6 +1384,10 @@ bool PeerData::isVerifyCodes() const {
 	return (id == kVerifyCodesId);
 }
 
+bool PeerData::isFreezeAppealChat() const {
+	return username().compare(u"spambot"_q, Qt::CaseInsensitive) == 0;
+}
+
 bool PeerData::sharedMediaInfo() const {
 	return isSelf() || isRepliesChat();
 }

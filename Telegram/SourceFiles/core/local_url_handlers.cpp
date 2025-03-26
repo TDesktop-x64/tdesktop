@@ -965,6 +965,8 @@ bool ShowEditBirthday(
 		const QVariant &context) {
 	if (!controller) {
 		return false;
+	} else if (controller->showFrozenError()) {
+		return true;
 	}
 	const auto user = controller->session().user();
 	const auto save = [=](Data::Birthday result) {
@@ -1021,6 +1023,8 @@ bool ShowEditPersonalChannel(
 		const QVariant &context) {
 	if (!controller) {
 		return false;
+	} else if (controller->showFrozenError()) {
+		return true;
 	}
 
 	auto listController = std::make_unique<PersonalChannelController>(

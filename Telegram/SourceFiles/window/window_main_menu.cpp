@@ -963,7 +963,9 @@ void MainMenu::updateInnerControlsGeometry() {
 }
 
 void MainMenu::chooseEmojiStatus() {
-	if (const auto widget = _badge->widget()) {
+	if (_controller->showFrozenError()) {
+		return;
+	} else if (const auto widget = _badge->widget()) {
 		_emojiStatusPanel->show(_controller, widget, _badge->sizeTag());
 	} else {
 		ShowPremiumPreviewBox(_controller, PremiumFeature::EmojiStatus);
@@ -1120,8 +1122,7 @@ void MainMenu::setupSwipe() {
 		});
 	}
 
-	Ui::Controls::SetupSwipeHandler(_inner, _scroll.data(), [=](
-			Ui::Controls::SwipeContextData data) {
+	auto update = [=](Ui::Controls::SwipeContextData data) {
 		if (data.translation < 0) {
 			if (!_swipeBackData.callback) {
 				_swipeBackData = Ui::Controls::SetupSwipeBack(
@@ -1138,13 +1139,22 @@ void MainMenu::setupSwipe() {
 		} else if (_swipeBackData.lifetime) {
 			_swipeBackData = {};
 		}
-	}, [=](int, Qt::LayoutDirection direction) {
+	};
+
+	auto init = [=](int, Qt::LayoutDirection direction) {
 		if (direction != Qt::LeftToRight) {
 			return Ui::Controls::SwipeHandlerFinishData();
 		}
 		return Ui::Controls::DefaultSwipeBackHandlerFinishData([=] {
 			closeLayer();
 		});
+	};
+
+	Ui::Controls::SetupSwipeHandler({
+		.widget = _inner,
+		.scroll = _scroll.data(),
+		.update = std::move(update),
+		.init = std::move(init),
 	});
 }
 

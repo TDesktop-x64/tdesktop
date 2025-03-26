@@ -180,6 +180,8 @@ public:
 
 	[[nodiscard]] Main::Session &session() const;
 
+	bool showFrozenError();
+
 	virtual void showSection(
 		std::shared_ptr<SectionMemento> memento,
 		const SectionShow &params = SectionShow()) = 0;
@@ -526,7 +528,7 @@ public:
 
 	void toggleChooseChatTheme(
 		not_null<PeerData*> peer,
-		std::optional<bool> show = std::nullopt) const;
+		std::optional<bool> show = std::nullopt);
 	void finishChatThemeEdit(not_null<PeerData*> peer);
 
 	[[nodiscard]] bool mainSectionShown() const {

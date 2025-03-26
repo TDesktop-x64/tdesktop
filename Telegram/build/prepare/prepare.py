@@ -447,7 +447,7 @@ if customRunCommand:
             with tempfile.NamedTemporaryFile(mode='w', delete=False) as tmp_zshrc:
                 tmp_zshrc.write(f'export PS1="{prompt}"\n')
                 tmp_zshrc_path = tmp_zshrc.name
-            subprocess.run(['zsh', '--rcs', tmp_zshrc_path], env=modifiedEnv)
+            subprocess.run(['zsh', '--rcs', tmp_zshrc_path], shell=True, env=modifiedEnv)
             os.remove(tmp_zshrc_path)
     elif not run(' '.join(runCommand) + '\n'):
         print('FAILED :(')
@@ -457,7 +457,7 @@ if customRunCommand:
 stage('patches', """
     git clone https://github.com/desktop-app/patches.git
     cd patches
-    git checkout b88d491492
+    git checkout 7cb9049583
 """)
 
 stage('msys64', """
@@ -1866,13 +1866,14 @@ release:
 """)
 
 stage('ada', """
-    git clone -b v2.9.0 https://github.com/ada-url/ada.git
+    git clone -b v3.2.1 https://github.com/ada-url/ada.git
     cd ada
 win:
     cmake -B out . ^
         -A %WIN32X64% ^
         -D ADA_TESTING=OFF ^
         -D ADA_TOOLS=OFF ^
+        -D ADA_INCLUDE_URL_PATTERN=OFF ^
         -D CMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded$<$<CONFIG:Debug>:Debug>" ^
         -D CMAKE_C_FLAGS_DEBUG="/MTd /Zi /Ob0 /Od /RTC1" ^
         -D CMAKE_C_FLAGS_RELEASE="/MT /O2 /Ob2 /DNDEBUG"

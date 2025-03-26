@@ -142,7 +142,9 @@ void GiftButton::setDescriptor(const GiftDescriptor &descriptor, Mode mode) {
 		_price.setMarkedText(
 			st::semiboldTextStyle,
 			(unique
-				? tr::lng_gift_price_unique(tr::now, Ui::Text::WithEntities)
+				? tr::lng_gift_transfer_button(
+					tr::now,
+					Ui::Text::WithEntities)
 				: _delegate->star().append(
 					' ' + Lang::FormatCountDecimal(data.info.stars))),
 			kMarkupTextOptions,
@@ -303,6 +305,9 @@ void GiftButton::paintBackground(QPainter &p, const QImage &background) {
 
 	auto hq = PainterHighQualityEnabler(p);
 	const auto progress = _selectedAnimation.value(_selected ? 1. : 0.);
+	if (progress < 0.01) {
+		return;
+	}
 	const auto pwidth = progress * st::defaultRoundCheckbox.width;
 	p.setPen(QPen(st::defaultRoundCheckbox.bgActive->c, pwidth));
 	p.setBrush(Qt::NoBrush);

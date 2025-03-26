@@ -680,6 +680,7 @@ private:
 
 	void setupScheduledToggle();
 	void refreshScheduledToggle();
+	void refreshSendGiftToggle();
 	void setupSendAsToggle();
 	void refreshSendAsToggle();
 	void refreshAttachBotsMenu();
@@ -821,6 +822,7 @@ private:
 	object_ptr<Ui::IconButton> _botKeyboardShow;
 	object_ptr<Ui::IconButton> _botKeyboardHide;
 	object_ptr<Ui::IconButton> _botCommandStart;
+	object_ptr<Ui::IconButton> _giftToUser = { nullptr };
 	object_ptr<Ui::SilentToggle> _silent = { nullptr };
 	object_ptr<Ui::IconButton> _scheduled = { nullptr };
 	std::unique_ptr<HistoryView::Controls::TTLButton> _ttlInfo;
@@ -830,7 +832,7 @@ private:
 	bool _cmdStartShown = false;
 	object_ptr<Ui::InputField> _field;
 	base::unique_qptr<Ui::RpWidget> _fieldDisabled;
-	base::unique_qptr<Ui::RpWidget> _sendRestriction;
+	std::unique_ptr<Ui::RpWidget> _sendRestriction;
 	using CharactersLimitLabel = HistoryView::Controls::CharactersLimitLabel;
 	base::unique_qptr<CharactersLimitLabel> _charsLimitation;
 	QString _sendRestrictionKey;

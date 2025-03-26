@@ -537,8 +537,8 @@ void HistoryInner::setupSwipeReplyAndBack() {
 		return;
 	}
 	const auto peer = _peer;
-	Ui::Controls::SetupSwipeHandler(this, _scroll, [=, history = _history](
-			Ui::Controls::SwipeContextData data) {
+
+	auto update = [=, history = _history](Ui::Controls::SwipeContextData data) {
 		if (data.translation > 0) {
 			if (!_swipeBackData.callback) {
 				_swipeBackData = Ui::Controls::SetupSwipeBack(
@@ -568,7 +568,9 @@ void HistoryInner::setupSwipeReplyAndBack() {
 				repaintItem(item);
 			}
 		}
-	}, [=, show = _controller->uiShow()](
+	};
+
+	auto init = [=, show = _controller->uiShow()](
 			int cursorTop,
 			Qt::LayoutDirection direction) {
 		if (direction == Qt::RightToLeft) {
@@ -616,11 +618,21 @@ void HistoryInner::setupSwipeReplyAndBack() {
 			return false;
 		});
 		return result;
-	}, _touchMaybeSelecting.value());
+	};
+
+	Ui::Controls::SetupSwipeHandler({
+		.widget = this,
+		.scroll = _scroll,
+		.update = std::move(update),
+		.init = std::move(init),
+		.dontStart = _touchMaybeSelecting.value(),
+	});
 }
 
 bool HistoryInner::hasSelectRestriction() const {
-	if (!_sharingDisallowed.current()) {
+	if (session().frozen()) {
+		return true;
+	} else if (!_sharingDisallowed.current()) {
 		return false;
 	} else if (const auto chat = _peer->asChat()) {
 		return !chat->canDeleteMessages();
@@ -2188,7 +2200,9 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 	}
 
 	const auto link = ClickHandler::getActive();
-	if (link
+	if (_controller->showFrozenError()) {
+		return;
+	} else if (link
 		&& !link->property(
 			kSendReactionEmojiProperty).value<Data::ReactionId>().empty()
 		&& _reactionsManager->showContextMenu(

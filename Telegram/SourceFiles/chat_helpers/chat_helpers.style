@@ -1131,6 +1131,10 @@ historyScheduledToggle: IconButton(historyAttach) {
 		{ "chat/input_scheduled_dot", attentionButtonFg }
 	};
 }
+historyGiftToUser: IconButton(historyAttach) {
+	icon: icon {{ "chat/input_gift", historyComposeIconFg }};
+	iconOver: icon {{ "chat/input_gift", historyComposeIconFgOver }};
+}
 
 historyAttachEmojiInner: IconButton(historyAttach) {
 	icon: icon {{ "chat/input_smile_face", historyComposeIconFg }};
@@ -1565,4 +1569,28 @@ processingVideoView: RoundButton(defaultActiveButton) {
 	textBg: transparent;
 	textBgOver: transparent;
 	ripple: emptyRippleAnimation;
+}
+
+frozenBarTitle: FlatLabel(defaultFlatLabel) {
+	style: semiboldTextStyle;
+	textFg: attentionButtonFg;
+}
+frozenRestrictionTitle: FlatLabel(frozenBarTitle) {
+	align: align(top);
+}
+frozenBarSubtitle: FlatLabel(defaultFlatLabel) {
+	textFg: windowSubTextFg;
+}
+frozenRestrictionSubtitle: FlatLabel(frozenBarSubtitle) {
+	align: align(top);
+}
+frozenInfoBox: Box(defaultBox) {
+	buttonPadding: margins(16px, 11px, 16px, 16px);
+	buttonHeight: 42px;
+	button: RoundButton(defaultActiveButton) {
+		height: 42px;
+		textTop: 12px;
+		style: semiboldTextStyle;
+	}
+	shadowIgnoreTopSkip: true;
 }

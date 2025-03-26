@@ -234,6 +234,9 @@ void Cover::initViewers() {
 	}, lifetime());
 
 	_username->overrideLinkClickHandler([=] {
+		if (_controller->showFrozenError()) {
+			return;
+		}
 		const auto username = _user->username();
 		if (username.isEmpty()) {
 			_controller->show(Box(UsernamesBox, _user));

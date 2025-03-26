@@ -683,12 +683,22 @@ void RepliesWidget::setupComposeControls() {
 			: tr::lng_forum_topic_closed(tr::now);
 	});
 	auto writeRestriction = rpl::combine(
+		session().frozenValue(),
 		session().changes().peerFlagsValue(
 			_history->peer,
 			Data::PeerUpdate::Flag::Rights),
 		Data::CanSendAnythingValue(_history->peer),
 		std::move(topicWriteRestrictions)
-	) | rpl::map([=](auto, auto, Data::SendError topicRestriction) {
+	) | rpl::map([=](
+			const Main::FreezeInfo &info,
+			auto,
+			auto,
+			Data::SendError topicRestriction) {
+		if (info) {
+			return Controls::WriteRestriction{
+				.type = Controls::WriteRestrictionType::Frozen,
+			};
+		}
 		const auto allWithoutPolls = Data::AllSendRestrictions()
 			& ~ChatRestriction::SendPolls;
 		const auto canSendAnything = _topic
@@ -902,8 +912,8 @@ void RepliesWidget::setupSwipeReplyAndBack() {
 		}
 		return false;
 	};
-	Ui::Controls::SetupSwipeHandler(_inner, _scroll.get(), [=](
-			Ui::Controls::SwipeContextData data) {
+
+	auto update = [=](Ui::Controls::SwipeContextData data) {
 		if (data.translation > 0) {
 			if (!_swipeBackData.callback) {
 				_swipeBackData = Ui::Controls::SetupSwipeBack(
@@ -935,7 +945,9 @@ void RepliesWidget::setupSwipeReplyAndBack() {
 				_history->owner().requestItemRepaint(item);
 			}
 		}
-	}, [=, show = controller()->uiShow()](
+	};
+
+	auto init = [=, show = controller()->uiShow()](
 			int cursorTop,
 			Qt::LayoutDirection direction) {
 		if (direction == Qt::RightToLeft) {
@@ -974,7 +986,15 @@ void RepliesWidget::setupSwipeReplyAndBack() {
 			});
 		};
 		return result;
-	}, _inner->touchMaybeSelectingValue());
+	};
+
+	Ui::Controls::SetupSwipeHandler({
+		.widget = _inner,
+		.scroll = _scroll.get(),
+		.update = std::move(update),
+		.init = std::move(init),
+		.dontStart = _inner->touchMaybeSelectingValue(),
+	});
 }
 
 void RepliesWidget::chooseAttach(

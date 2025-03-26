@@ -1647,8 +1647,9 @@ bool ListWidget::showCopyRestrictionForSelected() {
 }
 
 bool ListWidget::hasSelectRestriction() const {
-	return _delegate->listSelectRestrictionType()
-		!= CopyRestrictionType::None;
+	return session().frozen()
+		|| (_delegate->listSelectRestrictionType()
+			!= CopyRestrictionType::None);
 }
 
 Element *ListWidget::lookupItemByY(int y) const {
@@ -2812,7 +2813,9 @@ void ListWidget::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 	}
 
 	const auto link = ClickHandler::getActive();
-	if (link
+	if (controller()->showFrozenError()) {
+		return;
+	} else if (link
 		&& !link->property(
 			kSendReactionEmojiProperty).value<Data::ReactionId>().empty()
 		&& _reactionsManager

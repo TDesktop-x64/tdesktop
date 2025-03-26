@@ -701,12 +701,8 @@ void Filler::addToggleArchive() {
 	}
 	const auto peer = _peer;
 	const auto history = _request.key.history();
-	if (history && history->useTopPromotion()) {
+	if (!CanArchive(history, peer)) {
 		return;
-	} else if (peer->isNotificationsUser() || peer->isSelf()) {
-		if (!history || !history->folder()) {
-			return;
-		}
 	}
 	const auto isArchived = [=] {
 		return IsArchived(history);
@@ -802,7 +798,7 @@ void Filler::addBlockUser() {
 		|| user->isVerifyCodes()) {
 		return;
 	}
-	const auto window = &_controller->window();
+	const auto window = _controller;
 	const auto blockText = [](not_null<UserData*> user) {
 		return user->isBlocked()
 			? ((user->isBot() && !user->isSupport())
@@ -814,14 +810,16 @@ void Filler::addBlockUser() {
 	};
 	const auto blockAction = _addAction(blockText(user), [=] {
 		const auto show = window->uiShow();
-		if (user->isBlocked()) {
+		if (show->showFrozenError()) {
+			return;
+		} else if (user->isBlocked()) {
 			PeerMenuUnblockUserWithBotRestart(show, user);
 		} else if (user->isBot()) {
 			user->session().api().blockedPeers().block(user);
 		} else {
 			window->show(Box(
 				PeerMenuBlockUserBox,
-				window,
+				&window->window(),
 				user,
 				v::null,
 				v::null));
@@ -869,9 +867,10 @@ void Filler::addExportChat() {
 		return;
 	}
 	const auto peer = _peer;
+	const auto navigation = _controller;
 	_addAction(
 		tr::lng_profile_export_chat(tr::now),
-		[=] { PeerMenuExportChat(peer); },
+		[=] { PeerMenuExportChat(navigation, peer); },
 		&st::menuIconExport);
 }
 
@@ -917,9 +916,15 @@ void Filler::addNewContact() {
 		return;
 	}
 	const auto controller = _controller;
+	const auto edit = [=] {
+		if (controller->showFrozenError()) {
+			return;
+		}
+		controller->show(Box(EditContactBox, controller, user));
+	};
 	_addAction(
 		tr::lng_info_add_as_contact(tr::now),
-		[=] { controller->show(Box(EditContactBox, controller, user)); },
+		edit,
 		&st::menuIconInvite);
 }
 
@@ -941,9 +946,15 @@ void Filler::addEditContact() {
 		return;
 	}
 	const auto controller = _controller;
+	const auto edit = [=] {
+		if (controller->showFrozenError()) {
+			return;
+		}
+		controller->show(Box(EditContactBox, controller, user));
+	};
 	_addAction(
 		tr::lng_info_edit_contact(tr::now),
-		[=] { controller->show(Box(EditContactBox, controller, user)); },
+		edit,
 		&st::menuIconEdit);
 }
 
@@ -1607,7 +1618,9 @@ void PeerMenuUnhidePinnedMessage(not_null<PeerData*> peer) {
 	}
 }
 
-void PeerMenuExportChat(not_null<PeerData*> peer) {
+void PeerMenuExportChat(
+		not_null<Window::SessionController*> controller,
+		not_null<PeerData*> peer) {
 	base::call_delayed(st::defaultPopupMenu.showDuration, [=] {
 		Core::App().exportManager().start(peer);
 	});
@@ -1616,6 +1629,9 @@ void PeerMenuExportChat(not_null<PeerData*> peer) {
 void PeerMenuDeleteContact(
 		not_null<Window::SessionController*> controller,
 		not_null<UserData*> user) {
+	if (controller->showFrozenError()) {
+		return;
+	}
 	const auto text = tr::lng_sure_delete_contact(
 		tr::now,
 		lt_contact,
@@ -1712,6 +1728,9 @@ void PeerMenuDeleteTopic(
 void PeerMenuShareContactBox(
 		not_null<Window::SessionNavigation*> navigation,
 		not_null<UserData*> user) {
+	if (navigation->showFrozenError()) {
+		return;
+	}
 	// There is no async to make weak from controller.
 	const auto weak = std::make_shared<QPointer<Ui::BoxContent>>();
 	auto callback = [=](not_null<Data::Thread*> thread) {
@@ -3285,14 +3304,20 @@ Fn<void()> ClearHistoryHandler(
 		not_null<Window::SessionController*> controller,
 		not_null<PeerData*> peer) {
 	return [=] {
-		controller->show(Box<DeleteMessagesBox>(peer, true));
+		if (!controller->showFrozenError()) {
+			controller->show(Box<DeleteMessagesBox>(peer, true));
+		}
 	};
 }
 
 Fn<void()> DeleteAndLeaveHandler(
 		not_null<Window::SessionController*> controller,
 		not_null<PeerData*> peer) {
-	return [=] { controller->show(Box(DeleteChatBox, peer)); };
+	return [=] {
+		if (!controller->showFrozenError()) {
+			controller->show(Box(DeleteChatBox, peer));
+		}
+	};
 }
 
 void FillDialogsEntryMenu(
@@ -3473,6 +3498,17 @@ void TogglePinnedThread(
 
 bool IsArchived(not_null<History*> history) {
 	return (history->folder() != nullptr);
+}
+
+bool CanArchive(History *history, PeerData *peer) {
+	if (history && history->useTopPromotion()) {
+		return false;
+	} else if (peer && (peer->isNotificationsUser() || peer->isSelf())) {
+		if (!history || !history->folder()) {
+			return false;
+		}
+	}
+	return true;
 }
 
 } // namespace Window

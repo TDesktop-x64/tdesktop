@@ -1707,6 +1707,15 @@ ServiceAction ParseServiceAction(
 				.giftId = uint64(gift.vid().v),
 			};
 		});
+	}, [&](const MTPDmessageActionPaidMessagesRefunded &data) {
+		result.content = ActionPaidMessagesRefunded{
+			.messages = data.vcount().v,
+			.stars = int64(data.vstars().v),
+		};
+	}, [&](const MTPDmessageActionPaidMessagesPrice &data) {
+		result.content = ActionPaidMessagesPrice{
+			.stars = int(data.vstars().v),
+		};
 	}, [](const MTPDmessageActionEmpty &data) {});
 	return result;
 }

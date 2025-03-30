@@ -1916,9 +1916,9 @@ void SendFilesBox::send(
 		saveSendWaySettings();
 	}
 
-	for (auto &item : _list.files) {
-		item.spoiler = false;
-	}
+	//for (auto &item : _list.files) {
+	//	item.spoiler = false;
+	//}
 	applyBlockChanges();
 
 	Storage::ApplyModifications(_list);

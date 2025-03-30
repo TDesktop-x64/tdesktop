@@ -2228,7 +2228,6 @@ void AddStickerSetOwnerActions(
 	not_null<DocumentData*> document,
 	HistoryItem* item) {
 	if (document->sticker() && document->sticker()->set) {
-		const auto peer = item->history()->peer;
 		if (!menu->empty()) {
 			menu->addSeparator();
 		}

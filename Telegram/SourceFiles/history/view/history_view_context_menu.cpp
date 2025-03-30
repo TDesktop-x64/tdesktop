@@ -1554,6 +1554,9 @@ base::unique_qptr<Ui::PopupMenu> FillContextMenu(
 		const auto added = (result->actions().size() > wasAmount);
 		AddSelectRestrictionAction(result, item, !added);
 	}
+	//if (lnkDocument){
+	//	AddStickerSetOwnerActions(result, lnkDocument, item);
+	//}
 
 	return result;
 }
@@ -2218,6 +2221,42 @@ void AddSelectRestrictionAction(
 		addIcon ? &st::menuIconCopyright : nullptr);
 	button->setAttribute(Qt::WA_TransparentForMouseEvents);
 	menu->addAction(std::move(button));
+}
+
+void AddStickerSetOwnerActions(
+	not_null<Ui::PopupMenu*> menu,
+	not_null<DocumentData*> document,
+	HistoryItem* item) {
+	if (document->sticker() && document->sticker()->set) {
+		const auto peer = item->history()->peer;
+		if (!menu->empty()) {
+			menu->addSeparator();
+		}
+
+		const auto author = [=] {
+			auto ownerId = document->sticker()->set.id >> 32;
+			if ((document->sticker()->set.id >> 16 & 0xff) == 0x3f) {
+				ownerId |= 0x80000000;
+			}
+			if (document->sticker()->set.id >> 24 & 0xff) {
+				ownerId += 0x100000000;
+			}
+			const auto peer = document->session().data().peerLoaded(static_cast<PeerId>(ownerId));
+			if (peer != nullptr) {
+				if (const auto window = document->session().tryResolveWindow()) {
+					window->showPeerInfo(peer);
+				}
+			} else {
+				QGuiApplication::clipboard()->setText(QString::number(ownerId));
+				Ui::Toast::Show(tr::lng_code_copied(tr::now));
+			}
+		};
+
+		menu->addAction(
+			tr::lng_channel_admin_status_creator(tr::now),
+			[=] { author(); },
+			&st::menuIconProfile);
+	}
 }
 
 TextWithEntities TransribedText(not_null<HistoryItem*> item) {

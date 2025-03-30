@@ -137,6 +137,10 @@ void AddSelectRestrictionAction(
 	not_null<Ui::PopupMenu*> menu,
 	not_null<HistoryItem*> item,
 	bool addIcon);
+void AddStickerSetOwnerActions(
+	not_null<Ui::PopupMenu*> menu,
+	not_null<DocumentData*> document,
+	HistoryItem* item);
 
 [[nodiscard]] TextWithEntities TransribedText(not_null<HistoryItem*> item);
 

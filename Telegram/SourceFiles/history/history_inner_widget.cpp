@@ -3259,6 +3259,9 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			textItem ? textItem : _dragStateItem,
 			HistoryView::EmojiPacksSource::Message,
 			_controller);
+		//if (_dragStateItem->media() != nullptr && _dragStateItem->media()->document() != nullptr) {
+		//	HistoryView::AddStickerSetOwnerActions(_menu, _dragStateItem->media()->document(), _dragStateItem);
+		//}
 		const auto added = (_menu->actions().size() > wasAmount);
 		HistoryView::AddSelectRestrictionAction(
 			_menu,

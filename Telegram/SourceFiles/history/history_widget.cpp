@@ -7509,7 +7509,7 @@ bool HistoryWidget::showSlowmodeError() {
 				Ui::FormatDurationWordsSlowmode(left));
 		} else if (_peer->slowmodeApplied()) {
 			if (const auto item = _history->latestSendingMessage()) {
-				if (const auto view = item->mainView()) {
+				if (item->mainView()) {
 					animatedScrollToItem(item->id);
 					enqueueMessageHighlight({ item });
 				}

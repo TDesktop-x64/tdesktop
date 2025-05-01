@@ -150,6 +150,7 @@ void SetupExperimental(
 	addToggle(Window::kOptionViewProfileInChatsListContextMenu);
 	addToggle(Dialogs::kOptionCtrlClickChatNewWindow);
 	addToggle(Info::Profile::kOptionShowPeerIdBelowAbout);
+	addToggle(Info::Profile::kOptionShowChannelJoinedBelowAbout);
 	addToggle(Ui::kOptionUseSmallMsgBubbleRadius);
 	addToggle(Ui::kOptionUncoloredQuote);
 	addToggle(Media::Player::kOptionDisableAutoplayNext);

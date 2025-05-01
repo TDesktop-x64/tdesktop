@@ -2,7 +2,7 @@
 {%- set GIT_FREEDESKTOP = GIT ~ "/gitlab-freedesktop-mirrors" -%}
 {%- set GIT_UPDATE_M4 = "git submodule set-url m4 https://gitlab.freedesktop.org/xorg/util/xcb-util-m4 && git config -f .gitmodules submodule.m4.shallow true && git submodule init && git submodule update" -%}
 {%- set TOOLSET = "gcc-toolset-12" -%}
-{%- set QT = "6.8.2" -%}
+{%- set QT = "6.9.0" -%}
 {%- set QT_TAG = "v" ~ QT -%}
 {%- set CFLAGS_DEBUG = "$CFLAGS -O0 -fno-lto -U_FORTIFY_SOURCE" -%}
 {%- set LibrariesPath = "/usr/src/Libraries" -%}
@@ -44,7 +44,7 @@ FROM builder AS patches
 RUN git init patches \
 	&& cd patches \
 	&& git remote add origin {{ GIT }}/desktop-app/patches.git \
-	&& git fetch --depth=1 origin fb35ec726cf0a99eead201ddf80e1e717b9fa7c2 \
+	&& git fetch --depth=1 origin 7119a74e3f9b782f3cc29bf52fc78f2e8b0ca352 \
 	&& git reset --hard FETCH_HEAD \
 	&& rm -rf .git
 
@@ -70,14 +70,8 @@ RUN git clone -b v5.4.4 --depth=1 {{ GIT }}/tukaani-project/xz.git \
 	&& rm -rf xz
 
 FROM builder AS protobuf
-RUN git clone -b v21.9 --depth=1 --recursive --shallow-submodules {{ GIT }}/protocolbuffers/protobuf.git \
+RUN git clone -b v30.2 --depth=1 --recursive --shallow-submodules {{ GIT }}/protocolbuffers/protobuf.git \
 	&& cd protobuf \
-	&& git init third_party/abseil-cpp \
-	&& cd third_party/abseil-cpp \
-	&& git remote add origin {{ GIT }}/abseil/abseil-cpp.git \
-	&& git fetch --depth=1 origin 273292d1cfc0a94a65082ee350509af1d113344d \
-	&& git reset --hard FETCH_HEAD \
-	&& cd ../.. \
 	&& cmake -GNinja -B build . \
 		-DCMAKE_BUILD_TYPE=None \
 		-Dprotobuf_BUILD_TESTS=OFF \
@@ -249,7 +243,7 @@ RUN git clone -b v1.18.2 --depth=1 {{ GIT }}/strukturag/libheif.git \
 	&& cd .. \
 	&& rm -rf libheif
 
-FROM patches AS libjxl
+FROM builder AS libjxl
 COPY --link --from=lcms2 {{ LibrariesPath }}/lcms2-cache /
 COPY --link --from=brotli {{ LibrariesPath }}/brotli-cache /
 COPY --link --from=highway {{ LibrariesPath }}/highway-cache /
@@ -486,11 +480,9 @@ COPY --link --from=nv-codec-headers {{ LibrariesPath }}/nv-codec-headers-cache /
 RUN git clone -b n6.1.1 --depth=1 {{ GIT }}/FFmpeg/FFmpeg.git \
 	&& cd FFmpeg \
 	&& ./configure \
-		--extra-cflags="-DCONFIG_SAFE_BITSTREAM_READER=1" \
-		--extra-cxxflags="-DCONFIG_SAFE_BITSTREAM_READER=1" \
+		--extra-cflags="-fno-lto -DCONFIG_SAFE_BITSTREAM_READER=1" \
+		--extra-cxxflags="-fno-lto -DCONFIG_SAFE_BITSTREAM_READER=1" \
 		--disable-debug \
-		--disable-optimizations \
-		--disable-inline-asm \
 		--disable-programs \
 		--disable-doc \
 		--disable-network \
@@ -753,10 +745,10 @@ RUN git clone -b {{ QT_TAG }} --depth=1 {{ GIT }}/qt/qt5.git \
 	&& rm -rf qt5
 
 FROM builder AS breakpad
-RUN git clone -b v2023.06.01 --depth=1 https://chromium.googlesource.com/breakpad/breakpad.git \
+RUN git clone -b v2024.02.16 --depth=1 https://chromium.googlesource.com/breakpad/breakpad.git \
 	&& cd breakpad \
-	&& git clone -b v2022.10.12 --depth=1 https://chromium.googlesource.com/linux-syscall-support.git src/third_party/lss \
-	&& env -u CFLAGS -u CXXFLAGS ./configure \
+	&& git clone -b v2024.02.01 --depth=1 https://chromium.googlesource.com/linux-syscall-support.git src/third_party/lss \
+	&& CFLAGS="$CFLAGS -fno-lto" CXXFLAGS="$CXXFLAGS -fno-lto" ./configure \
 	&& make -j$(nproc) \
 	&& make DESTDIR="{{ LibrariesPath }}/breakpad-cache" install \
 	&& cd .. \
@@ -807,7 +799,7 @@ RUN cmake --build out --config Debug --parallel \
 {%- endif %}
 
 FROM builder AS ada
-RUN git clone -b v3.2.1 --depth=1 {{ GIT }}/ada-url/ada.git \
+RUN git clone -b v3.2.2 --depth=1 {{ GIT }}/ada-url/ada.git \
 	&& cd ada \
 	&& cmake -GNinja -B build . \
 		-D CMAKE_BUILD_TYPE=None \
@@ -818,6 +810,38 @@ RUN git clone -b v3.2.1 --depth=1 {{ GIT }}/ada-url/ada.git \
 	&& DESTDIR="{{ LibrariesPath }}/ada-cache" cmake --install build \
 	&& cd .. \
 	&& rm -rf ada
+
+FROM builder AS tdlib
+COPY --link --from=openssl {{ LibrariesPath }}/openssl-cache /
+
+# Shallow clone on a specific commit.
+RUN git init td \
+	&& cd td \
+	&& git remote add origin {{ GIT }}/tdlib/td.git \
+	&& git fetch --depth=1 origin f1b7500310baa496c0b779e4273a3aff0f14f42f \
+	&& git reset --hard FETCH_HEAD \
+	&& rm -rf .git \
+	&& env -u CFLAGS -u CXXFLAGS cmake -B out/Release . \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_C_FLAGS_RELEASE="$CFLAGS" \
+		-DCMAKE_C_FLAGS_DEBUG="{{ CFLAGS_DEBUG }}" \
+		-DCMAKE_CXX_FLAGS_RELEASE="$CXXFLAGS" \
+		-DCMAKE_CXX_FLAGS_DEBUG="{{ CFLAGS_DEBUG }}" \
+	&& cmake --build out/Release --config Release --target tde2e -j$(nproc)
+
+WORKDIR td
+
+{%- if DEBUG %}
+
+FROM tdlib AS tdlib_debug
+RUN env -u CFLAGS -u CXXFLAGS cmake -B out/Debug . \
+		-DCMAKE_BUILD_TYPE=Debug \
+		-DCMAKE_C_FLAGS_RELEASE="$CFLAGS" \
+		-DCMAKE_C_FLAGS_DEBUG="{{ CFLAGS_DEBUG }}" \
+		-DCMAKE_CXX_FLAGS_RELEASE="$CXXFLAGS" \
+		-DCMAKE_CXX_FLAGS_DEBUG="{{ CFLAGS_DEBUG }}" \
+	&& cmake --build out/Debug --config Debug --target tde2e -j$(nproc)
+{%- endif %}
 
 FROM builder
 COPY --link --from=zlib {{ LibrariesPath }}/zlib-cache /
@@ -866,6 +890,11 @@ COPY --link --from=ada {{ LibrariesPath }}/ada-cache /
 
 {%- if DEBUG %}
 COPY --link --from=webrtc_debug {{ LibrariesPath }}/tg_owt/out/Debug tg_owt/out/Debug
+{%- endif %}
+
+COPY --link --from=tdlib {{ LibrariesPath }}/td td
+{%- if DEBUG %}
+COPY --link --from=tdlib_debug {{ LibrariesPath }}/td/out/Debug td/out/Debug
 {%- endif %}
 
 WORKDIR ../tdesktop

@@ -190,7 +190,7 @@ void History::itemVanished(not_null<HistoryItem*> item) {
 		setUnreadCount(unreadCount() - 1);
 	}
 	if (const auto media = item->media()) {
-		if (const auto gift = media->gift()) {
+		if (media->gift()) {
 			using GiftAction = Data::GiftUpdate::Action;
 			owner().notifyGiftUpdate({
 				.id = Data::SavedStarGiftId::User(item->id),
@@ -1197,7 +1197,7 @@ void History::applyServiceChanges(
 			auto paid = std::optional<Payments::PaidInvoice>();
 			if (const auto message = payment->msg) {
 				if (const auto media = message->media()) {
-					if (const auto invoice = media->invoice()) {
+					if (media->invoice()) {
 						paid = Payments::CheckoutProcess::InvoicePaid(
 							message);
 					}
@@ -1260,6 +1260,12 @@ void History::applyServiceChanges(
 			}
 			if (const auto hidden = data.vhidden()) {
 				topic->setHidden(mtpIsTrue(*hidden));
+			}
+		}
+	}, [&](const MTPDmessageActionConferenceCall &data) {
+		if (!data.is_active() && !data.is_missed() && !item->out()) {
+			if (const auto user = item->history()->peer->asUser()) {
+				Core::App().calls().showConferenceInvite(user, item->id);
 			}
 		}
 	}, [](const auto &) {
@@ -2592,7 +2598,7 @@ auto History::computeChatListMessageFromLast() const
 	if (!last || !last->isGroupMigrate()) {
 		return _lastMessage;
 	}
-	if (const auto chat = peer->asChat()) {
+	if (peer->isChat()) {
 		// In chats we try to take the item before the 'last', which
 		// is the empty-displayed migration message.
 		if (!loadedAtBottom()) {
@@ -2670,7 +2676,7 @@ void History::setFakeChatListMessage() {
 			}
 		}
 		return;
-	} else if (const auto chat = peer->asChat()) {
+	} else if (peer->isChat()) {
 		// In chats we try to take the item before the 'last', which
 		// is the empty-displayed migration message.
 		owner().histories().requestFakeChatListMessage(this);
@@ -2913,10 +2919,8 @@ void History::dialogEntryApplied() {
 		addOlderSlice(QVector<MTPMessage>());
 		if (const auto channel = peer->asChannel()) {
 			const auto inviter = channel->inviter;
-			if (inviter && channel->amIn()) {
-				if (const auto from = owner().userLoaded(inviter)) {
-					insertJoinedMessage();
-				}
+			if (inviter && channel->amIn() && owner().userLoaded(inviter)) {
+				insertJoinedMessage();
 			}
 		}
 		return;
@@ -2927,10 +2931,9 @@ void History::dialogEntryApplied() {
 			const auto inviter = channel->inviter;
 			if (inviter
 				&& chatListTimeId() <= channel->inviteDate
-				&& channel->amIn()) {
-				if (const auto from = owner().userLoaded(inviter)) {
-					insertJoinedMessage();
-				}
+				&& channel->amIn()
+				&& owner().userLoaded(inviter)) {
+				insertJoinedMessage();
 			}
 		}
 	}

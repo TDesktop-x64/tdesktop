@@ -207,7 +207,11 @@ EntitiesInText EntitiesFromMTP(
 				d.vlength().v,
 			});
 		}, [&](const MTPDmessageEntityBankCard &d) {
-			// Skipping cards. // #TODO entities
+			result.push_back({
+				EntityType::BankCard,
+				d.voffset().v,
+				d.vlength().v,
+			});
 		}, [&](const MTPDmessageEntitySpoiler &d) {
 			if (length > 0) {
 				return;
@@ -280,6 +284,9 @@ MTPVector<MTPMessageEntity> EntitiesToMTP(
 		} break;
 		case EntityType::Phone: {
 			v.push_back(MTP_messageEntityPhone(offset, length));
+		} break;
+		case EntityType::BankCard: {
+			v.push_back(MTP_messageEntityBankCard(offset, length));
 		} break;
 		case EntityType::Hashtag: {
 			v.push_back(MTP_messageEntityHashtag(offset, length));

@@ -876,7 +876,7 @@ void InnerWidget::paintEvent(QPaintEvent *e) {
 					if (raw->finishedAt
 						&& (ms - raw->finishedAt
 							> st::defaultRippleAnimation.hideDuration)) {
-						_inactiveQuickActions.erase(it);
+						it = _inactiveQuickActions.erase(it);
 					} else {
 						if (raw->data.msgBareId == history->peer->id.value) {
 							context.quickActionContext = raw;
@@ -1681,6 +1681,9 @@ void InnerWidget::clearIrrelevantState() {
 bool InnerWidget::lookupIsInBotAppButton(
 		Row *row,
 		QPoint localPosition) {
+	if (_narrowRatio) {
+		return false;
+	}
 	if (const auto user = MaybeBotWithApp(row)) {
 		const auto it = _rightButtons.find(user->id);
 		if (it != _rightButtons.end()) {
@@ -1799,9 +1802,10 @@ void InnerWidget::selectByMouse(QPoint globalPosition) {
 					local.x(),
 					mappedY);
 			const auto selectedRightButton = (filteredSelected >= 0)
-				&& lookupIsInBotAppButton(
+				? lookupIsInBotAppButton(
 					_filterResults[filteredSelected].row,
-					QPoint(local.x(), mappedY));
+					QPoint(local.x(), mappedY))
+				: _selectedRightButton;
 			if (_filteredSelected != filteredSelected
 				|| _selectedTopicJump != selectedTopicJump
 				|| _selectedRightButton != selectedRightButton) {
@@ -1822,10 +1826,11 @@ void InnerWidget::selectByMouse(QPoint globalPosition) {
 				? mouseY - skip - (peerSearchSelected * st::dialogsRowHeight)
 				: 0;
 			const auto selectedRightButton = (peerSearchSelected >= 0)
-				&& _peerSearchResults[peerSearchSelected]->sponsored
-				&& lookupIsInRightButton(
-					_peerSearchResults[peerSearchSelected]->sponsored->button,
-					QPoint(local.x(), mappedY));
+				? (_peerSearchResults[peerSearchSelected]->sponsored
+					&& lookupIsInRightButton(
+						_peerSearchResults[peerSearchSelected]->sponsored->button,
+						QPoint(local.x(), mappedY)))
+				: _selectedRightButton;
 			if (_peerSearchSelected != peerSearchSelected
 				|| _selectedRightButton != selectedRightButton) {
 				updateSelectedRow();
@@ -2396,7 +2401,7 @@ void InnerWidget::mousePressReleased(
 	if (_chatPreviewScheduled) {
 		_controller->cancelScheduledPreview();
 	}
-	_pressButton = Qt::NoButton;
+	const auto pressButton = base::take(_pressButton);
 
 	const auto wasDragging = finishReorderOnRelease();
 
@@ -2429,7 +2434,10 @@ void InnerWidget::mousePressReleased(
 	if (_pressedRightButtonData && _pressedRightButtonData->ripple) {
 		_pressedRightButtonData->ripple->lastStop();
 	}
-	if (_activeQuickAction && pressed && !_activeQuickAction->data) {
+	if ((pressButton == Qt::MiddleButton)
+		&& _activeQuickAction
+		&& pressed
+		&& !_activeQuickAction->data) {
 		if (const auto history = pressed->history()) {
 			const auto raw = _activeQuickAction.get();
 			if (raw->ripple) {
@@ -2459,7 +2467,9 @@ void InnerWidget::mousePressReleased(
 			|| (hashtagPressed >= 0
 				&& hashtagPressed == _hashtagSelected
 				&& hashtagDeletePressed == _hashtagDeleteSelected)
-			|| (filteredPressed >= 0 && filteredPressed == _filteredSelected)
+			|| (filteredPressed >= 0
+				&& filteredPressed == _filteredSelected
+				&& pressedRightButton == _selectedRightButton)
 			|| (peerSearchPressed >= 0
 				&& peerSearchPressed == _peerSearchSelected
 				&& pressedRightButton == _selectedRightButton)
@@ -4764,7 +4774,7 @@ bool InnerWidget::chooseRow(
 		}
 		if (!chosen.message.fullId) {
 			if (const auto history = chosen.key.history()) {
-				if (const auto forum = history->peer->forum()) {
+				if (history->peer->forum()) {
 					if (pressedTopicRootId) {
 						chosen.message.fullId = {
 							history->peer->id,

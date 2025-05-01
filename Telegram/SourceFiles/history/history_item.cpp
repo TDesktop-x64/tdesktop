@@ -426,10 +426,12 @@ HistoryItem::HistoryItem(
 	} else if ((checked == MediaCheckResult::HasUnsupportedTimeToLive)
 			|| (checked == MediaCheckResult::HasExpiredMediaTimeToLive)) {
 		createServiceFromMtp(data);
+		setReactions(data.vreactions());
 		applyTTL(data);
 	} else if (checked == MediaCheckResult::HasStoryMention) {
 		setMedia(*data.vmedia());
 		createServiceFromMtp(data);
+		setReactions(data.vreactions());
 		applyTTL(data);
 	} else {
 		auto peerId = data.vfrom_id() ? peerFromMTP(*data.vfrom_id()) : PeerId(0);
@@ -524,7 +526,13 @@ HistoryItem::HistoryItem(
 		createComponents(CreateConfig());
 		_media = std::make_unique<Data::MediaCall>(
 			this,
-			Data::ComputeCallData(data));
+			Data::ComputeCallData(&history->owner(), data));
+		setTextValue({});
+	}, [&](const MTPDmessageActionConferenceCall &data) {
+		createComponents(CreateConfig());
+		_media = std::make_unique<Data::MediaCall>(
+			this,
+			Data::ComputeCallData(&history->owner(), data));
 		setTextValue({});
 	}, [&](const auto &) {
 		createServiceFromMtp(data);
@@ -1875,8 +1883,18 @@ void HistoryItem::applyEdition(HistoryMessageEdition &&edition) {
 	auto updatedText = checkedMedia
 		? edition.textWithEntities
 		: EnsureNonEmpty(edition.textWithEntities);
+	auto serviceText = (!checkedMedia
+		&& edition.textWithEntities.empty()
+		&& edition.mtpMedia)
+		? prepareServiceTextForMessage(
+			*edition.mtpMedia,
+			edition.isMediaUnread)
+		: PreparedServiceText();
 	if (updatingSavedLocalEdit) {
 		Get<HistoryMessageSavedMediaData>()->text = std::move(updatedText);
+	} else if (!serviceText.text.empty()) {
+		setServiceText(std::move(serviceText));
+		addToSharedMediaIndex();
 	} else {
 		setText(std::move(updatedText));
 		addToSharedMediaIndex();
@@ -1945,6 +1963,28 @@ void HistoryItem::applyEdition(const MTPDmessageService &message) {
 		applyServiceDateEdition(message);
 		finishEditionToEmpty();
 		_flags &= ~MessageFlag::DisplayFromChecked;
+	} else if (message.vaction().type() == mtpc_messageActionConferenceCall) {
+		removeFromSharedMediaIndex();
+		const auto owner = &history()->owner();
+		const auto &data = message.vaction().c_messageActionConferenceCall();
+		const auto info = Data::ComputeCallData(owner, data);
+		if (const auto user = history()->peer->asUser()) {
+			if (const auto conferenceId = out() ? info.conferenceId : 0) {
+				Core::App().calls().unregisterConferenceInvite(
+					conferenceId,
+					user,
+					id,
+					!out(),
+					true);
+			}
+		}
+		_media = nullptr;
+		_media = std::make_unique<Data::MediaCall>(this, info);
+		addToSharedMediaIndex();
+		finishEdition(-1);
+		_flags &= ~MessageFlag::DisplayFromChecked;
+
+		updateReactions(message.vreactions());
 	} else if (isService()) {
 		if (const auto reply = Get<HistoryMessageReply>()) {
 			reply->clearData(this);
@@ -1955,6 +1995,8 @@ void HistoryItem::applyEdition(const MTPDmessageService &message) {
 		applyServiceDateEdition(message);
 		finishEdition(-1);
 		_flags &= ~MessageFlag::DisplayFromChecked;
+
+		updateReactions(message.vreactions());
 	}
 	const auto nowSublist = savedSublist();
 	if (wasSublist && nowSublist != wasSublist) {
@@ -2113,6 +2155,31 @@ void HistoryItem::contributeToSlowmode(TimeId realDate) {
 		if (out() && isRegular() && !isService()) {
 			channel->growSlowmodeLastMessage(realDate ? realDate : date());
 		}
+	}
+}
+
+void HistoryItem::clearMediaAsExpired() {
+	const auto media = this->media();
+	if (!media || !media->ttlSeconds()) {
+		return;
+	}
+	if (const auto document = media->document()) {
+		applyEditionToHistoryCleared();
+		auto text = (document->isVideoFile()
+			? tr::lng_ttl_video_expired
+			: document->isVoiceMessage()
+			? tr::lng_ttl_voice_expired
+			: document->isVideoMessage()
+			? tr::lng_ttl_round_expired
+			: tr::lng_message_empty)(tr::now, Ui::Text::WithEntities);
+		updateServiceText({ std::move(text) });
+		_flags |= MessageFlag::ReactionsAllowed;
+	} else if (media->photo()) {
+		applyEditionToHistoryCleared();
+		updateServiceText({
+			tr::lng_ttl_photo_expired(tr::now, Ui::Text::WithEntities)
+		});
+		_flags |= MessageFlag::ReactionsAllowed;
 	}
 }
 
@@ -2314,7 +2381,7 @@ void HistoryItem::setRealId(MsgId newId) {
 	_history->owner().groups().refreshMessage(this);
 	_history->owner().requestItemResize(this);
 
-	if (const auto reply = Get<HistoryMessageReply>()) {
+	if (Has<HistoryMessageReply>()) {
 		incrementReplyToTopCounter();
 	}
 
@@ -2491,7 +2558,7 @@ bool HistoryItem::canDeleteForEveryone(TimeId now) const {
 bool HistoryItem::suggestReport() const {
 	if (out() || isService() || !isRegular()) {
 		return false;
-	} else if (const auto channel = _history->peer->asChannel()) {
+	} else if (_history->peer->isChannel()) {
 		return true;
 	} else if (const auto user = _history->peer->asUser()) {
 		return user->isBot();
@@ -3448,6 +3515,7 @@ void HistoryItem::setText(const TextWithEntities &textWithEntities) {
 		if (type == EntityType::Url
 			|| type == EntityType::CustomUrl
 			|| type == EntityType::Phone
+			|| type == EntityType::BankCard
 			|| type == EntityType::Email) {
 			_flags |= MessageFlag::HasTextLinks;
 			break;
@@ -3782,7 +3850,7 @@ void HistoryItem::createComponents(CreateConfig &&config) {
 	if (const auto via = Get<HistoryMessageVia>()) {
 		via->create(&_history->owner(), config.viaBotId);
 	}
-	if (const auto views = Get<HistoryMessageViews>()) {
+	if (Has<HistoryMessageViews>()) {
 		changeViewsCount(config.viewsCount);
 		if (config.replies.isNull
 			&& isSending()
@@ -4200,8 +4268,85 @@ void HistoryItem::refreshSentMedia(const MTPMessageMedia *media) {
 	}
 }
 
+PreparedServiceText HistoryItem::prepareServiceTextForMessage(
+		const MTPMessageMedia &media,
+		bool unread) {
+	return media.match([&](const MTPDmessageMediaStory &data) {
+		return prepareStoryMentionText();
+	}, [&](const MTPDmessageMediaPhoto &data) -> PreparedServiceText {
+		if (unread) {
+			const auto ttl = data.vttl_seconds();
+			Assert(ttl != nullptr);
+
+			if (out()) {
+				return {
+					tr::lng_ttl_photo_sent(tr::now, Ui::Text::WithEntities)
+				};
+			} else {
+				auto result = PreparedServiceText();
+				result.links.push_back(fromLink());
+				result.text = tr::lng_ttl_photo_received(
+					tr::now,
+					lt_from,
+					fromLinkText(), // Link 1.
+					Ui::Text::WithEntities);
+				return result;
+			}
+		} else {
+			return {
+				tr::lng_ttl_photo_expired(tr::now, Ui::Text::WithEntities)
+			};
+		}
+	}, [&](const MTPDmessageMediaDocument &data) -> PreparedServiceText {
+		if (unread) {
+			const auto ttl = data.vttl_seconds();
+			Assert(ttl != nullptr);
+
+			if (data.is_video()) {
+				if (out()) {
+					return {
+						tr::lng_ttl_video_sent(
+							tr::now,
+							Ui::Text::WithEntities)
+					};
+				} else {
+					auto result = PreparedServiceText();
+					result.links.push_back(fromLink());
+					result.text = tr::lng_ttl_video_received(
+						tr::now,
+						lt_from,
+						fromLinkText(), // Link 1.
+						Ui::Text::WithEntities);
+					return result;
+				}
+			} else if (out()) {
+				auto text = (data.is_voice()
+					? tr::lng_ttl_voice_sent
+					: data.is_round()
+					? tr::lng_ttl_round_sent
+					: tr::lng_message_empty)(tr::now, Ui::Text::WithEntities);
+				return { std::move(text) };
+			}
+			return {};
+		} else {
+			auto text = (data.is_video()
+				? tr::lng_ttl_video_expired
+				: data.is_voice()
+				? tr::lng_ttl_voice_expired
+				: data.is_round()
+				? tr::lng_ttl_round_expired
+				: tr::lng_message_empty)(tr::now, Ui::Text::WithEntities);
+			return { std::move(text) };
+		}
+	}, [](const auto &) {
+		return PreparedServiceText();
+	});
+}
+
 void HistoryItem::createServiceFromMtp(const MTPDmessage &message) {
 	AddComponents(HistoryServiceData::Bit());
+
+	_flags |= MessageFlag::ReactionsAllowed;
 
 	const auto unread = message.is_media_unread();
 	const auto media = message.vmedia();
@@ -4213,24 +4358,6 @@ void HistoryItem::createServiceFromMtp(const MTPDmessage &message) {
 			Assert(ttl != nullptr);
 
 			setSelfDestruct(HistoryServiceSelfDestruct::Type::Photo, *ttl);
-			if (out()) {
-				setServiceText({
-					tr::lng_ttl_photo_sent(tr::now, Ui::Text::WithEntities)
-				});
-			} else {
-				auto result = PreparedServiceText();
-				result.links.push_back(fromLink());
-				result.text = tr::lng_ttl_photo_received(
-					tr::now,
-					lt_from,
-					fromLinkText(), // Link 1.
-					Ui::Text::WithEntities);
-				setServiceText(std::move(result));
-			}
-		} else {
-			setServiceText({
-				tr::lng_ttl_photo_expired(tr::now, Ui::Text::WithEntities)
-			});
 		}
 	}, [&](const MTPDmessageMediaDocument &data) {
 		if (unread) {
@@ -4241,49 +4368,11 @@ void HistoryItem::createServiceFromMtp(const MTPDmessage &message) {
 				setSelfDestruct(
 					HistoryServiceSelfDestruct::Type::Video,
 					*ttl);
-				if (out()) {
-					setServiceText({
-						tr::lng_ttl_video_sent(
-							tr::now,
-							Ui::Text::WithEntities)
-					});
-				} else {
-					auto result = PreparedServiceText();
-					result.links.push_back(fromLink());
-					result.text = tr::lng_ttl_video_received(
-						tr::now,
-						lt_from,
-						fromLinkText(), // Link 1.
-						Ui::Text::WithEntities);
-					setServiceText(std::move(result));
-				}
-			} else if (out()) {
-				auto text = (data.is_voice()
-					? tr::lng_ttl_voice_sent
-					: data.is_round()
-					? tr::lng_ttl_round_sent
-					: tr::lng_message_empty)(tr::now, Ui::Text::WithEntities);
-				setServiceText({ std::move(text) });
 			}
-		} else {
-			auto text = (data.is_video()
-				? tr::lng_ttl_video_expired
-				: data.is_voice()
-				? tr::lng_ttl_voice_expired
-				: data.is_round()
-				? tr::lng_ttl_round_expired
-				: tr::lng_message_empty)(tr::now, Ui::Text::WithEntities);
-			setServiceText({ std::move(text) });
 		}
-	}, [&](const MTPDmessageMediaStory &data) {
-		setServiceText(prepareStoryMentionText());
-	}, [](const auto &) {
-		Unexpected("Media type in HistoryItem::createServiceFromMtp()");
-	});
+	}, [](const auto &) {});
 
-	if (const auto reactions = message.vreactions()) {
-		updateReactions(reactions);
-	}
+	setServiceText(prepareServiceTextForMessage(*media, unread));
 }
 
 void HistoryItem::createServiceFromMtp(const MTPDmessageService &message) {
@@ -4936,7 +5025,7 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 		for (const auto &id : action.vusers().v) {
 			const auto user = owner->user(id.v);
 			if (callId) {
-				owner->registerInvitedToCallUser(callId, peer, user);
+				owner->registerInvitedToCallUser(callId, peer, user, false);
 			}
 		};
 		const auto linkCallId = PeerHasThisCall(peer, callId).value_or(false)
@@ -5681,6 +5770,10 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 		return result;
 	};
 
+	auto prepareConferenceCall = [&](const MTPDmessageActionConferenceCall &) -> PreparedServiceText {
+		Unexpected("PhoneCall type in setServiceMessageFromMtp.");
+	};
+
 	setServiceText(action.match(
 		prepareChatAddUserText,
 		prepareChatJoinedByLink,
@@ -5730,6 +5823,7 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 		prepareStarGiftUnique,
 		preparePaidMessagesRefunded,
 		preparePaidMessagesPrice,
+		prepareConferenceCall,
 		PrepareEmptyText<MTPDmessageActionRequestedPeerSentMe>,
 		PrepareErrorText<MTPDmessageActionEmpty>));
 

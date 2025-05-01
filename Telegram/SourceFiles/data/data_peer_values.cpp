@@ -602,7 +602,7 @@ rpl::producer<int> UniqueReactionsLimitValue(
 	) | rpl::map([config = &peer->session().appConfig()] {
 		return UniqueReactionsLimit(config);
 	}) | rpl::distinct_until_changed();
-	if (const auto channel = peer->asChannel()) {
+	if (peer->isChannel()) {
 		return rpl::combine(
 			PeerAllowedReactionsValue(peer),
 			std::move(configValue)
@@ -611,7 +611,7 @@ rpl::producer<int> UniqueReactionsLimitValue(
 				? allowedReactions.maxCount
 				: limit;
 		});
-	} else if (const auto chat = peer->asChat()) {
+	} else if (peer->isChat()) {
 		return rpl::combine(
 			PeerAllowedReactionsValue(peer),
 			std::move(configValue)

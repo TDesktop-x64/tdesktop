@@ -113,6 +113,12 @@ base::options::toggle ShowPeerIdBelowAbout({
 		" Add contact IDs to exported data.",
 });
 
+base::options::toggle ShowChannelJoinedBelowAbout({
+	.id = kOptionShowChannelJoinedBelowAbout,
+	.name = "Show Channel Joined Date in Profile",
+	.description = "Show when you join Channel under its Description.",
+});
+
 [[nodiscard]] rpl::producer<TextWithEntities> UsernamesSubtext(
 		not_null<PeerData*> peer,
 		rpl::producer<QString> fallback) {
@@ -194,24 +200,47 @@ base::options::toggle ShowPeerIdBelowAbout({
 	return result;
 }
 
-[[nodiscard]] rpl::producer<TextWithEntities> AboutWithIdValue(
+[[nodiscard]] rpl::producer<TextWithEntities> AboutWithAdvancedValue(
 		not_null<PeerData*> peer) {
 
 	return AboutValue(
 		peer
 	) | rpl::map([=](TextWithEntities &&value) {
-		if (!ShowPeerIdBelowAbout.value()) {
-			return std::move(value);
+		if (ShowPeerIdBelowAbout.value()) {
+			using namespace Ui::Text;
+			if (!value.empty()) {
+				value.append("\n\n");
+			}
+			value.append(Italic(u"id: "_q));
+			const auto raw = peer->id.value & PeerId::kChatTypeMask;
+			value.append(Link(
+				Italic(Lang::FormatCountDecimal(raw)),
+				"internal:~peer_id~:copy:" + QString::number(raw)));
 		}
-		using namespace Ui::Text;
-		if (!value.empty()) {
-			value.append("\n\n");
+		if (ShowChannelJoinedBelowAbout.value()) {
+			if (const auto channel = peer->asChannel()) {
+				if (!channel->amCreator() && channel->inviteDate) {
+					if (!value.empty()) {
+						if (ShowPeerIdBelowAbout.value()) {
+							value.append("\n");
+						} else {
+							value.append("\n\n");
+						}
+					}
+					using namespace Ui::Text;
+					value.append((channel->isMegagroup()
+						? tr::lng_you_joined_group
+						: tr::lng_action_you_joined)(
+							tr::now,
+							Ui::Text::Italic));
+					value.append(Italic(": "));
+					const auto raw = channel->inviteDate;
+					value.append(Link(
+						Italic(langDateTimeFull(base::unixtime::parse(raw))),
+						"internal:~join_date~:show:" + QString::number(raw)));
+				}
+			}
 		}
-		value.append(Italic(u"id: "_q));
-		const auto raw = peer->id.value & PeerId::kChatTypeMask;
-		value.append(Link(
-			Italic(Lang::FormatCountDecimal(raw)),
-			"internal:~peer_id~:copy:" + QString::number(raw)));
 		return std::move(value);
 	});
 }
@@ -872,7 +901,7 @@ rpl::producer<uint64> AddCurrencyAction(
 		) | rpl::start_with_error_done([=](const QString &error) {
 			currencyLoadLifetime->destroy();
 		}, [=] {
-			if (const auto strong = weak.data()) {
+			if ([[maybe_unused]] const auto strong = weak.data()) {
 				state->balance = currencyLoad->data().currentBalance;
 				currencyLoadLifetime->destroy();
 			}
@@ -1189,6 +1218,23 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 			return false;
 		} else if (SetClickContext<CashtagClickHandler>(handler, context)) {
 			return false;
+		} else if (handler->url().startsWith(u"internal:~join_date~:"_q)) {
+			const auto joinDate = handler->url().split(
+				u"show:"_q,
+				Qt::SkipEmptyParts).last();
+			if (!joinDate.isEmpty()) {
+				const auto weak = base::make_weak(window);
+				window->session().api().resolveJumpToDate(
+					Dialogs::Key(peer->owner().history(peer)),
+					base::unixtime::parse(joinDate.toULongLong()).date(),
+					[=](not_null<PeerData*> p, MsgId m) {
+						const auto f = Window::SectionShow::Way::Forward;
+						if (const auto strong = weak.get()) {
+							strong->showPeerHistory(p, f, m);
+						}
+					});
+				return false;
+			}
 		} else if (SetClickContext<UrlClickHandler>(handler, context)) {
 			return false;
 		}
@@ -1397,8 +1443,8 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 			? tr::lng_info_about_label()
 			: tr::lng_info_bio_label();
 		addTranslateToMenu(
-			addInfoLine(std::move(label), AboutWithIdValue(user)).text,
-			AboutWithIdValue(user));
+			addInfoLine(std::move(label), AboutWithAdvancedValue(user)).text,
+			AboutWithAdvancedValue(user));
 
 		const auto usernameLine = addInfoOneLine(
 			UsernamesSubtext(_peer, tr::lng_info_username_label()),
@@ -1538,9 +1584,9 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 
 		const auto about = addInfoLine(tr::lng_info_about_label(), _topic
 			? rpl::single(TextWithEntities())
-			: AboutWithIdValue(_peer));
+			: AboutWithAdvancedValue(_peer));
 		if (!_topic) {
-			addTranslateToMenu(about.text, AboutWithIdValue(_peer));
+			addTranslateToMenu(about.text, AboutWithAdvancedValue(_peer));
 		}
 	}
 	if (!_peer->isSelf()) {
@@ -2122,7 +2168,9 @@ Ui::MultiSlideTracker DetailsFiller::fillUserButtons(
 			tracker);
 	};
 
-	addSendMessageButton();
+	if (!user->isVerifyCodes()) {
+		addSendMessageButton();
+	}
 	addReportReaction(tracker);
 
 	return tracker;
@@ -2660,6 +2708,7 @@ object_ptr<Ui::RpWidget> ActionsFiller::fill() {
 } // namespace
 
 const char kOptionShowPeerIdBelowAbout[] = "show-peer-id-below-about";
+const char kOptionShowChannelJoinedBelowAbout[] = "show-channel-joined-below-about";
 
 object_ptr<Ui::RpWidget> SetupDetails(
 		not_null<Controller*> controller,

@@ -1490,7 +1490,7 @@ void ListWidget::cancelSelection() {
 void ListWidget::selectItem(not_null<HistoryItem*> item) {
 	if (hasSelectRestriction()) {
 		return;
-	} else if (const auto view = viewForItem(item)) {
+	} else if ([[maybe_unused]] const auto view = viewForItem(item)) {
 		clearTextSelection();
 		changeSelection(
 			_selected,
@@ -1503,7 +1503,7 @@ void ListWidget::selectItem(not_null<HistoryItem*> item) {
 void ListWidget::selectItemAsGroup(not_null<HistoryItem*> item) {
 	if (hasSelectRestriction()) {
 		return;
-	} else if (const auto view = viewForItem(item)) {
+	} else if ([[maybe_unused]] const auto view = viewForItem(item)) {
 		clearTextSelection();
 		changeSelectionAsGroup(
 			_selected,

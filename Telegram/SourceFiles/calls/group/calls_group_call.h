@@ -26,6 +26,7 @@ struct GroupLevelsUpdate;
 struct GroupNetworkState;
 struct GroupParticipantDescription;
 class VideoCaptureInterface;
+enum class VideoCodecName;
 } // namespace tgcalls
 
 namespace base {
@@ -45,6 +46,11 @@ struct GroupCallParticipant;
 class GroupCall;
 } // namespace Data
 
+namespace TdE2E {
+class Call;
+class EncryptDecrypt;
+} // namespace TdE2E
+
 namespace Calls {
 
 namespace Group {
@@ -52,11 +58,16 @@ struct MuteRequest;
 struct VolumeRequest;
 struct ParticipantState;
 struct JoinInfo;
+struct ConferenceInfo;
 struct RejoinEvent;
 struct RtmpInfo;
 enum class VideoQuality;
 enum class Error;
 } // namespace Group
+
+struct InviteRequest;
+struct InviteResult;
+struct StartConferenceInfo;
 
 enum class MuteState {
 	Active,
@@ -220,6 +231,7 @@ public:
 		not_null<Delegate*> delegate,
 		Group::JoinInfo info,
 		const MTPInputGroupCall &inputCall);
+	GroupCall(not_null<Delegate*> delegate, StartConferenceInfo info);
 	~GroupCall();
 
 	[[nodiscard]] CallId id() const {
@@ -240,6 +252,7 @@ public:
 	}
 	[[nodiscard]] bool scheduleStartSubscribed() const;
 	[[nodiscard]] bool rtmp() const;
+	[[nodiscard]] bool conference() const;
 	[[nodiscard]] bool listenersHidden() const;
 	[[nodiscard]] bool emptyRtmp() const;
 	[[nodiscard]] rpl::producer<bool> emptyRtmpValue() const;
@@ -250,14 +263,19 @@ public:
 	void setRtmpInfo(const Group::RtmpInfo &value);
 
 	[[nodiscard]] Data::GroupCall *lookupReal() const;
+	[[nodiscard]] std::shared_ptr<Data::GroupCall> conferenceCall() const;
 	[[nodiscard]] rpl::producer<not_null<Data::GroupCall*>> real() const;
+	[[nodiscard]] rpl::producer<QByteArray> emojiHashValue() const;
 
+	void applyInputCall(const MTPInputGroupCall &inputCall);
+	void startConference();
 	void start(TimeId scheduleDate, bool rtmp);
 	void hangup();
 	void discard();
 	void rejoinAs(Group::JoinInfo info);
 	void rejoinWithHash(const QString &hash);
-	void join(const MTPInputGroupCall &inputCall);
+	void initialJoin();
+	void initialJoinRequested();
 	void handleUpdate(const MTPUpdate &update);
 	void handlePossibleCreateOrJoinResponse(const MTPDupdateGroupCall &data);
 	void handlePossibleCreateOrJoinResponse(
@@ -275,9 +293,20 @@ public:
 	void toggleScheduleStartSubscribed(bool subscribed);
 	void setNoiseSuppression(bool enabled);
 	void setStereoMode(bool enabled);
+	void removeConferenceParticipants(
+		const base::flat_set<UserId> userIds,
+		bool removingStale = false);
 
 	bool emitShareScreenError();
 	bool emitShareCameraError();
+
+	void joinDone(
+		int64 serverTimeMs,
+		const MTPUpdates &result,
+		MuteState wasMuteState,
+		bool wasVideoStopped,
+		bool justCreated = false);
+	void joinFail(const QString &error);
 
 	[[nodiscard]] rpl::producer<Group::Error> errors() const {
 		return _errors.events();
@@ -408,8 +437,10 @@ public:
 
 	void toggleMute(const Group::MuteRequest &data);
 	void changeVolume(const Group::VolumeRequest &data);
-	std::variant<int, not_null<UserData*>> inviteUsers(
-		const std::vector<not_null<UserData*>> &users);
+
+	void inviteUsers(
+		const std::vector<InviteRequest> &requests,
+		Fn<void(InviteResult)> done);
 
 	std::shared_ptr<GlobalShortcutManager> ensureGlobalShortcutManager();
 	void applyGlobalShortcutChanges();
@@ -430,6 +461,7 @@ private:
 	struct SinkPointer;
 
 	static constexpr uint32 kDisabledSsrc = uint32(-1);
+	static constexpr int kSubChainsCount = 2;
 
 	struct LoadingPart {
 		std::shared_ptr<LoadPartTask> task;
@@ -458,9 +490,14 @@ private:
 		Joining,
 		Leaving,
 	};
+	struct JoinPayload {
+		uint32 ssrc = 0;
+		QByteArray json;
+	};
 	struct JoinState {
 		uint32 ssrc = 0;
 		JoinAction action = JoinAction::None;
+		JoinPayload payload;
 		bool nextActionPending = false;
 
 		void finish(uint32 updatedSsrc = 0) {
@@ -468,10 +505,25 @@ private:
 			ssrc = updatedSsrc;
 		}
 	};
+	struct SubChainPending {
+		QVector<MTPbytes> blocks;
+		int next = 0;
+	};
+	struct SubChainState {
+		std::vector<SubChainPending> pending;
+		mtpRequestId requestId = 0;
+		bool inShortPoll = false;
+	};
 
 	friend inline constexpr bool is_flag_type(SendUpdateType) {
 		return true;
 	}
+
+	GroupCall(
+		not_null<Delegate*> delegate,
+		Group::JoinInfo join,
+		StartConferenceInfo conference,
+		const MTPInputGroupCall &inputCall);
 
 	void broadcastPartStart(std::shared_ptr<LoadPartTask> task);
 	void broadcastPartCancel(not_null<LoadPartTask*> task);
@@ -494,6 +546,13 @@ private:
 	void handlePossibleDiscarded(const MTPDgroupCallDiscarded &data);
 	void handleUpdate(const MTPDupdateGroupCall &data);
 	void handleUpdate(const MTPDupdateGroupCallParticipants &data);
+	void handleUpdate(const MTPDupdateGroupCallChainBlocks &data);
+	void applySubChainUpdate(
+		int subchain,
+		const QVector<MTPbytes> &blocks,
+		int next);
+	[[nodiscard]] auto lookupVideoCodecPreferences() const
+		-> std::vector<tgcalls::VideoCodecName>;
 	bool tryCreateController();
 	void destroyController();
 	bool tryCreateScreencast();
@@ -512,6 +571,7 @@ private:
 		const std::optional<Data::GroupCallParticipant> &was,
 		const Data::GroupCallParticipant &now);
 	void applyMeInCallLocally();
+	void startRejoin();
 	void rejoin();
 	void leave();
 	void rejoin(not_null<PeerData*> as);
@@ -522,6 +582,10 @@ private:
 	void rejoinPresentation();
 	void leavePresentation();
 	void checkNextJoinAction();
+	void sendJoinRequest();
+	void refreshLastBlockAndJoin();
+	void requestSubchainBlocks(int subchain, int height);
+	void sendOutboundBlock(QByteArray block);
 
 	void audioLevelsUpdated(const tgcalls::GroupLevelsUpdate &data);
 	void setInstanceConnected(tgcalls::GroupNetworkState networkState);
@@ -562,6 +626,9 @@ private:
 
 	void setupMediaDevices();
 	void setupOutgoingVideo();
+	void initConferenceE2E();
+	void setupConferenceCall();
+	void trackParticipantsWithAccess();
 	void setScreenEndpoint(std::string endpoint);
 	void setCameraEndpoint(std::string endpoint);
 	void addVideoOutput(const std::string &endpoint, SinkPointer sink);
@@ -574,11 +641,25 @@ private:
 	void markTrackPaused(const VideoEndpoint &endpoint, bool paused);
 	void markTrackShown(const VideoEndpoint &endpoint, bool shown);
 
+	void processConferenceStart(StartConferenceInfo conference);
+	void inviteToConference(
+		InviteRequest request,
+		Fn<not_null<InviteResult*>()> resultAddress,
+		Fn<void()> finishRequest);
+
 	[[nodiscard]] int activeVideoSendersCount() const;
 
 	[[nodiscard]] MTPInputGroupCall inputCall() const;
+	[[nodiscard]] MTPInputGroupCall inputCallSafe() const;
 
 	const not_null<Delegate*> _delegate;
+	std::shared_ptr<Data::GroupCall> _conferenceCall;
+	std::unique_ptr<TdE2E::Call> _e2e;
+	std::shared_ptr<TdE2E::EncryptDecrypt> _e2eEncryptDecrypt;
+	rpl::variable<QByteArray> _emojiHash;
+	QByteArray _pendingOutboundBlock;
+	std::shared_ptr<StartConferenceInfo> _startConferenceInfo;
+
 	not_null<PeerData*> _peer; // Can change in legacy group migration.
 	rpl::event_stream<PeerData*> _peerStream;
 	not_null<History*> _history; // Can change in legacy group migration.
@@ -587,6 +668,7 @@ private:
 	rpl::variable<State> _state = State::Creating;
 	base::flat_set<uint32> _unresolvedSsrcs;
 	rpl::event_stream<Error> _errors;
+	std::vector<Fn<void()>> _rejoinedCallbacks;
 	bool _recordingStoppedByMe = false;
 	bool _requestedVideoChannelsUpdateScheduled = false;
 
@@ -605,6 +687,8 @@ private:
 	rpl::variable<not_null<PeerData*>> _joinAs;
 	std::vector<not_null<PeerData*>> _possibleJoinAs;
 	QString _joinHash;
+	QString _conferenceLinkSlug;
+	MsgId _conferenceJoinMessageId;
 	int64 _serverTimeMs = 0;
 	crl::time _serverTimeMsGotAt = 0;
 
@@ -692,9 +776,14 @@ private:
 	bool _reloadedStaleCall = false;
 	int _rtmpVolume = 0;
 
+	SubChainState _subchains[kSubChainsCount];
+
 	rpl::lifetime _lifetime;
 
 };
+
+[[nodiscard]] TextWithEntities ComposeInviteResultToast(
+	const InviteResult &result);
 
 } // namespace Calls
 

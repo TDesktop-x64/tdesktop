@@ -30,6 +30,7 @@ RUN dnf -y install epel-release \
 	&& dnf clean all
 
 RUN python3 -m pip install meson ninja
+RUN sed -i '/Requires.private: valgrind/d' /usr/lib64/pkgconfig/libdrm.pc
 RUN echo set debuginfod enabled on > /opt/rh/{{ TOOLSET }}/root/etc/gdbinit.d/00-debuginfod.gdb
 RUN adduser user
 
@@ -49,22 +50,21 @@ RUN git init patches \
 	&& rm -rf .git
 
 FROM builder AS zlib
-RUN git init zlib \
+RUN git clone -b v1.3.1 --depth=1 {{ GIT }}/madler/zlib.git \
 	&& cd zlib \
-	&& git remote add origin {{ GIT }}/madler/zlib.git \
-	&& git fetch --depth=1 origin 643e17b7498d12ab8d15565662880579692f769d \
-	&& git reset --hard FETCH_HEAD \
-	&& ./configure \
-	&& make -j$(nproc) \
-	&& make DESTDIR="{{ LibrariesPath }}/zlib-cache" install \
+	&& cmake -GNinja -B build . \
+		-DCMAKE_BUILD_TYPE=None \
+		-DZLIB_BUILD_EXAMPLES=OFF \
+	&& cmake --build build --parallel \
+	&& DESTDIR="{{ LibrariesPath }}/zlib-cache" cmake --install build \
 	&& cd .. \
 	&& rm -rf zlib
 
 FROM builder AS xz
-RUN git clone -b v5.4.4 --depth=1 {{ GIT }}/tukaani-project/xz.git \
+RUN git clone -b v5.8.1 --depth=1 {{ GIT }}/tukaani-project/xz.git \
 	&& cd xz \
-	&& cmake -B build . -DCMAKE_BUILD_TYPE=None \
-	&& cmake --build build -j$(nproc) \
+	&& cmake -GNinja -B build . -DCMAKE_BUILD_TYPE=None \
+	&& cmake --build build --parallel \
 	&& DESTDIR="{{ LibrariesPath }}/xz-cache" cmake --install build \
 	&& cd .. \
 	&& rm -rf xz
@@ -120,12 +120,11 @@ RUN git clone -b 1.0.7 --depth=1 {{ GIT }}/google/highway.git \
 	&& rm -rf highway
 
 FROM builder AS opus
-RUN git clone -b v1.4 --depth=1 {{ GIT }}/xiph/opus.git \
+RUN git clone -b v1.5.2 --depth=1 {{ GIT }}/xiph/opus.git \
 	&& cd opus \
-	&& ./autogen.sh \
-	&& ./configure \
-	&& make -j$(nproc) \
-	&& make DESTDIR="{{ LibrariesPath }}/opus-cache" install \
+	&& cmake -GNinja -B build . -DCMAKE_BUILD_TYPE=None \
+	&& cmake --build build --parallel \
+	&& DESTDIR="{{ LibrariesPath }}/opus-cache" cmake --install build \
 	&& cd .. \
 	&& rm -rf opus
 
@@ -279,10 +278,7 @@ RUN git clone -b master --depth=1 {{ GIT }}/desktop-app/rnnoise.git \
 	&& cd rnnoise \
 	&& cmake -GNinja -B build . -DCMAKE_BUILD_TYPE=None \
 	&& cmake --build build --parallel \
-	&& mkdir -p "{{ LibrariesPath }}/rnnoise-cache/usr/local/include" \
-	&& cp "include/rnnoise.h" "{{ LibrariesPath }}/rnnoise-cache/usr/local/include/" \
-	&& mkdir -p "{{ LibrariesPath }}/rnnoise-cache/usr/local/lib" \
-	&& cp "build/librnnoise.a" "{{ LibrariesPath }}/rnnoise-cache/usr/local/lib/" \
+	&& DESTDIR="{{ LibrariesPath }}/rnnoise-cache" cmake --install build \
 	&& cd .. \
 	&& rm -rf rnnoise
 
@@ -482,6 +478,7 @@ RUN git clone -b n6.1.1 --depth=1 {{ GIT }}/FFmpeg/FFmpeg.git \
 	&& ./configure \
 		--extra-cflags="-fno-lto -DCONFIG_SAFE_BITSTREAM_READER=1" \
 		--extra-cxxflags="-fno-lto -DCONFIG_SAFE_BITSTREAM_READER=1" \
+		--pkg-config-flags=--static \
 		--disable-debug \
 		--disable-programs \
 		--disable-doc \
@@ -768,7 +765,7 @@ COPY --link --from=pipewire {{ LibrariesPath }}/pipewire-cache /
 RUN git init tg_owt \
 	&& cd tg_owt \
 	&& git remote add origin {{ GIT }}/desktop-app/tg_owt.git \
-	&& git fetch --depth=1 origin 8198c4d8b91e22d68eb5c7327fd408e3b6abcc79 \
+	&& git fetch --depth=1 origin c4192e8e2e10ccb72704daa79fa108becfa57b01 \
 	&& git reset --hard FETCH_HEAD \
 	&& git submodule update --init --recursive --depth=1 \
 	&& rm -rf .git \

@@ -1310,7 +1310,7 @@ void Filler::addViewChannel() {
 	if (!peer) {
 		return;
 	}
-	if (const auto chat = peer->linkedChat()) {
+	if (const auto chat = peer->discussionLink()) {
 		_addAction(peer->isMegagroup() ? tr::lng_profile_view_channel(tr::now) : tr::lng_profile_view_discussion(tr::now), [=] {
 			App::wnd()->sessionController()->showPeerHistory(
 					chat,

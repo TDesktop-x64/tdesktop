@@ -2003,7 +2003,7 @@ void SessionController::setActiveChatEntry(Dialogs::RowDescriptor row) {
 					{ anim::type::normal, anim::activation::background });
 				showForum(channel->forum(),
 					{ anim::type::normal, anim::activation::background });
-			}, _shownForumLifetime);
+			}, _activeHistoryLifetime);
 		}
 	}
 	if (session().supportMode()) {
@@ -2459,7 +2459,7 @@ void SessionController::showPeer(not_null<PeerData*> peer, MsgId msgId) {
 		if (!clickedChannel->isPublic()
 			&& !clickedChannel->amIn()
 			&& (!currentPeer->isChannel()
-				|| currentPeer->asChannel()->linkedChat()
+				|| currentPeer->asChannel()->discussionLink()
 					!= clickedChannel)) {
 			MainWindowShow(this).showToast(peer->isMegagroup()
 				? tr::lng_group_not_accessible(tr::now)
@@ -2682,7 +2682,7 @@ void SessionController::showInNewWindow(
 	const auto active = activeChatCurrent();
 	// windows check active forum / active archive
 	const auto fromActive = active.thread()
-		? (active.thread() == id.thread)
+		? (active.thread() == id.thread && id.type == SeparateType::Chat)
 		: false;
 	const auto toSeparate = [=] {
 		Core::App().ensureSeparateWindowFor(id, msgId);

@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_global_privacy.h"
 #include "api/api_sensitive_content.h"
 #include "api/api_statistics.h"
+#include "base/timer_rpl.h"
 #include "storage/localstorage.h"
 #include "storage/storage_account.h"
 #include "storage/storage_user_photos.h"
@@ -767,6 +768,7 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 				Data::PeerUpdate::Flag::Rights);
 		}
 		if (info->canEditInformation) {
+			static constexpr auto kTimeout = crl::time(60000);
 			const auto id = user->id;
 			const auto weak = base::make_weak(&user->session());
 			const auto creditsLoadLifetime
@@ -776,23 +778,28 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 			creditsLoad->request({}, [=](Data::CreditsStatusSlice slice) {
 				if (const auto strong = weak.get()) {
 					strong->credits().apply(id, slice.balance);
-					creditsLoadLifetime->destroy();
 				}
+				creditsLoadLifetime->destroy();
 			});
+			base::timer_once(kTimeout) | rpl::start_with_next([=] {
+				creditsLoadLifetime->destroy();
+			}, *creditsLoadLifetime);
 			const auto currencyLoadLifetime
 				= std::make_shared<rpl::lifetime>();
 			const auto currencyLoad
 				= currencyLoadLifetime->make_state<Api::EarnStatistics>(user);
-			currencyLoad->request(
-			) | rpl::start_with_error_done([=](const QString &error) {
-				currencyLoadLifetime->destroy();
-			}, [=] {
+			const auto apply = [=](Data::EarnInt balance) {
 				if (const auto strong = weak.get()) {
-					strong->credits().applyCurrency(
-						id,
-						currencyLoad->data().currentBalance);
-					currencyLoadLifetime->destroy();
+					strong->credits().applyCurrency(id, balance);
 				}
+				currencyLoadLifetime->destroy();
+			};
+			currencyLoad->request() | rpl::start_with_error_done(
+				[=](const QString &error) { apply(0); },
+				[=] { apply(currencyLoad->data().currentBalance); },
+				*currencyLoadLifetime);
+			base::timer_once(kTimeout) | rpl::start_with_next([=] {
+				currencyLoadLifetime->destroy();
 			}, *currencyLoadLifetime);
 		}
 	}

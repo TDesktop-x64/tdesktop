@@ -214,8 +214,8 @@ PRIVATE
     boxes/peers/edit_contact_box.h
     boxes/peers/edit_forum_topic_box.cpp
     boxes/peers/edit_forum_topic_box.h
-    boxes/peers/edit_linked_chat_box.cpp
-    boxes/peers/edit_linked_chat_box.h
+    boxes/peers/edit_discussion_link_box.cpp
+    boxes/peers/edit_discussion_link_box.h
     boxes/peers/edit_members_visible.cpp
     boxes/peers/edit_members_visible.h
     boxes/peers/edit_participant_box.cpp
@@ -505,6 +505,8 @@ PRIVATE
     data/components/factchecks.h
     data/components/location_pickers.cpp
     data/components/location_pickers.h
+    data/components/promo_suggestions.cpp
+    data/components/promo_suggestions.h
     data/components/recent_peers.cpp
     data/components/recent_peers.h
     data/components/scheduled_messages.cpp

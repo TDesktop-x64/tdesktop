@@ -18,7 +18,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/peers/replace_boost_box.h" // BoostsForGift.
 #include "boxes/premium_preview_box.h" // ShowPremiumPreviewBox.
 #include "boxes/star_gift_box.h" // ShowStarGiftBox.
-#include "boxes/transfer_gift_box.h" // ShowTransferGiftBox.
 #include "core/ui_integration.h"
 #include "data/data_boosts.h"
 #include "data/data_changes.h"
@@ -1336,7 +1335,13 @@ void AddStarGiftTable(
 		}, tooltip->lifetime());
 	};
 
-	if (unique && entry.bareGiftOwnerId) {
+	if (unique && entry.bareGiftResaleRecipientId) {
+		AddTableRow(
+			table,
+			tr::lng_credits_box_history_entry_peer(),
+			MakePeerTableValue(table, show, PeerId(entry.bareGiftResaleRecipientId)),
+			st::giveawayGiftCodePeerMargin);
+	} else if (unique && entry.bareGiftOwnerId) {
 		const auto ownerId = PeerId(entry.bareGiftOwnerId);
 		const auto was = std::make_shared<std::optional<CollectibleId>>();
 		const auto handleChange = [=](
@@ -1621,7 +1626,17 @@ void AddCreditsHistoryEntryTable(
 	const auto starrefRecipientId = PeerId(entry.starrefRecipientId);
 	const auto session = &show->session();
 	if (entry.starrefCommission) {
-		if (entry.starrefAmount) {
+		if (entry.giftResale && entry.starrefCommission < 1000) {
+			const auto full = int(base::SafeRound(entry.credits.value()
+				/ (1. - (entry.starrefCommission / 1000.))));
+			auto value = Ui::Text::IconEmoji(&st::starIconEmojiColored);
+			const auto starsText = Lang::FormatStarsAmountDecimal(
+				StarsAmount{ full });
+			AddTableRow(
+				table,
+				tr::lng_credits_box_history_entry_gift_full_price(),
+				rpl::single(value.append(' ' + starsText)));
+		} else if (entry.starrefAmount) {
 			AddTableRow(
 				table,
 				tr::lng_star_ref_commission_title(),
@@ -1635,7 +1650,7 @@ void AddCreditsHistoryEntryTable(
 					Ui::Text::WithEntities));
 		}
 	}
-	if (starrefRecipientId && entry.starrefAmount) {
+	if (starrefRecipientId && entry.starrefAmount && !entry.giftResale) {
 		AddTableRow(
 			table,
 			tr::lng_credits_box_history_entry_affiliate(),
@@ -1645,7 +1660,9 @@ void AddCreditsHistoryEntryTable(
 	if (peerId && entry.starrefCommission) {
 		AddTableRow(
 			table,
-			(entry.starrefAmount
+			(entry.giftResale
+				? tr::lng_credits_box_history_entry_gift_sold_to
+				: entry.starrefAmount
 				? tr::lng_credits_box_history_entry_referred
 				: tr::lng_credits_box_history_entry_miniapp)(),
 			show,
@@ -1656,6 +1673,8 @@ void AddCreditsHistoryEntryTable(
 			? tr::lng_credits_box_history_entry_referred()
 			: entry.in
 			? tr::lng_credits_box_history_entry_peer_in()
+			: entry.giftResale
+			? tr::lng_credits_box_history_entry_gift_bought_from()
 			: entry.giftUpgraded
 			? tr::lng_credits_box_history_entry_gift_from()
 			: tr::lng_credits_box_history_entry_peer();

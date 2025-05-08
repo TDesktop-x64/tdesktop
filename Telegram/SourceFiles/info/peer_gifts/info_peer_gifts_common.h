@@ -68,6 +68,7 @@ struct GiftTypeStars {
 	bool userpic : 1 = false;
 	bool pinned : 1 = false;
 	bool hidden : 1 = false;
+	bool resale : 1 = false;
 	bool mine : 1 = false;
 
 	[[nodiscard]] friend inline bool operator==(
@@ -87,6 +88,7 @@ struct GiftBadge {
 	QString text;
 	QColor bg1;
 	QColor bg2 = QColor(0, 0, 0, 0);
+	QColor border = QColor(0, 0, 0, 0);
 	QColor fg;
 	bool gradient = false;
 	bool small = false;
@@ -112,6 +114,7 @@ enum class GiftButtonMode {
 class GiftButtonDelegate {
 public:
 	[[nodiscard]] virtual TextWithEntities star() = 0;
+	[[nodiscard]] virtual TextWithEntities monostar() = 0;
 	[[nodiscard]] virtual TextWithEntities ministar() = 0;
 	[[nodiscard]] virtual Ui::Text::MarkedContext textContext() = 0;
 	[[nodiscard]] virtual QSize buttonSize() = 0;
@@ -172,6 +175,7 @@ private:
 	base::flat_map<float64, QImage> _uniquePatternCache;
 	std::optional<Ui::Premium::ColoredMiniStars> _stars;
 	Ui::Animations::Simple _selectedAnimation;
+	int _resalePrice = 0;
 	bool _subscribed = false;
 	bool _patterned = false;
 	bool _selected = false;
@@ -192,6 +196,7 @@ public:
 	~Delegate();
 
 	TextWithEntities star() override;
+	TextWithEntities monostar() override;
 	TextWithEntities ministar() override;
 	Ui::Text::MarkedContext textContext() override;
 	QSize buttonSize() override;

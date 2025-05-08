@@ -43,55 +43,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Ui {
 namespace {
 
-class CreditsIconEmoji final : public Ui::Text::CustomEmoji {
-public:
-	CreditsIconEmoji(int height, int count);
-
-	int width() override;
-	QString entityData() override;
-
-	void paint(QPainter &p, const Context &context) override;
-	void unload() override;
-	bool ready() override;
-	bool readyInDefaultState() override;
-
-private:
-	const int _height;
-	const int _count;
-	QImage _image;
-
-};
-
-CreditsIconEmoji::CreditsIconEmoji(int height, int count)
-: _height(height)
-, _count(count)
-, _image(GenerateStars(height, count)) {
-}
-
-int CreditsIconEmoji::width() {
-	return _image.width() / style::DevicePixelRatio();
-}
-
-QString CreditsIconEmoji::entityData() {
-	return u"credits_icon:%1:%2"_q.arg(_height).arg(_count);
-}
-
-void CreditsIconEmoji::paint(QPainter &p, const Context &context) {
-	p.drawImage(context.position, _image);
-}
-
-void CreditsIconEmoji::unload() {
-	_image = QImage();
-}
-
-bool CreditsIconEmoji::ready() {
-	return true;
-}
-
-bool CreditsIconEmoji::readyInDefaultState() {
-	return true;
-}
-
 PaintRoundImageCallback MultiThumbnail(
 		PaintRoundImageCallback first,
 		PaintRoundImageCallback second,
@@ -618,6 +569,10 @@ TextWithEntities GenerateEntryName(const Data::CreditsHistoryEntry &entry) {
 		? tr::lng_credits_box_history_entry_reaction_name
 		: entry.giftUpgraded
 		? tr::lng_credits_box_history_entry_gift_upgrade
+		: entry.giftResale
+		? (entry.in
+			? tr::lng_credits_box_history_entry_gift_sold
+			: tr::lng_credits_box_history_entry_gift_bought)
 		: entry.bareGiveawayMsgId
 		? tr::lng_credits_box_history_entry_giveaway_name
 		: entry.converted
@@ -731,7 +686,9 @@ QImage CreditsWhiteDoubledIcon(int size, float64 outlineRatio) {
 std::unique_ptr<Ui::Text::CustomEmoji> MakeCreditsIconEmoji(
 		int height,
 		int count) {
-	return std::make_unique<CreditsIconEmoji>(height, count);
+	return std::make_unique<Ui::Text::StaticCustomEmoji>(
+		GenerateStars(height, count),
+		u"credits_icon:%1:%2"_q.arg(height).arg(count));
 }
 
 } // namespace Ui

@@ -122,6 +122,33 @@ giftBoxTabStyle: semiboldTextStyle;
 giftBoxTabFg: windowSubTextFg;
 giftBoxTabFgActive: windowBoldFg;
 giftBoxTabBgActive: windowBgRipple;
+giftBoxResaleTabsMargin: margins(11px, 10px, 11px, 8px);
+giftBoxResaleTabSkip: 8px;
+giftBoxResaleTabsDropdown: IconEmoji {
+	icon: icon{{ "intro_country_dropdown", lightButtonFg }};
+	padding: margins(4px, 6px, 0px, 0px);
+}
+giftBoxResaleMiniNumber: IconEmoji {
+	icon: icon{{ "settings/mini_gift_order_number-16x16", lightButtonFg }};
+	padding: margins(0px, 2px, 4px, 0px);
+}
+giftBoxResaleMiniPrice: IconEmoji {
+	icon: icon{{ "settings/mini_gift_order_price-16x16", lightButtonFg }};
+	padding: margins(0px, 2px, 4px, 0px);
+}
+giftBoxResaleMiniDate: IconEmoji {
+	icon: icon{{ "settings/mini_gift_order_date-16x16", lightButtonFg }};
+	padding: margins(0px, 2px, 4px, 0px);
+}
+giftBoxResaleFilter: PopupMenu(popupMenuWithIcons) {
+	menu: Menu(menuWithIcons) {
+		itemPadding: margins(54px, 8px, 48px, 8px);
+		itemRightSkip: 12px;
+	}
+	maxHeight: 320px;
+}
+giftBoxResaleColorSize: 18px;
+giftBoxResaleColorTop: 1px;
 giftBoxPadding: margins(11px, 4px, 11px, 24px);
 giftBoxGiftSkip: point(10px, 8px);
 giftBoxGiftHeight: 164px;
@@ -137,6 +164,7 @@ giftBoxPremiumIconSize: 64px;
 giftBoxPremiumIconTop: 10px;
 giftBoxPremiumTextTop: 84px;
 giftBoxPremiumTextTopByStars: 78px;
+giftBoxButtonBottomSmall: 4px;
 giftBoxButtonBottom: 12px;
 giftBoxButtonBottomByStars: 18px;
 giftBoxButtonPadding: margins(8px, 4px, 8px, 4px);
@@ -206,6 +234,11 @@ uniqueGiftModelTop: 20px;
 uniqueGiftTitle: FlatLabel(boxTitle) {
 	align: align(top);
 }
+uniqueGiftResalePrice: FlatLabel(defaultFlatLabel) {
+	style: semiboldTextStyle;
+}
+uniqueGiftResalePadding: margins(4px, 4px, 8px, 4px);
+uniqueGiftResaleMargin: margins(10px, 10px, 10px, 10px);
 uniqueGiftTitleTop: 140px;
 uniqueGiftSubtitle: FlatLabel(defaultFlatLabel) {
 	minWidth: 256px;

@@ -2831,6 +2831,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_credits_box_history_entry_reaction_name" = "Star Reaction";
 "lng_credits_box_history_entry_subscription" = "Monthly subscription fee";
 "lng_credits_box_history_entry_gift_upgrade" = "Collectible Upgrade";
+"lng_credits_box_history_entry_gift_sold" = "Gift Sale";
+"lng_credits_box_history_entry_gift_bought" = "Gift Purchase";
+"lng_credits_box_history_entry_gift_sold_to" = "To";
+"lng_credits_box_history_entry_gift_full_price" = "Full Price";
+"lng_credits_box_history_entry_gift_bought_from" = "From";
 
 "lng_credits_subscription_section" = "My subscriptions";
 "lng_credits_box_subscription_title" = "Subscription";
@@ -3163,6 +3168,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_boost_group_ask" = "Ask your **Premium** members to boost your group with this link:";
 //"lng_boost_group_gifting" = "Boost your group by gifting your members Telegram Premium. {link}";
 
+"lng_boost_channel_title_autotranslate" = "Autotranslation of Messages";
+"lng_boost_channel_needs_level_autotranslate#one" = "Your channel needs to reach **Level {count}** to enable autotranslation of messages.";
+"lng_boost_channel_needs_level_autotranslate#other" = "Your channel needs to reach **Level {count}** to enable autotranslation of messages.";
+
 "lng_feature_stories#one" = "**{count}** Story Per Day";
 "lng_feature_stories#other" = "**{count}** Stories Per Day";
 "lng_feature_reactions#one" = "**{count}** Custom Reaction";
@@ -3181,6 +3190,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_feature_custom_background_group" = "Custom Group Background";
 "lng_feature_custom_emoji_pack" = "Custom Emoji Pack";
 "lng_feature_transcribe" = "Voice-to-Text Conversion";
+"lng_feature_autotranslate" = "Autotranslation of Messages";
 
 "lng_giveaway_new_title" = "Boosts via Gifts";
 "lng_giveaway_new_about" = "Get more boosts for your channel by gifting Premium to your subscribers.";
@@ -3429,10 +3439,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_gift_stars_link" = "What are Stars >";
 "lng_gift_stars_limited" = "limited";
 "lng_gift_stars_sold_out" = "sold out";
+"lng_gift_stars_resale" = "resale";
+"lng_gift_stars_on_sale" = "on sale";
 "lng_gift_stars_tabs_all" = "All Gifts";
 "lng_gift_stars_tabs_my" = "My Gifts";
 "lng_gift_stars_tabs_limited" = "Limited";
 "lng_gift_stars_tabs_in_stock" = "In Stock";
+"lng_gift_stars_tabs_resale" = "Resale";
 "lng_gift_send_title" = "Send a Gift";
 "lng_gift_send_message" = "Enter Message";
 "lng_gift_send_anonymous" = "Hide My Name";
@@ -3454,7 +3467,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_gift_send_limited_left#other" = "{count} left";
 "lng_gift_send_button" = "Send a Gift for {cost}";
 "lng_gift_send_button_self" = "Buy a Gift for {cost}";
+"lng_gift_buy_resale_title" = "Buy {name}";
+"lng_gift_buy_resale_button" = "Buy for {cost}";
+"lng_gift_buy_resale_confirm" = "Do you want to buy {name} for {price} and gift it to {user}?";
+"lng_gift_buy_resale_confirm_self" = "Do you want to buy {name} for {price}?";
 "lng_gift_sent_title" = "Gift Sent!";
+"lng_gift_sent_resale_done" = "{user} has been notified about your gift.";
+"lng_gift_sent_resale_done_self" = "{gift} is now yours.";
 "lng_gift_sent_about#one" = "You spent **{count}** Star from your balance.";
 "lng_gift_sent_about#other" = "You spent **{count}** Stars from your balance.";
 "lng_gift_limited_of_one" = "unique";
@@ -3581,6 +3600,23 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_gift_transfer_button_for" = "Transfer for {price}";
 "lng_gift_transfer_wear" = "Wear";
 "lng_gift_transfer_take_off" = "Take Off";
+"lng_gift_transfer_sell" = "Sell";
+"lng_gift_transfer_update" = "Change Price";
+"lng_gift_transfer_unlist" = "Unlist";
+"lng_gift_sell_unlist_title" = "Unlist {name}";
+"lng_gift_sell_unlist_sure" = "Are you sure you want to unlist your gift?";
+"lng_gift_sell_title" = "Price in Stars";
+"lng_gift_sell_placeholder" = "Enter price in Stars";
+"lng_gift_sell_about" = "You will receive {percent} of the selected amount.";
+"lng_gift_sell_amount#one" = "You will receive **{count}** Star.";
+"lng_gift_sell_amount#other" = "You will receive **{count}** Stars.";
+"lng_gift_sell_min_price#one" = "Minimum price is {count} Star.";
+"lng_gift_sell_min_price#other" = "Minimum price is {count} Stars.";
+"lng_gift_sell_put" = "Put for Sale";
+"lng_gift_sell_update" = "Update the Price";
+"lng_gift_sell_toast" = "{name} is now for sale!";
+"lng_gift_sell_updated" = "Sale price for {name} was updated.";
+"lng_gift_sell_removed" = "{name} is removed from sale.";
 "lng_gift_menu_show" = "Show";
 "lng_gift_menu_hide" = "Hide";
 "lng_gift_wear_title" = "Wear {name}";
@@ -3597,6 +3633,27 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_gift_wear_end_toast" = "You took off {name}";
 "lng_gift_many_pinned_title" = "Too Many Pinned Gifts";
 "lng_gift_many_pinned_choose" = "Select a gift to unpin below";
+"lng_gift_resale_price" = "Price";
+"lng_gift_resale_number" = "Number";
+"lng_gift_resale_date" = "Date";
+"lng_gift_resale_count#one" = "{count} gift in resale";
+"lng_gift_resale_count#other" = "{count} gifts in resale";
+"lng_gift_resale_sort_price" = "Sort by Price";
+"lng_gift_resale_sort_date" = "Sort by Date";
+"lng_gift_resale_sort_number" = "Sort by Number";
+"lng_gift_resale_filter_all" = "Select All";
+"lng_gift_resale_model" = "Model";
+"lng_gift_resale_models#one" = "{count} Model";
+"lng_gift_resale_models#other" = "{count} Models";
+"lng_gift_resale_backdrop" = "Backdrop";
+"lng_gift_resale_backdrops#one" = "{count} Backdrop";
+"lng_gift_resale_backdrops#other" = "{count} Backdrops";
+"lng_gift_resale_symbol" = "Symbol";
+"lng_gift_resale_symbols#one" = "{count} Symbol";
+"lng_gift_resale_symbols#other" = "{count} Symbols";
+"lng_gift_resale_early" = "You will be able to resell this gift in {duration}.";
+"lng_gift_transfer_early" = "You will be able to transfer this gift in {duration}.";
+"lng_gift_resale_transfer_early_title" = "Try Later";
 
 "lng_accounts_limit_title" = "Limit Reached";
 "lng_accounts_limit1#one" = "You have reached the limit of **{count}** connected account.";
@@ -4250,6 +4307,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_sensitive_toast" = "You can update the visibility of sensitive media in **Settings > Chat Settings > Sensitive content**";
 
 "lng_translate_show_original" = "Show Original";
+"lng_translate_return_original" = "View Original ({language})";
 "lng_translate_bar_to" = "Translate to {name}";
 "lng_translate_bar_to_other" = "Translate to {name}";
 "lng_translate_menu_to" = "Translate To";
@@ -4357,6 +4415,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_edit_contact_title" = "Edit contact";
 "lng_edit_channel_title" = "Edit channel";
 "lng_edit_bot_title" = "Edit bot";
+"lng_edit_autotranslate" = "Auto-translate messages";
 "lng_edit_sign_messages" = "Sign messages";
 "lng_edit_sign_messages_about" = "Add names of admins to the messages they post.";
 "lng_edit_sign_profiles" = "Show authors' profiles";
@@ -5216,10 +5275,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_admin_log_filter_all_actions" = "All actions";
 "lng_admin_log_filter_actions_type_subtitle" = "Filter actions by type";
 "lng_admin_log_filter_actions_member_section" = "Members And Admins";
+"lng_admin_log_filter_actions_subscriber_section" = "Subscribers And Admins";
 "lng_admin_log_filter_restrictions" = "New restrictions";
 "lng_admin_log_filter_admins_new" = "Admin rights";
 "lng_admin_log_filter_members_new" = "New members";
+"lng_admin_log_filter_subscribers_new" = "New subscribers";
 "lng_admin_log_filter_actions_settings_section" = "Group Settings";
+"lng_admin_log_filter_actions_channel_settings_section" = "Channel Settings";
 "lng_admin_log_filter_info_group" = "Group info";
 "lng_admin_log_filter_info_channel" = "Channel info";
 "lng_admin_log_filter_actions_messages_section" = "Messages";
@@ -5230,6 +5292,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_admin_log_filter_voice_chats_channel" = "Live stream";
 "lng_admin_log_filter_invite_links" = "Invite links";
 "lng_admin_log_filter_members_removed" = "Members leaving";
+"lng_admin_log_filter_subscribers_removed" = "Subscribers leaving";
 "lng_admin_log_filter_topics" = "Topics";
 "lng_admin_log_filter_sub_extend" = "Subscription Renewals";
 "lng_admin_log_filter_all_admins" = "All users and admins";
@@ -5341,6 +5404,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_admin_log_participant_volume_channel" = "{from} changed live stream volume for {user} to {percent}";
 "lng_admin_log_antispam_enabled" = "{from} enabled aggressive anti-spam";
 "lng_admin_log_antispam_disabled" = "{from} disabled aggressive anti-spam";
+"lng_admin_log_autotranslate_enabled" = "{from} enabled automatic translation";
+"lng_admin_log_autotranslate_disabled" = "{from} disabled automatic translation";
 "lng_admin_log_change_color" = "{from} changed channel color from {previous} to {color}";
 "lng_admin_log_set_background_emoji" = "{from} set channel background emoji to {emoji}";
 "lng_admin_log_change_background_emoji" = "{from} changed channel background emoji from {previous} to {emoji}";

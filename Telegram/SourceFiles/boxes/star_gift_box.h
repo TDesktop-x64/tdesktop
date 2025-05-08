@@ -17,7 +17,12 @@ namespace Data {
 struct UniqueGift;
 struct GiftCode;
 struct CreditsHistoryEntry;
+class SavedStarGiftId;
 } // namespace Data
+
+namespace Main {
+class SessionShow;
+} // namespace Main
 
 namespace Payments {
 enum class CheckoutResult;
@@ -52,7 +57,9 @@ void ShowStarGiftBox(
 void AddUniqueGiftCover(
 	not_null<VerticalLayout*> container,
 	rpl::producer<Data::UniqueGift> data,
-	rpl::producer<QString> subtitleOverride = nullptr);
+	rpl::producer<QString> subtitleOverride = nullptr,
+	rpl::producer<int> resalePrice = nullptr,
+	Fn<void()> resaleClick = nullptr);
 void AddWearGiftCover(
 	not_null<VerticalLayout*> container,
 	const Data::UniqueGift &data,
@@ -62,6 +69,17 @@ void ShowUniqueGiftWearBox(
 	std::shared_ptr<ChatHelpers::Show> show,
 	not_null<PeerData*> peer,
 	const Data::UniqueGift &gift,
+	Settings::GiftWearBoxStyleOverride st);
+
+void UpdateGiftSellPrice(
+	std::shared_ptr<ChatHelpers::Show> show,
+	std::shared_ptr<Data::UniqueGift> unique,
+	Data::SavedStarGiftId savedId,
+	int price);
+void ShowUniqueGiftSellBox(
+	std::shared_ptr<ChatHelpers::Show> show,
+	std::shared_ptr<Data::UniqueGift> unique,
+	Data::SavedStarGiftId savedId,
 	Settings::GiftWearBoxStyleOverride st);
 
 struct PatternPoint {
@@ -101,12 +119,17 @@ void AddUniqueCloseButton(
 	Fn<void(not_null<PopupMenu*>)> fillMenu = nullptr);
 
 void RequestStarsFormAndSubmit(
-	not_null<Window::SessionController*> window,
+	std::shared_ptr<Main::SessionShow> show,
 	MTPInputInvoice invoice,
 	Fn<void(Payments::CheckoutResult, const MTPUpdates *)> done);
 
 void ShowGiftTransferredToast(
-	base::weak_ptr<Window::SessionController> weak,
+	std::shared_ptr<Main::SessionShow> show,
+	not_null<PeerData*> to,
+	const Data::UniqueGift &gift);
+
+void ShowResaleGiftBoughtToast(
+	std::shared_ptr<Main::SessionShow> show,
 	not_null<PeerData*> to,
 	const Data::UniqueGift &gift);
 

@@ -105,8 +105,8 @@ constexpr auto kSearchRequestDelay = crl::time(900);
 
 base::options::toggle OptionForumHideChatsList({
 	.id = kOptionForumHideChatsList,
-	.name = "Hide chats list in forums",
-	.description = "Don't keep a narrow column of chats list.",
+	.name = "Hide chat list in forums",
+	.description = "Don't keep a narrow column of chat list.",
 });
 
 [[nodiscard]] bool RedirectTextToSearch(const QString &text) {
@@ -2559,7 +2559,19 @@ bool Widget::search(bool inCache, SearchRequestDelay delay) {
 	};
 	if (trimmed.isEmpty() && !fromPeer && inTags.empty()) {
 		cancelSearchRequest();
+
+		// Otherwise inside first searchApplyEmpty we call searchMode(),
+		// which tries to load migrated search results for empty query.
+		_migratedProcess.full = true;
+
 		searchApplyEmpty(fromStartType, currentSearchProcess());
+		if (_searchInMigrated) {
+			const auto type = SearchRequestType{
+				.migrated = true,
+				.start = true,
+			};
+			searchApplyEmpty(type, &_migratedProcess);
+		}
 		if (_searchWithPostsPreview) {
 			searchApplyEmpty(
 				{ .posts = true, .start = true },
@@ -2982,7 +2994,8 @@ auto Widget::currentSearchProcess() -> not_null<SearchProcessState*> {
 
 bool Widget::computeSearchWithPostsPreview() const {
 	return 	(_searchHashOrCashtag != HashOrCashtag::None)
-		&& (_searchState.tab == ChatSearchTab::MyMessages);
+		&& (_searchState.tab == ChatSearchTab::MyMessages)
+		&& !_searchState.inChat;
 }
 
 void Widget::searchReceived(
@@ -3520,7 +3533,9 @@ bool Widget::applySearchState(SearchState state) {
 			: ChatSearchTab::MyMessages;
 	}
 
-	const auto migrateFrom = (peer && !topic)
+	const auto migrateFrom = (peer
+		&& !topic
+		&& state.tab == ChatSearchTab::ThisPeer)
 		? peer->migrateFrom()
 		: nullptr;
 	_searchInMigrated = migrateFrom

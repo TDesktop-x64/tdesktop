@@ -799,6 +799,7 @@ std::optional<Data::StarGift> FromTL(
 	return gift.match([&](const MTPDstarGift &data) {
 		const auto document = session->data().processDocument(
 			data.vsticker());
+		const auto resellPrice = data.vresell_min_stars().value_or_empty();
 		const auto remaining = data.vavailability_remains();
 		const auto total = data.vavailability_total();
 		if (!document->sticker()) {
@@ -809,7 +810,10 @@ std::optional<Data::StarGift> FromTL(
 			.stars = int64(data.vstars().v),
 			.starsConverted = int64(data.vconvert_stars().v),
 			.starsToUpgrade = int64(data.vupgrade_stars().value_or_empty()),
+			.starsResellMin = int64(resellPrice),
 			.document = document,
+			.resellTitle = qs(data.vtitle().value_or_empty()),
+			.resellCount = int(data.vavailability_resale().value_or_empty()),
 			.limitedLeft = remaining.value_or_empty(),
 			.limitedCount = total.value_or_empty(),
 			.firstSaleDate = data.vfirst_sale_date().value_or_empty(),
@@ -849,6 +853,7 @@ std::optional<Data::StarGift> FromTL(
 					? peerFromMTP(*data.vowner_id())
 					: PeerId()),
 				.number = data.vnum().v,
+				.starsForResale = int(data.vresell_stars().value_or_empty()),
 				.model = *model,
 				.pattern = *pattern,
 			}),
@@ -881,6 +886,8 @@ std::optional<Data::SavedStarGift> FromTL(
 	} else if (const auto unique = parsed->unique.get()) {
 		unique->starsForTransfer = data.vtransfer_stars().value_or(-1);
 		unique->exportAt = data.vcan_export_at().value_or_empty();
+		unique->canTransferAt = data.vcan_transfer_at().value_or_empty();
+		unique->canResellAt = data.vcan_resell_at().value_or_empty();
 	}
 	using Id = Data::SavedStarGiftId;
 	const auto hasUnique = parsed->unique != nullptr;
@@ -936,7 +943,7 @@ Data::UniqueGiftPattern FromTL(
 }
 
 Data::UniqueGiftBackdrop FromTL(const MTPDstarGiftAttributeBackdrop &data) {
-	auto result = Data::UniqueGiftBackdrop();
+	auto result = Data::UniqueGiftBackdrop{ .id = data.vbackdrop_id().v };
 	result.name = qs(data.vname());
 	result.rarityPermille = data.vrarity_permille().v;
 	result.centerColor = Ui::ColorFromSerialized(

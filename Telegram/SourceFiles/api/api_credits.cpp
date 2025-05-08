@@ -157,6 +157,7 @@ constexpr auto kTransactionsLimit = 100;
 		.converted = stargift && incoming,
 		.stargift = stargift.has_value(),
 		.giftUpgraded = tl.data().is_stargift_upgrade(),
+		.giftResale = tl.data().is_stargift_resale(),
 		.reaction = tl.data().is_reaction(),
 		.refunded = tl.data().is_refund(),
 		.pending = tl.data().is_pending(),
@@ -528,8 +529,12 @@ void EditCreditsSubscription(
 	)).done(done).fail([=](const MTP::Error &e) { fail(e.type()); }).send();
 }
 
-MTPInputSavedStarGift InputSavedStarGiftId(const Data::SavedStarGiftId &id) {
-	return id.isUser()
+MTPInputSavedStarGift InputSavedStarGiftId(
+		const Data::SavedStarGiftId &id,
+		const std::shared_ptr<Data::UniqueGift> &unique) {
+	return (!id && unique)
+		? MTP_inputSavedStarGiftSlug(MTP_string(unique->slug))
+		: id.isUser()
 		? MTP_inputSavedStarGiftUser(MTP_int(id.userMessageId().bare))
 		: MTP_inputSavedStarGiftChat(
 			id.chat()->input,

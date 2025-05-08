@@ -12,6 +12,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "data/data_changes.h"
+#include "data/data_channel.h"
+#include "data/data_flags.h"
 #include "data/data_peer_values.h" // Data::AmPremiumValue.
 #include "data/data_session.h"
 #include "history/history.h"
@@ -51,14 +53,21 @@ void TranslateTracker::setup() {
 	const auto peer = _history->peer;
 	peer->updateFull();
 
+	const auto channel = peer->asChannel();
+	auto autoTranslationValue = (channel
+		? (channel->flagsValue() | rpl::type_erased())
+		: rpl::single(Data::Flags<ChannelDataFlags>::Change({}, {}))
+		) | rpl::map([=](Data::Flags<ChannelDataFlags>::Change data) {
+		return (data.value & ChannelDataFlag::AutoTranslation);
+	}) | rpl::distinct_until_changed();
+
 	using namespace rpl::mappers;
 	_trackingLanguage = rpl::combine(
-		Data::AmPremiumValue(&_history->session()),
 		Core::App().settings().translateChatEnabledValue(),
-		_1 && _2);
-
-	_trackingLanguage.value(
-	) | rpl::start_with_next([=](bool tracking) {
+		Data::AmPremiumValue(&_history->session()),
+		std::move(autoTranslationValue),
+		_1 && (_2 || _3));
+	_trackingLanguage.value() | rpl::start_with_next([=](bool tracking) {
 		_trackingLifetime.destroy();
 		if (tracking) {
 			recognizeCollected();
@@ -101,7 +110,7 @@ bool TranslateTracker::add(
 		bool skipDependencies) {
 	Expects(_addedInBunch >= 0);
 
-	if (item->out()
+	if ((item->out() && !item->history()->peer->autoTranslation())
 		|| item->isService()
 		|| !item->isRegular()
 		|| item->isOnlyEmojiAndSpaces()) {

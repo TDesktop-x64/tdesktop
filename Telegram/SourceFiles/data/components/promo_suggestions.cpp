@@ -15,11 +15,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_changes.h"
 #include "data/data_histories.h"
 #include "data/data_session.h"
+#include "data/data_user.h"
 #include "history/history.h"
 #include "main/main_session.h"
 
 namespace Data {
 namespace {
+
+using UserIds = std::vector<UserId>;
 
 constexpr auto kTopPromotionInterval = TimeId(60 * 60);
 constexpr auto kTopPromotionMinDelay = TimeId(10);
@@ -131,9 +134,15 @@ void PromoSuggestions::refreshTopPromotion() {
 				changedCustom = true;
 			}
 
+			const auto changedContactBirthdaysLastDayRequest =
+				_contactBirthdaysLastDayRequest != -1
+					&& _contactBirthdaysLastDayRequest
+						!= QDate::currentDate().day();
+
 			if (changedPendingSuggestions
 				|| changedDismissedSuggestions
-				|| changedCustom) {
+				|| changedCustom
+				|| changedContactBirthdaysLastDayRequest) {
 				_refreshed.fire({});
 			}
 		});
@@ -194,7 +203,7 @@ bool PromoSuggestions::current(const QString &key) const {
 			return false;
 		} else {
 			const auto known
-				= _session->data().knownBirthdaysToday();
+				= PromoSuggestions::knownBirthdaysToday();
 			if (!known) {
 				return true;
 			}
@@ -229,6 +238,70 @@ void PromoSuggestions::invalidate() {
 
 std::optional<CustomSuggestion> PromoSuggestions::custom() const {
 	return _custom;
+}
+
+void PromoSuggestions::requestContactBirthdays(Fn<void()> done, bool force) {
+	if ((_contactBirthdaysLastDayRequest != -1)
+		&& (_contactBirthdaysLastDayRequest == QDate::currentDate().day())
+		&& !force) {
+		return done();
+	}
+	if (_contactBirthdaysRequestId) {
+		_session->api().request(_contactBirthdaysRequestId).cancel();
+	}
+	_contactBirthdaysRequestId = _session->api().request(
+		MTPcontacts_GetBirthdays()
+	).done([=](const MTPcontacts_ContactBirthdays &result) {
+		_contactBirthdaysRequestId = 0;
+		_contactBirthdaysLastDayRequest = QDate::currentDate().day();
+		auto users = UserIds();
+		auto today = UserIds();
+		_session->data().processUsers(result.data().vusers());
+		for (const auto &tlContact : result.data().vcontacts().v) {
+			const auto peerId = tlContact.data().vcontact_id().v;
+			if (const auto user = _session->data().user(peerId)) {
+				const auto &data = tlContact.data().vbirthday().data();
+				user->setBirthday(Data::Birthday(
+					data.vday().v,
+					data.vmonth().v,
+					data.vyear().value_or_empty()));
+				if (user->isSelf()
+					|| user->isInaccessible()
+					|| user->isBlocked()) {
+					continue;
+				}
+				if (Data::IsBirthdayToday(user->birthday())) {
+					today.push_back(peerToUser(user->id));
+				}
+				users.push_back(peerToUser(user->id));
+			}
+		}
+		_contactBirthdays = std::move(users);
+		_contactBirthdaysToday = std::move(today);
+		done();
+	}).fail([=](const MTP::Error &error) {
+		_contactBirthdaysRequestId = 0;
+		_contactBirthdaysLastDayRequest = QDate::currentDate().day();
+		_contactBirthdays = {};
+		_contactBirthdaysToday = {};
+		done();
+	}).send();
+}
+
+std::optional<UserIds> PromoSuggestions::knownContactBirthdays() const {
+	if ((_contactBirthdaysLastDayRequest == -1)
+		|| (_contactBirthdaysLastDayRequest != QDate::currentDate().day())) {
+		return std::nullopt;
+	}
+	return _contactBirthdays;
+}
+
+std::optional<UserIds> PromoSuggestions::knownBirthdaysToday() const {
+	if ((_contactBirthdaysLastDayRequest == -1)
+		|| (_contactBirthdaysLastDayRequest != QDate::currentDate().day())) {
+		return std::nullopt;
+	}
+	return _contactBirthdaysToday;
 }
 
 } // namespace Data

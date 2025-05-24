@@ -15,6 +15,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/star_gift_box.h" // ShowStarGiftBox.
 #include "core/application.h"
 #include "core/click_handler_types.h"
+#include "core/ui_integration.h"
 #include "data/data_birthday.h"
 #include "data/data_changes.h"
 #include "data/data_session.h"
@@ -28,6 +29,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/settings_credits_graphics.h"
 #include "settings/settings_premium.h"
 #include "ui/controls/userpic_button.h"
+#include "ui/effects/credits_graphics.h"
 #include "ui/layers/generic_box.h"
 #include "ui/text/format_values.h"
 #include "ui/text/text_utilities.h"
@@ -123,6 +125,7 @@ rpl::producer<Ui::SlideWrap<Ui::RpWidget>*> TopBarSuggestionValue(
 			const auto promo = &session->promoSuggestions();
 			if (const auto custom = promo->custom()) {
 				content->setRightIcon(RightIcon::Close);
+				content->setLeftPadding(0);
 				content->setClickedCallback([=] {
 					const auto controller = FindSessionController(parent);
 					UrlClickHandler::Open(
@@ -135,13 +138,18 @@ rpl::producer<Ui::SlideWrap<Ui::RpWidget>*> TopBarSuggestionValue(
 					promo->dismiss(custom->suggestion);
 					repeat(repeat);
 				});
-				content->setContent(custom->title, custom->description);
+
+				content->setContent(
+					custom->title,
+					custom->description,
+					Core::TextContext({ .session = session }));
 				state->desiredWrapToggle.force_assign(
 					Toggle{ true, anim::type::normal });
 				return;
 			} else if (session->premiumCanBuy()
 				&& promo->current(kSugPremiumGrace.utf8())) {
 				content->setRightIcon(RightIcon::Close);
+				content->setLeftPadding(0);
 				content->setClickedCallback([=] {
 					const auto controller = FindSessionController(parent);
 					UrlClickHandler::Open(
@@ -174,7 +182,11 @@ rpl::producer<Ui::SlideWrap<Ui::RpWidget>*> TopBarSuggestionValue(
 						const QString &peers,
 						uint64 needed,
 						uint64 whole) {
+					if (whole > needed) {
+						return;
+					}
 					content->setRightIcon(RightIcon::Close);
+					content->setLeftPadding(0);
 					content->setClickedCallback([=] {
 						const auto controller = FindSessionController(parent);
 						controller->uiShow()->show(Box(
@@ -191,6 +203,19 @@ rpl::producer<Ui::SlideWrap<Ui::RpWidget>*> TopBarSuggestionValue(
 						promo->dismiss(kSugLowCreditsSubs.utf8());
 						repeat(repeat);
 					});
+
+					const auto fontH = content->contentTitleSt().font->height;
+					auto customEmojiFactory = [=](
+						QStringView data,
+						const Ui::Text::MarkedContext &context
+					) -> std::unique_ptr<Ui::Text::CustomEmoji> {
+						return Ui::MakeCreditsIconEmoji(fontH, 1);
+					};
+					using namespace Ui::Text;
+					auto context = MarkedContext{
+						.customEmojiFactory = std::move(customEmojiFactory),
+					};
+
 					content->setContent(
 						tr::lng_dialogs_suggestions_credits_sub_low_title(
 							tr::now,
@@ -204,7 +229,7 @@ rpl::producer<Ui::SlideWrap<Ui::RpWidget>*> TopBarSuggestionValue(
 						tr::lng_dialogs_suggestions_credits_sub_low_about(
 							tr::now,
 							TextWithEntities::Simple),
-						true);
+						std::move(context));
 					state->desiredWrapToggle.force_assign(
 						Toggle{ true, anim::type::normal });
 				};
@@ -237,11 +262,9 @@ rpl::producer<Ui::SlideWrap<Ui::RpWidget>*> TopBarSuggestionValue(
 				return;
 			} else if (session->premiumCanBuy()
 				&& promo->current(kSugBirthdayContacts.utf8())) {
-				session->data().contactBirthdays(
-				) | rpl::start_with_next(crl::guard(content, [=] {
-					const auto users = session->data()
-						.knownBirthdaysToday().value_or(
-							std::vector<UserId>());
+				promo->requestContactBirthdays(crl::guard(content, [=] {
+					const auto users = promo->knownBirthdaysToday().value_or(
+						std::vector<UserId>());
 					if (users.empty()) {
 						repeat(repeat);
 						return;
@@ -367,11 +390,12 @@ rpl::producer<Ui::SlideWrap<Ui::RpWidget>*> TopBarSuggestionValue(
 
 					state->desiredWrapToggle.force_assign(
 						Toggle{ true, anim::type::normal });
-				}), state->giftsLifetime);
+				}));
 				return;
 			} else if (promo->current(kSugSetBirthday.utf8())
 				&& !Data::IsBirthdayToday(session->user()->birthday())) {
 				content->setRightIcon(RightIcon::Close);
+				content->setLeftPadding(0);
 				content->setClickedCallback([=] {
 					const auto controller = FindSessionController(parent);
 					Core::App().openInternalUrl(
@@ -446,6 +470,7 @@ rpl::producer<Ui::SlideWrap<Ui::RpWidget>*> TopBarSuggestionValue(
 				};
 				if (isPremiumAnnual || isPremiumRestore || isPremiumUpgrade) {
 					content->setRightIcon(RightIcon::Arrow);
+					content->setLeftPadding(0);
 					const auto api = &session->api().premium();
 					api->statusTextValue() | rpl::start_with_next([=] {
 						for (const auto &o : api->subscriptionOptions()) {

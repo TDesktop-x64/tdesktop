@@ -456,7 +456,7 @@ if customRunCommand:
 stage('patches', """
     git clone https://github.com/desktop-app/patches.git
     cd patches
-    git checkout 7119a74e3f
+    git checkout a405719f0963abf7cb93354a390617c0f0d90f17
 """)
 
 stage('msys64', """
@@ -1559,7 +1559,6 @@ release:
 depends:patches/qtbase_""" + qt + """/*.patch
     cd qtbase
 win:
-    git revert --no-edit 6ad56dce34
     setlocal enabledelayedexpansion
     for /r %%i in (..\\..\\patches\\qtbase_%QT%\\*) do (
         git apply %%i -v
@@ -1748,7 +1747,7 @@ win:
 stage('tg_owt', """
     git clone https://github.com/desktop-app/tg_owt.git
     cd tg_owt
-    git checkout c4192e8
+    git checkout 62321fd
     git submodule update --init --recursive
 win:
     SET MOZJPEG_PATH=$LIBS_DIR/mozjpeg

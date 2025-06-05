@@ -1096,6 +1096,9 @@ int Message::marginTop() const {
 	if (const auto bar = Get<UnreadBar>()) {
 		result += bar->height();
 	}
+	if (const auto monoforumBar = Get<MonoforumSenderBar>()) {
+		result += monoforumBar->height();
+	}
 	if (const auto service = Get<ServicePreMessage>()) {
 		result += service->height;
 	}
@@ -1138,24 +1141,22 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 
 	if (const auto bar = Get<UnreadBar>()) {
 		auto unreadbarh = bar->height();
-		auto dateh = 0;
+		auto aboveh = 0;
 		if (const auto date = Get<DateBadge>()) {
-			dateh = date->height();
+			aboveh += date->height();
 		}
-		if (context.clip.intersects(QRect(0, dateh, width(), unreadbarh))) {
-			p.translate(0, dateh);
-			bar->paint(
-				p,
-				context,
-				0,
-				width(),
-				delegate()->elementIsChatWide());
-			p.translate(0, -dateh);
+		if (const auto sender = Get<MonoforumSenderBar>()) {
+			aboveh += sender->height();
+		}
+		if (context.clip.intersects(QRect(0, aboveh, width(), unreadbarh))) {
+			p.translate(0, aboveh);
+			bar->paint(p, context, 0, width(), delegate()->elementChatMode());
+			p.translate(0, -aboveh);
 		}
 	}
 
 	if (const auto service = Get<ServicePreMessage>()) {
-		service->paint(p, context, g, delegate()->elementIsChatWide());
+		service->paint(p, context, g, delegate()->elementChatMode());
 	}
 
 	if (isHidden()) {
@@ -1558,8 +1559,8 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 		constexpr auto kMaxHeightRatio = 3.5;
 		constexpr auto kStrokeWidth = 2.;
 		constexpr auto kWaveWidth = 10.;
-		const auto isLeftSize = (!context.outbg)
-			|| delegate()->elementIsChatWide();
+		const auto isLeftSize = !context.outbg
+			|| (delegate()->elementChatMode() == ElementChatMode::Wide);
 		const auto ratio = std::min(context.gestureHorizontal.ratio, 1.);
 		const auto reachRatio = context.gestureHorizontal.reachRatio;
 		const auto size = st::historyFastShareSize;
@@ -1644,7 +1645,8 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 			}
 			const auto o = ScopedPainterOpacity(p, progress);
 			const auto &st = st::msgSelectionCheck;
-			const auto right = delegate()->elementIsChatWide()
+			const auto right = (delegate()->elementChatMode()
+				== ElementChatMode::Wide)
 				? std::min(
 					int(_bubbleWidthLimit
 						+ st::msgPhotoSkip
@@ -2476,6 +2478,8 @@ bool Message::hasFromPhoto() const {
 	switch (context()) {
 	case Context::AdminLog:
 		return true;
+	case Context::Monoforum:
+		return (delegate()->elementChatMode() == ElementChatMode::Wide);
 	case Context::History:
 	case Context::ChatPreview:
 	case Context::TTLViewer:
@@ -2494,8 +2498,10 @@ bool Message::hasFromPhoto() const {
 			|| item->isFakeAboutView()
 			|| (context() == Context::Replies && item->isDiscussionPost())) {
 			return false;
-		} else if (delegate()->elementIsChatWide()) {
-			return true;
+		}
+		const auto mode = delegate()->elementChatMode();
+		if (mode != ElementChatMode::Default) {
+			return (mode == ElementChatMode::Wide);
 		} else if (item->history()->peer->isVerifyCodes()) {
 			return !hasOutLayout();
 		} else if (item->Has<HistoryMessageForwarded>()) {
@@ -3714,6 +3720,8 @@ bool Message::hasFromName() const {
 	switch (context()) {
 	case Context::AdminLog:
 		return true;
+	case Context::Monoforum:
+		return data()->out();
 	case Context::History:
 	case Context::ChatPreview:
 	case Context::TTLViewer:
@@ -3982,6 +3990,8 @@ bool Message::displayFastShare() const {
 bool Message::displayGoToOriginal() const {
 	if (isPinnedContext()) {
 		return !hasOutLayout();
+	} else if (context() == Context::Monoforum) {
+		return false;
 	}
 	const auto item = data();
 	if (const auto forwarded = item->Get<HistoryMessageForwarded>()) {
@@ -4414,12 +4424,15 @@ QRect Message::countGeometry() const {
 		? media->width()
 		: width();
 	const auto outbg = hasOutLayout();
+	const auto useMoreSpace = (delegate()->elementChatMode()
+		== ElementChatMode::Narrow);
+	const auto wideSkip = useMoreSpace
+		? st::msgMargin.left()
+		: st::msgMargin.right();
 	const auto availableWidth = width()
 		- st::msgMargin.left()
-		- (centeredView ? st::msgMargin.left() : st::msgMargin.right());
-	auto contentLeft = hasRightLayout()
-		? st::msgMargin.right()
-		: st::msgMargin.left();
+		- (centeredView ? st::msgMargin.left() : wideSkip);
+	auto contentLeft = hasRightLayout() ? wideSkip : st::msgMargin.left();
 	auto contentWidth = availableWidth;
 	if (hasFromPhoto()) {
 		contentLeft += st::msgPhotoSkip;
@@ -4440,7 +4453,8 @@ QRect Message::countGeometry() const {
 			contentWidth = mediaWidth;
 		}
 	}
-	if (contentWidth < availableWidth && !delegate()->elementIsChatWide()) {
+	if (contentWidth < availableWidth
+		&& delegate()->elementChatMode() != ElementChatMode::Wide) {
 		if (outbg) {
 			contentLeft += availableWidth - contentWidth;
 		} else if (centeredView) {
@@ -4534,7 +4548,7 @@ int Message::resizeContentGetHeight(int newWidth) {
 	auto newHeight = minHeight();
 
 	if (const auto service = Get<ServicePreMessage>()) {
-		service->resizeToWidth(newWidth, delegate()->elementIsChatWide());
+		service->resizeToWidth(newWidth, delegate()->elementChatMode());
 	}
 
 	const auto botTop = item->isFakeAboutView()
@@ -4549,9 +4563,14 @@ int Message::resizeContentGetHeight(int newWidth) {
 	// This code duplicates countGeometry() but also resizes media.
 	const auto centeredView = item->isFakeAboutView()
 		|| (context() == Context::Replies && item->isDiscussionPost());
+	const auto useMoreSpace = (delegate()->elementChatMode()
+		== ElementChatMode::Narrow);
+	const auto wideSkip = useMoreSpace
+		? st::msgMargin.left()
+		: st::msgMargin.right();
 	auto contentWidth = newWidth
 		- st::msgMargin.left()
-		- (centeredView ? st::msgMargin.left() : st::msgMargin.right());
+		- (centeredView ? st::msgMargin.left() : wideSkip);
 	if (hasFromPhoto()) {
 		if (const auto size = rightActionSize()) {
 			contentWidth -= size->width() + (st::msgPhotoSkip - st::historyFastShareSize);

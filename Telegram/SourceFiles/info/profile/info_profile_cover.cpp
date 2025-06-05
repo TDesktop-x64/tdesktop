@@ -637,10 +637,11 @@ Cover::Cover(
 	: object_ptr<Ui::UserpicButton>(
 		this,
 		controller,
-		_peer,
+		_peer->userpicPaintingPeer(),
 		Ui::UserpicButton::Role::OpenPhoto,
 		Ui::UserpicButton::Source::PeerPhoto,
-		_st.photo))
+		_st.photo,
+		_peer->userpicShape()))
 , _changePersonal((role == Role::Info
 	|| topic
 	|| !_peer->isUser()
@@ -659,6 +660,9 @@ Cover::Cover(
 , _showLastSeen(this, tr::lng_status_lastseen_when(), _st.showLastSeen)
 , _refreshStatusTimer([this] { refreshStatusText(); }) {
 	_peer->updateFull();
+	if (const auto broadcast = _peer->monoforumBroadcast()) {
+		broadcast->updateFull();
+	}
 
 	_name->setSelectable(true);
 	_name->setContextCopyText(tr::lng_profile_copy_fullname(tr::now));
@@ -997,6 +1001,12 @@ void Cover::refreshStatusText() {
 				chat->count,
 				int(chat->participants.size()));
 			return { .text = ChatStatusText(fullCount, onlineCount, true) };
+		} else if (auto broadcast = _peer->monoforumBroadcast()) {
+			auto result = ChatStatusText(
+				qMax(broadcast->membersCount(), 1),
+				0,
+				false);
+			return TextWithEntities{ .text = result };
 		} else if (auto channel = _peer->asChannel()) {
 			const auto onlineCount = _onlineCount.current();
 			const auto fullCount = qMax(channel->membersCount(), 1);

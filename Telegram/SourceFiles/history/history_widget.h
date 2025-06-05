@@ -107,6 +107,7 @@ class Element;
 class PinnedTracker;
 class TranslateBar;
 class ComposeSearch;
+class SubsectionTabs;
 struct SelectedQuote;
 } // namespace HistoryView
 
@@ -185,6 +186,7 @@ public:
 	void showAnimated(
 		Window::SlideDirection direction,
 		const Window::SectionSlideParams &params);
+	void showFast();
 	void finishAnimating();
 
 	void doneShow();
@@ -412,6 +414,7 @@ private:
 
 	void refreshJoinChannelText();
 	void refreshGiftToChannelShown();
+	void refreshDirectMessageShown();
 	void requestMessageData(MsgId msgId);
 	void messageDataReceived(not_null<PeerData*> peer, MsgId msgId);
 
@@ -544,6 +547,7 @@ private:
 
 	void setupShortcuts();
 	void setupGiftToChannelButton();
+	void setupDirectMessageButton();
 
 	void handlePeerMigration();
 
@@ -691,6 +695,8 @@ private:
 
 	void switchToSearch(QString query);
 
+	void validateSubsectionTabs();
+
 	void checkCharsCount();
 	void checkCharsLimitation();
 
@@ -713,6 +719,8 @@ private:
 	mutable base::Timer _updateEditTimeLeftDisplay;
 
 	object_ptr<Ui::IconButton> _fieldBarCancel;
+
+	std::unique_ptr<Ui::RpWidget> _topBars;
 
 	std::unique_ptr<HistoryView::TranslateBar> _translateBar;
 	int _translateBarHeight = 0;
@@ -807,8 +815,8 @@ private:
 	object_ptr<Ui::FlatButton> _joinChannel;
 	object_ptr<Ui::FlatButton> _muteUnmute;
 	object_ptr<Ui::FlatButton> _discuss;
-	QPointer<Ui::IconButton> _giftToChannelIn;
-	QPointer<Ui::IconButton> _giftToChannelOut;
+	QPointer<Ui::IconButton> _giftToChannel;
+	QPointer<Ui::IconButton> _directMessage;
 	object_ptr<Ui::FlatButton> _reportMessages;
 	struct {
 		object_ptr<Ui::RoundButton> button = { nullptr };
@@ -829,6 +837,9 @@ private:
 	const std::unique_ptr<VoiceRecordBar> _voiceRecordBar;
 	const std::unique_ptr<ForwardPanel> _forwardPanel;
 	std::unique_ptr<HistoryView::ComposeSearch> _composeSearch;
+	std::unique_ptr<HistoryView::SubsectionTabs> _subsectionTabs;
+	rpl::lifetime _subsectionTabsLifetime;
+	rpl::lifetime _subsectionCheckLifetime;
 	bool _cmdStartShown = false;
 	object_ptr<Ui::InputField> _field;
 	base::unique_qptr<Ui::RpWidget> _fieldDisabled;

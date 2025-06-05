@@ -674,6 +674,7 @@ struct ActionPaidMessagesRefunded {
 
 struct ActionPaidMessagesPrice {
 	int stars = 0;
+	bool broadcastAllowed = false;
 };
 
 struct ServiceAction {

@@ -27,8 +27,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/peers/edit_peer_requests_box.h"
 #include "boxes/peers/edit_peer_reactions.h"
 #include "boxes/peers/replace_boost_box.h"
+#include "boxes/peers/toggle_topics_box.h"
 #include "boxes/peers/verify_peers_box.h"
 #include "boxes/peer_list_controllers.h"
+#include "boxes/edit_privacy_box.h" // EditDirectMessagesPriceBox
 #include "boxes/stickers_box.h"
 #include "boxes/username_box.h"
 #include "chat_helpers/emoji_suggestions_widget.h"
@@ -222,27 +224,41 @@ void SaveSlowmodeSeconds(
 }
 
 void SaveStarsPerMessage(
+		std::shared_ptr<Ui::Show> show,
 		not_null<ChannelData*> channel,
 		int starsPerMessage,
-		Fn<void()> done) {
+		Fn<void(bool)> done) {
 	const auto api = &channel->session().api();
 	const auto key = Api::RequestKey("stars_per_message", channel->id);
 
+	const auto broadcast = channel->isBroadcast();
+
+	using Flag = MTPchannels_UpdatePaidMessagesPrice::Flag;
+	const auto broadcastAllowed = broadcast && (starsPerMessage >= 0);
 	const auto requestId = api->request(MTPchannels_UpdatePaidMessagesPrice(
+		MTP_flags(broadcastAllowed
+			? Flag::f_broadcast_messages_allowed
+			: Flag(0)),
 		channel->inputChannel,
 		MTP_long(starsPerMessage)
 	)).done([=](const MTPUpdates &result) {
 		api->clearModifyRequest(key);
 		api->applyUpdates(result);
-		channel->setStarsPerMessage(starsPerMessage);
-		done();
+		if (!broadcast) {
+			channel->setStarsPerMessage(starsPerMessage);
+		}
+		done(true);
 	}).fail([=](const MTP::Error &error) {
 		api->clearModifyRequest(key);
 		if (error.type() != u"CHAT_NOT_MODIFIED"_q) {
-			return;
+			show->showToast(error.type());
+			done(false);
+		} else {
+			if (!broadcast) {
+				channel->setStarsPerMessage(starsPerMessage);
+			}
+			done(true);
 		}
-		channel->setStarsPerMessage(starsPerMessage);
-		done();
 	}).send();
 
 	api->registerModifyRequest(key, requestId);
@@ -282,6 +298,7 @@ void SaveBoostsUnrestrict(
 void ShowEditPermissions(
 		not_null<Window::SessionNavigation*> navigation,
 		not_null<PeerData*> peer) {
+	const auto show = navigation->uiShow();
 	auto createBox = [=](not_null<Ui::GenericBox*> box) {
 		const auto saving = box->lifetime().make_state<int>(0);
 		const auto save = [=](
@@ -300,7 +317,10 @@ void ShowEditPermissions(
 					channel,
 					result.boostsUnrestrict,
 					close);
-				SaveStarsPerMessage(channel, result.starsPerMessage, close);
+				const auto price = result.starsPerMessage;
+				SaveStarsPerMessage(show, channel, price, [=](bool ok) {
+					close();
+				});
 			}
 		};
 		auto done = [=](EditPeerPermissionsBoxResult result) {
@@ -360,6 +380,7 @@ private:
 		std::optional<QString> description;
 		std::optional<bool> hiddenPreHistory;
 		std::optional<bool> forum;
+		std::optional<bool> forumTabs;
 		std::optional<bool> autotranslate;
 		std::optional<bool> signatures;
 		std::optional<bool> signatureProfiles;
@@ -367,6 +388,7 @@ private:
 		std::optional<bool> joinToWrite;
 		std::optional<bool> requestToJoin;
 		std::optional<ChannelData*> discussionLink;
+		std::optional<int> starsPerDirectMessage;
 	};
 
 	[[nodiscard]] object_ptr<Ui::RpWidget> createPhotoAndTitleEdit();
@@ -383,8 +405,10 @@ private:
 	void showEditPeerTypeBox(
 		std::optional<rpl::producer<QString>> error = {});
 	void showEditDiscussionLinkBox();
+	void showEditDirectMessagesBox();
 	void fillPrivacyTypeButton();
 	void fillDiscussionLinkButton();
+	void fillDirectMessagesButton();
 	//void fillInviteLinkButton();
 	void fillForumButton();
 	void fillColorIndexButton();
@@ -414,6 +438,7 @@ private:
 	[[nodiscard]] bool validateUsernamesOrder(Saving &to) const;
 	[[nodiscard]] bool validateUsername(Saving &to) const;
 	[[nodiscard]] bool validateDiscussionLink(Saving &to) const;
+	[[nodiscard]] bool validateDirectMessagesPrice(Saving &to) const;
 	[[nodiscard]] bool validateTitle(Saving &to) const;
 	[[nodiscard]] bool validateDescription(Saving &to) const;
 	[[nodiscard]] bool validateHistoryVisibility(Saving &to) const;
@@ -428,6 +453,7 @@ private:
 	void saveUsernamesOrder();
 	void saveUsername();
 	void saveDiscussionLink();
+	void saveDirectMessagesPrice();
 	void saveTitle();
 	void saveDescription();
 	void saveHistoryVisibility();
@@ -456,9 +482,11 @@ private:
 	std::optional<ChannelData*> _discussionLinkSavedValue;
 	ChannelData *_discussionLinkOriginalValue = nullptr;
 	bool _channelHasLocationOriginalValue = false;
+	std::optional<rpl::variable<int>> _starsPerDirectMessageSavedValue;
 	std::optional<HistoryVisibility> _historyVisibilitySavedValue;
 	std::optional<EditPeerTypeData> _typeDataSavedValue;
 	std::optional<bool> _forumSavedValue;
+	std::optional<bool> _forumTabsSavedValue;
 	std::optional<bool> _autotranslateSavedValue;
 	std::optional<bool> _signaturesSavedValue;
 	std::optional<bool> _signatureProfilesSavedValue;
@@ -920,6 +948,20 @@ void Controller::showEditDiscussionLinkBox() {
 	}).send();
 }
 
+void Controller::showEditDirectMessagesBox() {
+	Expects(_peer->isBroadcast());
+	Expects(_starsPerDirectMessageSavedValue.has_value());
+
+	const auto stars = _starsPerDirectMessageSavedValue->current();
+	_navigation->parentController()->show(Box(
+		EditDirectMessagesPriceBox,
+		_peer->asChannel(),
+		(stars >= 0) ? stars : std::optional<int>(),
+		[=](std::optional<int> value) {
+			*_starsPerDirectMessageSavedValue = value.value_or(-1);
+		}));
+}
+
 void Controller::fillPrivacyTypeButton() {
 	Expects(_controls.buttonsLayout != nullptr);
 
@@ -985,9 +1027,11 @@ void Controller::fillPrivacyTypeButton() {
 void Controller::fillDiscussionLinkButton() {
 	Expects(_controls.buttonsLayout != nullptr);
 
-	_discussionLinkSavedValue = _discussionLinkOriginalValue = _peer->isChannel()
-		? _peer->asChannel()->discussionLink()
-		: nullptr;
+	_discussionLinkSavedValue
+		= _discussionLinkOriginalValue
+		= (_peer->isChannel()
+			? _peer->asChannel()->discussionLink()
+			: nullptr);
 
 	const auto isGroup = (_peer->isChat() || _peer->isMegagroup());
 	auto text = !isGroup
@@ -1021,6 +1065,33 @@ void Controller::fillDiscussionLinkButton() {
 		{ isGroup ? &st::menuIconChannel : &st::menuIconGroups });
 	_discussionLinkUpdates.fire_copy(*_discussionLinkSavedValue);
 }
+
+void Controller::fillDirectMessagesButton() {
+	Expects(_controls.buttonsLayout != nullptr);
+
+	if (!_peer->isBroadcast() || !_peer->asChannel()->canEditInformation()) {
+		return;
+	}
+
+	const auto monoforumLink = _peer->asChannel()->monoforumLink();
+	_starsPerDirectMessageSavedValue = rpl::variable<int>(
+		monoforumLink ? monoforumLink->starsPerMessage() : -1);
+
+	auto label = _starsPerDirectMessageSavedValue->value(
+	) | rpl::map([](int starsPerMessage) {
+		return (starsPerMessage < 0)
+			? tr::lng_manage_monoforum_off()
+			: !starsPerMessage
+			? tr::lng_manage_monoforum_free()
+			: rpl::single(Lang::FormatCountDecimal(starsPerMessage));
+	}) | rpl::flatten_latest();
+	AddButtonWithText(
+		_controls.buttonsLayout,
+		tr::lng_manage_monoforum(),
+		std::move(label),
+		[=] { showEditDirectMessagesBox(); },
+		{ .icon = &st::menuIconChats, .newBadge = true });
+}
 //
 //void Controller::fillInviteLinkButton() {
 //	Expects(_controls.buttonsLayout != nullptr);
@@ -1039,21 +1110,30 @@ void Controller::fillDiscussionLinkButton() {
 void Controller::fillForumButton() {
 	Expects(_controls.buttonsLayout != nullptr);
 
+	_forumSavedValue = _peer->isForum();
+	_forumTabsSavedValue = !_peer->isChannel()
+		|| !_peer->isForum()
+		|| _peer->asChannel()->useSubsectionTabs();
+
+	const auto changes = std::make_shared<rpl::event_stream<>>();
+	const auto label = [=] {
+		return !*_forumSavedValue
+			? tr::lng_manage_monoforum_off(tr::now)
+			: *_forumTabsSavedValue
+			? tr::lng_edit_topics_tabs(tr::now)
+			: tr::lng_edit_topics_list(tr::now);
+	};
 	const auto button = _controls.forumToggle = _controls.buttonsLayout->add(
 		EditPeerInfoBox::CreateButton(
 			_controls.buttonsLayout,
 			tr::lng_forum_topics_switch(),
-			rpl::single(QString()),
+			changes->events_starting_with({}) | rpl::map(label),
 			[] {},
 			st::manageGroupTopicsButton,
-			{ &st::menuIconTopics }));
-	const auto unlocks = std::make_shared<rpl::event_stream<bool>>();
-	button->toggleOn(
-		rpl::single(_peer->isForum()) | rpl::then(unlocks->events())
-	)->toggledValue(
-	) | rpl::start_with_next([=](bool toggled) {
-		if (_controls.forumToggleLocked && toggled) {
-			unlocks->fire(false);
+			{ .icon = &st::menuIconTopics, .newBadge = true }));
+
+	button->setClickedCallback(crl::guard(this, [=] {
+		if (!*_forumSavedValue && _controls.forumToggleLocked) {
 			if (_discussionLinkSavedValue && *_discussionLinkSavedValue) {
 				ShowForumForDiscussionError(_navigation);
 			} else {
@@ -1065,13 +1145,21 @@ void Controller::fillForumButton() {
 						Ui::Text::RichLangValue));
 			}
 		} else {
-			_forumSavedValue = toggled;
-			if (toggled) {
-				_savingData.hiddenPreHistory = false;
-			}
-			refreshHistoryVisibility();
+			_navigation->uiShow()->show(Box(
+				Ui::ToggleTopicsBox,
+				*_forumSavedValue,
+				*_forumTabsSavedValue,
+				crl::guard(this, [=](bool topics, bool topicsTabs) {
+					_forumSavedValue = topics;
+					_forumTabsSavedValue = !topics || topicsTabs;
+					if (topics) {
+						_savingData.hiddenPreHistory = false;
+					}
+					changes->fire({});
+					refreshHistoryVisibility();
+				})));
 		}
-	}, _controls.buttonsLayout->lifetime());
+	}));
 	refreshForumToggleLocked();
 }
 
@@ -1361,6 +1449,8 @@ void Controller::fillManageSection() {
 	const auto canViewOrEditDiscussionLink = isChannel
 		&& (channel->discussionLink()
 			|| (channel->isBroadcast() && channel->canEditInformation()));
+	const auto canEditDirectMessages = isChannel
+		&& (channel->isBroadcast() && channel->canEditInformation());
 	const auto canUpgradeToSupergroup = [&] {
 		return isChannel ? false : chat->amCreator() && chat->asChat();
 	}();
@@ -1374,6 +1464,9 @@ void Controller::fillManageSection() {
 	}
 	if (canViewOrEditDiscussionLink) {
 		fillDiscussionLinkButton();
+	}
+	if (canEditDirectMessages) {
+		fillDirectMessagesButton();
 	}
 	if (canEditPreHistoryHidden) {
 		fillHistoryVisibilityButton();
@@ -1986,6 +2079,7 @@ std::optional<Controller::Saving> Controller::validate() const {
 	if (validateUsernamesOrder(result)
 		&& validateUsername(result)
 		&& validateDiscussionLink(result)
+		&& validateDirectMessagesPrice(result)
 		&& validateTitle(result)
 		&& validateDescription(result)
 		&& validateHistoryVisibility(result)
@@ -2035,6 +2129,14 @@ bool Controller::validateDiscussionLink(Saving &to) const {
 	return true;
 }
 
+bool Controller::validateDirectMessagesPrice(Saving &to) const {
+	if (!_starsPerDirectMessageSavedValue) {
+		return true;
+	}
+	to.starsPerDirectMessage = _starsPerDirectMessageSavedValue->current();
+	return true;
+}
+
 bool Controller::validateTitle(Saving &to) const {
 	if (!_controls.title) {
 		return true;
@@ -2075,6 +2177,7 @@ bool Controller::validateForum(Saving &to) const {
 		return true;
 	}
 	to.forum = _forumSavedValue;
+	to.forumTabs = _forumTabsSavedValue;
 	return true;
 }
 
@@ -2133,6 +2236,7 @@ void Controller::save() {
 		pushSaveStage([=] { saveUsernamesOrder(); });
 		pushSaveStage([=] { saveUsername(); });
 		pushSaveStage([=] { saveDiscussionLink(); });
+		pushSaveStage([=] { saveDirectMessagesPrice(); });
 		pushSaveStage([=] { saveTitle(); });
 		pushSaveStage([=] { saveDescription(); });
 		pushSaveStage([=] { saveHistoryVisibility(); });
@@ -2288,6 +2392,30 @@ void Controller::saveDiscussionLink() {
 		_navigation->showToast(error.type());
 		cancelSave();
 	}).send();
+}
+
+void Controller::saveDirectMessagesPrice() {
+	const auto channel = _peer->asChannel();
+	if (!channel) {
+		return continueSave();
+	}
+	const auto monoforumLink = channel->monoforumLink();
+	const auto current = monoforumLink ? monoforumLink->starsPerMessage() : -1;
+	const auto desired = _savingData.starsPerDirectMessage
+		? *_savingData.starsPerDirectMessage
+		: current;
+	if (desired == current) {
+		return continueSave();
+	}
+	const auto show = _navigation->uiShow();
+	const auto done = [=](bool ok) {
+		if (ok) {
+			continueSave();
+		} else {
+			cancelSave();
+		}
+	};
+	SaveStarsPerMessage(show, channel, desired, crl::guard(this, done));
 }
 
 void Controller::saveTitle() {
@@ -2496,8 +2624,13 @@ void Controller::togglePreHistoryHidden(
 
 void Controller::saveForum() {
 	const auto channel = _peer->asChannel();
+	const auto nowForum = _peer->isForum();
+	const auto nowForumTabs = !channel
+		|| !nowForum
+		|| channel->useSubsectionTabs();
 	if (!_savingData.forum
-		|| *_savingData.forum == _peer->isForum()) {
+		|| (*_savingData.forum == nowForum
+			&& *_savingData.forumTabs == nowForumTabs)) {
 		return continueSave();
 	} else if (!channel) {
 		const auto saveForChannel = [=](not_null<ChannelData*> channel) {
@@ -2514,7 +2647,8 @@ void Controller::saveForum() {
 	}
 	_api.request(MTPchannels_ToggleForum(
 		channel->inputChannel,
-		MTP_bool(*_savingData.forum)
+		MTP_bool(*_savingData.forum),
+		MTP_bool(*_savingData.forum && *_savingData.forumTabs)
 	)).done([=](const MTPUpdates &result) {
 		const auto weak = base::make_weak(this);
 		channel->session().api().applyUpdates(result);
@@ -2865,7 +2999,9 @@ bool EditPeerInfoBox::Available(not_null<PeerData*> peer) {
 
 		// canViewAdmins() is removed, because in supergroups it is
 		// always true and in channels it is equal to canViewBanned().
-
+		if (channel->isMonoforum()) {
+			return false;
+		}
 		return false
 			//|| channel->canViewMembers()
 			//|| channel->canViewAdmins()

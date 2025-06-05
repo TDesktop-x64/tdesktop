@@ -58,6 +58,7 @@ class ChatFilter;
 class Thread;
 class Folder;
 class Forum;
+class SavedMessages;
 struct ReactionId;
 } // namespace Data
 
@@ -85,6 +86,8 @@ enum class ChatTypeFilter : uchar;
 struct ChosenRow {
 	Key key;
 	Data::MessagePosition message;
+	MsgId topicJumpRootId;
+	PeerId sublistJumpPeerId;
 	QByteArray sponsoredRandomId;
 	bool userpicClick : 1 = false;
 	bool filteredRow : 1 = false;
@@ -164,7 +167,8 @@ public:
 	void chatPreviewShown(bool shown, RowDescriptor row = {});
 	bool chooseRow(
 		Qt::KeyboardModifiers modifiers = {},
-		MsgId pressedTopicRootId = {});
+		MsgId pressedTopicRootId = {},
+		PeerId pressedSublistPeerId = {});
 
 	void scrollToEntry(const RowDescriptor &entry);
 
@@ -544,6 +548,7 @@ private:
 	Row *_selected = nullptr;
 	Row *_pressed = nullptr;
 	MsgId _pressedTopicJumpRootId;
+	PeerId _pressedSublistJumpPeerId;
 	bool _selectedTopicJump = false;
 	bool _pressedTopicJump = false;
 
@@ -670,7 +675,8 @@ private:
 	float64 _narrowRatio = 0.;
 	bool _geometryInited = false;
 
-	bool _savedSublists = false;
+	Data::SavedMessages *_savedSublists = nullptr;
+
 	bool _searchLoading = false;
 	bool _searchWaiting = false;
 

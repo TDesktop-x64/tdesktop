@@ -840,6 +840,8 @@ PRIVATE
     history/view/history_view_bottom_info.h
     history/view/history_view_chat_preview.cpp
     history/view/history_view_chat_preview.h
+    history/view/history_view_chat_section.cpp
+    history/view/history_view_chat_section.h
     history/view/history_view_contact_status.cpp
     history/view/history_view_contact_status.h
     history/view/history_view_context_menu.cpp
@@ -874,8 +876,6 @@ PRIVATE
     history/view/history_view_pinned_tracker.h
     history/view/history_view_quick_action.cpp
     history/view/history_view_quick_action.h
-    history/view/history_view_replies_section.cpp
-    history/view/history_view_replies_section.h
     history/view/history_view_reply.cpp
     history/view/history_view_reply.h
     history/view/history_view_requests_bar.cpp
@@ -892,8 +892,8 @@ PRIVATE
     history/view/history_view_sponsored_click_handler.h
     history/view/history_view_sticker_toast.cpp
     history/view/history_view_sticker_toast.h
-    history/view/history_view_sublist_section.cpp
-    history/view/history_view_sublist_section.h
+    history/view/history_view_subsection_tabs.cpp
+    history/view/history_view_subsection_tabs.h
     history/view/history_view_text_helper.cpp
     history/view/history_view_text_helper.h
     history/view/history_view_transcribe_button.cpp
@@ -1450,6 +1450,8 @@ PRIVATE
     settings/cloud_password/settings_cloud_password_start.h
     settings/cloud_password/settings_cloud_password_step.cpp
     settings/cloud_password/settings_cloud_password_step.h
+    settings/cloud_password/settings_cloud_password_validate_icon.cpp
+    settings/cloud_password/settings_cloud_password_validate_icon.h
     settings/settings_active_sessions.cpp
     settings/settings_active_sessions.h
     settings/settings_advanced.cpp
@@ -1873,11 +1875,7 @@ else()
         set(bundle_identifier "com.tdesktop.Telegram")
     endif()
     set(bundle_entitlements "Telegram.entitlements")
-    if (LINUX AND DESKTOP_APP_USE_PACKAGED)
-        set(output_name "telegram-desktop")
-    else()
-        set(output_name "Telegram")
-    endif()
+    set(output_name "Telegram")
 endif()
 
 if (CMAKE_GENERATOR STREQUAL Xcode)
@@ -1919,8 +1917,9 @@ PRIVATE
     G_LOG_DOMAIN="Telegram"
 )
 
+get_property(is_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if (APPLE
-    OR "${CMAKE_GENERATOR}" STREQUAL "Ninja Multi-Config"
+    OR is_multi_config
     OR NOT CMAKE_EXECUTABLE_SUFFIX STREQUAL ""
     OR NOT "${output_name}" STREQUAL "Telegram")
     set(output_folder ${CMAKE_BINARY_DIR})
@@ -1996,6 +1995,10 @@ if (NOT DESKTOP_APP_DISABLE_AUTOUPDATE AND NOT build_macstore AND NOT build_wins
             desktop-app::external_auto_updates
             desktop-app::external_openssl
         )
+
+        if (DESKTOP_APP_USE_PACKAGED)
+            target_compile_definitions(Packer PRIVATE PACKER_USE_PACKAGED)
+        endif()
 
         set_target_properties(Packer PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${output_folder})
     endif()

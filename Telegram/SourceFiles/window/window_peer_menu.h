@@ -32,6 +32,8 @@ class Folder;
 class Session;
 struct ForwardDraft;
 class ForumTopic;
+class SavedMessages;
+class SavedSublist;
 class Thread;
 } // namespace Data
 
@@ -148,6 +150,9 @@ Fn<void()> ClearHistoryHandler(
 Fn<void()> DeleteAndLeaveHandler(
 	not_null<Window::SessionController*> controller,
 	not_null<PeerData*> peer);
+Fn<void()> DeleteSublistHandler(
+	not_null<Window::SessionController*> controller,
+	not_null<Data::SavedSublist*> sublist);
 
 [[nodiscard]] Api::SendAction prepareSendAction(
 		History *history, Api::SendOptions options);
@@ -199,6 +204,11 @@ QPointer<Ui::BoxContent> ShowDropMediaBox(
 	std::shared_ptr<QMimeData> data,
 	not_null<Data::Forum*> forum,
 	FnMut<void()> &&successCallback = nullptr);
+QPointer<Ui::BoxContent> ShowDropMediaBox(
+	not_null<Window::SessionNavigation*> navigation,
+	std::shared_ptr<QMimeData> data,
+	not_null<Data::SavedMessages*> monoforum,
+	FnMut<void()> &&successCallback = nullptr);
 
 QPointer<Ui::BoxContent> ShowSendNowMessagesBox(
 	not_null<Window::SessionNavigation*> navigation,
@@ -219,6 +229,7 @@ void HidePinnedBar(
 	not_null<Window::SessionNavigation*> navigation,
 	not_null<PeerData*> peer,
 	MsgId topicRootId,
+	PeerId monoforumPeerId,
 	Fn<void()> onHidden);
 void UnpinAllMessages(
 	not_null<Window::SessionNavigation*> navigation,

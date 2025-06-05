@@ -3325,7 +3325,7 @@ void ChatWidget::confirmDeleteSelected() {
 	ConfirmDeleteSelectedItems(_inner);
 }
 
-void ChatWidget::confirmForwardSelected() {
+void ChatWidget::confirmOldForwardSelected() {
 	ConfirmOldForwardSelectedItems(_inner);
 }
 

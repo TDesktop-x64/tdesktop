@@ -418,6 +418,10 @@ void TopBarWidget::toggleInfoSection() {
 					(_activeChat.key.topic()
 						? std::make_shared<Info::Memento>(
 							_activeChat.key.topic())
+						: (_activeChat.key.sublist()
+							&& _activeChat.key.sublist()->parentChat())
+						? std::make_shared<Info::Memento>(
+							_activeChat.key.sublist())
 						: Info::Memento::Default(_activeChat.key.peer())),
 					Window::SectionShow().withThirdColumn());
 			} else {
@@ -774,9 +778,7 @@ void TopBarWidget::infoClicked() {
 	} else if (const auto topic = key.topic()) {
 		_controller->showSection(std::make_shared<Info::Memento>(topic));
 	} else if (const auto sublist = key.sublist()) {
-		_controller->showSection(std::make_shared<Info::Memento>(
-			sublist,
-			Info::Section(Storage::SharedMediaType::Photo)));
+		_controller->showSection(std::make_shared<Info::Memento>(sublist));
 	} else if (key.peer()->savedSublistsInfo()) {
 		_controller->showSection(std::make_shared<Info::Memento>(
 			key.peer(),
@@ -1237,6 +1239,9 @@ void TopBarWidget::updateControlsVisibility() {
 			? true
 			: (section == Section::Replies)
 			? (_activeChat.key.topic() != nullptr)
+			: (section == Section::SavedSublist)
+			? (_activeChat.key.sublist() != nullptr
+				&& _activeChat.key.sublist()->parentChat())
 			: false);
 	updateSearchVisibility();
 	if (_searchMode) {

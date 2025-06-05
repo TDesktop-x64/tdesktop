@@ -2892,6 +2892,12 @@ void ChatWidget::showFinishedHook() {
 	// because after that the method showChildren() is called.
 	setupDragArea();
 	updatePinnedVisibility();
+
+	if (_topic) {
+		_topic->saveMeAsActiveSubsectionThread();
+	} else if (_sublist) {
+		_sublist->saveMeAsActiveSubsectionThread();
+	}
 }
 
 bool ChatWidget::floatPlayerHandleWheelEvent(QEvent *e) {

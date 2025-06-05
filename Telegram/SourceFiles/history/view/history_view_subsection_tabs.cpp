@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/history_view_subsection_tabs.h"
 
+#include "base/qt/qt_key_modifiers.h"
 #include "core/ui_integration.h"
 #include "data/stickers/data_custom_emoji.h"
 #include "data/data_channel.h"
@@ -35,6 +36,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/dynamic_image.h"
 #include "ui/dynamic_thumbnails.h"
 #include "window/window_peer_menu.h"
+#include "window/window_separate_id.h"
 #include "window/window_session_controller.h"
 #include "styles/style_chat.h"
 
@@ -209,13 +211,20 @@ void SubsectionTabs::setupSlider(
 		not_null<Ui::SubsectionSlider*> slider,
 		bool vertical) {
 	slider->sectionActivated() | rpl::start_with_next([=](int active) {
+		const auto newWindow = base::IsCtrlPressed();
 		if (active >= 0
 			&& active < _slice.size()
-			&& _active != _slice[active].thread) {
-			auto params = Window::SectionShow();
-			params.way = Window::SectionShow::Way::ClearStack;
-			params.animated = anim::type::instant;
-			_controller->showThread(_slice[active].thread, {}, params);
+			&& (newWindow || _active != _slice[active].thread)) {
+			const auto thread = _slice[active].thread;
+			if (newWindow) {
+				_controller->showInNewWindow(Window::SeparateId(thread));
+				_refreshed.fire({}); // This should activate current section.
+			} else {
+				auto params = Window::SectionShow();
+				params.way = Window::SectionShow::Way::ClearStack;
+				params.animated = anim::type::instant;
+				_controller->showThread(thread, ShowAtUnreadMsgId, params);
+			}
 		}
 	}, slider->lifetime());
 
@@ -241,45 +250,24 @@ void SubsectionTabs::setupSlider(
 			: scroll->scrollLeftMax();
 		const auto availableFrom = scrollValue;
 		const auto availableTill = (scrollMax - scrollValue);
-		if (scrollMax <= 3 * full && _afterAvailable > 0) {
+		const auto needMore = (scrollMax <= 3 * full && _afterAvailable > 0);
+		if (needMore) {
 			_beforeLimit *= 2;
 			_afterLimit *= 2;
 		}
-		const auto findMiddle = [&] {
-			Expects(!_slice.empty());
-
-			auto best = -1;
-			auto bestDistance = -1;
-			const auto ideal = scrollValue + (full / 2);
-			for (auto i = 0, count = int(_slice.size()); i != count; ++i) {
-				const auto a = slider->lookupSectionPosition(i);
-				const auto b = (i + 1 == count)
-					? (full + scrollMax)
-					: slider->lookupSectionPosition(i + 1);
-				const auto middle = (a + b) / 2;
-				const auto distance = std::abs(middle - ideal);
-				if (best < 0 || distance < bestDistance) {
-					best = i;
-					bestDistance = distance;
-				}
-			}
-
-			Ensures(best >= 0);
-			return best;
-		};
 		if (availableFrom < full
 			&& _beforeSkipped.value_or(0) > 0
 			&& !_slice.empty()) {
-			_around = _slice[findMiddle()].thread;
-			refreshSlice();
+			refreshAroundMiddle(scroll, slider);
 		} else if (availableTill < full) {
 			if (_afterAvailable > 0) {
-				_around = _slice[findMiddle()].thread;
-				refreshSlice();
+				refreshAroundMiddle(scroll, slider);
 			} else if (!_afterSkipped.has_value()) {
 				_loading = true;
 				loadMore();
 			}
+		} else if (needMore) {
+			refreshAroundMiddle(scroll, slider);
 		}
 	}, scroll->lifetime());
 
@@ -639,6 +627,41 @@ void SubsectionTabs::track() {
 	} else {
 		Unexpected("Peer in SubsectionTabs::track.");
 	}
+}
+
+void SubsectionTabs::refreshAroundMiddle(
+		not_null<Ui::ScrollArea*> scroll,
+		not_null<Ui::SubsectionSlider*> slider) {
+	Expects(!_slice.empty());
+
+	const auto full = _vertical ? scroll->height() : scroll->width();
+	const auto scrollValue = _vertical
+		? scroll->scrollTop()
+		: scroll->scrollLeft();
+	const auto scrollMax = _vertical
+		? scroll->scrollTopMax()
+		: scroll->scrollLeftMax();
+
+	auto best = -1;
+	auto bestDistance = -1;
+	const auto ideal = scrollValue + (full / 2);
+	for (auto i = 0, count = int(_slice.size()); i != count; ++i) {
+		const auto a = slider->lookupSectionPosition(i);
+		const auto b = (i + 1 == count)
+			? (full + scrollMax)
+			: slider->lookupSectionPosition(i + 1);
+		const auto middle = (a + b) / 2;
+		const auto distance = std::abs(middle - ideal);
+		if (best < 0 || distance < bestDistance) {
+			best = i;
+			bestDistance = distance;
+		}
+	}
+
+	Assert(best >= 0 && best < _slice.size());
+
+	_around = _slice[best].thread;
+	refreshSlice();
 }
 
 void SubsectionTabs::refreshSlice() {

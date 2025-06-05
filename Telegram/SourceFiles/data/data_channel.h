@@ -81,6 +81,7 @@ enum class ChannelDataFlag : uint64 {
 	AutoTranslation = (1ULL << 38),
 	Monoforum = (1ULL << 39),
 	MonoforumAdmin = (1ULL << 40),
+	MonoforumDisabled = (1ULL << 41),
 	ForumTabs = (1ULL << 41),
 };
 inline constexpr bool is_flag_type(ChannelDataFlag) { return true; };
@@ -433,6 +434,7 @@ public:
 
 	void setMonoforumLink(ChannelData *link);
 	[[nodiscard]] ChannelData *monoforumLink() const;
+	[[nodiscard]] bool monoforumDisabled() const;
 
 	void ptsInit(int32 pts) {
 		_ptsWaiter.init(pts);

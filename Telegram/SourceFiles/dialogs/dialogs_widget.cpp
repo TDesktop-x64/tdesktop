@@ -79,6 +79,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_changes.h"
 #include "data/data_download_manager.h"
 #include "data/data_chat_filters.h"
+#include "data/data_saved_messages.h"
 #include "data/data_saved_sublist.h"
 #include "data/data_stories.h"
 #include "info/downloads/info_downloads_widget.h"
@@ -874,7 +875,8 @@ void Widget::chosenRow(const ChosenRow &row) {
 		} else if (row.newWindow) {
 			controller()->showInNewWindow(Window::SeparateId(topicJump));
 		} else {
-			if (!controller()->adaptive().isOneColumn()) {
+			if (!controller()->adaptive().isOneColumn()
+				&& !topicJump->channel()->useSubsectionTabs()) {
 				controller()->showForum(
 					topicJump->forum(),
 					Window::SectionShow().withChildColumn());
@@ -921,7 +923,8 @@ void Widget::chosenRow(const ChosenRow &row) {
 		&& history->isForum()
 		&& !row.message.fullId
 		&& (!controller()->adaptive().isOneColumn()
-			|| !history->peer->forum()->channel()->viewForumAsMessages())) {
+			|| !history->peer->forum()->channel()->viewForumAsMessages()
+			|| history->peer->forum()->channel()->useSubsectionTabs())) {
 		const auto forum = history->peer->forum();
 		if (controller()->shownForum().current() == forum) {
 			controller()->closeForum();
@@ -933,12 +936,33 @@ void Widget::chosenRow(const ChosenRow &row) {
 		} else {
 			controller()->showForum(
 				forum,
-				Window::SectionShow().withChildColumn());
+				Window::SectionShow(
+					Window::SectionShow::Way::ClearStack).withChildColumn());
 			if (controller()->shownForum().current() == forum
 				&& forum->channel()->viewForumAsMessages()) {
 				controller()->showThread(
 					history,
 					ShowAtUnreadMsgId,
+					Window::SectionShow::Way::ClearStack);
+			}
+		}
+		return;
+	} else if (history
+		&& history->amMonoforumAdmin()
+		&& !row.message.fullId) {
+		const auto monoforum = history->peer->monoforum();
+		if (row.newWindow) {
+			controller()->showInNewWindow(
+				Window::SeparateId(Window::SeparateType::Chat, history));
+		} else {
+			if (const auto active = monoforum->activeSubsectionThread()) {
+				controller()->showThread(
+					active,
+					ShowAtUnreadMsgId,
+					Window::SectionShow::Way::ClearStack);
+			} else {
+				controller()->showPeerHistory(
+					history,
 					Window::SectionShow::Way::ClearStack);
 			}
 		}
@@ -3532,7 +3556,10 @@ bool Widget::applySearchState(SearchState state) {
 			showSearchInTopBar(anim::type::normal);
 		} else if (_layout == Layout::Main) {
 			_forumSearchRequested = true;
-			controller()->showForum(forum);
+			auto params = Window::SectionShow(
+				Window::SectionShow::Way::ClearStack);
+			params.forceTopicsList = true;
+			controller()->showForum(forum, params);
 		} else {
 			return false;
 		}
@@ -4361,6 +4388,19 @@ bool Widget::cancelSearch(CancelSearchOptions options) {
 		}
 	}
 	updateForceDisplayWide();
+	if (clearingInChat) {
+		if (const auto forum = controller()->shownForum().current()) {
+			if (forum->channel()->useSubsectionTabs()) {
+				const auto id = controller()->windowId();
+				const auto initial = id.forum();
+				if (!initial) {
+					controller()->closeForum();
+				} else if (initial != forum) {
+					controller()->showForum(initial);
+				}
+			}
+		}
+	}
 	return clearingQuery || clearingInChat || clearSearchFocus;
 }
 

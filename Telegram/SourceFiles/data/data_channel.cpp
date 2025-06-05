@@ -339,7 +339,18 @@ bool ChannelData::discussionLinkKnown() const {
 }
 
 void ChannelData::setMonoforumLink(ChannelData *link) {
-	if (_monoforumLink || !link) {
+	if (_monoforumLink) {
+		if (isBroadcast()) {
+			_monoforumLink->setMonoforumLink(link ? this : nullptr);
+		} else if (isMonoforum()) {
+			if (!link && !monoforumDisabled()) {
+				setFlags(flags() | Flag::MonoforumDisabled);
+			} else if (link && monoforumDisabled()) {
+				setFlags(flags() & ~Flag::MonoforumDisabled);
+			}
+		}
+		return;
+	} else if (!link) {
 		return;
 	}
 	_monoforumLink = link;
@@ -352,6 +363,10 @@ void ChannelData::setMonoforumLink(ChannelData *link) {
 
 ChannelData *ChannelData::monoforumLink() const {
 	return _monoforumLink;
+}
+
+bool ChannelData::monoforumDisabled() const {
+	return flags() & Flag::MonoforumDisabled;
 }
 
 void ChannelData::setMembersCount(int newMembersCount) {
@@ -411,8 +426,8 @@ void ChannelData::setPendingRequestsCount(
 }
 
 bool ChannelData::useSubsectionTabs() const {
-	return isForum()
-		&& (flags() & ChannelDataFlag::ForumTabs);
+	return amMonoforumAdmin()
+		|| (isForum() && (flags() & ChannelDataFlag::ForumTabs));
 }
 
 ChatRestrictionsInfo ChannelData::KickedRestrictedRights(

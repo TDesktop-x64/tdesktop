@@ -1577,6 +1577,9 @@ Data::RestrictionCheckResult PeerData::amRestricted(
 				: Result::Explicit())
 			: Result::Allowed();
 	} else if (const auto channel = asChannel()) {
+		if (channel->monoforumDisabled()) {
+			return Result::WithEveryone();
+		}
 		const auto defaultRestrictions = channel->defaultRestrictions()
 			| (channel->isPublic()
 				? (ChatRestriction::PinMessages

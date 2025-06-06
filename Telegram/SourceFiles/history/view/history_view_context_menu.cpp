@@ -866,6 +866,10 @@ void AddViewJSONAction(
 	const ContextMenuRequest& request,
 	not_null<ListWidget*> list) {
 	const auto item = request.item;
+	if (item == nullptr)
+	{
+		return;
+	}
 	if (!request.selectedItems.empty()) {
 		return;
 	}

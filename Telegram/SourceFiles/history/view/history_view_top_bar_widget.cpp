@@ -1269,6 +1269,9 @@ void TopBarWidget::updateControlsVisibility() {
 			return false;
 		}
 		if (const auto peer = _activeChat.key.peer()) {
+			if (peer->isMonoforum()) {
+				return false;
+			}
 			if (peer->isMegagroup() || peer->isChannel()) {
 				const auto channel = peer->asChannel();
 				if (channel->hasAdminRights() || channel->amCreator()) {
@@ -1284,9 +1287,13 @@ void TopBarWidget::updateControlsVisibility() {
 			return false;
 		}
 		if (const auto peer = _activeChat.key.peer()) {
+			if (peer->isMonoforum()) {
+				return false;
+			}
 			if (peer->isMegagroup()) {
 				return true;
-			} else if (peer->isChannel()) {
+			} 
+			if (peer->isChannel()) {
 				const auto channel = peer->asChannel();
 				if (channel->hasAdminRights() || channel->amCreator()) {
 					return true;

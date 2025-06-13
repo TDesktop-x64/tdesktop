@@ -3254,6 +3254,15 @@ void HistoryWidget::updateControlsVisibility() {
 	if (_sponsoredMessageBar && checkSponsoredMessageBarVisibility()) {
 		_sponsoredMessageBar->toggle(true, anim::type::normal);
 	}
+	if (_paysStatus) {
+		_paysStatus->show();
+	}
+	if (_contactStatus) {
+		_contactStatus->show();
+	}
+	if (_businessBotStatus) {
+		_businessBotStatus->show();
+	}
 	if (_subsectionTabs) {
 		_subsectionTabs->show();
 	}
@@ -4512,6 +4521,15 @@ void HistoryWidget::hideChildWidgets() {
 	}
 	if (_chooseTheme) {
 		_chooseTheme->hide();
+	}
+	if (_paysStatus) {
+		_paysStatus->hide();
+	}
+	if (_contactStatus) {
+		_contactStatus->hide();
+	}
+	if (_businessBotStatus) {
+		_businessBotStatus->hide();
 	}
 	hideChildren();
 }

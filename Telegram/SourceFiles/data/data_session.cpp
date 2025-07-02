@@ -1027,6 +1027,11 @@ not_null<PeerData*> Session::processChat(const MTPChat &data) {
 			= data.vsend_paid_messages_stars().has_value();
 		if (!hasStarsPerMessage) {
 			channel->setStarsPerMessage(0);
+			_commonStarsPerMessage.remove(channel);
+		} else if (const auto count = data.vsend_paid_messages_stars()->v) {
+			_commonStarsPerMessage[channel] = count;
+		} else {
+			_commonStarsPerMessage.remove(channel);
 		}
 		const auto storiesState = minimal
 			? std::optional<Data::Stories::PeerSourceState>()
@@ -5163,6 +5168,24 @@ void Session::sentFromScheduled(SentFromScheduled value) {
 
 rpl::producer<SentFromScheduled> Session::sentFromScheduled() const {
 	return _sentFromScheduled.events();
+}
+
+void Session::editStarsPerMessage(
+		not_null<ChannelData*> channel,
+		int count) {
+	// For admin it's zero, we're admin if we can edit it.
+	channel->setStarsPerMessage(0);
+	if (count) {
+		_commonStarsPerMessage[channel] = count;
+	} else {
+		_commonStarsPerMessage.remove(channel);
+	}
+}
+
+int Session::commonStarsPerMessage(
+		not_null<const ChannelData*> channel) const {
+	const auto i = _commonStarsPerMessage.find(channel);
+	return (i != end(_commonStarsPerMessage)) ? i->second : 0;
 }
 
 void Session::clearLocalStorage() {

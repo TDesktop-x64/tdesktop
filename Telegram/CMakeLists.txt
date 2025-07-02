@@ -347,6 +347,9 @@ PRIVATE
     boxes/transfer_gift_box.h
     boxes/translate_box.cpp
     boxes/translate_box.h
+    boxes/BaseTranslator.h
+    boxes/GoogleAppTranslator.h
+    boxes/GoogleAppTranslator.cpp
     boxes/url_auth_box.cpp
     boxes/url_auth_box.h
     boxes/username_box.cpp

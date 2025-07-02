@@ -657,6 +657,9 @@ historyPollOutChosenSelected: icon {{ "poll_select_check", historyFileOutIconFgS
 historyPollInChosen: icon {{ "poll_select_check", historyFileInIconFg }};
 historyPollInChosenSelected: icon {{ "poll_select_check", historyFileInIconFgSelected }};
 
+historyChecklistTaskPadding: margins(32px, 12px, 0px, 12px);
+historyChecklistCheckedTop: 4px;
+
 historyViewButtonHeight: 48px;
 historyViewButtonMargins: margins(10px, 5px, 10px, 10px);
 historyViewButtonTextStyle: semiboldTextStyle;
@@ -1052,6 +1055,27 @@ chatSimilarName: TextStyle(defaultTextStyle) {
 chatSimilarWidthMax: 424px;
 chatSimilarSkip: 12px;
 
+chatSuggestWidth: 236px;
+chatSuggestInfoWidth: 272px;
+chatSuggestInfoTitleMargin: margins(16px, 16px, 16px, 6px);
+chatSuggestInfoMiddleMargin: margins(16px, 4px, 16px, 4px);
+chatSuggestInfoLastMargin: margins(16px, 4px, 16px, 16px);
+chatSuggestTableMiddleMargin: margins(8px, 4px, 8px, 4px);
+chatSuggestTableLastMargin: margins(8px, 4px, 8px, 16px);
+chatSuggestInfoFullMargin: margins(16px, 16px, 16px, 16px);
+chatSuggestAcceptIcon: IconEmoji {
+	icon: icon{{ "chat/paid_approve", windowFg }};
+	padding: margins(0px, -2px, 0px, 0px);
+}
+chatSuggestDeclineIcon: IconEmoji {
+	icon: icon{{ "chat/paid_decline", windowFg }};
+	padding: margins(0px, -2px, 0px, 0px);
+}
+chatSuggestChangeIcon: IconEmoji {
+	icon: icon{{ "chat/paid_edit", windowFg }};
+	padding: margins(0px, -2px, 0px, 0px);
+}
+
 premiumRequiredWidth: 186px;
 premiumRequiredIcon: icon{{ "chat/large_lockedchat", msgServiceFg }};
 premiumRequiredCircle: 60px;
@@ -1342,4 +1366,48 @@ chatTabsOutlineHorizontal: ChatTabsOutline {
 }
 
 chatTabsOutlineVertical: ChatTabsOutline(chatTabsOutlineHorizontal) {
+}
+
+suggestPriceTonIconMargins: margins(0px, 2px, 0px, 0px);
+suggestPriceBox: Box(defaultBox) {
+	buttonPadding: margins(22px, 22px, 22px, 22px);
+	buttonHeight: 42px;
+	button: RoundButton(defaultActiveButton) {
+		height: 42px;
+		textTop: 12px;
+		style: semiboldTextStyle;
+	}
+	shadowIgnoreTopSkip: true;
+}
+suggestPriceEstimate: FlatLabel(defaultFlatLabel) {
+	textFg: windowSubTextFg;
+}
+suggestPriceEstimateTop: 12px;
+tonInput: InputField(defaultInputField) {
+	textBg: transparent;
+	textMargins: margins(0px, 7px, 0px, 7px);
+
+	placeholderFg: placeholderFg;
+	placeholderFgActive: placeholderFgActive;
+	placeholderFgError: placeholderFgActive;
+	placeholderMargins: margins(0px, 0px, 0px, 0px);
+	placeholderScale: 0.;
+	placeholderFont: boxTextFont;
+
+	heightMin: 34px;
+	heightMax: 100px;
+}
+starsFieldIconPosition: point(0px, 10px);
+tonFieldIconSize: 16px;
+tonFieldIconPosition: point(2px, 9px);
+
+suggestBarTonIconSize: 14px;
+suggestBarTonIconMargins: margins(0px, 3px, 0px, 0px);
+
+lowTonIconPadding: margins(12px, 20px, 12px, 0px);
+lowTonTitlePadding: margins(0px, 12px, 0px, 12px);
+lowTonTextPadding: margins(0px, 0px, 0px, 8px);
+lowTonText: FlatLabel(defaultFlatLabel) {
+	minWidth: 100px;
+	align: align(top);
 }

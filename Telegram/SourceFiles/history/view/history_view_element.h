@@ -309,7 +309,11 @@ private:
 // Any HistoryView::Element can have this Component for
 // displaying some text in layout of a service message above the message.
 struct ServicePreMessage : RuntimeComponent<ServicePreMessage, Element> {
-	void init(PreparedServiceText string);
+	void init(
+		not_null<Element*> view,
+		PreparedServiceText string,
+		ClickHandlerPtr fullClickHandler,
+		std::unique_ptr<Media> media = nullptr);
 
 	int resizeToWidth(int newWidth, ElementChatMode mode);
 
@@ -323,7 +327,9 @@ struct ServicePreMessage : RuntimeComponent<ServicePreMessage, Element> {
 		const StateRequest &request,
 		QRect g) const;
 
+	std::unique_ptr<Media> media;
 	Ui::Text::String text;
+	ClickHandlerPtr handler;
 	int width = 0;
 	int height = 0;
 
@@ -456,7 +462,10 @@ public:
 
 	// For blocks context this should be called only from recountDisplayDate().
 	void setDisplayDate(bool displayDate);
-	void setServicePreMessage(PreparedServiceText text);
+	void setServicePreMessage(
+		PreparedServiceText text,
+		ClickHandlerPtr fullClickHandler = nullptr,
+		std::unique_ptr<Media> media = nullptr);
 
 	bool computeIsAttachToPrevious(not_null<Element*> previous);
 

@@ -46,6 +46,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_document.h"
 #include "data/data_histories.h"
 #include "data/data_history_messages.h"
+#include "data/data_todo_list.h"
 #include "lang/lang_keys.h"
 #include "apiwrap.h"
 #include "api/api_chat_participants.h"
@@ -238,6 +239,9 @@ void History::createLocalDraftFromCloud(
 
 	draft->reply.topicRootId = topicRootId;
 	draft->reply.monoforumPeerId = monoforumPeerId;
+	if (!suggestDraftAllowed()) {
+		draft->suggest = SuggestPostOptions();
+	}
 	auto existing = localDraft(topicRootId, monoforumPeerId);
 	if (Data::DraftIsNull(existing)
 		|| !existing->date
@@ -246,12 +250,14 @@ void History::createLocalDraftFromCloud(
 			setLocalDraft(std::make_unique<Data::Draft>(
 				draft->textWithTags,
 				draft->reply,
+				draft->suggest,
 				draft->cursor,
 				draft->webpage));
 			existing = localDraft(topicRootId, monoforumPeerId);
 		} else if (existing != draft) {
 			existing->textWithTags = draft->textWithTags;
 			existing->reply = draft->reply;
+			existing->suggest = draft->suggest;
 			existing->cursor = draft->cursor;
 			existing->webpage = draft->webpage;
 		}
@@ -324,6 +330,7 @@ Data::Draft *History::createCloudDraft(
 				.topicRootId = topicRootId,
 				.monoforumPeerId = monoforumPeerId,
 			},
+			SuggestPostOptions(),
 			MessageCursor(),
 			Data::WebPageDraft()));
 		cloudDraft(topicRootId, monoforumPeerId)->date = TimeId(0);
@@ -336,18 +343,23 @@ Data::Draft *History::createCloudDraft(
 			setCloudDraft(std::make_unique<Data::Draft>(
 				fromDraft->textWithTags,
 				reply,
+				fromDraft->suggest,
 				fromDraft->cursor,
 				fromDraft->webpage));
 			existing = cloudDraft(topicRootId, monoforumPeerId);
 		} else if (existing != fromDraft) {
 			existing->textWithTags = fromDraft->textWithTags;
 			existing->reply = fromDraft->reply;
+			existing->suggest = fromDraft->suggest;
 			existing->cursor = fromDraft->cursor;
 			existing->webpage = fromDraft->webpage;
 		}
 		existing->date = base::unixtime::now();
 		existing->reply.topicRootId = topicRootId;
 		existing->reply.monoforumPeerId = monoforumPeerId;
+		if (!suggestDraftAllowed()) {
+			existing->suggest = SuggestPostOptions();
+		}
 	}
 
 	if (const auto thread = threadFor(topicRootId, monoforumPeerId)) {
@@ -1368,6 +1380,28 @@ void History::applyServiceChanges(
 				Core::App().calls().showConferenceInvite(user, item->id);
 			}
 		}
+	}, [&](const MTPDmessageActionTodoCompletions &data) {
+		if (const auto done = item->Get<HistoryServiceTodoCompletions>()) {
+			const auto list = done->msg
+				? done->msg
+				: owner().message(peer, done->msgId);
+			if (const auto media = list ? list->media() : nullptr) {
+				if (const auto todolist = media->todolist()) {
+					todolist->apply(item, data);
+				}
+			}
+		}
+	}, [&](const MTPDmessageActionTodoAppendTasks &data) {
+		if (const auto done = item->Get<HistoryServiceTodoCompletions>()) {
+			const auto list = done->msg
+				? done->msg
+				: owner().message(peer, done->msgId);
+			if (const auto media = list ? list->media() : nullptr) {
+				if (const auto todolist = media->todolist()) {
+					todolist->apply(data);
+				}
+			}
+		}
 	}, [](const auto &) {
 	});
 }
@@ -2373,7 +2407,7 @@ Dialogs::UnreadState History::chatListUnreadState() const {
 		return AdjustedForumUnreadState(forum->topicsList()->unreadState());
 	} else if (const auto monoforum = peer->monoforum()) {
 		return AdjustedForumUnreadState(
-			monoforum->chatsList()->unreadState());
+			monoforum->unreadStateWithParentMuted());
 	}
 	return computeUnreadState();
 }
@@ -2388,9 +2422,9 @@ Dialogs::BadgesState History::chatListBadgesState() const {
 	} else if (const auto monoforum = peer->monoforum()) {
 		return adjustBadgesStateByFolder(
 			Dialogs::BadgesForUnread(
-				monoforum->chatsList()->unreadState(),
+				monoforum->unreadStateWithParentMuted(),
 				Dialogs::CountInBadge::Chats,
-				Dialogs::IncludeInBadge::UnmutedOrAll));
+				Dialogs::IncludeInBadge::All));
 	}
 	return computeBadgesState();
 }
@@ -3388,6 +3422,10 @@ void History::monoforumChanged(Data::SavedMessages *old) {
 
 bool History::amMonoforumAdmin() const {
 	return (_flags & Flag::IsMonoforumAdmin);
+}
+
+bool History::suggestDraftAllowed() const {
+	return peer->isMonoforum() && !peer->amMonoforumAdmin();
 }
 
 not_null<History*> History::migrateToOrMe() const {

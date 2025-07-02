@@ -1228,7 +1228,8 @@ void Updates::applyUpdatesNoPtsCheck(const MTPUpdates &updates) {
 				MTPlong(), // effect
 				MTPFactCheck(),
 				MTPint(), // report_delivery_until_date
-				MTPlong()), // paid_message_stars
+				MTPlong(), // paid_message_stars
+				MTPSuggestedPost()),
 			MessageFlags(),
 			NewMessageType::Unread);
 	} break;
@@ -1267,7 +1268,8 @@ void Updates::applyUpdatesNoPtsCheck(const MTPUpdates &updates) {
 				MTPlong(), // effect
 				MTPFactCheck(),
 				MTPint(), // report_delivery_until_date
-				MTPlong()), // paid_message_stars
+				MTPlong(), // paid_message_stars
+				MTPSuggestedPost()),
 			MessageFlags(),
 			NewMessageType::Unread);
 	} break;
@@ -1916,7 +1918,7 @@ void Updates::feedUpdate(const MTPUpdate &update) {
 
 		// Update web page anyway.
 		session().data().processWebpage(d.vwebpage());
-		session().data().sendWebPageGamePollNotifications();
+		session().data().sendWebPageGamePollTodoListNotifications();
 
 		updateAndApply(d.vpts().v, d.vpts_count().v, update);
 	} break;
@@ -1926,7 +1928,7 @@ void Updates::feedUpdate(const MTPUpdate &update) {
 
 		// Update web page anyway.
 		session().data().processWebpage(d.vwebpage());
-		session().data().sendWebPageGamePollNotifications();
+		session().data().sendWebPageGamePollTodoListNotifications();
 
 		auto channel = session().data().channelLoaded(d.vchannel_id());
 		if (channel && !_handlingChannelDifference) {

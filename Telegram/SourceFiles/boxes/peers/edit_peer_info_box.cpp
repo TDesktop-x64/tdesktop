@@ -185,10 +185,7 @@ void SaveDefaultRestrictions(
 	const auto requestId = api->request(
 		MTPmessages_EditChatDefaultBannedRights(
 			peer->input,
-			MTP_chatBannedRights(
-				MTP_flags(
-					MTPDchatBannedRights::Flags::from_raw(uint32(rights))),
-				MTP_int(0)))
+			RestrictionsToMTP({ rights, 0 }))
 	).done([=](const MTPUpdates &result) {
 		api->clearModifyRequest(key);
 		api->applyUpdates(result);
@@ -1101,8 +1098,8 @@ void Controller::fillDirectMessagesButton() {
 			: rpl::single(Ui::Text::IconEmoji(
 				&st::starIconEmojiColored
 			).append(' ').append(
-				Lang::FormatStarsAmountDecimal(
-					StarsAmount{ starsPerMessage })));
+				Lang::FormatCreditsAmountDecimal(
+					CreditsAmount{ starsPerMessage })));
 	}) | rpl::flatten_latest();
 	AddButtonWithText(
 		_controls.buttonsLayout,
@@ -1858,9 +1855,8 @@ void Controller::fillBotCurrencyButton() {
 
 	auto &lifetime = _controls.buttonsLayout->lifetime();
 	const auto state = lifetime.make_state<State>();
-	const auto format = [=](uint64 balance) {
-		return Info::ChannelEarn::MajorPart(balance)
-			+ Info::ChannelEarn::MinorPart(balance);
+	const auto format = [=](const CreditsAmount &balance) {
+		return Lang::FormatCreditsAmountDecimal(balance);
 	};
 	const auto was = _peer->session().credits().balanceCurrency(
 		_peer->id);
@@ -1924,7 +1920,7 @@ void Controller::fillBotCreditsButton() {
 	auto &lifetime = _controls.buttonsLayout->lifetime();
 	const auto state = lifetime.make_state<State>();
 	if (const auto balance = _peer->session().credits().balance(_peer->id)) {
-		state->balance = Lang::FormatStarsAmountDecimal(balance);
+		state->balance = Lang::FormatCreditsAmountDecimal(balance);
 	}
 
 	const auto wrap = _controls.buttonsLayout->add(
@@ -1949,7 +1945,7 @@ void Controller::fillBotCreditsButton() {
 			if (data.balance) {
 				wrap->toggle(true, anim::type::normal);
 			}
-			state->balance = Lang::FormatStarsAmountDecimal(data.balance);
+			state->balance = Lang::FormatCreditsAmountDecimal(data.balance);
 		});
 	}
 	{

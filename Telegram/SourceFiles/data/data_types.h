@@ -128,6 +128,7 @@ struct WebPageData;
 struct GameData;
 struct BotAppData;
 struct PollData;
+struct TodoListData;
 
 using PhotoId = uint64;
 using VideoId = uint64;
@@ -136,6 +137,7 @@ using DocumentId = uint64;
 using WebPageId = uint64;
 using GameId = uint64;
 using PollId = uint64;
+using TodoListId = FullMsgId;
 using WallPaperId = uint64;
 using CallId = uint64;
 using BotAppId = uint64;
@@ -351,6 +353,9 @@ enum class MessageFlag : uint64 {
 	ReactionsAllowed      = (1ULL << 50),
 
 	HideDisplayDate       = (1ULL << 51),
+
+	StarsPaidSuggested    = (1ULL << 52),
+	TonPaidSuggested      = (1ULL << 53),
 };
 inline constexpr bool is_flag_type(MessageFlag) { return true; }
 using MessageFlags = base::flags<MessageFlag>;

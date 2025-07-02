@@ -24,6 +24,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_session.h"
 #include "data/data_stories.h"
 #include "data/data_user.h"
+#include "history/view/controls/history_view_suggest_options.h"
 #include "history/history.h"
 #include "history/history_item_components.h"
 #include "main/main_account.h"
@@ -189,20 +190,27 @@ Data::SendErrorWithThread GetErrorForSending(
 std::optional<SendPaymentDetails> ComputePaymentDetails(
 		not_null<PeerData*> peer,
 		int messagesCount) {
-	if (const auto user = peer->asUser()) {
-		if (user->hasStarsPerMessage()
-			&& !user->messageMoneyRestrictionsKnown()) {
-			user->updateFull();
-			return {};
-		}
-	} else if (const auto channel = peer->asChannel()) {
-		if (!channel->isFullLoaded()) {
-			channel->updateFull();
-			return {};
-		}
+	const auto user = peer->asUser();
+	const auto channel = user ? nullptr : peer->asChannel();
+	const auto has = (user && user->hasStarsPerMessage())
+		|| (channel && channel->hasStarsPerMessage());
+	if (!has) {
+		return SendPaymentDetails();
 	}
-	if (!peer->session().credits().loaded()) {
+
+	const auto known1 = peer->session().credits().loaded();
+	if (!known1) {
 		peer->session().credits().load();
+	}
+
+	const auto known2 = user
+		? user->messageMoneyRestrictionsKnown()
+		: channel->starsPerMessageKnown();
+	if (!known2) {
+		peer->updateFull();
+	}
+
+	if (!known1 || !known2) {
 		return {};
 	} else if (const auto perMessage = peer->starsPerMessageChecked()) {
 		return SendPaymentDetails{
@@ -211,6 +219,21 @@ std::optional<SendPaymentDetails> ComputePaymentDetails(
 		};
 	}
 	return SendPaymentDetails();
+}
+
+bool SuggestPaymentDataReady(
+		not_null<PeerData*> peer,
+		SuggestPostOptions suggest) {
+	if (!suggest.exists || !suggest.price() || peer->amMonoforumAdmin()) {
+		return true;
+	} else if (suggest.ton && !peer->session().credits().tonLoaded()) {
+		peer->session().credits().tonLoad();
+		return false;
+	} else if (!suggest.ton && !peer->session().credits().loaded()) {
+		peer->session().credits().load();
+		return false;
+	}
+	return true;
 }
 
 object_ptr<Ui::BoxContent> MakeSendErrorBox(
@@ -250,13 +273,15 @@ void ShowSendPaidConfirm(
 		not_null<PeerData*> peer,
 		SendPaymentDetails details,
 		Fn<void()> confirmed,
-		PaidConfirmStyles styles) {
+		PaidConfirmStyles styles,
+		int suggestStarsPrice) {
 	return ShowSendPaidConfirm(
 		navigation->uiShow(),
 		peer,
 		details,
 		confirmed,
-		styles);
+		styles,
+		suggestStarsPrice);
 }
 
 void ShowSendPaidConfirm(
@@ -264,13 +289,15 @@ void ShowSendPaidConfirm(
 		not_null<PeerData*> peer,
 		SendPaymentDetails details,
 		Fn<void()> confirmed,
-		PaidConfirmStyles styles) {
+		PaidConfirmStyles styles,
+		int suggestStarsPrice) {
 	ShowSendPaidConfirm(
 		std::move(show),
 		std::vector<not_null<PeerData*>>{ peer },
 		details,
 		confirmed,
-		styles);
+		styles,
+		suggestStarsPrice);
 }
 
 void ShowSendPaidConfirm(
@@ -278,7 +305,8 @@ void ShowSendPaidConfirm(
 		const std::vector<not_null<PeerData*>> &peers,
 		SendPaymentDetails details,
 		Fn<void()> confirmed,
-		PaidConfirmStyles styles) {
+		PaidConfirmStyles styles,
+		int suggestStarsPrice) {
 	Expects(!peers.empty());
 
 	const auto singlePeer = (peers.size() > 1)
@@ -286,7 +314,7 @@ void ShowSendPaidConfirm(
 		: peers.front().get();
 	const auto singlePeerId = singlePeer ? singlePeer->id : PeerId();
 	const auto check = [=] {
-		const auto required = details.stars;
+		const auto required = details.stars + suggestStarsPrice;
 		if (!required) {
 			return;
 		}
@@ -296,10 +324,13 @@ void ShowSendPaidConfirm(
 				confirmed();
 			}
 		};
-		Settings::MaybeRequestBalanceIncrease(
+		using namespace Settings;
+		MaybeRequestBalanceIncrease(
 			show,
 			required,
-			Settings::SmallBalanceForMessage{ .recipientId = singlePeerId },
+			(suggestStarsPrice
+				? SmallBalanceSource(SmallBalanceForSuggest{ singlePeerId })
+				: SmallBalanceForMessage{ singlePeerId }),
 			done);
 	};
 	auto usersOnly = true;
@@ -388,15 +419,15 @@ void ShowSendPaidConfirm(
 bool SendPaymentHelper::check(
 		not_null<Window::SessionNavigation*> navigation,
 		not_null<PeerData*> peer,
+		Api::SendOptions options,
 		int messagesCount,
-		int starsApproved,
 		Fn<void(int)> resend,
 		PaidConfirmStyles styles) {
 	return check(
 		navigation->uiShow(),
 		peer,
+		options,
 		messagesCount,
-		starsApproved,
 		std::move(resend),
 		styles);
 }
@@ -404,18 +435,41 @@ bool SendPaymentHelper::check(
 bool SendPaymentHelper::check(
 		std::shared_ptr<Main::SessionShow> show,
 		not_null<PeerData*> peer,
+		Api::SendOptions options,
 		int messagesCount,
-		int starsApproved,
 		Fn<void(int)> resend,
 		PaidConfirmStyles styles) {
 	clear();
 
+	const auto admin = peer->amMonoforumAdmin();
+	const auto suggest = options.suggest;
+	const auto starsApproved = options.starsApproved;
+	const auto checkSuggestPriceStars = (admin || suggest.ton)
+		? 0
+		: int(base::SafeRound(suggest.price().value()));
+	const auto checkSuggestPriceTon = (!admin && suggest.ton)
+		? suggest.price()
+		: CreditsAmount();
 	const auto details = ComputePaymentDetails(peer, messagesCount);
-	if (!details) {
+	const auto suggestDetails = SuggestPaymentDataReady(peer, suggest);
+	if (!details || !suggestDetails) {
 		_resend = [=] { resend(starsApproved); };
 
-		if (!peer->session().credits().loaded()) {
+		if ((!details || !suggest.ton)
+			&& !peer->session().credits().loaded()) {
 			peer->session().credits().loadedValue(
+			) | rpl::filter(
+				rpl::mappers::_1
+			) | rpl::take(1) | rpl::start_with_next([=] {
+				if (const auto callback = base::take(_resend)) {
+					callback();
+				}
+			}, _lifetime);
+		}
+
+		if ((!suggestDetails && suggest.ton)
+			&& !peer->session().credits().tonLoaded()) {
+			peer->session().credits().tonLoadedValue(
 			) | rpl::filter(
 				rpl::mappers::_1
 			) | rpl::take(1) | rpl::start_with_next([=] {
@@ -438,7 +492,33 @@ bool SendPaymentHelper::check(
 	} else if (const auto stars = details->stars; stars > starsApproved) {
 		ShowSendPaidConfirm(show, peer, *details, [=] {
 			resend(stars);
-		}, styles);
+		}, styles, checkSuggestPriceStars);
+		return false;
+	} else if (checkSuggestPriceStars
+		&& (CreditsAmount(details->stars + checkSuggestPriceStars)
+			> peer->session().credits().balance())) {
+		using namespace Settings;
+		const auto broadcast = peer->monoforumBroadcast();
+		const auto broadcastId = (broadcast ? broadcast : peer)->id;
+		const auto forMessages = details->stars;
+		const auto required = forMessages + checkSuggestPriceStars;
+		const auto done = [=](SmallBalanceResult result) {
+			if (result == SmallBalanceResult::Success
+				|| result == SmallBalanceResult::Already) {
+				resend(forMessages);
+			}
+		};
+		MaybeRequestBalanceIncrease(
+			show,
+			required,
+			SmallBalanceForSuggest{ broadcastId },
+			done);
+		return false;
+	}
+	if (checkSuggestPriceTon
+		&& checkSuggestPriceTon > peer->session().credits().tonBalance()) {
+		using namespace HistoryView;
+		show->show(Box(InsufficientTonBox, peer, checkSuggestPriceTon));
 		return false;
 	}
 	return true;
@@ -762,6 +842,11 @@ MessageFlags FlagsFromMTP(
 		| ((flags & MTP::f_invert_media) ? Flag::InvertMedia : Flag())
 		| ((flags & MTP::f_video_processing_pending)
 			? Flag::EstimatedDate
+			: Flag())
+		| ((flags & MTP::f_paid_suggested_post_ton)
+			? Flag::TonPaidSuggested
+			: (flags & MTP::f_paid_suggested_post_stars)
+			? Flag::StarsPaidSuggested
 			: Flag());
 }
 
@@ -896,6 +981,8 @@ MediaCheckResult CheckMessageMedia(const MTPMessageMedia &media) {
 	}, [](const MTPDmessageMediaInvoice &) {
 		return Result::Good;
 	}, [](const MTPDmessageMediaPoll &) {
+		return Result::Good;
+	}, [](const MTPDmessageMediaToDo &) {
 		return Result::Good;
 	}, [](const MTPDmessageMediaDice &) {
 		return Result::Good;

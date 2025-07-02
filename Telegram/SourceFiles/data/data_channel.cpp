@@ -665,45 +665,38 @@ void ChannelData::setAvailableMinId(MsgId availableMinId) {
 }
 
 bool ChannelData::canBanMembers() const {
-	return amCreator()
-		|| (adminRights() & AdminRight::BanUsers);
+	return amCreator() || (adminRights() & AdminRight::BanUsers);
 }
 
 bool ChannelData::canPostMessages() const {
-	return amCreator()
-		|| (adminRights() & AdminRight::PostMessages);
+	return amCreator() || (adminRights() & AdminRight::PostMessages);
 }
 
 bool ChannelData::canEditMessages() const {
-	return amCreator()
-		|| (adminRights() & AdminRight::EditMessages);
+	return amCreator() || (adminRights() & AdminRight::EditMessages);
 }
 
 bool ChannelData::canDeleteMessages() const {
-	return amCreator()
-		|| (adminRights() & AdminRight::DeleteMessages);
+	return amCreator() || (adminRights() & AdminRight::DeleteMessages);
 }
 
 bool ChannelData::canPostStories() const {
-	return amCreator()
-		|| (adminRights() & AdminRight::PostStories);
+	return amCreator() || (adminRights() & AdminRight::PostStories);
 }
 
 bool ChannelData::canEditStories() const {
 	if (isMonoforum()) {
 		return false;
 	}
-	return amCreator()
-		|| (adminRights() & AdminRight::EditStories);
+	return amCreator() || (adminRights() & AdminRight::EditStories);
 }
 
 bool ChannelData::canDeleteStories() const {
-	return amCreator()
-		|| (adminRights() & AdminRight::DeleteStories);
+	return amCreator() || (adminRights() & AdminRight::DeleteStories);
 }
 
 bool ChannelData::canAccessMonoforum() const {
-	return canPostMessages();
+	return amCreator() || (adminRights() & AdminRight::ManageDirect);
 }
 
 bool ChannelData::canPostPaidMedia() const {
@@ -727,8 +720,7 @@ bool ChannelData::canAddMembers() const {
 }
 
 bool ChannelData::canAddAdmins() const {
-	return amCreator()
-		|| (adminRights() & AdminRight::AddAdmins);
+	return amCreator() || (adminRights() & AdminRight::AddAdmins);
 }
 
 bool ChannelData::allowsForwarding() const {
@@ -1277,6 +1269,8 @@ void ApplyChannelUpdate(
 	}
 
 	channel->setMessagesTTL(update.vttl_period().value_or_empty());
+	channel->setStarsPerMessage(
+		update.vsend_paid_messages_stars().value_or_empty());
 	using Flag = ChannelDataFlag;
 	const auto mask = Flag::CanSetUsername
 		| Flag::CanViewParticipants
@@ -1291,7 +1285,9 @@ void ApplyChannelUpdate(
 		| Flag::PaidMediaAllowed
 		| Flag::CanViewCreditsRevenue
 		| Flag::StargiftsAvailable
-		| Flag::PaidMessagesAvailable;
+		| Flag::PaidMessagesAvailable
+		| Flag::HasStarsPerMessage
+		| Flag::StarsPerMessageKnown;
 	channel->setFlags((channel->flags() & ~mask)
 		| (update.is_can_set_username() ? Flag::CanSetUsername : Flag())
 		| (update.is_can_view_participants()
@@ -1318,7 +1314,9 @@ void ApplyChannelUpdate(
 			: Flag())
 		| (update.is_paid_messages_available()
 			? Flag::PaidMessagesAvailable
-			: Flag()));
+			: Flag())
+		| (channel->starsPerMessage() ? Flag::HasStarsPerMessage : Flag())
+		| Flag::StarsPerMessageKnown);
 	channel->setUserpicPhoto(update.vchat_photo());
 	if (const auto migratedFrom = update.vmigrated_from_chat_id()) {
 		channel->addFlags(Flag::Megagroup);
@@ -1493,14 +1491,16 @@ void ApplyChannelUpdate(
 		const auto currencyLoadLifetime = std::make_shared<rpl::lifetime>();
 		const auto currencyLoad
 			= currencyLoadLifetime->make_state<Api::EarnStatistics>(channel);
-		const auto apply = [=](Data::EarnInt balance) {
+		const auto apply = [=](const CreditsAmount &balance) {
 			if (const auto strong = weak.get()) {
 				strong->credits().applyCurrency(id, balance);
 			}
 			currencyLoadLifetime->destroy();
 		};
 		currencyLoad->request() | rpl::start_with_error_done(
-			[=](const QString &error) { apply(0); },
+			[=](const QString &error) {
+				apply(CreditsAmount(0, CreditsType::Ton));
+			},
 			[=] { apply(currencyLoad->data().currentBalance); },
 			*currencyLoadLifetime);
 		base::timer_once(kTimeout) | rpl::start_with_next([=] {

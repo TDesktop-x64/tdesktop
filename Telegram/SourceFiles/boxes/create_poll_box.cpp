@@ -114,7 +114,7 @@ private:
 		void setPlaceholder() const;
 		void removePlaceholder() const;
 
-		not_null<Ui::InputField*> field() const;
+		[[nodiscard]] not_null<Ui::InputField*> field() const;
 
 		[[nodiscard]] PollAnswer toPollAnswer(int index) const;
 

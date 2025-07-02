@@ -431,7 +431,7 @@ void MainWindow::createGlobalMenu() {
 			u"64Gram"_q),
 		[=] {
 			ensureWindowShown();
-			controller().show(Box<AboutBox>());
+			controller().show(Box(AboutBox));
 		});
 
 	about->setMenuRole(QAction::AboutQtRole);

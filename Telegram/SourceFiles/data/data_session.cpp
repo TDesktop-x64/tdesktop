@@ -75,6 +75,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_premium_limits.h"
 #include "data/data_forum.h"
 #include "data/data_forum_topic.h"
+#include "data/data_todo_list.h"
 #include "base/platform/base_platform_info.h"
 #include "base/unixtime.h"
 #include "base/call_delayed.h"
@@ -1019,7 +1020,14 @@ not_null<PeerData*> Session::processChat(const MTPChat &data) {
 				? Flag::StoriesHidden
 				: Flag())
 			| Flag::AutoTranslation
-			| Flag::Monoforum;
+			| Flag::Monoforum
+			| Flag::HasStarsPerMessage
+			| Flag::StarsPerMessageKnown;
+		const auto hasStarsPerMessage
+			= data.vsend_paid_messages_stars().has_value();
+		if (!hasStarsPerMessage) {
+			channel->setStarsPerMessage(0);
+		}
 		const auto storiesState = minimal
 			? std::optional<Data::Stories::PeerSourceState>()
 			: data.is_stories_unavailable()
@@ -1061,7 +1069,13 @@ not_null<PeerData*> Session::processChat(const MTPChat &data) {
 				? Flag::StoriesHidden
 				: Flag())
 			| (data.is_autotranslation() ? Flag::AutoTranslation : Flag())
-			| (data.is_monoforum() ? Flag::Monoforum : Flag());
+			| (data.is_monoforum() ? Flag::Monoforum : Flag())
+			| (hasStarsPerMessage
+				? (Flag::HasStarsPerMessage
+					| (channel->starsPerMessageKnown()
+						? Flag::StarsPerMessageKnown
+						: Flag()))
+				: Flag::StarsPerMessageKnown);
 		channel->setFlags((channel->flags() & ~flagsMask) | flagsSet);
 		channel->setBotVerifyDetailsIcon(
 			data.vbot_verification_icon().value_or_empty());
@@ -1074,18 +1088,9 @@ not_null<PeerData*> Session::processChat(const MTPChat &data) {
 		}
 
 		channel->setPhoto(data.vphoto());
-		channel->setStarsPerMessage(
-			data.vsend_paid_messages_stars().value_or_empty());
-
-		if (const auto monoforum = data.vlinked_monoforum_id()) {
-			if (const auto linked = channelLoaded(monoforum->v)) {
-				channel->setMonoforumLink(linked);
-			} else {
-				channel->updateFull();
-			}
-		} else {
-			channel->setMonoforumLink(nullptr);
-		}
+		applyMonoforumLinkedId(
+			channel,
+			data.vlinked_monoforum_id().value_or_empty());
 
 		if (wasInChannel != channel->amIn()) {
 			flags |= UpdateFlag::ChannelAmIn;
@@ -1169,10 +1174,36 @@ UserData *Session::processUsers(const MTPVector<MTPUser> &data) {
 
 PeerData *Session::processChats(const MTPVector<MTPChat> &data) {
 	auto result = (PeerData*)nullptr;
+	_postponedMonoforumLinkedIds.emplace();
 	for (const auto &chat : data.v) {
 		result = processChat(chat);
 	}
+	const auto ids = base::take(_postponedMonoforumLinkedIds);
+	for (const auto &[channel, linkedId] : *ids) {
+		applyMonoforumLinkedId(channel, linkedId);
+	}
 	return result;
+}
+
+void Session::applyMonoforumLinkedId(
+		not_null<ChannelData*> channel,
+		ChannelId linkedId) {
+	if (!linkedId) {
+		channel->setMonoforumLink(nullptr);
+	} else if (_postponedMonoforumLinkedIds) {
+		_postponedMonoforumLinkedIds->emplace(channel, linkedId);
+	} else {
+		const auto loaded = channel->isLoaded();
+		const auto linked = this->channel(linkedId);
+		const auto good = loaded
+			? linked->isLoaded()
+			: linked->isMinimalLoaded();
+		if (good) {
+			channel->setMonoforumLink(linked);
+		} else {
+			channel->updateFull();
+		}
+	}
 }
 
 void Session::applyMaximumChatVersions(const MTPVector<MTPChat> &data) {
@@ -1732,6 +1763,16 @@ void Session::requestDocumentViewRepaint(
 
 void Session::requestPollViewRepaint(not_null<const PollData*> poll) {
 	if (const auto i = _pollViews.find(poll); i != _pollViews.end()) {
+		for (const auto &view : i->second) {
+			requestViewResize(view);
+		}
+	}
+}
+
+void Session::requestTodoListViewRepaint(
+		not_null<const TodoListData*> todolist) {
+	if (const auto i = _todoListViews.find(todolist)
+		; i != _todoListViews.end()) {
 		for (const auto &view : i->second) {
 			requestViewResize(view);
 		}
@@ -4126,6 +4167,49 @@ not_null<PollData*> Session::processPoll(const MTPDmessageMediaPoll &data) {
 	return result;
 }
 
+not_null<TodoListData*> Session::todoList(TodoListId id) {
+	auto i = _todoLists.find(id);
+	if (i == _todoLists.cend()) {
+		i = _todoLists.emplace(
+			id,
+			std::make_unique<TodoListData>(this, id)).first;
+	}
+	return i->second.get();
+}
+
+not_null<TodoListData*> Session::processTodoList(
+		TodoListId id,
+		const MTPTodoList &todolist) {
+	const auto &data = todolist.data();
+	const auto result = todoList(id);
+	const auto changed = result->applyChanges(data);
+	if (changed) {
+		notifyTodoListUpdateDelayed(result);
+	}
+	return result;
+}
+
+not_null<TodoListData*> Session::processTodoList(
+		TodoListId id,
+		const MTPDmessageMediaToDo &data) {
+	const auto result = processTodoList(id, data.vtodo());
+	const auto changed = result->applyCompletions(data.vcompletions());
+	if (changed) {
+		notifyTodoListUpdateDelayed(result);
+	}
+	return result;
+}
+
+not_null<TodoListData*> Session::duplicateTodoList(
+		TodoListId id,
+		not_null<TodoListData*> existing) {
+	const auto result = todoList(id);
+	result->title = existing->title;
+	result->items = existing->items;
+	++result->version;
+	return result;
+}
+
 void Session::checkPollsClosings() {
 	const auto now = base::unixtime::now();
 	auto closest = 0;
@@ -4336,6 +4420,24 @@ void Session::unregisterPollView(
 	}
 }
 
+void Session::registerTodoListView(
+		not_null<const TodoListData*> todolist,
+		not_null<ViewElement*> view) {
+	_todoListViews[todolist].insert(view);
+}
+
+void Session::unregisterTodoListView(
+		not_null<const TodoListData*> todolist,
+		not_null<ViewElement*> view) {
+	const auto i = _todoListViews.find(todolist);
+	if (i != _todoListViews.end()) {
+		auto &items = i->second;
+		if (items.remove(view) && items.empty()) {
+			_todoListViews.erase(i);
+		}
+	}
+}
+
 void Session::registerContactView(
 		UserId contactId,
 		not_null<ViewElement*> view) {
@@ -4516,37 +4618,54 @@ QString Session::findContactPhone(UserId contactId) const {
 	return QString();
 }
 
-bool Session::hasPendingWebPageGamePollNotification() const {
+bool Session::hasPendingWebPageGamePollTodoListNotification() const {
 	return !_webpagesUpdated.empty()
 		|| !_gamesUpdated.empty()
-		|| !_pollsUpdated.empty();
+		|| !_pollsUpdated.empty()
+		|| !_todoListsUpdated.empty();
 }
 
 void Session::notifyWebPageUpdateDelayed(not_null<WebPageData*> page) {
-	const auto invoke = !hasPendingWebPageGamePollNotification();
+	const auto invoke = !hasPendingWebPageGamePollTodoListNotification();
 	_webpagesUpdated.insert(page);
 	if (invoke) {
-		crl::on_main(_session, [=] { sendWebPageGamePollNotifications(); });
+		crl::on_main(_session, [=] {
+			sendWebPageGamePollTodoListNotifications();
+		});
 	}
 }
 
 void Session::notifyGameUpdateDelayed(not_null<GameData*> game) {
-	const auto invoke = !hasPendingWebPageGamePollNotification();
+	const auto invoke = !hasPendingWebPageGamePollTodoListNotification();
 	_gamesUpdated.insert(game);
 	if (invoke) {
-		crl::on_main(_session, [=] { sendWebPageGamePollNotifications(); });
+		crl::on_main(_session, [=] {
+			sendWebPageGamePollTodoListNotifications();
+		});
 	}
 }
 
 void Session::notifyPollUpdateDelayed(not_null<PollData*> poll) {
-	const auto invoke = !hasPendingWebPageGamePollNotification();
+	const auto invoke = !hasPendingWebPageGamePollTodoListNotification();
 	_pollsUpdated.insert(poll);
 	if (invoke) {
-		crl::on_main(_session, [=] { sendWebPageGamePollNotifications(); });
+		crl::on_main(_session, [=] {
+			sendWebPageGamePollTodoListNotifications();
+		});
 	}
 }
 
-void Session::sendWebPageGamePollNotifications() {
+void Session::notifyTodoListUpdateDelayed(not_null<TodoListData*> todolist) {
+	const auto invoke = !hasPendingWebPageGamePollTodoListNotification();
+	_todoListsUpdated.insert(todolist);
+	if (invoke) {
+		crl::on_main(_session, [=] {
+			sendWebPageGamePollTodoListNotifications();
+		});
+	}
+}
+
+void Session::sendWebPageGamePollTodoListNotifications() {
 	auto resize = std::vector<not_null<ViewElement*>>();
 	for (const auto &page : base::take(_webpagesUpdated)) {
 		_webpageUpdates.fire_copy(page);
@@ -4562,6 +4681,12 @@ void Session::sendWebPageGamePollNotifications() {
 	}
 	for (const auto &poll : base::take(_pollsUpdated)) {
 		if (const auto i = _pollViews.find(poll); i != _pollViews.end()) {
+			resize.insert(end(resize), begin(i->second), end(i->second));
+		}
+	}
+	for (const auto &todolist : base::take(_todoListsUpdated)) {
+		if (const auto i = _todoListViews.find(todolist)
+			; i != _todoListViews.end()) {
 			resize.insert(end(resize), begin(i->second), end(i->second));
 		}
 	}
@@ -4729,11 +4854,11 @@ void Session::refreshChatListEntry(Dialogs::Key key) {
 		} else if (const auto monoforum = history->peer->monoforum()) {
 			monoforum->preloadSublists();
 		}
-		if (const auto broadcast = history->peer->monoforumBroadcast()) {
-			if (!broadcast->isFullLoaded()) {
-				broadcast->updateFull();
-			}
-		}
+		//if (const auto broadcast = history->peer->monoforumBroadcast()) {
+		//	if (!broadcast->isFullLoaded()) {
+		//		broadcast->updateFull();
+		//	}
+		//}
 	}
 }
 
@@ -4880,7 +5005,8 @@ void Session::insertCheckedServiceNotification(
 				MTPlong(), // effect
 				MTPFactCheck(),
 				MTPint(), // report_delivery_until_date
-				MTPlong()), // paid_message_stars
+				MTPlong(), // paid_message_stars
+				MTPSuggestedPost()),
 			localFlags,
 			NewMessageType::Unread);
 	}

@@ -16,6 +16,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/chat/message_bubble.h"
 
 struct WebPageData;
+struct TodoListItem;
 class VoiceSeekClickHandler;
 class ReplyKeyboard;
 
@@ -56,6 +57,12 @@ struct BotKeyboardButton;
 
 extern const char kOptionFastButtonsMode[];
 [[nodiscard]] bool FastButtonsMode();
+
+enum class SuggestionActions : uchar {
+	None,
+	Decline,
+	AcceptAndDecline,
+};
 
 struct HistoryMessageVia : RuntimeComponent<HistoryMessageVia, HistoryItem> {
 	void create(not_null<Data::Session*> owner, UserId userId);
@@ -382,6 +389,7 @@ struct HistoryMessageReplyMarkup
 
 	void createForwarded(const HistoryMessageReplyMarkup &original);
 	void updateData(HistoryMessageMarkupData &&markup);
+	void updateSuggestControls(SuggestionActions actions);
 
 	[[nodiscard]] bool hiddenBy(Data::Media *media) const;
 
@@ -613,6 +621,15 @@ struct HistoryMessageFactcheck
 	bool requested = false;
 };
 
+struct HistoryMessageSuggestedPost
+: RuntimeComponent<HistoryMessageSuggestedPost, HistoryItem> {
+	CreditsAmount price;
+	TimeId date = 0;
+	mtpRequestId requestId = 0;
+	bool accepted = false;
+	bool rejected = false;
+};
+
 struct HistoryMessageRestrictions
 : RuntimeComponent<HistoryMessageRestrictions, HistoryItem> {
 	std::vector<Data::UnavailableReason> reasons;
@@ -659,6 +676,49 @@ struct HistoryServiceTopicInfo
 			&& !hidden
 			&& !unhidden;
 	}
+};
+
+struct HistoryServiceTodoCompletions
+: RuntimeComponent<HistoryServiceTodoCompletions, HistoryItem>
+, HistoryServiceDependentData {
+	std::vector<int> completed;
+	std::vector<int> incompleted;
+};
+
+[[nodiscard]] TextWithEntities ComposeTodoTasksList(
+	HistoryItem *itemWithList,
+	const std::vector<int> &ids);
+
+struct HistoryServiceTodoAppendTasks
+: RuntimeComponent<HistoryServiceTodoAppendTasks, HistoryItem>
+, HistoryServiceDependentData {
+	std::vector<TodoListItem> list;
+};
+
+[[nodiscard]] TextWithEntities ComposeTodoTasksList(
+	not_null<HistoryServiceTodoAppendTasks*> append);
+
+struct HistoryServiceSuggestDecision
+: RuntimeComponent<HistoryServiceSuggestDecision, HistoryItem>
+, HistoryServiceDependentData {
+	CreditsAmount price;
+	TimeId date = 0;
+	QString rejectComment;
+	bool rejected = false;
+	bool balanceTooLow = false;
+};
+
+enum class SuggestRefundType {
+	None,
+	User,
+	Admin,
+};
+
+struct HistoryServiceSuggestFinish
+: RuntimeComponent<HistoryServiceSuggestFinish, HistoryItem>
+, HistoryServiceDependentData {
+	CreditsAmount successPrice;
+	SuggestRefundType refundType = SuggestRefundType::None;
 };
 
 struct HistoryServiceGameScore

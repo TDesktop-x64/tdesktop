@@ -22,12 +22,15 @@ struct HistoryMessageMarkupData;
 struct HistoryMessageReplyMarkup;
 struct HistoryMessageTranslation;
 struct HistoryMessageForwarded;
+struct HistoryMessageSuggestedPost;
 struct HistoryServiceDependentData;
+struct HistoryServiceTodoCompletions;
 enum class HistorySelfDestructType;
 struct PreparedServiceText;
 struct MessageFactcheck;
 class ReplyKeyboard;
 struct LanguageId;
+enum class SuggestionActions : uchar;
 
 namespace base {
 template <typename Enum>
@@ -81,6 +84,7 @@ struct HistoryItemCommonFields {
 	uint64 groupedId = 0;
 	EffectId effectId = 0;
 	HistoryMessageMarkupData markup;
+	HistoryMessageSuggestInfo suggest;
 	bool ignoreForwardFrom = false;
 	bool ignoreForwardCaptions = false;
 };
@@ -89,6 +93,12 @@ enum class HistoryReactionSource : char {
 	Selector,
 	Quick,
 	Existing,
+};
+
+enum class PaidPostType : uchar {
+	None,
+	Stars,
+	Ton,
 };
 
 class HistoryItem final : public RuntimeComposer<HistoryItem> {
@@ -320,6 +330,7 @@ public:
 	[[nodiscard]] bool hasUnpaidContent() const;
 	[[nodiscard]] bool inHighlightProcess() const;
 	void highlightProcessDone();
+	[[nodiscard]] PaidPostType paidType() const;
 
 	void setCommentsInboxReadTill(MsgId readTillId);
 	void setCommentsMaxId(MsgId maxId);
@@ -350,7 +361,9 @@ public:
 	void overrideMedia(std::unique_ptr<Data::Media> media);
 
 	void applyEditionToHistoryCleared();
-	void updateReplyMarkup(HistoryMessageMarkupData &&markup);
+	void updateReplyMarkup(
+		HistoryMessageMarkupData &&markup,
+		bool ignoreSuggestButtons = false);
 	void contributeToSlowmode(TimeId realDate = 0);
 
 	void clearMediaAsExpired();
@@ -423,6 +436,8 @@ public:
 	[[nodiscard]] ChatRestriction requiredSendRight() const;
 	[[nodiscard]] bool requiresSendInlineRight() const;
 	[[nodiscard]] Data::SendError errorTextForForward(
+		not_null<Data::Thread*> to) const;
+	[[nodiscard]] Data::SendError errorTextForForwardIgnoreRights(
 		not_null<Data::Thread*> to) const;
 	[[nodiscard]] const HistoryMessageTranslation *translation() const;
 	[[nodiscard]] bool translationShowRequiresCheck(LanguageId to) const;
@@ -537,6 +552,13 @@ public:
 	[[nodiscard]] bool canUpdateDate() const;
 	void customEmojiRepaint();
 
+	[[nodiscard]] SuggestionActions computeSuggestionActions() const;
+	[[nodiscard]] SuggestionActions computeSuggestionActions(
+		const HistoryMessageSuggestedPost *suggest) const;
+	[[nodiscard]] SuggestionActions computeSuggestionActions(
+		bool accepted,
+		bool rejected) const;
+
 	[[nodiscard]] bool needsUpdateForVideoQualities(const MTPMessage &data);
 
 	[[nodiscard]] TimeId ttlDestroyAt() const {
@@ -580,7 +602,10 @@ private:
 
 	[[nodiscard]] bool checkDiscussionLink(ChannelId id) const;
 
-	void setReplyMarkup(HistoryMessageMarkupData &&markup);
+	void setReplyMarkup(
+		HistoryMessageMarkupData &&markup,
+		bool ignoreSuggestButtons = false);
+	void updateSuggestControls(const HistoryMessageSuggestedPost *suggest);
 
 	void changeReplyToTopCounter(
 		not_null<HistoryMessageReply*> reply,
@@ -652,6 +677,13 @@ private:
 		CallId linkCallId);
 	[[nodiscard]] PreparedServiceText prepareCallScheduledText(
 		TimeId scheduleDate);
+	[[nodiscard]] PreparedServiceText prepareTodoCompletionsText();
+	[[nodiscard]] PreparedServiceText prepareTodoAppendTasksText();
+
+	[[nodiscard]] PreparedServiceText composeTodoIncompleted(
+		not_null<HistoryServiceTodoCompletions*> done);
+	[[nodiscard]] PreparedServiceText composeTodoCompleted(
+		not_null<HistoryServiceTodoCompletions*> done);
 
 	[[nodiscard]] PreparedServiceText prepareServiceTextForMessage(
 		const MTPMessageMedia &media,

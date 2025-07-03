@@ -227,16 +227,15 @@ void TranslateBox(
 	const auto send = [=](LanguageId to) {
 		loading->show(anim::type::instant);
 		translated->hide(anim::type::instant);
-		auto toTC = GetEnhancedBool("translate_to_tc"); // Override translate setting :)
 
-		try {
-			auto result = GoogleAppTranslator::instance()->translate(text.text, "auto", toTC ? "zh-Hant" : to.twoLetterCode());
-			showText(TextWithEntities{ .text = result.translation });	
-		} catch (...) {
-			showText(
-				Ui::Text::Italic("Translations are currently unavailable."));
-		}
-
+		crl::async([=] {
+			const auto toTC = GetEnhancedBool("translate_to_tc"); // Override translate setting :)
+			const auto result = GoogleAppTranslator::instance()->translate(
+				  text.text, "auto", toTC ? "zh-Hant" : to.twoLetterCode());
+		  crl::on_main([=] {
+			showText(TextWithEntities{.text = result.translation});
+		  });
+		});
 
 		//state->api.request(MTPmessages_TranslateText(
 		//	MTP_flags(flags),

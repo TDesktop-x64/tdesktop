@@ -696,7 +696,7 @@ rpl::producer<rpl::no_value, QString> EarnStatistics::request() {
 	return [=](auto consumer) {
 		auto lifetime = rpl::lifetime();
 
-		makeRequest(MTPpayments_GetStarsRevenueStats(
+		api().request(MTPpayments_GetStarsRevenueStats(
 			MTP_flags(MTPpayments_getStarsRevenueStats::Flag::f_ton),
 			(_isUser ? user()->input : channel()->input)
 		)).done([=](const MTPpayments_StarsRevenueStats &result) {
@@ -755,9 +755,7 @@ void EarnStatistics::requestHistory(
 	constexpr auto kTlLimit = tl::make_int(kLimit);
 
 	_requestId = api().request(MTPpayments_GetStarsTransactions(
-		MTP_flags(MTPpayments_getStarsTransactions::Flag::f_ton
-			| MTPpayments_getStarsTransactions::Flag::f_inbound
-			| MTPpayments_getStarsTransactions::Flag::f_outbound),
+		MTP_flags(MTPpayments_getStarsTransactions::Flag::f_ton),
 		MTP_string(), // Subscription ID.
 		(_isUser ? user()->input : channel()->input),
 		MTP_string(token),

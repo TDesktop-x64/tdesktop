@@ -1236,6 +1236,11 @@ void TopBarWidget::updateControlsVisibility() {
 			? (hasPollsMenu || hasTodoListsMenu || hasTopicMenu)
 			: (section == Section::ChatsList)
 			? (_activeChat.key.peer() && _activeChat.key.peer()->isForum())
+			: (section == Section::SavedSublist)
+			? (_activeChat.key.peer()
+				&& _activeChat.key.peer()->isChannel()
+				&& _activeChat.key.peer()->owner().commonStarsPerMessage(
+					_activeChat.key.peer()->asChannel()))
 			: false);
 	const auto hasInfo = !_activeChat.key.folder()
 		&& (section == Section::History

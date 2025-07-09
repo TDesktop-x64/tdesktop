@@ -1290,7 +1290,7 @@ void ApplyChannelUpdate(
 		| Flag::CanViewCreditsRevenue
 		| Flag::StargiftsAvailable
 		| Flag::PaidMessagesAvailable
-		| Flag::HasStarsPerMessage
+		| (channel->starsPerMessage() ? Flag::HasStarsPerMessage : Flag())
 		| Flag::StarsPerMessageKnown;
 	channel->setFlags((channel->flags() & ~mask)
 		| (update.is_can_set_username() ? Flag::CanSetUsername : Flag())

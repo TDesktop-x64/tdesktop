@@ -282,6 +282,7 @@ void MediaGenericTextPart::draw(
 		.now = context.now,
 		.pausedEmoji = context.paused || On(PowerSaving::kEmojiChat),
 		.pausedSpoiler = context.paused || On(PowerSaving::kChatSpoiler),
+		.elisionLines = elisionLines(),
 	});
 }
 
@@ -293,6 +294,10 @@ void MediaGenericTextPart::setupPen(
 	p.setPen(service
 		? context.st->msgServiceFg()
 		: context.messageStyle()->historyTextFg);
+}
+
+int MediaGenericTextPart::elisionLines() const {
+	return 0;
 }
 
 TextState MediaGenericTextPart::textState(
@@ -314,21 +319,31 @@ TextState MediaGenericTextPart::textState(
 }
 
 QSize MediaGenericTextPart::countOptimalSize() {
+	const auto lines = elisionLines();
+	const auto height = lines
+		? std::min(_text.minHeight(), lines * _text.style()->font->height)
+		: _text.minHeight();
 	return {
 		_margins.left() + _text.maxWidth() + _margins.right(),
-		_margins.top() + _text.minHeight() + _margins.bottom(),
+		_margins.top() + height + _margins.bottom(),
 	};
 }
 
 QSize MediaGenericTextPart::countCurrentSize(int newWidth) {
 	auto skip = _margins.left() + _margins.right();
-	const auto size = CountOptimalTextSize(
-		_text,
-		st::msgMinWidth,
-		std::max(st::msgMinWidth, newWidth - skip));
+	const auto size = (_align == style::al_top)
+		? CountOptimalTextSize(
+			_text,
+			st::msgMinWidth,
+			std::max(st::msgMinWidth, newWidth - skip))
+		: QSize(newWidth - skip, _text.countHeight(newWidth - skip));
+	const auto lines = elisionLines();
+	const auto height = lines
+		? std::min(size.height(), lines * _text.style()->font->height)
+		: size.height();
 	return {
 		size.width() + skip,
-		_margins.top() + size.height() + _margins.bottom(),
+		_margins.top() + height + _margins.bottom(),
 	};
 }
 

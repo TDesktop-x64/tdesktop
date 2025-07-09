@@ -2280,6 +2280,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_action_suggest_success_ton#other" = "{from} has received {count} TON for publishing post.";
 "lng_action_suggest_refund_user" = "User refunded the Stars so that post was deleted.";
 "lng_action_suggest_refund_admin" = "Admin deleted the post early so that the price was refunded to the user.";
+"lng_action_post_rejected" = "The post was rejected.";
+"lng_action_not_enough_funds" = "Transaction failed.";
 "lng_you_paid_stars#one" = "You paid {count} Star.";
 "lng_you_paid_stars#other" = "You paid {count} Stars.";
 
@@ -2869,6 +2871,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_credits_box_history_entry_gift_converted" = "Converted Gift";
 "lng_credits_box_history_entry_gift_transfer" = "Gift Transfer";
 "lng_credits_box_history_entry_gift_unavailable" = "Unavailable";
+"lng_credits_box_history_entry_gift_released" = "released by {name}";
 "lng_credits_box_history_entry_gift_sold_out" = "This gift has sold out";
 "lng_credits_box_history_entry_gift_out_about" = "With Stars, **{user}** will be able to unlock content and services on Telegram.\n{link}";
 "lng_credits_box_history_entry_gift_in_about" = "Use Stars to unlock content and services on Telegram. {link}";
@@ -3587,12 +3590,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_gift_self_about" = "Buy yourself a gift to display on your page or reserve for later.\n\nLimited-edition gifts upgraded to collectibles can be gifted to others later.";
 "lng_gift_channel_title" = "Send a Gift";
 "lng_gift_channel_about" = "Select a gift to show appreciation for {name}.";
+"lng_gift_released_by" = "Released by {name}";
 "lng_gift_unique_owner" = "Owner";
 "lng_gift_unique_address_copied" = "Address copied to clipboard.";
 "lng_gift_unique_status" = "Status";
 "lng_gift_unique_status_non" = "Non-Unique";
 "lng_gift_unique_status_upgrade" = "upgrade";
 "lng_gift_unique_number" = "Collectible #{index}";
+"lng_gift_unique_number_by" = "Collectible #{index} by {name}";
 "lng_gift_unique_model" = "Model";
 "lng_gift_unique_backdrop" = "Backdrop";
 "lng_gift_unique_symbol" = "Symbol";
@@ -4318,6 +4323,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_context_edit_shortcut" = "Edit Shortcut";
 "lng_context_delete_shortcut" = "Delete Quick Reply";
 "lng_context_gift_send" = "Send Another Gift";
+"lng_context_charge_fee" = "Charge Fee";
+"lng_context_remove_fee" = "Remove Fee";
+"lng_context_fee_now" = "{name} pays {amount} per message.";
+"lng_context_fee_free" = "{name} can send messages for free.";
 
 "lng_add_tag_about" = "Tag this message with an emoji for quick search.";
 "lng_subscribe_tag_about" = "Organize your Saved Messages with tags. {link}";
@@ -5323,6 +5332,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_payment_bar_button" = "Remove Fee";
 "lng_payment_refund_title" = "Remove Fee";
 "lng_payment_refund_text" = "Are you sure you want to allow {name} to message you for free?";
+"lng_payment_refund_channel" = "Do you want to allow {name} to message the channel for free?";
 "lng_payment_refund_also#one" = "Refund already paid {count} Star";
 "lng_payment_refund_also#other" = "Refund already paid {count} Stars";
 "lng_payment_refund_confirm" = "Confirm";

@@ -569,7 +569,7 @@ Cover::Cover(
 		if (peer->id == PeerId(1021739447)) {
 			return Badge::Content{
 				.badge = BadgeType::Premium,
-				.emojiStatusId = DocumentId(),
+				.emojiStatusId = { DocumentId() },
 			};
 		}
 		const auto info = peer->botVerifyDetails();

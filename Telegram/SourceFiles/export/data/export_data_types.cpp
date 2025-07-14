@@ -1170,8 +1170,15 @@ Chat ParseChat(const MTPChat &data) {
 		result.colorIndex = (color && color->data().vcolor())
 			? color->data().vcolor()->v
 			: PeerColorIndex(result.bareId);
+		result.isMonoforum = data.is_monoforum();
 		result.isBroadcast = data.is_broadcast();
 		result.isSupergroup = data.is_megagroup();
+		result.hasMonoforumAdminRights = data.is_broadcast()
+			&& (data.is_creator()
+				|| (data.vadmin_rights()
+					&& data.vadmin_rights()->data().is_manage_direct_messages()));
+		result.monoforumLinkId
+			= data.vlinked_monoforum_id().value_or_empty();
 		result.title = ParseString(data.vtitle());
 		if (const auto username = data.vusername()) {
 			result.username = ParseString(*username);
@@ -1188,15 +1195,6 @@ Chat ParseChat(const MTPChat &data) {
 			MTP_long(result.bareId),
 			data.vaccess_hash());
 	});
-	return result;
-}
-
-std::map<PeerId, Chat> ParseChatsList(const MTPVector<MTPChat> &data) {
-	auto result = std::map<PeerId, Chat>();
-	for (const auto &chat : data.v) {
-		auto parsed = ParseChat(chat);
-		result.emplace(parsed.id(), std::move(parsed));
-	}
 	return result;
 }
 
@@ -1275,6 +1273,20 @@ std::map<PeerId, Peer> ParsePeersLists(
 	for (const auto &chat : chats.v) {
 		auto parsed = ParseChat(chat);
 		result.emplace(parsed.id(), Peer{ std::move(parsed) });
+	}
+	for (auto &[peerId, parsed] : result) {
+		if (const auto chat = std::get_if<Chat>(&parsed.data)) {
+			if (chat->isMonoforum) {
+				const auto i = result.find(
+					PeerId(ChannelId(chat->monoforumLinkId)));
+				if (i != end(result)) {
+					chat->isMonoforumAdmin
+						= i->second.chat()->hasMonoforumAdminRights;
+					chat->isMonoforumOfPublicBroadcast
+						= !i->second.chat()->username.isEmpty();
+				}
+			}
+		}
 	}
 	return result;
 }
@@ -2195,7 +2207,13 @@ const DialogInfo *DialogsInfo::item(int index) const {
 
 DialogInfo::Type DialogTypeFromChat(const Chat &chat) {
 	using Type = DialogInfo::Type;
-	return chat.username.isEmpty()
+	return (chat.isMonoforum && !chat.isMonoforumAdmin)
+		? Type::Personal
+		: (chat.isMonoforumAdmin && chat.isMonoforumOfPublicBroadcast)
+		? Type::PublicSupergroup
+		: chat.isMonoforumAdmin
+		? Type::PrivateSupergroup
+		: chat.username.isEmpty()
 		? (chat.isBroadcast
 			? Type::PrivateChannel
 			: chat.isSupergroup
@@ -2256,6 +2274,11 @@ DialogsInfo ParseDialogsInfo(const MTPmessages_Dialogs &data) {
 				info.migratedToChannelId = peer.chat()
 					? peer.chat()->migratedToChannelId
 					: 0;
+				info.isMonoforum = peer.chat()
+					&& peer.chat()->isMonoforum;
+				info.monoforumBroadcastInput = peer.chat()
+					? peer.chat()->monoforumBroadcastInput
+					: MTPInputPeer(MTP_inputPeerEmpty());
 			}
 			info.topMessageId = fields.vtop_message().v;
 			const auto messageIt = messages.find(MessageId{
@@ -2294,6 +2317,10 @@ DialogInfo DialogInfoFromChat(const Chat &data) {
 	result.topMessageId = 0;
 	result.type = DialogTypeFromChat(data);
 	result.migratedToChannelId = data.migratedToChannelId;
+	result.isMonoforum = data.isMonoforum;
+	if (data.isMonoforumAdmin) {
+		result.monoforumBroadcastInput = data.monoforumBroadcastInput;
+	}
 	return result;
 }
 
@@ -2428,7 +2455,8 @@ void FinalizeDialogsInfo(DialogsInfo &info, const Settings &settings) {
 			}
 			Unexpected("Type in ApiWrap::onlyMyMessages.");
 		}();
-		dialog.onlyMyMessages = ((settings.fullChats & setting) != setting);
+		dialog.onlyMyMessages = (dialog.type != DialogType::Personal)
+			&& ((settings.fullChats & setting) != setting);
 
 		ranges::sort(dialog.splits);
 	}

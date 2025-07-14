@@ -920,8 +920,13 @@ bool AddReplyToMessageAction(
 		return false;
 	}
 
+	const auto todoListTaskId = request.link
+		? request.link->property(kTodoListItemIdProperty).toInt()
+		: 0;
 	const auto &quote = request.quote;
-	auto text = (quote.text.empty()
+	auto text = (todoListTaskId
+		? tr::lng_context_reply_to_task
+		: quote.highlight.quote.empty()
 		? tr::lng_context_reply_msg
 		: tr::lng_context_quote_and_reply)(
 			tr::now,
@@ -929,8 +934,9 @@ bool AddReplyToMessageAction(
 	menu->addAction(std::move(text), [=, itemId = item->fullId()] {
 		list->replyToMessageRequestNotify({
 			.messageId = itemId,
-			.quote = quote.text,
-			.quoteOffset = quote.offset,
+			.quote = quote.highlight.quote,
+			.quoteOffset = quote.highlight.quoteOffset,
+			.todoItemId = todoListTaskId,
 		}, base::IsCtrlPressed());
 	}, &st::menuIconReply);
 	return true;
@@ -956,7 +962,7 @@ bool AddTodoListAction(
 		if (const auto item = controller->session().data().message(itemId)) {
 			Window::PeerMenuAddTodoListTasks(controller, item);
 		}
-	}, &st::menuIconCreateTodoList);
+	}, &st::menuIconAdd);
 	return true;
 }
 

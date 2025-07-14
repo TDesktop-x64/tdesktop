@@ -78,6 +78,7 @@ struct ContentLayout;
 
 namespace Media::View {
 
+class PlaybackSponsored;
 class GroupThumbs;
 class Pip;
 
@@ -412,6 +413,7 @@ private:
 		const StartStreaming &startStreaming = StartStreaming());
 	void startStreamingPlayer(const StartStreaming &startStreaming);
 	void initStreamingThumbnail();
+	void markStreamedReady();
 	void streamingReady(Streaming::Information &&info);
 	[[nodiscard]] bool createStreamingObjects();
 	void handleStreamingUpdate(Streaming::Update &&update);

@@ -900,10 +900,7 @@ void Widget::chosenRow(const ChosenRow &row) {
 	} else if (const auto topic = row.key.topic()) {
 		auto params = Window::SectionShow(
 			Window::SectionShow::Way::ClearStack);
-		params.highlightPart.text = _searchState.query;
-		if (!params.highlightPart.empty()) {
-			params.highlightPartOffsetHint = kSearchQueryOffsetHint;
-		}
+		params.highlight = Window::SearchHighlightId(_searchState.query);
 		if (row.newWindow) {
 			controller()->showInNewWindow(
 				Window::SeparateId(topic),
@@ -969,15 +966,12 @@ void Widget::chosenRow(const ChosenRow &row) {
 		return;
 	} else if (history) {
 		const auto peer = history->peer;
-		const auto showAtMsgId = controller()->uniqueChatsInSearchResults()
-			? ShowAtUnreadMsgId
-			: row.message.fullId.msg;
+		const auto showAtMsgId = controller()->uniqueChatsInSearchResults(
+			_searchState
+		) ? ShowAtUnreadMsgId : row.message.fullId.msg;
 		auto params = Window::SectionShow(
 			Window::SectionShow::Way::ClearStack);
-		params.highlightPart.text = _searchState.query;
-		if (!params.highlightPart.empty()) {
-			params.highlightPartOffsetHint = kSearchQueryOffsetHint;
-		}
+		params.highlight = Window::SearchHighlightId(_searchState.query);
 		if (row.newWindow) {
 			controller()->showInNewWindow(peer, showAtMsgId);
 		} else {

@@ -952,12 +952,26 @@ void HistoryItem::updateServiceDependent(bool force) {
 	}
 
 	if (!dependent->lnk) {
+		auto todoItemId = 0;
+		if (const auto done = Get<HistoryServiceTodoCompletions>()) {
+			const auto &items = !done->completed.empty()
+				? done->completed
+				: done->incompleted;
+			if (items.size() == 1) {
+				todoItemId = items.front();
+			}
+		} else if (const auto append = Get<HistoryServiceTodoAppendTasks>()) {
+			if (append->list.size() == 1) {
+				todoItemId = append->list.front().id;
+			}
+		}
 		dependent->lnk = JumpToMessageClickHandler(
 			(dependent->peerId
 				? _history->owner().peer(dependent->peerId)
 				: _history->peer),
 			dependent->msgId,
-			fullId());
+			fullId(),
+			{ .todoItemId = todoItemId });
 	}
 	auto gotDependencyItem = false;
 	if (!dependent->msg) {
@@ -1835,7 +1849,10 @@ bool HistoryItem::isSponsored() const {
 }
 
 bool HistoryItem::canLookupMessageAuthor() const {
-	return isRegular() && _history->amMonoforumAdmin() && _from->isChannel();
+	return isRegular()
+		&& !isService()
+		&& _history->amMonoforumAdmin()
+		&& _from->isChannel();
 }
 
 bool HistoryItem::skipNotification() const {
@@ -4261,6 +4278,7 @@ void HistoryItem::createComponentsHelper(HistoryItemCommonFields &&fields) {
 			: replyTo.monoforumPeerId
 			? replyTo.monoforumPeerId
 			: PeerId();
+		config.reply.todoItemId = replyTo.todoItemId;
 		const auto replyToTop = replyTo.topicRootId
 			? replyTo.topicRootId
 			: LookupReplyToTop(_history, to);

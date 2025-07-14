@@ -46,6 +46,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_channel.h"
 #include "data/data_saved_sublist.h"
 #include "data/data_session.h"
+#include "data/data_todo_list.h"
 #include "data/data_forum.h"
 #include "data/data_forum_topic.h"
 #include "data/data_message_reactions.h"
@@ -1344,9 +1345,18 @@ void Element::validateText() {
 
 		if (const auto done = item->Get<HistoryServiceTodoCompletions>()) {
 			if (!done->completed.empty() && !done->incompleted.empty()) {
+				const auto todoItemId = (done->incompleted.size() == 1)
+					? done->incompleted.front()
+					: 0;
 				setServicePreMessage(
 					item->composeTodoIncompleted(done),
-					done->lnk);
+					JumpToMessageClickHandler(
+						(done->peerId
+							? history()->owner().peer(done->peerId)
+							: history()->peer),
+						done->msgId,
+						item->fullId(),
+						{ .todoItemId = todoItemId }));
 			} else {
 				setServicePreMessage({});
 			}
@@ -2185,7 +2195,7 @@ SelectedQuote Element::FindSelectedQuote(
 			++i;
 		}
 	}
-	return { item, result, modified.from, overflown };
+	return { item, { result, modified.from }, overflown };
 }
 
 TextSelection Element::FindSelectionFromQuote(
@@ -2193,17 +2203,18 @@ TextSelection Element::FindSelectionFromQuote(
 		const SelectedQuote &quote) {
 	Expects(quote.item != nullptr);
 
-	if (quote.text.empty()) {
+	const auto &rich = quote.highlight.quote;
+	if (rich.empty()) {
 		return {};
 	}
 	const auto &original = quote.item->originalText();
-	if (quote.offset == kSearchQueryOffsetHint) {
+	if (quote.highlight.quoteOffset == kSearchQueryOffsetHint) {
 		return ApplyModificationsFrom(
-			FindSearchQueryHighlight(original.text, quote.text.text),
+			FindSearchQueryHighlight(original.text, rich.text),
 			text);
 	}
 	const auto length = int(original.text.size());
-	const auto qlength = int(quote.text.text.size());
+	const auto qlength = int(rich.text.size());
 	const auto checkAt = [&](int offset) {
 		return TextSelection{
 			uint16(offset),
@@ -2214,7 +2225,7 @@ TextSelection Element::FindSelectionFromQuote(
 		if (offset > length - qlength) {
 			return TextSelection();
 		}
-		const auto i = original.text.indexOf(quote.text.text, offset);
+		const auto i = original.text.indexOf(rich.text, offset);
 		return (i >= 0) ? checkAt(i) : TextSelection();
 	};
 	const auto findOneBefore = [&](int offset) {
@@ -2223,7 +2234,7 @@ TextSelection Element::FindSelectionFromQuote(
 		}
 		const auto end = std::min(offset + qlength - 1, length);
 		const auto from = end - length - 1;
-		const auto i = original.text.lastIndexOf(quote.text.text, from);
+		const auto i = original.text.lastIndexOf(rich.text, from);
 		return (i >= 0) ? checkAt(i) : TextSelection();
 	};
 	const auto findAfter = [&](int offset) {
@@ -2261,7 +2272,7 @@ TextSelection Element::FindSelectionFromQuote(
 			? before
 			: after;
 	};
-	auto result = findTwoWays(quote.offset);
+	auto result = findTwoWays(quote.highlight.quoteOffset);
 	if (result.empty()) {
 		return {};
 	}
@@ -2443,6 +2454,70 @@ int FindViewY(not_null<Element*> view, uint16 symbol, int yfrom) {
 		} else {
 			ytill = middle;
 			symboltill = found;
+		}
+	}
+	return origin.y() + (yfrom + ytill) / 2;
+}
+
+int FindViewTaskY(not_null<Element*> view, int taskId, int yfrom) {
+	auto request = HistoryView::StateRequest();
+	request.flags = Ui::Text::StateRequest::Flag::LookupLink;
+	const auto single = st::messageTextStyle.font->height;
+	const auto inner = view->innerGeometry();
+	const auto origin = inner.topLeft();
+	const auto top = 0;
+	const auto bottom = view->height();
+	if (origin.y() < top
+		|| origin.y() + inner.height() > bottom
+		|| inner.height() <= 0) {
+		return yfrom;
+	}
+	const auto media = view->data()->media();
+	const auto todolist = media ? media->todolist() : nullptr;
+	if (!todolist) {
+		return yfrom;
+	}
+	const auto &items = todolist->items;
+	const auto indexOf = [&](int id) -> int {
+		return ranges::find(items, id, &TodoListItem::id) - begin(items);
+	};
+	const auto index = indexOf(taskId);
+	const auto count = int(items.size());
+	if (index == count) {
+		return yfrom;
+	}
+	yfrom = std::max(yfrom - origin.y(), 0);
+	auto ytill = inner.height() - 1;
+	const auto middle = (yfrom + ytill) / 2;
+	const auto fory = [&](int y) {
+		const auto state = view->textState(origin + QPoint(0, y), request);
+		const auto &link = state.link;
+		const auto id = link
+			? link->property(kTodoListItemIdProperty).toInt()
+			: -1;
+		const auto index = (id >= 0) ? indexOf(id) : int(items.size());
+		return (index < count) ? index : (y < middle) ? -1 : count;
+	};
+	auto indexfrom = fory(yfrom);
+	auto indextill = fory(ytill);
+	if ((yfrom >= ytill) || (indexfrom >= index)) {
+		return origin.y() + yfrom;
+	} else if (indextill <= index) {
+		return origin.y() + ytill;
+	}
+	while (ytill - yfrom >= 2 * single) {
+		const auto middle = (yfrom + ytill) / 2;
+		const auto found = fory(middle);
+		if (found == index
+			|| indexfrom > found
+			|| indextill < found) {
+			return origin.y() + middle;
+		} else if (found < index) {
+			yfrom = middle;
+			indexfrom = found;
+		} else {
+			ytill = middle;
+			indextill = found;
 		}
 	}
 	return origin.y() + (yfrom + ytill) / 2;

@@ -30,6 +30,10 @@ class SavedMessages;
 enum class StorySourcesList : uchar;
 } // namespace Data
 
+namespace Dialogs {
+struct SearchState;
+} // namespace Dialogs
+
 namespace ChatHelpers {
 class TabbedSelector;
 class EmojiInteractions;
@@ -162,8 +166,9 @@ struct SectionShow {
 		return copy;
 	}
 
-	TextWithEntities highlightPart;
+	MessageHighlightId highlight;
 	int highlightPartOffsetHint = 0;
+	int highlightTodoItemId = 0;
 	std::optional<TimeId> videoTimestamp;
 	Way way = Way::Forward;
 	anim::type animated = anim::type::normal;
@@ -177,6 +182,8 @@ struct SectionShow {
 	Origin origin;
 
 };
+
+[[nodiscard]] MessageHighlightId SearchHighlightId(const QString &query);
 
 class SessionController;
 
@@ -404,7 +411,7 @@ public:
 	void setSearchInChat(Dialogs::Key value) {
 		_searchInChat = value;
 	}
-	bool uniqueChatsInSearchResults() const;
+	bool uniqueChatsInSearchResults(const Dialogs::SearchState &state) const;
 
 	void openFolder(not_null<Data::Folder*> folder);
 	void closeFolder();

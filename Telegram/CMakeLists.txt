@@ -1264,6 +1264,8 @@ PRIVATE
     media/view/media_view_playback_controls.h
     media/view/media_view_playback_progress.cpp
     media/view/media_view_playback_progress.h
+    media/view/media_view_playback_sponsored.cpp
+    media/view/media_view_playback_sponsored.h
     media/system_media_controls_manager.h
     media/system_media_controls_manager.cpp
     menu/menu_antispam_validator.cpp

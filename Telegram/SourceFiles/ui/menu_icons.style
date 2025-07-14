@@ -185,6 +185,7 @@ menuIconPayment: icon {{ "payments/payment_card", menuIconColor }};
 menuIconOrderPrice: icon {{ "menu/order_price", menuIconColor }};
 menuIconOrderDate: icon {{ "menu/order_date", menuIconColor }};
 menuIconOrderNumber: icon {{ "menu/order_number", menuIconColor }};
+menuIconAdd: icon{{ "menu/add", menuIconColor }};
 
 menuIconTTLAny: icon {{ "menu/auto_delete_plain", menuIconColor }};
 menuIconTTLAnyTextPosition: point(11px, 22px);
@@ -204,6 +205,7 @@ menuBlueIconGroupCreate: icon {{ "menu/groups_create", lightButtonFg }};
 
 mediaMenuIconStickers: icon {{ "menu/stickers", mediaviewMenuFg }};
 mediaMenuIconCancel: icon {{ "menu/cancel", mediaviewMenuFg }};
+mediaMenuIconChannel: icon {{ "menu/channel", mediaviewMenuFg }};
 mediaMenuIconShowInChat: icon {{ "menu/show_in_chat", mediaviewMenuFg }};
 mediaMenuIconShowInFolder: icon {{ "menu/show_in_folder", mediaviewMenuFg }};
 mediaMenuIconDownload: icon {{ "menu/download", mediaviewMenuFg }};

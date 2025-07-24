@@ -318,6 +318,7 @@ namespace EnhancedSettings {
 		settings.insert(qsl("hide_stories"), false);
 		settings.insert(qsl("recent_display_limit"), 20);
 		settings.insert(qsl("screenshot_mode"), false);
+		settings.insert(qsl("update_url"), "");
 
 		auto document = QJsonDocument();
 		document.setObject(settings);
@@ -372,6 +373,7 @@ namespace EnhancedSettings {
 		settings.insert(qsl("hide_stories"), GetEnhancedBool("hide_stories"));
 		settings.insert(qsl("recent_display_limit"), GetEnhancedInt("recent_display_limit"));
 		settings.insert(qsl("screenshot_mode"), GetEnhancedBool("screenshot_mode"));
+		settings.insert(qsl("update_url"), GetEnhancedString("update_url"));
 
 		auto document = QJsonDocument();
 		document.setObject(settings);

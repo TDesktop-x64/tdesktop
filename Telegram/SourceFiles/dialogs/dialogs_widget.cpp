@@ -1012,7 +1012,7 @@ void Widget::setGeometryWithTopMoved(
 	_topDelta = topDelta;
 	bool willBeResized = (size() != newGeometry.size());
 	if (geometry() != newGeometry) {
-		auto weak = Ui::MakeWeak(this);
+		auto weak = base::make_weak(this);
 		setGeometry(newGeometry);
 		if (!weak) {
 			return;

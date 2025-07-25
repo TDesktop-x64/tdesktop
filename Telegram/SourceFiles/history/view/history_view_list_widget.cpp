@@ -3124,7 +3124,7 @@ void ListWidget::touchEvent(QTouchEvent *e) {
 			return;
 		}
 		_touchInProgress = false;
-		auto weak = Ui::MakeWeak(this);
+		auto weak = base::make_weak(this);
 		const auto notMoved = (_touchPos - _touchStart).manhattanLength()
 			< QApplication::startDragDistance();
 		if (_touchSelect) {
@@ -3626,10 +3626,8 @@ void ListWidget::mouseActionFinish(
 ClickHandlerContext ListWidget::prepareClickHandlerContext(FullMsgId id) {
 	return {
 		.itemId = id,
-		.elementDelegate = [weak = Ui::MakeWeak(this)] {
-			return weak
-				? (ElementDelegate*)weak
-				: nullptr;
+		.elementDelegate = [weak = base::make_weak(this)] {
+			return (ElementDelegate*)weak.get();
 		},
 		.sessionWindow = base::make_weak(controller()),
 	};
@@ -4348,9 +4346,9 @@ void ConfirmOldForwardSelectedItems(not_null<ListWidget*> widget) {
 		}
 	}
 	auto ids = widget->getSelectedIds();
-	const auto weak = Ui::MakeWeak(widget);
+	const auto weak = base::make_weak(widget);
 	Window::ShowForwardMessagesBox(widget->controller(), std::move(ids), [=] {
-		if (const auto strong = weak.data()) {
+		if (const auto strong = weak.get()) {
 			strong->cancelSelection();
 		}
 	});
@@ -4460,8 +4458,8 @@ void ConfirmSendNowSelectedItems(not_null<ListWidget*> widget) {
 	if (!history) {
 		return;
 	}
-	const auto clearSelection = [weak = Ui::MakeWeak(widget)] {
-		if (const auto strong = weak.data()) {
+	const auto clearSelection = [weak = base::make_weak(widget)] {
+		if (const auto strong = weak.get()) {
 			strong->cancelSelection();
 		}
 	};

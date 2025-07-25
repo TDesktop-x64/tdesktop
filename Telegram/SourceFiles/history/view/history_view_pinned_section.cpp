@@ -188,6 +188,11 @@ PinnedWidget::PinnedWidget(
 		onScroll();
 	}, lifetime());
 
+	_inner->scrollKeyEvents(
+	) | rpl::start_with_next([=](not_null<QKeyEvent*> e) {
+		_scroll->keyPressEvent(e);
+	}, lifetime());
+
 	setupClearButton();
 	setupTranslateBar();
 	Window::SetupSwipeBackSection(this, _scroll.get(), _inner);

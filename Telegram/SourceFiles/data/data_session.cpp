@@ -1427,6 +1427,9 @@ UserData *Session::userByPhone(const QString &phone) const {
 
 PeerData *Session::peerByUsername(const QString &username) const {
 	const auto uname = username.trimmed();
+	if (uname.isEmpty()) {
+		return nullptr;
+	}
 	for (const auto &[peerId, peer] : _peers) {
 		if (peer->isLoaded()
 			&& !peer->username().compare(uname, Qt::CaseInsensitive)) {
@@ -1866,6 +1869,14 @@ void Session::notifyGiftUpdate(GiftUpdate &&update) {
 
 rpl::producer<GiftUpdate> Session::giftUpdates() const {
 	return _giftUpdates.events();
+}
+
+void Session::notifyGiftsUpdate(GiftsUpdate &&update) {
+	_giftsUpdates.fire(std::move(update));
+}
+
+rpl::producer<GiftsUpdate> Session::giftsUpdates() const {
+	return _giftsUpdates.events();
 }
 
 HistoryItem *Session::changeMessageId(PeerId peerId, MsgId wasId, MsgId nowId) {

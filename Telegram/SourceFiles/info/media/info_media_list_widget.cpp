@@ -1368,7 +1368,7 @@ void ListWidget::deleteItems(SelectedItems &&items, Fn<void()> confirmed) {
 				: tr::lng_downloads_delete_in_cloud(tr::now));
 		const auto deleteSure = [=] {
 			Ui::PostponeCall(this, [=] {
-				if (const auto box = _actionBoxWeak.data()) {
+				if (const auto box = _actionBoxWeak.get()) {
 					box->closeBox();
 				}
 			});
@@ -1428,10 +1428,10 @@ void ListWidget::deleteItems(SelectedItems &&items, Fn<void()> confirmed) {
 	}
 }
 
-void ListWidget::setActionBoxWeak(QPointer<Ui::BoxContent> box) {
+void ListWidget::setActionBoxWeak(base::weak_qptr<Ui::BoxContent> box) {
 	if ((_actionBoxWeak = box)) {
 		_actionBoxWeakLifetime = _actionBoxWeak->alive(
-		) | rpl::start_with_done([weak = Ui::MakeWeak(this)]{
+		) | rpl::start_with_done([weak = base::make_weak(this)]{
 			if (weak) {
 				weak->_checkForHide.fire({});
 			}

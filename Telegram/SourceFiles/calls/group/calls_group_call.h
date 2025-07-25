@@ -208,6 +208,7 @@ public:
 			Connecting,
 			AllowedToSpeak,
 			Ended,
+			RecordingStarted,
 		};
 		virtual void groupCallPlaySound(GroupCallSound sound) = 0;
 		virtual auto groupCallGetVideoCapture(const QString &deviceId)
@@ -286,6 +287,7 @@ public:
 		const QString &title,
 		bool video,
 		bool videoPortrait);
+	void playSoundRecordingStarted() const;
 	[[nodiscard]] bool recordingStoppedByMe() const {
 		return _recordingStoppedByMe;
 	}

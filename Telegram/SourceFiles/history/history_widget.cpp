@@ -1047,7 +1047,7 @@ void HistoryWidget::setGeometryWithTopMoved(
 	_topDelta = topDelta;
 	bool willBeResized = (size() != newGeometry.size());
 	if (geometry() != newGeometry) {
-		auto weak = Ui::MakeWeak(this);
+		auto weak = base::make_weak(this);
 		setGeometry(newGeometry);
 		if (!weak) {
 			return;
@@ -4544,7 +4544,7 @@ void HistoryWidget::saveEditMessage(Api::SendOptions options) {
 		}
 	}
 
-	const auto weak = Ui::MakeWeak(this);
+	const auto weak = base::make_weak(this);
 	const auto history = _history;
 
 	const auto done = [=](mtpRequestId requestId) {
@@ -5669,7 +5669,7 @@ bool HistoryWidget::searchInChatEmbedded(
 	if (!peer || Window::SeparateId(peer) != controller()->windowId()) {
 		return false;
 	} else if (_peer != peer) {
-		const auto weak = Ui::MakeWeak(this);
+		const auto weak = base::make_weak(this);
 		controller()->showPeerHistory(peer);
 		if (!weak) {
 			return false;
@@ -9196,9 +9196,9 @@ void HistoryWidget::oldForwardSelected() {
 	if (!_list) {
 		return;
 	}
-	const auto weak = Ui::MakeWeak(this);
+	const auto weak = base::make_weak(this);
 	Window::ShowForwardMessagesBox(controller(), getSelectedItems(), [=] {
-		if (const auto strong = weak.data()) {
+		if (const auto strong = weak.get()) {
 			strong->clearSelected();
 		}
 	});

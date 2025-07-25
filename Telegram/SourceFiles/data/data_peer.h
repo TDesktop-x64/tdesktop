@@ -7,10 +7,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "data/notify/data_peer_notify_settings.h"
 #include "data/data_types.h"
 #include "data/data_flags.h"
-#include "data/notify/data_peer_notify_settings.h"
 #include "data/data_cloud_file.h"
+#include "data/data_peer_common.h"
 #include "ui/userpic_view.h"
 
 struct BotInfo;
@@ -290,6 +291,7 @@ public:
 
 	[[nodiscard]] int starsPerMessage() const;
 	[[nodiscard]] int starsPerMessageChecked() const;
+	[[nodiscard]] Data::StarsRating starsRating() const;
 
 	[[nodiscard]] UserData *asBot();
 	[[nodiscard]] const UserData *asBot() const;

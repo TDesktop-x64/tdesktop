@@ -1978,9 +1978,9 @@ void InnerWidget::mousePressEvent(QMouseEvent *e) {
 		});
 	} else if (_pressed) {
 		auto row = _pressed;
-		const auto weak = Ui::MakeWeak(this);
+		const auto weak = base::make_weak(this);
 		const auto updateCallback = [weak, row] {
-			const auto strong = weak.data();
+			const auto strong = weak.get();
 			if (!strong || !strong->_pinnedShiftAnimation.animating()) {
 				row->entry()->updateChatListEntry();
 			}
@@ -4095,7 +4095,7 @@ void InnerWidget::refreshEmpty() {
 		_empty->setVisible(_state == WidgetState::Default);
 		if (_emptyList) {
 			_emptyList->setVisible(_state == WidgetState::Default);
-			_empty->setVisible(!_emptyList->isVisible());
+			_empty->setVisible(false);
 		}
 		if (_emptyButton) {
 			_emptyButton->setVisible(_state == WidgetState::Default);

@@ -297,9 +297,9 @@ void AddDocumentActions(
 			item->history()->peer,
 			document);
 		if (notAutoplayedGif) {
-			const auto weak = Ui::MakeWeak(list.get());
+			const auto weak = base::make_weak(list.get());
 			menu->addAction(tr::lng_context_open_gif(tr::now), [=] {
-				if (const auto strong = weak.data()) {
+				if (const auto strong = weak.get()) {
 					OpenGif(strong, contextId);
 				}
 			}, &st::menuIconShowInChat);
@@ -400,7 +400,7 @@ bool AddForwardSelectedAction(
 	}
 
 	menu->addAction(tr::lng_context_forward_selected(tr::now), [=] {
-		const auto weak = Ui::MakeWeak(list);
+		const auto weak = base::make_weak(list);
 		Window::ShowNewForwardMessagesBox(
 			request.navigation,
 			ExtractIdsList(request.selectedItems),
@@ -733,7 +733,7 @@ bool AddSendNowSelectedAction(
 	const auto history = *histories.begin();
 
 	menu->addAction(tr::lng_context_send_now_selected(tr::now), [=] {
-		const auto weak = Ui::MakeWeak(list);
+		const auto weak = base::make_weak(list);
 		const auto callback = [=] {
 			request.navigation->showBackFromStack();
 		};
@@ -1433,9 +1433,9 @@ void EditTagBox(
 			field->showError();
 			return;
 		}
-		const auto weak = Ui::MakeWeak(box);
+		const auto weak = base::make_weak(box);
 		controller->session().data().reactions().renameTag(id, text);
-		if (const auto strong = weak.data()) {
+		if (const auto strong = weak.get()) {
 			strong->closeBox();
 		}
 	};
@@ -1937,10 +1937,10 @@ void AddWhoReactedAction(
 		not_null<HistoryItem*> item,
 		not_null<Window::SessionController*> controller) {
 	const auto whoReadIds = std::make_shared<Api::WhoReadList>();
-	const auto weak = Ui::MakeWeak(menu.get());
+	const auto weak = base::make_weak(menu.get());
 	const auto user = item->history()->peer;
 	const auto showOrPremium = [=] {
-		if (const auto strong = weak.data()) {
+		if (const auto strong = weak.get()) {
 			strong->hideMenu();
 		}
 		const auto type = Ui::ShowOrPremium::ReadTime;
@@ -1955,14 +1955,14 @@ void AddWhoReactedAction(
 	};
 	const auto itemId = item->fullId();
 	const auto participantChosen = [=](Ui::WhoReadParticipant who) {
-		if (const auto strong = weak.data()) {
+		if (const auto strong = weak.get()) {
 			strong->hideMenu();
 		}
 		ShowWhoReadInfo(controller, itemId, who);
 	};
 	const auto showAllChosen = [=, itemId = item->fullId()]{
 		// Pressing on an item that has a submenu doesn't hide it :(
-		if (const auto strong = weak.data()) {
+		if (const auto strong = weak.get()) {
 			strong->hideMenu();
 		}
 		if (const auto item = controller->session().data().message(itemId)) {

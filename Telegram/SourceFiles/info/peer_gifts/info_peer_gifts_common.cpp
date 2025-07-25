@@ -279,12 +279,19 @@ QMargins GiftButton::currentExtend() const {
 	return _extend + QMargins(added, added, added, added);
 }
 
-void GiftButton::toggleSelected(bool selected) {
+void GiftButton::toggleSelected(bool selected, anim::type animated) {
 	if (_selected == selected) {
+		if (animated == anim::type::instant) {
+			_selectedAnimation.stop();
+		}
 		return;
 	}
 	const auto duration = st::defaultRoundCheckbox.duration;
 	_selected = selected;
+	if (animated == anim::type::instant) {
+		_selectedAnimation.stop();
+		return;
+	}
 	_selectedAnimation.start([=] {
 		update();
 	}, selected ? 0. : 1., selected ? 1. : 0., duration, anim::easeOutCirc);
@@ -419,8 +426,12 @@ void GiftButton::paintEvent(QPaintEvent *e) {
 		? v::get<GiftTypeStars>(_descriptor).info.unique.get()
 		: nullptr;
 	const auto onsale = (unique && unique->starsForResale && _small);
+	const auto requirePremium = v::is<GiftTypeStars>(_descriptor)
+		&& !v::get<GiftTypeStars>(_descriptor).userpic
+		&& !v::get<GiftTypeStars>(_descriptor).info.unique
+		&& v::get<GiftTypeStars>(_descriptor).info.requirePremium;
 	const auto hidden = v::is<GiftTypeStars>(_descriptor)
-		&& v::get<GiftTypeStars>(_descriptor).hidden;;
+		&& v::get<GiftTypeStars>(_descriptor).hidden;
 	const auto extend = currentExtend();
 	const auto position = QPoint(extend.left(), extend.top());
 	const auto background = _delegate->background();
@@ -430,6 +441,16 @@ void GiftButton::paintEvent(QPaintEvent *e) {
 	if (unique) {
 		cacheUniqueBackground(unique, width, background.height() / dpr);
 		p.drawImage(extend.left(), extend.top(), _uniqueBackgroundCache);
+	} else if (requirePremium) {
+		auto hq = PainterHighQualityEnabler(p);
+		auto pen = st::creditsFg->p;
+		pen.setWidth(style::ConvertScaleExact(2.));
+		p.setPen(pen);
+		p.setBrush(Qt::NoBrush);
+		const auto outer = QRect(0, 0, width, background.height() / dpr);
+		const auto extend = currentExtend();
+		const auto radius = st::giftBoxGiftRadius;
+		p.drawRoundedRect(outer.marginsRemoved(extend), radius, radius);
 	}
 
 	if (_userpic) {
@@ -515,6 +536,7 @@ void GiftButton::paintEvent(QPaintEvent *e) {
 		const auto pinned = data.pinned || data.pinnedSelection;
 		if (count || pinned) {
 			const auto soldOut = !pinned
+				&& !unique
 				&& !data.userpic
 				&& !data.info.limitedLeft;
 			return GiftBadge{
@@ -526,6 +548,10 @@ void GiftButton::paintEvent(QPaintEvent *e) {
 					? tr::lng_gift_stars_resale(tr::now)
 					: soldOut
 					? tr::lng_gift_stars_sold_out(tr::now)
+					: (!data.userpic
+						&& !data.info.unique
+						&& data.info.requirePremium)
+					? tr::lng_gift_stars_premium(tr::now)
 					: (!data.userpic && !data.info.unique)
 					? tr::lng_gift_stars_limited(tr::now)
 					: (count == 1)
@@ -544,6 +570,8 @@ void GiftButton::paintEvent(QPaintEvent *e) {
 					? st::boxTextFgGood->c
 					: soldOut
 					? st::attentionButtonFg->c
+					: (!data.userpic && data.info.requirePremium)
+					? st::creditsFg->c
 					: st::windowActiveTextFg->c),
 				.bg2 = (onsale
 					? QColor(0, 0, 0, 0)
@@ -1015,9 +1043,9 @@ void SelectGiftToUnpin(
 			}
 			Assert(index < int(pinned.size()));
 			const auto &entry = pinned[index];
-			const auto weak = Ui::MakeWeak(box);
+			const auto weak = base::make_weak(box);
 			chosen(::Settings::EntryToSavedStarGiftId(session, entry));
-			if (const auto strong = weak.data()) {
+			if (const auto strong = weak.get()) {
 				strong->closeBox();
 			}
 		});

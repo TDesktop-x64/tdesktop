@@ -351,6 +351,8 @@ InfoProfileCover {
 	status: FlatLabel;
 	statusLeft: pixels;
 	statusTop: pixels;
+	starsRatingLeft: pixels;
+	starsRatingTop: pixels;
 	showLastSeen: RoundButton;
 	showLastSeenPosition: point;
 	showLastSeenVisible: bool;
@@ -384,6 +386,8 @@ infoProfileCover: InfoProfileCover {
 	status: infoProfileStatus;
 	statusLeft: 109px;
 	statusTop: 58px;
+	starsRatingLeft: 107px;
+	starsRatingTop: 57px;
 	showLastSeen: RoundButton(defaultActiveButton) {
 		textFg: windowSubTextFg;
 		textFgOver: windowSubTextFg;
@@ -1195,3 +1199,89 @@ topicsLayoutButtonIconPadding: margins(4px, 0px, 4px, 0px);
 topicsLayoutButtonIconSize: 140px;
 topicsLayoutButtonPadding: margins(4px, 0px, 4px, 12px);
 topicsLayoutButtonSkip: 0px;
+
+StarsRating {
+	margin: margins;
+	padding: margins;
+	style: TextStyle;
+	minSkip: pixels;
+	border: pixels;
+	activeBg: color;
+	inactiveBg: color;
+	activeFg: color;
+	inactiveFg: color;
+}
+infoStarsRating: StarsRating {
+	margin: margins(6px, 6px, 6px, 6px);
+	padding: margins(6px, 1px, 6px, 1px);
+	style: TextStyle(defaultTextStyle) {
+		font: font(11px semibold);
+	}
+	minSkip: 32px;
+	border: 2px;
+	activeBg: windowBgActive;
+	inactiveBg: windowBgRipple;
+	activeFg: windowFgActive;
+	inactiveFg: windowBoldFg;
+}
+infoStarsRatingLearn: RoundButton(defaultActiveButton) {
+	width: -24px;
+	height: 44px;
+	textTop: 13px;
+	textFg: mediaviewTextLinkFg;
+	textFgOver: mediaviewTextLinkFg;
+	textBg: transparent;
+	textBgOver: transparent;
+	ripple: emptyRippleAnimation;
+}
+infoStarsRatingTooltip: defaultImportantTooltip;
+
+collectionAbout: FlatLabel(defaultFlatLabel) {
+	minWidth: 256px;
+}
+collectionNameField: InputField(defaultInputField) {
+	textBg: transparent;
+	textMargins: margins(2px, 10px, 32px, 2px);
+
+	placeholderFg: placeholderFg;
+	placeholderFgActive: placeholderFgActive;
+	placeholderFgError: placeholderFgActive;
+	placeholderMargins: margins(2px, 0px, 2px, 0px);
+	placeholderScale: 0.;
+
+	heightMin: 36px;
+}
+collectionEmptyTitle: FlatLabel(boxTitle) {
+}
+collectionEmptyText: FlatLabel(defaultFlatLabel) {
+	textFg: windowSubTextFg;
+}
+collectionEmptyTitleMargin: margins(10px, 24px, 10px, 4px);
+collectionEmptyTextMargin: margins(10px, 4px, 10px, 12px);
+collectionEmptyAddMargin: margins(10px, 12px, 10px, 24px);
+collectionAddIcon: IconEmoji {
+	icon: icon {{ "settings/plus", windowFgActive }};
+	padding: margins(1px, -2px, 1px, 0px);
+}
+collectionEditBox: Box(defaultBox) {
+	buttonPadding: margins(16px, 12px, 16px, 12px);
+	buttonHeight: 42px;
+	buttonWide: true;
+	button: RoundButton(defaultActiveButton) {
+		height: 42px;
+		textTop: 12px;
+		style: semiboldTextStyle;
+	}
+}
+collectionEditMenuToggle: IconButton(infoTopBarMenu) {
+	width: boxTitleHeight;
+	height: boxTitleHeight;
+
+	icon: icon {{ "title_menu_dots", boxTitleCloseFg }};
+	iconOver: icon {{ "title_menu_dots", boxTitleCloseFgOver }};
+	iconPosition: point(-1px, -1px);
+
+	rippleAreaPosition: point(4px, 4px);
+	rippleAreaSize: 40px;
+	ripple: defaultRippleAnimationBgOver;
+}

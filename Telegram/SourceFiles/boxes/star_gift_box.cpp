@@ -777,6 +777,19 @@ void ShowSentToast(
 			tr::now,
 			Text::RichLangValue);
 	}, [&](const GiftTypeStars &gift) {
+		if (gift.info.perUserTotal && gift.info.perUserRemains < 2) {
+			return tr::lng_gift_sent_finished(
+				tr::now,
+				lt_count,
+				gift.info.perUserTotal,
+				Text::RichLangValue);
+		} else if (gift.info.perUserTotal) {
+			return tr::lng_gift_sent_remains(
+				tr::now,
+				lt_count,
+				gift.info.perUserRemains - 1,
+				Text::RichLangValue);
+		}
 		const auto amount = gift.info.stars
 			+ (details.upgraded ? gift.info.starsToUpgrade : 0);
 		return tr::lng_gift_sent_about(
@@ -1114,6 +1127,7 @@ void PreviewWrap::paintEvent(QPaintEvent *e) {
 			MTPpayments_GetSavedStarGifts(
 			MTP_flags(Flag::f_exclude_limited | Flag::f_exclude_unlimited),
 			user->input,
+			MTP_int(0), // collection_id
 			MTP_string(offset),
 			MTP_int(kMyGiftsPerPage)
 		)).done([=](const MTPpayments_SavedStarGifts &result) {
@@ -2503,9 +2517,6 @@ void SendGiftBox(
 					rpl::single(peer->shortName()))));
 	});
 
-	const auto buttonWidth = st::boxWideWidth
-		- st::giftBox.buttonPadding.left()
-		- st::giftBox.buttonPadding.right();
 	const auto button = box->addButton(rpl::single(QString()), [=] {
 		if (state->submitting) {
 			return;
@@ -2515,18 +2526,19 @@ void SendGiftBox(
 		if (!state->messageAllowed.current()) {
 			details.text = {};
 		}
-		const auto weak = MakeWeak(box);
+		const auto copy = state->media; // Let media outlive the box.
+		const auto weak = base::make_weak(box);
 		const auto done = [=](Payments::CheckoutResult result) {
 			if (result == Payments::CheckoutResult::Paid) {
 				if (details.byStars
 					|| v::is<GiftTypeStars>(details.descriptor)) {
 					window->session().credits().load(true);
 				}
-				const auto copy = state->media;
+				const auto another = copy; // Let media outlive the box.
 				window->showPeerHistory(peer);
 				ShowSentToast(window, details.descriptor, details);
 			}
-			if (const auto strong = weak.data()) {
+			if (const auto strong = weak.get()) {
 				strong->closeBox();
 			}
 		};
@@ -2546,12 +2558,6 @@ void SendGiftBox(
 		session,
 		st::creditsBoxButtonLabel,
 		&st::giftBox.button.textFg);
-	button->resizeToWidth(buttonWidth);
-	button->widthValue() | rpl::start_with_next([=](int width) {
-		if (width != buttonWidth) {
-			button->resizeToWidth(buttonWidth);
-		}
-	}, button->lifetime());
 }
 
 [[nodiscard]] rpl::producer<ResaleGiftsDescriptor> ResaleGiftsSlice(
@@ -2748,7 +2754,12 @@ void SendGiftBox(
 			button->setClickedCallback([=] {
 				const auto star = std::get_if<GiftTypeStars>(&descriptor);
 				const auto unique = star ? star->info.unique : nullptr;
-				if (unique && star->mine && !peer->isSelf()) {
+				if (star
+					&& star->info.requirePremium
+					&& !peer->session().premium()) {
+					Settings::ShowPremiumGiftPremium(window, star->info);
+					return;
+				} else if (unique && star->mine && !peer->isSelf()) {
 					if (ShowTransferGiftLater(window->uiShow(), unique)) {
 						return;
 					}
@@ -4336,12 +4347,12 @@ void ShowUniqueGiftWearBox(
 					return;
 				}
 				*checking = true;
-				const auto weak = Ui::MakeWeak(box);
+				const auto weak = base::make_weak(box);
 				CheckBoostLevel(show, peer, [=](int level) {
 					const auto limits = Data::LevelLimits(&peer->session());
 					const auto wanted = limits.channelEmojiStatusLevelMin();
 					if (level >= wanted) {
-						if (const auto strong = weak.data()) {
+						if (const auto strong = weak.get()) {
 							strong->closeBox();
 						}
 						emojiStatuses->set(peer, id);
@@ -4834,13 +4845,13 @@ void UpgradeBox(
 		}
 		state->sent = true;
 		const auto keepDetails = state->preserveDetails;
-		const auto weak = Ui::MakeWeak(box);
+		const auto weak = base::make_weak(box);
 		const auto done = [=](Payments::CheckoutResult result) {
 			if (result != Payments::CheckoutResult::Paid) {
 				state->sent = false;
 			} else {
 				controller->showPeerHistory(args.peer);
-				if (const auto strong = weak.data()) {
+				if (const auto strong = weak.get()) {
 					strong->closeBox();
 				}
 			}

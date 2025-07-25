@@ -121,6 +121,14 @@ int AppConfig::pinnedGiftsLimit() const {
 	return get<int>(u"stargifts_pinned_to_top_limit"_q, 6);
 }
 
+int AppConfig::giftCollectionsLimit() const {
+	return get<int>(u"stargifts_collections_limit"_q, 10);
+}
+
+int AppConfig::giftCollectionGiftsLimit() const {
+	return get<int>(u"stargifts_collection_gifts_limit"_q, 500);
+}
+
 bool AppConfig::callsDisabledForSession() const {
 	const auto authorizations = _account->sessionExists()
 		? &_account->session().api().authorizations()
@@ -206,6 +214,28 @@ int AppConfig::suggestedPostDelayMax() const {
 
 TimeId AppConfig::suggestedPostAgeMin() const {
 	return get<int>(u"stars_suggested_post_age_min"_q, 86400);
+}
+
+bool AppConfig::ageVerifyNeeded() const {
+	return get<bool>(u"need_age_video_verification"_q, false);
+}
+
+QString AppConfig::ageVerifyCountry() const {
+	return get<QString>(u"verify_age_country"_q, QString());
+}
+
+int AppConfig::ageVerifyMinAge() const {
+	return get<int>(u"verify_age_min"_q, 18);
+}
+
+QString AppConfig::ageVerifyBotUsername() const {
+	return get<QString>(u"verify_age_bot_username"_q, QString());
+}
+
+QString AppConfig::starsRatingLearnMoreUrl() const {
+	return get<QString>(
+		u"stars_rating_learnmore_url"_q,
+		u"https://telegram.org/blog"_q);
 }
 
 void AppConfig::refresh(bool force) {

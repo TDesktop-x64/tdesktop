@@ -2202,6 +2202,7 @@ void Gif::ensureTranscribeButton() const {
 	if (_data->isVideoMessage()
 		&& !_parent->data()->media()->ttlSeconds()
 		&& !_parent->data()->isScheduled()
+		&& !_parent->data()->isAdminLogEntry()
 		&& (_data->session().premium()
 			|| _data->session().api().transcribes().trialsSupport())) {
 		if (!_transcribe) {

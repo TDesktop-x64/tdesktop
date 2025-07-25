@@ -78,6 +78,8 @@ public:
 	[[nodiscard]] int paidMessageChannelStarsDefault() const;
 
 	[[nodiscard]] int pinnedGiftsLimit() const;
+	[[nodiscard]] int giftCollectionsLimit() const;
+	[[nodiscard]] int giftCollectionGiftsLimit() const;
 
 	[[nodiscard]] bool callsDisabledForSession() const;
 	[[nodiscard]] int confcallSizeLimit() const;
@@ -101,6 +103,13 @@ public:
 	[[nodiscard]] int suggestedPostDelayMin() const;
 	[[nodiscard]] int suggestedPostDelayMax() const;
 	[[nodiscard]] TimeId suggestedPostAgeMin() const;
+
+	[[nodiscard]] bool ageVerifyNeeded() const;
+	[[nodiscard]] QString ageVerifyCountry() const;
+	[[nodiscard]] int ageVerifyMinAge() const;
+	[[nodiscard]] QString ageVerifyBotUsername() const;
+
+	[[nodiscard]] QString starsRatingLearnMoreUrl() const;
 
 	void refresh(bool force = false);
 

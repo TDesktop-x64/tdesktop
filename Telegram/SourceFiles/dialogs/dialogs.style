@@ -731,7 +731,7 @@ dialogsTabsScroll: ScrollArea(defaultScrollArea) {
 	barHidden: true;
 }
 dialogsSearchTabs: SettingsSlider(defaultSettingsSlider) {
-	padding: 8px;
+	padding: 9px;
 	height: 33px;
 	barTop: 30px;
 	barSkip: 0px;
@@ -825,6 +825,7 @@ dialogsSponsoredButton: DialogRightButton(dialogRowOpenBot) {
 	margin: margins(0px, 9px, 10px, 0px);
 }
 
+dialogsTopBarLeftPadding: 18px;
 dialogsTopBarSuggestionTitleStyle: TextStyle(defaultTextStyle) {
 	font: font(semibold 12px);
 }

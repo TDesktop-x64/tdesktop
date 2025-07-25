@@ -31,17 +31,20 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/media/history_view_sticker_player.h"
 #include "lang/lang_keys.h"
 #include "ui/boxes/show_or_premium_box.h"
+#include "ui/controls/stars_rating.h"
 #include "ui/controls/userpic_button.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/labels.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/text/text_utilities.h"
+#include "ui/basic_click_handlers.h"
 #include "ui/ui_utility.h"
 #include "ui/painter.h"
 #include "base/event_filter.h"
 #include "base/unixtime.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
+#include "main/main_app_config.h"
 #include "main/main_session.h"
 #include "settings/settings_premium.h"
 #include "chat_helpers/stickers_lottie.h"
@@ -653,6 +656,13 @@ Cover::Cover(
 	? object_ptr<TopicIconButton>(this, controller, topic)
 	: nullptr)
 , _name(this, _st.name)
+, _starsRating(_peer->isUser()
+	? std::make_unique<Ui::StarsRating>(
+		this,
+		st::infoStarsRating,
+		Data::StarsRatingValue(_peer),
+		_parentForTooltip)
+	: nullptr)
 , _status(this, _st.status)
 , _id(
 	this,
@@ -669,6 +679,21 @@ Cover::Cover(
 
 	if (!_peer->isMegagroup()) {
 		_status->setAttribute(Qt::WA_TransparentForMouseEvents);
+		if (const auto rating = _starsRating.get()) {
+			_status->widthValue() | rpl::start_with_next([=](int width) {
+				rating->setMinimalAddedWidth(width);
+			}, rating->lifetime());
+			const auto session = &_peer->session();
+			rating->learnMoreRequests() | rpl::start_with_next([=] {
+				const auto &appConfig = session->appConfig();
+				UrlClickHandler::Open(appConfig.starsRatingLearnMoreUrl());
+			}, rating->lifetime());
+			_statusShift = rating->collapsedWidthValue();
+			_statusShift.changes() | rpl::start_with_next([=] {
+				refreshStatusGeometry(width());
+			}, _status->lifetime());
+			rating->raise();
+		}
 	}
 
 	setupShowLastSeen();
@@ -1095,9 +1120,13 @@ void Cover::refreshNameGeometry(int newWidth) {
 }
 
 void Cover::refreshStatusGeometry(int newWidth) {
-	auto statusWidth = newWidth - _st.statusLeft - _st.rightSkip;
-	_status->resizeToWidth(statusWidth);
-	_status->moveToLeft(_st.statusLeft, _st.statusTop, newWidth);
+	if (const auto rating = _starsRating.get()) {
+		rating->moveTo(_st.starsRatingLeft, _st.starsRatingTop);
+	}
+	const auto statusLeft = _st.statusLeft + _statusShift.current();
+	auto statusWidth = newWidth - statusLeft - _st.rightSkip;
+	_status->resizeToNaturalWidth(statusWidth);
+	_status->moveToLeft(statusLeft, _st.statusTop, newWidth);
 	const auto left = _st.statusLeft + _status->textMaxWidth();
 	_showLastSeen->moveToLeft(
 		left + _st.showLastSeenPosition.x(),

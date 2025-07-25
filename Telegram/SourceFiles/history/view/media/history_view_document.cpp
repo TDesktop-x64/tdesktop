@@ -421,6 +421,7 @@ QSize Document::countOptimalSize() {
 		const auto transcribes = &session->api().transcribes();
 		if (_parent->data()->media()->ttlSeconds()
 			|| _realParent->isScheduled()
+			|| _realParent->isAdminLogEntry()
 			|| (!session->premium()
 				&& !transcribes->freeFor(_realParent)
 				&& !transcribes->trialsSupport())

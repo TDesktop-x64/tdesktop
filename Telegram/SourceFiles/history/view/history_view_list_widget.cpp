@@ -4365,9 +4365,9 @@ void ConfirmForwardSelectedItems(not_null<ListWidget*> widget) {
 		}
 	}
 	auto ids = widget->getSelectedIds();
-	const auto weak = Ui::MakeWeak(widget);
+	const auto weak = base::make_weak(widget);
 	Window::ShowNewForwardMessagesBox(widget->controller(), std::move(ids), false, [=] {
-		if (const auto strong = weak.data()) {
+		if (const auto strong = weak.get()) {
 			strong->cancelSelection();
 		}
 	});
@@ -4384,9 +4384,9 @@ void ConfirmForwardNoQuoteSelectedItems(not_null<ListWidget*> widget) {
 		}
 	}
 	auto ids = widget->getSelectedIds();
-	const auto weak = Ui::MakeWeak(widget);
+	const auto weak = base::make_weak(widget);
 	Window::ShowNewForwardMessagesBox(widget->controller(), std::move(ids), true, [=] {
-		if (const auto strong = weak.data()) {
+		if (const auto strong = weak.get()) {
 			strong->cancelSelection();
 		}
 	});
@@ -4410,7 +4410,7 @@ void ConfirmForwardSelectedToSavedMessagesItems(not_null<ListWidget*> widget) {
 			return;
 		}
 	}
-	const auto weak = Ui::MakeWeak(widget);
+	const auto weak = base::make_weak(widget);
 
 	const auto itemsList = ExtractIdsList(items);
 	const auto item = widget->controller()->session().data().message(itemsList[0]);
@@ -4429,7 +4429,7 @@ void ConfirmForwardSelectedToSavedMessagesItems(not_null<ListWidget*> widget) {
 	api->forwardMessages(std::move(resolved), action, [=] {
 		Ui::Toast::Show(tr::lng_share_done(tr::now));
 
-		if (const auto strong = weak.data()) {
+		if (const auto strong = weak.get()) {
 			strong->cancelSelection();
 		}
 	});

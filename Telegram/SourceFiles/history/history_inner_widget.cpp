@@ -5028,9 +5028,9 @@ void HistoryInner::oldForwardAsGroup(FullMsgId itemId) {
 }
 
 void HistoryInner::forwardItem(FullMsgId itemId) {
-	const auto weak = Ui::MakeWeak(this);
+	const auto weak = base::make_weak(this);
 	Window::ShowNewForwardMessagesBox(_controller, { 1, itemId }, false, [=] {
-		if (const auto strong = weak.data()) {
+		if (const auto strong = weak.get()) {
 			strong->clearSelected();
 		}
 	});
@@ -5038,13 +5038,13 @@ void HistoryInner::forwardItem(FullMsgId itemId) {
 
 void HistoryInner::forwardAsGroup(FullMsgId itemId) {
 	if (const auto item = session().data().message(itemId)) {
-		const auto weak = Ui::MakeWeak(this);
+		const auto weak = base::make_weak(this);
 		Window::ShowNewForwardMessagesBox(
 			_controller,
 			session().data().itemOrItsGroup(item),
 			false, 
 			[=] {
-				if (const auto strong = weak.data()) {
+				if (const auto strong = weak.get()) {
 					strong->clearSelected();
 				}
 			});
@@ -5052,9 +5052,9 @@ void HistoryInner::forwardAsGroup(FullMsgId itemId) {
 }
 
 void HistoryInner::forwardItemNoQuote(FullMsgId itemId) {
-	const auto weak = Ui::MakeWeak(this);
+	const auto weak = base::make_weak(this);
 	Window::ShowNewForwardMessagesBox(_controller, { 1, itemId }, true, [=] {
-		if (const auto strong = weak.data()) {
+		if (const auto strong = weak.get()) {
 			strong->clearSelected();
 		}
 	});
@@ -5062,13 +5062,13 @@ void HistoryInner::forwardItemNoQuote(FullMsgId itemId) {
 
 void HistoryInner::forwardAsGroupNoQuote(FullMsgId itemId) {
 	if (const auto item = session().data().message(itemId)) {
-		const auto weak = Ui::MakeWeak(this);
+		const auto weak = base::make_weak(this);
 		Window::ShowNewForwardMessagesBox(
 			_controller,
 			session().data().itemOrItsGroup(item),
 			true, 
 			[=] {
-				if (const auto strong = weak.data()) {
+				if (const auto strong = weak.get()) {
 					strong->clearSelected();
 				}
 			});

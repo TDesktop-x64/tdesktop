@@ -406,25 +406,25 @@ bool AddForwardSelectedAction(
 			ExtractIdsList(request.selectedItems),
 			false,
 			[=] {
-				if (const auto strong = weak.data()) {
+				if (const auto strong = weak.get()) {
 					strong->cancelSelection();
 				}
 			});
 	}, &st::menuIconForward);
 	menu->addAction(tr::lng_context_forward_selected_no_quote(tr::now), [=] {
-		const auto weak = Ui::MakeWeak(list);
+		const auto weak = base::make_weak(list);
 		Window::ShowNewForwardMessagesBox(
 				request.navigation,
 				ExtractIdsList(request.selectedItems),
 				true,
 				[=] {
-					if (const auto strong = weak.data()) {
+					if (const auto strong = weak.get()) {
 						strong->cancelSelection();
 					}
 				});
 	}, &st::menuIconForward);
 	menu->addAction(tr::lng_forward_to_saved_message(tr::now), [=] {
-		const auto weak = Ui::MakeWeak(list);
+		const auto weak = base::make_weak(list);
 		const auto items = ExtractIdsList(request.selectedItems);
 		const auto item = request.navigation->session().data().message(items[0]);
 		const auto api = &item->history()->peer->session().api();
@@ -442,7 +442,7 @@ bool AddForwardSelectedAction(
 		api->forwardMessages(std::move(resolved), action, [=] {
 			Ui::Toast::Show(tr::lng_share_done(tr::now));
 
-			if (const auto strong = weak.data()) {
+			if (const auto strong = weak.get()) {
 				strong->cancelSelection();
 			}
 		});
@@ -473,14 +473,14 @@ bool AddForwardMessageAction(
 	auto fwdSubmenu = std::make_unique<Ui::PopupMenu>(list, st::popupMenuWithIcons);
 	fwdSubmenu->addAction(tr::lng_context_forward_msg_old(tr::now), [=] {
 		if (const auto item = owner->message(itemId)) {
-			const auto weak = Ui::MakeWeak(list);
+			const auto weak = base::make_weak(list);
 			Window::ShowForwardMessagesBox(
 				request.navigation,
 				(asGroup
 					? owner->itemOrItsGroup(item)
 					: MessageIdsList{ 1, itemId }),
 				[=] {
-					if (const auto strong = weak.data()) {
+					if (const auto strong = weak.get()) {
 						strong->cancelSelection();
 					}
 				});
@@ -488,14 +488,14 @@ bool AddForwardMessageAction(
 		}, &st::menuIconForward);
 	fwdSubmenu->addAction(tr::lng_context_forward_msg(tr::now), [=] {
 		if (const auto item = owner->message(itemId)) {
-			const auto weak = Ui::MakeWeak(list);
+			const auto weak = base::make_weak(list);
 			Window::ShowNewForwardMessagesBox(
 				request.navigation,
 				(asGroup
 					? owner->itemOrItsGroup(item)
 					: MessageIdsList{ 1, itemId }), false,
 				[=] {
-					if (const auto strong = weak.data()) {
+					if (const auto strong = weak.get()) {
 						strong->cancelSelection();
 					}
 				});
@@ -503,7 +503,7 @@ bool AddForwardMessageAction(
 	}, &st::menuIconForward);
 	fwdSubmenu->addAction(tr::lng_context_forward_msg_no_quote(tr::now), [=] {
 		if (const auto item = owner->message(itemId)) {
-			const auto weak = Ui::MakeWeak(list);
+			const auto weak = base::make_weak(list);
 			Window::ShowNewForwardMessagesBox(
 					request.navigation,
 					(asGroup
@@ -511,7 +511,7 @@ bool AddForwardMessageAction(
 					 : MessageIdsList{ 1, itemId }),
 					true, 
 					[=] {
-					if (const auto strong = weak.data()) {
+					if (const auto strong = weak.get()) {
 						strong->cancelSelection();
 					}
 				});

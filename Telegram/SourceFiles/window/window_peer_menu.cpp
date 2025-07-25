@@ -2698,7 +2698,7 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 				|| Data::CanSend(thread, ChatRestriction::SendInline))
 			&& (!isGame || !thread->peer()->isBroadcast());
 	};
-	const auto weak = std::make_shared<QPointer<ShareBox>>();
+	const auto weak = std::make_shared<base::weak_qptr<ShareBox>>();
 	*weak = Ui::show(Box<ShareBox>(ShareBox::Descriptor{
 						.session = session,
 						.submitCallback = ShareBox::DefaultForwardCallback(
@@ -2717,10 +2717,10 @@ QPointer<Ui::BoxContent> ShowNewForwardMessagesBox(
 						},
 						.moneyRestrictionError = WriteMoneyRestrictionError,
 					}), Ui::LayerOption::CloseOther);
-	return weak->data();
+	return weak->get();
 }
 
-QPointer<Ui::BoxContent> ShowForwardMessagesBox(
+base::weak_qptr<Ui::BoxContent> ShowForwardMessagesBox(
 		std::shared_ptr<ChatHelpers::Show> show,
 		Data::ForwardDraft &&draft,
 		Fn<void()> &&successCallback) {

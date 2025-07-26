@@ -880,6 +880,10 @@ void AddViewJSONAction(
 	not_null<Ui::PopupMenu*> menu,
 	const ContextMenuRequest& request,
 	not_null<ListWidget*> list) {
+	if (!GetEnhancedBool("show_json"))
+	{
+		return;
+	}
 	const auto item = request.item;
 	if (item == nullptr)
 	{
@@ -892,7 +896,7 @@ void AddViewJSONAction(
 	const auto itemId = item->fullId();
 	menu->addAction(tr::lng_context_view_as_json(tr::now), [=] {
 		HistoryView::ViewAsJSON(controller, itemId);
-	}, &st::menuIconLink);
+	}, &st::menuIcon64gJson);
 }
 
 bool AddReplyToMessageAction(

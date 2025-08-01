@@ -661,7 +661,10 @@ Cover::Cover(
 		this,
 		_controller->uiShow(),
 		_peer->isSelf() ? QString() : _peer->shortName(),
-		Data::StarsRatingValue(_peer))
+		Data::StarsRatingValue(_peer),
+		(_peer->isSelf()
+			? [=] { return _peer->owner().pendingStarsRating(); }
+			: Fn<Data::StarsRatingPending()>()))
 	: nullptr)
 , _status(this, _st.status)
 , _id(

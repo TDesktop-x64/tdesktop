@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "ui/controls/stars_rating.h"
 
+#include "base/unixtime.h"
 #include "info/profile/info_profile_icon.h"
 #include "lang/lang_keys.h"
 #include "ui/effects/premium_bubble.h"
@@ -22,6 +23,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/painter.h"
 #include "ui/rp_widget.h"
 #include "ui/ui_utility.h"
+#include "styles/style_chat.h" // textMoreIconEmoji
 #include "styles/style_info.h"
 #include "styles/style_info_levels.h"
 #include "styles/style_layers.h"
@@ -121,6 +123,9 @@ struct Feature {
 }
 
 [[nodiscard]] Counters AdjustByReached(Counters data) {
+	if (data.stars < 0) {
+		return data;
+	}
 	const auto reached = !data.nextLevelStars;
 	if (reached) {
 		--data.level;
@@ -153,13 +158,19 @@ void FillRatingLimit(
 		rpl::producer<> showFinished,
 		not_null<VerticalLayout*> container,
 		rpl::producer<Counters> data,
+		Premium::BubbleType type,
 		style::margins limitLinePadding,
-		int starsForScale) {
+		int starsForScale,
+		bool hideCount) {
 	const auto addSkip = [&](int skip) {
 		container->add(object_ptr<Ui::FixedHeightWidget>(container, skip));
 	};
 
+	const auto negative = (type == Premium::BubbleType::NegativeRating);
 	const auto ratio = [=](Counters rating) {
+		if (negative) {
+			return 0.5;
+		}
 		const auto min = rating.thisLevelStars;
 		const auto max = rating.nextLevelStars;
 
@@ -209,12 +220,14 @@ void FillRatingLimit(
 	});
 	Premium::AddBubbleRow(
 		container,
-		st::boostBubble,
+		(hideCount ? st::iconOnlyPremiumBubble : st::boostBubble),
 		std::move(showFinished),
 		rpl::duplicate(bubbleRowState),
-		Premium::BubbleType::StarRating,
-		BubbleTextFactory(starsForScale),
-		&st::infoStarsCrown,
+		type,
+		(hideCount
+			? [](int) { return QString(); }
+			: BubbleTextFactory(starsForScale)),
+		negative ? &st::levelNegativeBubble : &st::infoStarsCrown,
 		limitLinePadding);
 	addSkip(st::premiumLineTextSkip);
 
@@ -223,30 +236,35 @@ void FillRatingLimit(
 	};
 	auto limitState = std::move(
 		bubbleRowState
-	) | rpl::map([](const Premium::BubbleRowState &state) {
+	) | rpl::map([negative](const Premium::BubbleRowState &state) {
 		return Premium::LimitRowState{
-			.ratio = state.ratio,
-			.animateFromZero = state.animateFromZero,
+			.ratio = negative ? 0.5 : state.ratio,
+			.animateFromZero = !negative && state.animateFromZero,
 			.dynamic = state.dynamic
 		};
 	});
 	auto left = rpl::duplicate(
 		adjustedData
 	) | rpl::map([=](Counters counters) {
-		return level(counters.level);
+		return (counters.level < 0) ? QString() : level(counters.level);
 	});
 	auto right = rpl::duplicate(
 		adjustedData
 	) | rpl::map([=](Counters counters) {
-		return level(counters.level + 1);
+		return (counters.level < 0)
+			? tr::lng_stars_rating_negative_label(tr::now)
+			: level(counters.level + 1);
 	});
 	Premium::AddLimitRow(
 		container,
-		st::boostLimits,
+		(negative ? st::negativeStarsLimits : st::boostLimits),
 		Premium::LimitRowLabels{
 			.leftLabel = std::move(left),
 			.rightLabel = std::move(right),
-			.activeLineBg = [=] { return st::windowBgActive->b; },
+			.activeLineBg = [=] { return negative
+				? st::attentionButtonFg->b
+				: st::windowBgActive->b;
+			},
 		},
 		std::move(limitState),
 		limitLinePadding);
@@ -255,30 +273,36 @@ void FillRatingLimit(
 void AboutRatingBox(
 		not_null<GenericBox*> box,
 		const QString &name,
-		Counters data) {
+		Counters data,
+		Data::StarsRatingPending pending) {
 	box->setWidth(st::boxWideWidth);
 	box->setStyle(st::boostBox);
 
 	struct State {
 		rpl::variable<Counters> data;
+		rpl::variable<bool> pending;
 		rpl::variable<bool> full;
 	};
 	const auto state = box->lifetime().make_state<State>();
-	state->data = std::move(data);
+	state->data = data;
 
 	FillRatingLimit(
 		BoxShowFinishes(box),
 		box->verticalLayout(),
 		state->data.value(),
+		(data.level < 0
+			? Premium::BubbleType::NegativeRating
+			: Premium::BubbleType::StarRating),
 		st::boxRowPadding,
-		data.stars);
+		data.stars,
+		(data.level < 0 && !data.stars));
 
 	box->setMaxHeight(st::boostBoxMaxHeight);
-	const auto close = box->addTopButton(
-		st::boxTitleClose,
-		[=] { box->closeBox(); });
 
-	auto title = tr::lng_stars_rating_title();;
+	auto title = rpl::conditional(
+		state->pending.value(),
+		tr::lng_stars_rating_future(),
+		tr::lng_stars_rating_title());
 
 	auto text = !name.isEmpty()
 		? tr::lng_stars_rating_about(
@@ -288,9 +312,70 @@ void AboutRatingBox(
 		: tr::lng_stars_rating_about_your(
 			Ui::Text::RichLangValue) | rpl::type_erased();
 
+	if (data.level < 0) {
+		auto text = (data.stars < 0)
+			? tr::lng_stars_rating_negative_your(
+				lt_count_decimal,
+				rpl::single(-data.stars * 1.),
+				Ui::Text::RichLangValue)
+			: tr::lng_stars_rating_negative(
+				lt_name,
+				rpl::single(TextWithEntities{ name }),
+				Ui::Text::RichLangValue);
+		const auto aboutNegative = box->addRow(
+			object_ptr<Ui::FlatLabel>(
+				box,
+				std::move(text),
+				st::boostTextNegative),
+			(st::boxRowPadding
+				+ QMargins(0, st::boostTextSkip, 0, st::boostBottomSkip)));
+		aboutNegative->setTryMakeSimilarLines(true);
+	}
+
 	box->addRow(
 		object_ptr<Ui::FlatLabel>(box, std::move(title), st::infoStarsTitle),
 		st::boxRowPadding + QMargins(0, st::boostTitleSkip / 2, 0, 0));
+
+	if (pending) {
+		const auto now = base::unixtime::now();
+		const auto days = std::max((pending.date - now + 43200) / 86400, 1);
+		auto text = state->pending.value(
+		) | rpl::map([=](bool value) {
+			return tr::lng_stars_rating_pending(
+				tr::now,
+				lt_count_decimal,
+				pending.value.stars - data.stars,
+				lt_when,
+				TextWithEntities{
+					tr::lng_stars_rating_updates(tr::now, lt_count, days),
+				},
+				lt_link,
+				Ui::Text::Link((value
+					? tr::lng_stars_rating_pending_back
+					: tr::lng_stars_rating_pending_preview)(
+						tr::now,
+						lt_arrow,
+						Ui::Text::IconEmoji(&st::textMoreIconEmoji),
+						Ui::Text::WithEntities)),
+				Ui::Text::RichLangValue);
+		});
+		const auto aboutPending = box->addRow(
+			object_ptr<Ui::FlatLabel>(
+				box,
+				std::move(text),
+				st::boostTextPending),
+			(st::boxRowPadding
+				+ QMargins(0, st::boostTextSkip, 0, st::boostBottomSkip)));
+		aboutPending->setTryMakeSimilarLines(true);
+		aboutPending->setClickHandlerFilter([=](const auto &...) {
+			state->pending = !state->pending.current();
+			state->data = state->pending.current()
+				? pending.value
+				: data;
+			box->verticalLayout()->resizeToWidth(box->width());
+			return false;
+		});
+	}
 
 	const auto aboutLabel = box->addRow(
 		object_ptr<Ui::FlatLabel>(
@@ -357,6 +442,9 @@ void AboutRatingBox(
 }
 
 [[nodiscard]] not_null<const style::LevelShape*> SelectShape(int level) {
+	if (level < 0) {
+		return &st::levelNegative;
+	}
 	struct Shape {
 		int level = 0;
 		not_null<const style::LevelShape*> shape;
@@ -395,11 +483,13 @@ StarsRating::StarsRating(
 	QWidget *parent,
 	std::shared_ptr<Ui::Show> show,
 	const QString &name,
-	rpl::producer<Counters> value)
+	rpl::producer<Counters> value,
+	Fn<Data::StarsRatingPending()> pending)
 : _widget(std::make_unique<Ui::AbstractButton>(parent))
 , _show(std::move(show))
 , _name(name)
-, _value(std::move(value)) {
+, _value(std::move(value))
+, _pending(std::move(pending)) {
 	init();
 }
 
@@ -417,7 +507,9 @@ void StarsRating::init() {
 		if (!_value.current()) {
 			return;
 		}
-		_show->show(Box(AboutRatingBox, _name, _value.current()));
+		_show->show(Box(AboutRatingBox, _name, _value.current(), _pending
+			? _pending()
+			: Data::StarsRatingPending()));
 	});
 
 	_widget->resize(_widget->width(), st::level1.icon.height());
@@ -435,7 +527,9 @@ void StarsRating::updateData(Data::StarsRating rating) {
 		_shape = SelectShape(rating.level);
 		_collapsedText.setText(
 			st::levelStyle,
-			Lang::FormatCountDecimal(rating.level));
+			(rating.level < 0
+				? QString()
+				: Lang::FormatCountDecimal(rating.level)));
 		_widthValue = _shape->icon.width() - st::levelMargin.left();
 	}
 	updateWidth();

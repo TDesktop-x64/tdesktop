@@ -1878,11 +1878,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 "lng_stars_rating_title" = "Rating";
 "lng_stars_rating_future" = "Future Rating";
-"lng_stars_rating_subtitle" = "The rating update updates in 21 days after purchases.";
-"lng_stars_rating_pending#one" = "{count} point is pending. {link}";
-"lng_stars_rating_pending#other" = "{count} points are pending. {link}";
+"lng_stars_rating_updates#one" = "in {count} day";
+"lng_stars_rating_updates#other" = "in {count} days";
+"lng_stars_rating_pending#one" = "The rating will update {when}.\n{count} point is pending. {link}";
+"lng_stars_rating_pending#other" = "The rating will update {when}.\n{count} points are pending. {link}";
 "lng_stars_rating_pending_preview" = "Preview {arrow}";
 "lng_stars_rating_pending_back" = "Back {arrow}";
+"lng_stars_rating_negative_label" = "Negative Rating";
+"lng_stars_rating_negative" = "A negative rating indicates that **{name}'s** payments are unreliable.";
+"lng_stars_rating_negative_your#one" = "A negative rating indicates that your payments are unreliable. Spend **{count} Star** to fix this issue.";
+"lng_stars_rating_negative_your#other" = "A negative rating indicates that your payments are unreliable. Spend **{count} Stars** to fix this issue.";
 "lng_stars_rating_about" = "This rating reflects **{name}'s** activity on Telegram. What affects it:";
 "lng_stars_rating_about_your" = "This rating reflects your activity on Telegram. What affects it:";
 "lng_stars_title_gifts_telegram" = "Gifts from Telegram";
@@ -3798,6 +3803,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_gift_collection_empty_text" = "Add some of your gifts to this collection.";
 "lng_gift_collection_all" = "All Gifts";
 "lng_gift_collection_add_title" = "Add Gifts";
+"lng_gift_collection_add_button" = "Add Gifts";
 "lng_gift_collection_share" = "Share Collection";
 "lng_gift_collection_edit" = "Edit Name";
 "lng_gift_collection_limit_title" = "Limit Reached";
@@ -6509,6 +6515,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_stories_album_empty_text" = "Add some of your stories to this album.";
 "lng_stories_album_all" = "All Stories";
 "lng_stories_album_add_title" = "Add Stories";
+"lng_stories_album_add_button" = "Add Stories";
 "lng_stories_album_share" = "Share Album";
 "lng_stories_album_edit" = "Edit Name";
 "lng_stories_album_limit_title" = "Limit Reached";

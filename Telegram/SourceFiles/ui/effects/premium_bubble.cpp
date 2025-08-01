@@ -15,6 +15,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/wrap/padding_wrap.h"
 #include "ui/wrap/vertical_layout.h"
 #include "ui/painter.h"
+#include "styles/style_info_levels.h"
 #include "styles/style_layers.h"
 #include "styles/style_premium.h"
 
@@ -64,7 +65,7 @@ crl::time Bubble::SlideNoDeflectionDuration() {
 	return kSlideDuration * kStepBeforeDeflection;
 }
 
-int Bubble::counter() const {
+std::optional<int> Bubble::counter() const {
 	return _counter;
 }
 
@@ -100,7 +101,7 @@ int Bubble::countMaxWidth(int maxPossibleCounter) const {
 void Bubble::setCounter(int value) {
 	if (_counter != value) {
 		_counter = value;
-		_numberAnimation.setText(_textFactory(_counter), _counter);
+		_numberAnimation.setText(_textFactory(value), value);
 	}
 }
 
@@ -113,7 +114,7 @@ void Bubble::setFlipHorizontal(bool value) {
 }
 
 void Bubble::paintBubble(QPainter &p, const QRect &r, const QBrush &brush) {
-	if (_counter < 0) {
+	if (!_counter.has_value()) {
 		return;
 	}
 
@@ -181,11 +182,9 @@ void Bubble::paintBubble(QPainter &p, const QRect &r, const QBrush &brush) {
 	p.setPen(st::activeButtonFg);
 	p.setFont(_st.font);
 	const auto iconLeft = r.x() + _st.padding.left();
-	_icon->paint(
-		p,
-		iconLeft,
-		bubbleRect.y() + (bubbleRect.height() - _icon->height()) / 2,
-		bubbleRect.width());
+	const auto iconTop = bubbleRect.y()
+		+ (bubbleRect.height() - _icon->height()) / 2;
+	_icon->paint(p, iconLeft, iconTop, bubbleRect.width());
 	_numberAnimation.paint(
 		p,
 		iconLeft + _icon->width() + _st.textSkip,
@@ -364,7 +363,7 @@ void BubbleWidget::animateTo(BubbleRowState state) {
 }
 
 void BubbleWidget::paintEvent(QPaintEvent *e) {
-	if (_bubble.counter() < 0) {
+	if (!_bubble.counter().has_value()) {
 		return;
 	}
 
@@ -424,6 +423,7 @@ void BubbleWidget::paintEvent(QPaintEvent *e) {
 		switch (_type) {
 		case BubbleType::NoPremium:
 		case BubbleType::StarRating: return st::windowBgActive->b;
+		case BubbleType::NegativeRating: return st::attentionButtonFg->b;
 		case BubbleType::Premium: return QBrush(_cachedGradient);
 		case BubbleType::Credits: return st::creditsBg3->b;
 		}

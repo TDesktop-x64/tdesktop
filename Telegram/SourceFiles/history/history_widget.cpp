@@ -2151,11 +2151,12 @@ void HistoryWidget::setupGiftToChannelButton() {
 	});
 	rpl::combine(
 		_muteUnmute->shownValue(),
-		_joinChannel->shownValue()
-	) | rpl::start_with_next([=](bool muteUnmute, bool joinChannel) {
-		const auto newParent = (muteUnmute && !joinChannel)
+		_joinChannel->shownValue(),
+		_discuss->shownValue()
+	) | rpl::start_with_next([=](bool muteUnmute, bool joinChannel, bool discuss) {
+		const auto newParent = (muteUnmute && !joinChannel && !discuss)
 			? _muteUnmute.data()
-			: (joinChannel && !muteUnmute)
+			: (joinChannel && !muteUnmute && discuss)
 			? _joinChannel.data()
 			: nullptr;
 		if (newParent) {

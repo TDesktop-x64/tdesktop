@@ -286,11 +286,11 @@ Dialogs::RowDescriptor WrapWidget::activeChat() const {
 			peer->owner().history(peer),
 			FullMsgId());
 	} else if (const auto storiesPeer = key().storiesPeer()) {
-		return (key().storiesTab() == Stories::Tab::Saved)
-			? Dialogs::RowDescriptor(
+		return (key().storiesAlbumId() == Stories::ArchiveId())
+			? Dialogs::RowDescriptor()
+			: Dialogs::RowDescriptor(
 				storiesPeer->owner().history(storiesPeer),
-				FullMsgId())
-			: Dialogs::RowDescriptor();
+				FullMsgId());
 	} else if (key().settingsSelf()
 			|| key().isDownloads()
 			|| key().reactionsContextId()
@@ -312,7 +312,9 @@ void WrapWidget::forceContentRepaint() {
 }
 
 void WrapWidget::setupTop() {
-	if (HasCustomTopBar(_controller.get()) || wrap() == Wrap::Search) {
+	if (HasCustomTopBar(_controller.get())
+		|| wrap() == Wrap::Search
+		|| wrap() == Wrap::StoryAlbumEdit) {
 		_topBar.destroy();
 		return;
 	}
@@ -412,7 +414,7 @@ void WrapWidget::setupTopBarMenuToggle() {
 		}
 	} else if (key.storiesPeer()
 		&& key.storiesPeer()->isSelf()
-		&& key.storiesTab() == Stories::Tab::Saved) {
+		&& key.storiesAlbumId() != Stories::ArchiveId()) {
 		const auto &st = (wrap() == Wrap::Layer)
 			? st::infoLayerTopBarEdit
 			: st::infoTopBarEdit;
@@ -444,7 +446,7 @@ void WrapWidget::setupTopBarMenuToggle() {
 				addTopBarMenuButton();
 			}
 		}, _topBar->lifetime());
-	} else if (section.type() == Section::Type::PeerGifts && key.peer()) {
+	} else if (key.giftsPeer()) {
 		addTopBarMenuButton();
 	}
 }
@@ -655,8 +657,6 @@ void WrapWidget::finishShowContent() {
 			.subtitle = _content->subtitle(),
 		});
 		_topBar->setStories(_content->titleStories());
-		_topBar->setStoriesArchive(
-			_controller->key().storiesTab() == Stories::Tab::Archive);
 	}
 	_desiredHeights.fire(desiredHeightForContent());
 	_desiredShadowVisibilities.fire(_content->desiredShadowVisibility());
@@ -696,7 +696,13 @@ rpl::producer<int> WrapWidget::desiredHeightForContent() const {
 }
 
 rpl::producer<SelectedItems> WrapWidget::selectedListValue() const {
-	return _selectedLists.events() | rpl::flatten_latest();
+	auto current = _content
+		? _content->selectedListValue()
+		: nullptr;
+	return _selectedLists.events_starting_with(current
+		? std::move(current)
+		: rpl::single(SelectedItems(Storage::SharedMediaType::Photo))
+	) | rpl::flatten_latest();
 }
 
 object_ptr<ContentWidget> WrapWidget::createContent(
@@ -779,7 +785,6 @@ bool WrapWidget::showInternal(
 			&& (params.way == Window::SectionShow::Way::ClearStack);
 		if (_controller->validateMementoPeer(content)) {
 			if (!skipInternal && _content->showInternal(content)) {
-				highlightTopBar();
 				return true;
 			}
 		}

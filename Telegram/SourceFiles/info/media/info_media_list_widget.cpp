@@ -47,8 +47,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/ui_utility.h"
 #include "ui/inactive_press.h"
 #include "lang/lang_keys.h"
-#include "main/main_session.h"
 #include "main/main_account.h"
+#include "main/main_app_config.h"
+#include "main/main_session.h"
 #include "mainwidget.h"
 #include "mainwindow.h"
 #include "base/platform/base_platform_info.h"
@@ -57,6 +58,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "media/player/media_player_instance.h"
 #include "boxes/delete_messages_box.h"
 #include "boxes/peer_list_controllers.h"
+#include "boxes/sticker_set_box.h" // StickerPremiumMark
 #include "core/file_utilities.h"
 #include "core/application.h"
 #include "ui/toast/toast.h"
@@ -65,6 +67,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_chat.h"
+#include "styles/style_credits.h" // giftBoxHiddenMark
 
 #include <QtWidgets/QApplication>
 #include <QtGui/QClipboard>
@@ -148,9 +151,14 @@ ListWidget::ListWidget(
 , _controller(controller)
 , _provider(MakeProvider(_controller))
 , _dateBadge(std::make_unique<DateBadge>(
-		_provider->type(),
-		[=] { scrollDateCheck(); },
-		[=] { scrollDateHide(); })) {
+	_provider->type(),
+	[=] { scrollDateCheck(); },
+	[=] { scrollDateHide(); }))
+, _storiesAddToAlbumId(controller->storiesAddToAlbumId())
+, _hiddenMark(std::make_unique<StickerPremiumMark>(
+		&_controller->session(),
+		st::giftBoxHiddenMark,
+		RectPart::Center)) {
 	start();
 }
 
@@ -184,6 +192,7 @@ void ListWidget::start() {
 			_provider->setSearchQuery(std::move(query));
 		}, lifetime());
 	} else if (_controller->storiesPeer()) {
+		setupStoriesTrackIds();
 		trackSession(&session());
 		restart();
 	} else {
@@ -260,6 +269,41 @@ void ListWidget::setupSelectRestriction() {
 	}, lifetime());
 }
 
+void ListWidget::setupStoriesTrackIds() {
+	if (!_storiesAddToAlbumId) {
+		return;
+	}
+	const auto peerId = _controller->storiesPeer()->id;
+	const auto stories = &session().data().stories();
+	constexpr auto kArchive = Data::kStoriesAlbumIdArchive;
+	const auto key = Data::StoryAlbumIdsKey{ peerId, kArchive };
+	rpl::single(rpl::empty) | rpl::then(
+		stories->albumIdsChanged() | rpl::filter(
+			rpl::mappers::_1 == key
+		) | rpl::to_empty
+	) | rpl::start_with_next([=] {
+		const auto albumId = _storiesAddToAlbumId;
+		const auto &ids = stories->albumKnownInArchive(peerId, albumId);
+		if (_storiesInAlbum != ids) {
+			for (const auto id : ids) {
+				if (_storiesInAlbum.emplace(id).second) {
+					_storyMsgsToMarkSelected.emplace(StoryIdToMsgId(id));
+				}
+			}
+			if (_storiesInAlbum.size() > ids.size()) {
+				for (auto i = begin(_storiesInAlbum); i != end(_storiesInAlbum);) {
+					if (ids.contains(*i)) {
+						++i;
+					} else {
+						_storyMsgsToMarkSelected.remove(StoryIdToMsgId(*i));
+						i = _storiesInAlbum.erase(i);
+					}
+				}
+			}
+		}
+	}, lifetime());
+}
+
 rpl::producer<int> ListWidget::scrollToRequests() const {
 	return _scrollToRequests.events();
 }
@@ -274,8 +318,11 @@ void ListWidget::selectionAction(SelectionAction action) {
 	case SelectionAction::Clear: clearSelected(); return;
 	case SelectionAction::Forward: forwardSelected(); return;
 	case SelectionAction::Delete: deleteSelected(); return;
-	case SelectionAction::ToggleStoryInProfile:
-		toggleStoryInProfileSelected();
+	case SelectionAction::ToggleStoryToProfile:
+		toggleStoryInProfileSelected(true);
+		return;
+	case SelectionAction::ToggleStoryToArchive:
+		toggleStoryInProfileSelected(false);
 		return;
 	case SelectionAction::ToggleStoryPin: toggleStoryPinSelected(); return;
 	}
@@ -357,6 +404,7 @@ auto ListWidget::collectSelectedItems() const -> SelectedItems {
 		result.canForward = selection.canForward;
 		result.canToggleStoryPin = selection.canToggleStoryPin;
 		result.canUnpinStory = selection.canUnpinStory;
+		result.storyInProfile = selection.storyInProfile;
 		return result;
 	};
 	auto transformation = [&](const auto &item) {
@@ -489,6 +537,10 @@ bool ListWidget::itemVisible(not_null<const BaseLayout*> item) {
 	return true;
 }
 
+not_null<StickerPremiumMark*> ListWidget::hiddenMark() {
+	return _hiddenMark.get();
+}
+
 QString ListWidget::tooltipText() const {
 	if (const auto link = ClickHandler::getActive()) {
 		return link->tooltip();
@@ -507,10 +559,10 @@ bool ListWidget::tooltipWindowActive() const {
 void ListWidget::openPhoto(not_null<PhotoData*> photo, FullMsgId id) {
 	using namespace Data;
 
-	const auto tab = _controller->storiesTab();
-	const auto context = (tab == Stories::Tab::Archive)
-		? Data::StoriesContext{ Data::StoriesContextArchive() }
-		: Data::StoriesContext{ Data::StoriesContextSaved() };
+	const auto albumId = _controller->storiesAlbumId();
+	const auto context = Data::StoriesContext{
+		Data::StoriesContextAlbum{ albumId }
+	};
 	_controller->parentController()->openPhoto(
 		photo,
 		{ id, topicRootId(), monoforumPeerId() },
@@ -521,10 +573,10 @@ void ListWidget::openDocument(
 		not_null<DocumentData*> document,
 		FullMsgId id,
 		bool showInMediaView) {
-	const auto tab = _controller->storiesTab();
-	const auto context = (tab == Stories::Tab::Archive)
-		? Data::StoriesContext{ Data::StoriesContextArchive() }
-		: Data::StoriesContext{ Data::StoriesContextSaved() };
+	const auto albumId = _controller->storiesAlbumId();
+	const auto context = Data::StoriesContext{
+		Data::StoriesContextAlbum{ albumId }
+	};
 	_controller->parentController()->openDocument(
 		document,
 		showInMediaView,
@@ -544,6 +596,37 @@ void ListWidget::trackSession(not_null<Main::Session*> session) {
 	}, lifetime);
 }
 
+void ListWidget::markStoryMsgsSelected() {
+	const auto now = int(_storyMsgsToMarkSelected.size());
+	const auto guard = gsl::finally([&] {
+		if (now != int(_storyMsgsToMarkSelected.size())) {
+			pushSelectedItems();
+		}
+	});
+	const auto &appConfig = _controller->session().appConfig();
+	const auto selectLimit = appConfig.storiesAlbumLimit();
+	const auto selection = FullSelection;
+	for (const auto &section : _sections) {
+		for (const auto &entry : section.items()) {
+			const auto item = entry->getItem();
+			const auto id = item->id;
+			const auto i = _storyMsgsToMarkSelected.find(id);
+			if (i != end(_storyMsgsToMarkSelected)) {
+				ChangeItemSelection(
+					_selected,
+					item,
+					_provider->computeSelectionData(item, selection),
+					selectLimit);
+				repaintItem(item);
+				_storyMsgsToMarkSelected.erase(i);
+				if (_storyMsgsToMarkSelected.empty()) {
+					return;
+				}
+			}
+		}
+	}
+}
+
 void ListWidget::refreshRows() {
 	saveScrollState();
 
@@ -554,6 +637,8 @@ void ListWidget::refreshRows() {
 		for (const auto &item : _sections.back().items()) {
 			trackSession(&item->getItem()->history()->session());
 		}
+	} else if (!_storyMsgsToMarkSelected.empty()) {
+		markStoryMsgsSelected();
 	}
 
 	if (const auto count = _provider->fullCount()) {
@@ -819,8 +904,9 @@ void ListWidget::paintEvent(QPaintEvent *e) {
 	const auto window = _controller->parentController();
 	const auto paused = window->isGifPausedAtLeastFor(
 		Window::GifPauseReason::Layer);
+	const auto selecting = hasSelectedItems() || _storiesAddToAlbumId;
 	auto context = ListContext{
-		Overview::Layout::PaintContext(ms, hasSelectedItems(), paused),
+		Overview::Layout::PaintContext(ms, selecting, paused),
 		&_selected,
 		&_dragSelected,
 		_dragSelectAction
@@ -890,6 +976,9 @@ void ListWidget::mouseDoubleClickEvent(QMouseEvent *e) {
 void ListWidget::showContextMenu(
 		QContextMenuEvent *e,
 		ContextMenuSource source) {
+	if (_storiesAddToAlbumId) {
+		return;
+	}
 	if (_contextMenu) {
 		_contextMenu = nullptr;
 		repaintItem(_contextItem);
@@ -943,6 +1032,11 @@ void ListWidget::showContextMenu(
 	const auto canToggleStoryPinAll = [&] {
 		return ranges::none_of(_selected, [](auto &&item) {
 			return !item.second.canToggleStoryPin;
+		});
+	};
+	const auto allInProfile = [&] {
+		return ranges::all_of(_selected, [](auto &&item) {
+			return item.second.storyInProfile;
 		});
 	};
 	const auto canUnpinStoryAll = [&] {
@@ -1050,13 +1144,14 @@ void ListWidget::showContextMenu(
 	}
 	if (overSelected == SelectionState::OverSelectedItems) {
 		if (canToggleStoryPinAll()) {
-			const auto tab = _controller->key().storiesTab();
-			const auto toProfile = (tab == Stories::Tab::Archive);
+			const auto toProfile = !allInProfile();
 			_contextMenu->addAction(
 				(toProfile
 					? tr::lng_mediaview_save_to_profile
 					: tr::lng_archived_add)(tr::now),
-				crl::guard(this, [this] { toggleStoryInProfileSelected(); }),
+				crl::guard(this, [=] {
+					toggleStoryInProfileSelected(toProfile);
+				}),
 				(toProfile
 					? &st::menuIconStoriesSave
 					: &st::menuIconStoriesArchive));
@@ -1102,14 +1197,15 @@ void ListWidget::showContextMenu(
 				item,
 				FullSelection);
 			if (selectionData.canToggleStoryPin) {
-				const auto tab = _controller->key().storiesTab();
-				const auto toProfile = (tab == Stories::Tab::Archive);
+				const auto toProfile = !selectionData.storyInProfile;
 				_contextMenu->addAction(
 					(toProfile
 						? tr::lng_mediaview_save_to_profile
 						: tr::lng_mediaview_archive_story)(tr::now),
 					crl::guard(this, [=] {
-						toggleStoryInProfile({ 1, globalId.itemId });
+						toggleStoryInProfile(
+							{ 1, globalId.itemId },
+							toProfile);
 					}),
 					(toProfile
 						? &st::menuIconStoriesSave
@@ -1237,10 +1333,11 @@ void ListWidget::deleteSelected() {
 	}));
 }
 
-void ListWidget::toggleStoryInProfileSelected() {
-	toggleStoryInProfile(collectSelectedIds(), crl::guard(this, [=] {
-		clearSelected();
-	}));
+void ListWidget::toggleStoryInProfileSelected(bool toProfile) {
+	toggleStoryInProfile(
+		collectSelectedIds(),
+		toProfile,
+		crl::guard(this, [=] { clearSelected(); }));
 }
 
 void ListWidget::toggleStoryPinSelected() {
@@ -1255,6 +1352,7 @@ void ListWidget::toggleStoryPinSelected() {
 
 void ListWidget::toggleStoryInProfile(
 		MessageIdsList &&items,
+		bool toProfile,
 		Fn<void()> confirmed) {
 	auto list = std::vector<FullStoryId>();
 	for (const auto &id : items) {
@@ -1267,7 +1365,6 @@ void ListWidget::toggleStoryInProfile(
 	}
 	const auto channel = peerIsChannel(list.front().peer);
 	const auto count = int(list.size());
-	const auto toProfile = (_controller->storiesTab() == Stories::Tab::Archive);
 	const auto controller = _controller;
 	const auto sure = [=](Fn<void()> close) {
 		using namespace ::Media::Stories;
@@ -1481,11 +1578,15 @@ void ListWidget::switchToWordSelection() {
 void ListWidget::applyItemSelection(
 		HistoryItem *item,
 		TextSelection selection) {
+	const auto selectLimit = _storiesAddToAlbumId
+		? _controller->session().appConfig().storiesAlbumLimit()
+		: MaxSelectedItems;
 	if (item
 		&& ChangeItemSelection(
 			_selected,
 			item,
-			_provider->computeSelectionData(item, selection))) {
+			_provider->computeSelectionData(item, selection),
+			selectLimit)) {
 		repaintItem(item);
 		pushSelectedItems();
 	}
@@ -1955,22 +2056,21 @@ void ListWidget::mouseActionFinish(
 	auto pressState = base::take(_pressState);
 	repaintItem(pressState.item);
 
+	const auto selectionMode = hasSelectedItems() || _storiesAddToAlbumId;
 	auto simpleSelectionChange = pressState.item
 		&& pressState.inside
 		&& !_pressWasInactive
 		&& (button != Qt::RightButton)
 		&& (_mouseAction == MouseAction::PrepareDrag
 			|| _mouseAction == MouseAction::PrepareSelect);
-	auto needSelectionToggle = simpleSelectionChange
-		&& hasSelectedItems();
-	auto needSelectionClear = simpleSelectionChange
-		&& hasSelectedText();
+	auto needSelectionToggle = simpleSelectionChange && selectionMode;
+	auto needSelectionClear = simpleSelectionChange && hasSelectedText();
 
 	auto activated = ClickHandler::unpressed();
 	if (_mouseAction == MouseAction::Dragging
 		|| _mouseAction == MouseAction::Selecting) {
 		activated = nullptr;
-	} else if (needSelectionToggle) {
+	} else if (needSelectionToggle || _storiesAddToAlbumId) {
 		activated = nullptr;
 	}
 
@@ -2028,11 +2128,15 @@ void ListWidget::applyDragSelection() {
 
 void ListWidget::applyDragSelection(SelectedMap &applyTo) const {
 	if (_dragSelectAction == DragSelectAction::Selecting) {
+		const auto selectLimit = _storiesAddToAlbumId
+			? _controller->session().appConfig().storiesAlbumLimit()
+			: MaxSelectedItems;
 		for (auto &[item, data] : _dragSelected) {
 			ChangeItemSelection(
 				applyTo,
 				item,
-				_provider->computeSelectionData(item, FullSelection));
+				_provider->computeSelectionData(item, FullSelection),
+				selectLimit);
 		}
 	} else if (_dragSelectAction == DragSelectAction::Deselecting) {
 		for (auto &[item, data] : _dragSelected) {

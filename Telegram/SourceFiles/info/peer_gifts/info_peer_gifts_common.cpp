@@ -20,6 +20,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_session.h"
 #include "history/view/media/history_view_sticker_player.h"
 #include "lang/lang_keys.h"
+#include "info/channel_statistics/earn/earn_icons.h"
 #include "main/main_session.h"
 #include "settings/settings_credits_graphics.h"
 #include "ui/layers/generic_box.h"
@@ -91,10 +92,16 @@ void GiftButton::setDescriptor(const GiftDescriptor &descriptor, Mode mode) {
 	if (_descriptor == descriptor && _resalePrice == resalePrice) {
 		return;
 	}
-	auto player = base::take(_player);
 	const auto starsType = Ui::Premium::MiniStarsType::SlowStars;
-	_mediaLifetime.destroy();
 	unsubscribe();
+	update();
+
+	const auto format = [=](int64 number) {
+		const auto onlyK = (number < 100'000'000);
+		return (number >= 1'000'000)
+			? Lang::FormatCountToShort(number, onlyK).string
+			: Lang::FormatCountDecimal(number);
+	};
 
 	_descriptor = descriptor;
 	_resalePrice = resalePrice;
@@ -153,22 +160,22 @@ void GiftButton::setDescriptor(const GiftDescriptor &descriptor, Mode mode) {
 		_price.setMarkedText(
 			st::semiboldTextStyle,
 			(data.resale
-				? (unique
+				? ((unique && data.forceTon)
+					? Data::FormatGiftResaleTon(*unique)
+					: (unique
 					? _delegate->monostar()
-					: _delegate->star()).append(' ').append(
-						Lang::FormatCountDecimal(unique
-							? unique->starsForResale
-							: data.info.starsResellMin)
-					).append(data.info.resellCount > 1 ? "+" : "")
+						: _delegate->star()).append(' ').append(
+							format(unique
+								? unique->starsForResale
+								: data.info.starsResellMin)
+						).append(data.info.resellCount > 1 ? "+" : ""))
 				: (_small && unique && unique->starsForResale)
-				? _delegate->monostar().append(' ').append(
-					Lang::FormatCountDecimal(unique->starsForResale))
+				? Data::FormatGiftResaleAsked(*unique)
 				: unique
 				? tr::lng_gift_transfer_button(
 					tr::now,
 					Ui::Text::WithEntities)
-				: _delegate->star().append(
-					' ' + Lang::FormatCountDecimal(data.info.stars))),
+				: _delegate->star().append(' ' + format(data.info.stars))),
 			kMarkupTextOptions,
 			_delegate->textContext());
 		if (!_stars) {
@@ -190,11 +197,18 @@ void GiftButton::setDescriptor(const GiftDescriptor &descriptor, Mode mode) {
 				Ui::Premium::CreditsIconGradientStops());
 		}
 	});
-	_delegate->sticker(
+
+	_resolvedDocument = nullptr;
+	_documentLifetime = _delegate->sticker(
 		descriptor
 	) | rpl::start_with_next([=](not_null<DocumentData*> document) {
+		_documentLifetime.destroy();
 		setDocument(document);
-	}, lifetime());
+	});
+	if (_resolvedDocument) {
+		_documentLifetime.destroy();
+	}
+
 	_patterned = false;
 	_uniqueBackgroundCache = QImage();
 	_uniquePatternEmoji = nullptr;
@@ -226,16 +240,19 @@ void GiftButton::setDescriptor(const GiftDescriptor &descriptor, Mode mode) {
 	}
 }
 
-bool GiftButton::documentResolved() const {
-	return _player || _mediaLifetime;
-}
-
 void GiftButton::setDocument(not_null<DocumentData*> document) {
+	_resolvedDocument = document;
+	if (_playerDocument == document) {
+		return;
+	}
+
 	const auto media = document->createMediaView();
 	media->checkStickerLarge();
 	media->goodThumbnailWanted();
 
-	rpl::single() | rpl::then(
+	const auto destroyed = base::take(_player);
+	_playerDocument = nullptr;
+	_mediaLifetime = rpl::single() | rpl::then(
 		document->owner().session().downloaderTaskFinished()
 	) | rpl::filter([=] {
 		return media->loaded();
@@ -263,9 +280,13 @@ void GiftButton::setDocument(not_null<DocumentData*> document) {
 				st::giftBoxStickerSize);
 		}
 		result->setRepaintCallback([=] { update(); });
+		_playerDocument = media->owner();
 		_player = std::move(result);
 		update();
-	}, _mediaLifetime);
+	});
+	if (_playerDocument) {
+		_mediaLifetime.destroy();
+	}
 }
 
 void GiftButton::setGeometry(QRect inner, QMargins extend) {
@@ -608,7 +629,8 @@ void GiftButton::paintEvent(QPaintEvent *e) {
 
 	v::match(_descriptor, [](const GiftTypePremium &) {
 	}, [&](const GiftTypeStars &data) {
-		if (unique && data.pinned) {
+		if (!unique) {
+		} else if (data.pinned) {
 			auto hq = PainterHighQualityEnabler(p);
 			const auto &icon = st::giftBoxPinIcon;
 			const auto skip = st::giftBoxUserpicSkip;
@@ -620,6 +642,26 @@ void GiftButton::paintEvent(QPaintEvent *e) {
 				QSize(icon.width() + 2 * add, icon.height() + 2 * add));
 			p.drawEllipse(rect);
 			icon.paintInCenter(p, rect);
+		} else if (!data.forceTon
+			&& unique->nanoTonForResale
+			&& unique->onlyAcceptTon) {
+			if (_tonIcon.isNull()) {
+				_tonIcon = st::tonIconEmoji.icon.instance(
+					QColor(255, 255, 255));
+			}
+			const auto size = _tonIcon.size() / _tonIcon.devicePixelRatio();
+			const auto skip = st::giftBoxUserpicSkip;
+			const auto add = (st::giftBoxUserpicSize - size.width()) / 2;
+			p.setPen(Qt::NoPen);
+			p.setBrush(unique->backdrop.patternColor);
+			const auto rect = QRect(
+				QPoint(extend.left() + skip, extend.top() + skip),
+				QSize(size.width() + 2 * add, size.height() + 2 * add));
+			p.drawEllipse(rect);
+			p.drawImage(
+				extend.left() + skip + add,
+				extend.top() + skip + add,
+				_tonIcon);
 		}
 	});
 
@@ -712,6 +754,10 @@ TextWithEntities Delegate::star() {
 
 TextWithEntities Delegate::monostar() {
 	return Ui::Text::IconEmoji(&st::starIconEmoji);
+}
+
+TextWithEntities Delegate::monoton() {
+	return Ui::Text::IconEmoji(&st::tonIconEmoji);
 }
 
 TextWithEntities Delegate::ministar() {

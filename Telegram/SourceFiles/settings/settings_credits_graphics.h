@@ -155,11 +155,16 @@ void CreditsPrizeBox(
 	not_null<Window::SessionController*> controller,
 	const Data::GiftCode &data,
 	TimeId date);
+
+struct StarGiftResaleInfo {
+	PeerId recipientId;
+	bool forceTon = false;
+};
 void GlobalStarGiftBox(
 	not_null<Ui::GenericBox*> box,
 	std::shared_ptr<ChatHelpers::Show> show,
 	const Data::StarGift &data,
-	PeerId resaleRecipientId,
+	StarGiftResaleInfo resale,
 	CreditsEntryBoxStyleOverrides st = {});
 
 [[nodiscard]] Data::CreditsHistoryEntry SavedStarGiftEntry(
@@ -237,6 +242,8 @@ struct SmallBalanceForMessage {
 struct SmallBalanceForSuggest {
 	PeerId recipientId;
 };
+struct SmallBalanceForSearch {
+};
 struct SmallBalanceSource : std::variant<
 	SmallBalanceBot,
 	SmallBalanceReaction,
@@ -244,7 +251,8 @@ struct SmallBalanceSource : std::variant<
 	SmallBalanceDeepLink,
 	SmallBalanceStarGift,
 	SmallBalanceForMessage,
-	SmallBalanceForSuggest> {
+	SmallBalanceForSuggest,
+	SmallBalanceForSearch> {
 	using variant::variant;
 };
 

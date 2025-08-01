@@ -1876,8 +1876,24 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_star_ref_revoked_title" = "Link removed";
 "lng_star_ref_revoked_text" = "It will no longer work.";
 
-"lng_stars_rating_tooltip" = "Profile level reflects the user's payment reliability.";
-"lng_stars_rating_learn_more" = "Learn More";
+"lng_stars_rating_title" = "Rating";
+"lng_stars_rating_future" = "Future Rating";
+"lng_stars_rating_subtitle" = "The rating update updates in 21 days after purchases.";
+"lng_stars_rating_pending#one" = "{count} point is pending. {link}";
+"lng_stars_rating_pending#other" = "{count} points are pending. {link}";
+"lng_stars_rating_pending_preview" = "Preview {arrow}";
+"lng_stars_rating_pending_back" = "Back {arrow}";
+"lng_stars_rating_about" = "This rating reflects **{name}'s** activity on Telegram. What affects it:";
+"lng_stars_rating_about_your" = "This rating reflects your activity on Telegram. What affects it:";
+"lng_stars_title_gifts_telegram" = "Gifts from Telegram";
+"lng_stars_about_gifts_telegram" = "{emoji} 100% of the Stars spent on gifts purchased from Telegram.";
+"lng_stars_title_gifts_users" = "Gifts and Posts from Users";
+"lng_stars_about_gifts_users" = "{emoji} 20% of the Stars spent on resold gifts, paid messages and channel posts.";
+"lng_stars_title_refunds" = "Refunds and Conversions";
+"lng_stars_about_refunds" = "{emoji} 10x of refunded Stars and 85% of bought gifts converted to Stars.";
+"lng_stars_rating_added" = "Added";
+"lng_stars_rating_deducted" = "Deducted";
+"lng_stars_rating_understood" = "Understood";
 
 "lng_manage_discussion_group" = "Discussion";
 "lng_manage_discussion_group_add" = "Add a group";
@@ -2182,6 +2198,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_action_gift_channel_about_unique" = "You can display this gift in channel's Gifts or turn it into unique collectible.";
 "lng_action_gift_for_stars#one" = "{count} Star";
 "lng_action_gift_for_stars#other" = "{count} Stars";
+"lng_action_gift_for_ton#one" = "{count} TON";
+"lng_action_gift_for_ton#other" = "{count} TON";
 "lng_action_gift_got_subtitle" = "Gift from {user}";
 "lng_action_gift_got_stars_text#one" = "Display this gift on your page or convert it to **{count}** Star.";
 "lng_action_gift_got_stars_text#other" = "Display this gift on your page or convert it to **{count}** Stars.";
@@ -2951,6 +2969,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_credits_small_balance_for_message" = "Buy **Stars** to send messages to {user}.";
 "lng_credits_small_balance_for_messages" = "Buy **Stars** to send messages.";
 "lng_credits_small_balance_for_suggest" = "Buy **Stars** to suggest post to {channel}.";
+"lng_credits_small_balance_for_search" = "Buy **Stars** to search through public posts.";
 "lng_credits_small_balance_fallback" = "Buy **Stars** to unlock content and services on Telegram.";
 "lng_credits_purchase_blocked" = "Sorry, you can't purchase this item with Telegram Stars.";
 "lng_credits_enough" = "You have enough stars at the moment. {link}";
@@ -3565,6 +3584,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_gift_send_button_self" = "Buy a Gift for {cost}";
 "lng_gift_buy_resale_title" = "Buy {name}";
 "lng_gift_buy_resale_button" = "Buy for {cost}";
+"lng_gift_buy_resale_equals" = "Equals to {cost}";
+"lng_gift_buy_resale_only_ton" = "The seller only accepts TON as payment.";
+"lng_gift_buy_resale_pay_stars" = "Pay in Stars";
+"lng_gift_buy_resale_pay_ton" = "Pay in TON";
 "lng_gift_buy_resale_confirm" = "Do you want to buy {name} for {price} and gift it to {user}?";
 "lng_gift_buy_resale_confirm_self" = "Do you want to buy {name} for {price}?";
 "lng_gift_buy_price_change_title" = "Price change!";
@@ -3710,12 +3733,18 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_gift_sell_unlist_title" = "Unlist {name}";
 "lng_gift_sell_unlist_sure" = "Are you sure you want to unlist your gift?";
 "lng_gift_sell_title" = "Price in Stars";
-"lng_gift_sell_placeholder" = "Enter price in Stars";
 "lng_gift_sell_about" = "You will receive {percent} of the selected amount.";
 "lng_gift_sell_amount#one" = "You will receive **{count}** Star.";
 "lng_gift_sell_amount#other" = "You will receive **{count}** Stars.";
 "lng_gift_sell_min_price#one" = "Minimum price is {count} Star.";
 "lng_gift_sell_min_price#other" = "Minimum price is {count} Stars.";
+"lng_gift_sell_only_ton" = "Only Accept TON";
+"lng_gift_sell_only_ton_about" = "If the buyer pays you in TON, there's no risk of refunds, unlike Stars payments.";
+"lng_gift_sell_amount_ton#one" = "You will receive **{count}** TON.";
+"lng_gift_sell_amount_ton#other" = "You will receive **{count}** TON.";
+"lng_gift_sell_min_price_ton#one" = "Minimum price is {count} TON.";
+"lng_gift_sell_min_price_ton#other" = "Minimum price is {count} TON.";
+"lng_gift_sell_title_ton" = "Price in TON";
 "lng_gift_sell_put" = "Put for Sale";
 "lng_gift_sell_update" = "Update the Price";
 "lng_gift_sell_toast" = "{name} is now for sale!";
@@ -3755,6 +3784,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_gift_resale_symbol" = "Symbol";
 "lng_gift_resale_symbols#one" = "{count} Symbol";
 "lng_gift_resale_symbols#other" = "{count} Symbols";
+"lng_gift_resale_switch_to" = "Switch to {currency}";
 "lng_gift_resale_early" = "You will be able to resell this gift in {duration}.";
 "lng_gift_transfer_early" = "You will be able to transfer this gift in {duration}.";
 "lng_gift_resale_transfer_early_title" = "Try Later";
@@ -3766,9 +3796,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_gift_collection_new_create" = "Create";
 "lng_gift_collection_empty_title" = "Organize Your Gifts";
 "lng_gift_collection_empty_text" = "Add some of your gifts to this collection.";
-"lng_gift_collection_empty_button" = "Add to Collection";
 "lng_gift_collection_all" = "All Gifts";
 "lng_gift_collection_add_title" = "Add Gifts";
+"lng_gift_collection_share" = "Share Collection";
 "lng_gift_collection_edit" = "Edit Name";
 "lng_gift_collection_limit_title" = "Limit Reached";
 "lng_gift_collection_limit_text" = "Please remove one of the existing collections to add a new one.";
@@ -6266,6 +6296,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_view_button_emojipack" = "View emoji";
 "lng_view_button_collectible" = "View collectible";
 "lng_view_button_call" = "Join call";
+"lng_view_button_storyalbum" = "View Album";
+"lng_view_button_collection" = "View Collection";
 
 "lng_sponsored_hide_ads" = "Hide";
 "lng_sponsored_title" = "What are sponsored messages?";
@@ -6430,6 +6462,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_stories_archive_title" = "Story Archive";
 "lng_stories_archive_about" = "Only you can see archived stories unless you choose to post them to your profile.";
 "lng_stories_channel_archive_about" = "Only admins of the channel can see archived stories unless they are posted to the channel page.";
+"lng_stories_empty" = "Your stories will be here.";
+"lng_stories_empty_channel" = "Channel posts will be here.";
 "lng_stories_reply_sent" = "Message sent.";
 "lng_stories_hidden_to_contacts" = "Stories from {user} were moved to the **Archive**.";
 "lng_stories_shown_in_chats" = "Stories from {user} were returned from the **Archive**.";
@@ -6464,6 +6498,25 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_stories_channel_archive_done_many#other" = "{count} stories are hidden from the channel page.";
 "lng_stories_save_promo" = "Subscribe to {link} to save other people's stories that are not protected.";
 "lng_stories_reaction_as_message" = "Send reaction as a private message";
+
+"lng_stories_album_add" = "Add Album";
+"lng_stories_album_new_title" = "Create a New Album";
+"lng_stories_album_new_button" = "New Album";
+"lng_stories_album_new_text" = "Choose a name for your album and start adding your stories there.";
+"lng_stories_album_new_ph" = "Title";
+"lng_stories_album_new_create" = "Create";
+"lng_stories_album_empty_title" = "Organize Your Stories";
+"lng_stories_album_empty_text" = "Add some of your stories to this album.";
+"lng_stories_album_all" = "All Stories";
+"lng_stories_album_add_title" = "Add Stories";
+"lng_stories_album_share" = "Share Album";
+"lng_stories_album_edit" = "Edit Name";
+"lng_stories_album_limit_title" = "Limit Reached";
+"lng_stories_album_limit_text" = "Please remove one of the existing albums to add a new one.";
+"lng_stories_album_delete" = "Delete Album";
+"lng_stories_album_delete_sure" = "Are you sure you want to delete this album?";
+"lng_stories_album_delete_button" = "Delete";
+"lng_stories_album_add_to" = "Add to Album";
 
 "lng_stealth_mode_menu_item" = "Hide My View";
 "lng_stealth_mode_title" = "Stealth Mode";
@@ -6721,6 +6774,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_recent_chats" = "Chats";
 "lng_recent_channels" = "Channels";
 "lng_recent_apps" = "Apps";
+"lng_recent_posts" = "Posts";
 "lng_all_photos" = "Photos";
 "lng_all_videos" = "Videos";
 "lng_all_downloads" = "Downloads";
@@ -6738,6 +6792,22 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_bot_apps_popular" = "Grossing apps";
 "lng_bot_apps_which" = "Which apps are included here? {link}";
 "lng_bot_apps_which_link" = "Learn >";
+"lng_posts_title" = "Global Search";
+"lng_posts_start" = "Type a keyword to search all posts from public channels.";
+"lng_posts_subscribe" = "Subscribe to Premium";
+"lng_posts_need_subscribe" = "Global search is a Premium feature.";
+"lng_posts_search_button" = "Search {query}";
+"lng_posts_remaining#one" = "{count} free search remaining today";
+"lng_posts_remaining#other" = "{count} free searches remaining today";
+"lng_posts_subtitle_empty" = "Telegram News";
+"lng_posts_subtitle" = "Public posts";
+"lng_posts_limit_reached" = "Limit Reached";
+"lng_posts_limit_about#one" = "You can make up to {count} search query per day.";
+"lng_posts_limit_about#other" = "You can make up to {count} search queries per day.";
+"lng_posts_limit_search_paid" = "Search for {cost}";
+"lng_posts_limit_unlocks" = "free search unlocks in {duration}";
+"lng_posts_paid_spent#one" = "**{count} Star** spent on extra search.";
+"lng_posts_paid_spent#other" = "**{count} Stars** spent on extra search.";
 
 "lng_popular_apps_info_title" = "Top Mini Apps";
 "lng_popular_apps_info_text" = "This catalogue ranks mini apps based on their daily revenue, measured in Stars. To be listed, developers must set their main mini apps in {bot} (as described {link}), have over **1,000** daily users, and earn a daily revenue above **1,000** Stars, based on the weekly average.";

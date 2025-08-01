@@ -40,6 +40,8 @@ struct PeerByLinkInfo {
 	QString chatLinkSlug;
 	MsgId messageId = ShowAtUnreadMsgId;
 	StoryId storyId = 0;
+	int storyAlbumId = 0;
+	int giftCollectionId = 0;
 	std::optional<TimeId> videoTimestamp;
 	QString text;
 	RepliesByLinkInfo repliesInfo;
@@ -60,6 +62,7 @@ struct PeerByLinkInfo {
 	std::optional<QString> voicechatHash;
 	FullMsgId clickFromMessageId;
 	std::shared_ptr<InlineBots::WebViewContext> clickFromBotWebviewContext;
+	bool historyInNewWindow = false;
 };
 
 } // namespace Window

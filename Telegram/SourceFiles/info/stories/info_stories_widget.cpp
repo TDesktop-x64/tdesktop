@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/stories/info_stories_widget.h"
 
 #include "data/data_peer.h"
+#include "data/data_stories.h"
 #include "info/stories/info_stories_inner_widget.h"
 #include "info/info_controller.h"
 #include "info/info_memento.h"
@@ -17,13 +18,20 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace Info::Stories {
 
+int ArchiveId() {
+	return Data::kStoriesAlbumIdArchive;
+}
+
 Memento::Memento(not_null<Controller*> controller)
-: ContentMemento(Tag{ controller->storiesPeer(), controller->storiesTab() })
+: ContentMemento(Tag{
+	controller->storiesPeer(),
+	controller->storiesAlbumId(),
+	controller->storiesAddToAlbumId() })
 , _media(controller) {
 }
 
-Memento::Memento(not_null<PeerData*> peer, Tab tab)
-: ContentMemento(Tag{ peer, tab })
+Memento::Memento(not_null<PeerData*> peer, int albumId, int addingToAlbumId)
+: ContentMemento(Tag{ peer, albumId, addingToAlbumId })
 , _media(peer, 0, Media::Type::PhotoVideo) {
 }
 
@@ -45,10 +53,18 @@ object_ptr<ContentWidget> Memento::createWidget(
 Widget::Widget(
 	QWidget *parent,
 	not_null<Controller*> controller)
-: ContentWidget(parent, controller) {
+: ContentWidget(parent, controller)
+, _albumId(controller->key().storiesAlbumId()) {
 	_inner = setInnerWidget(object_ptr<InnerWidget>(
 		this,
-		controller));
+		controller,
+		_albumId.value(),
+		controller->key().storiesAddToAlbumId()));
+	_inner->albumIdChanges() | rpl::start_with_next([=](int id) {
+		controller->showSection(
+			Make(controller->storiesPeer(), id),
+			Window::SectionShow::Way::Backward);
+	}, _inner->lifetime());
 	_inner->setScrollHeightValue(scrollHeightValue());
 	_inner->scrollToRequests(
 	) | rpl::start_with_next([this](Ui::ScrollToRequest request) {
@@ -66,9 +82,14 @@ bool Widget::showInternal(not_null<ContentMemento*> memento) {
 		return false;
 	}
 	if (auto storiesMemento = dynamic_cast<Memento*>(memento.get())) {
-		const auto tab = controller()->key().storiesTab();
-		if (storiesMemento->storiesTab() == tab) {
+		const auto myId = controller()->key().storiesAlbumId();
+		const auto hisId = storiesMemento->storiesAlbumId();
+		constexpr auto kArchive = Data::kStoriesAlbumIdArchive;
+		if (myId == hisId) {
 			restoreState(storiesMemento);
+			return true;
+		} else if (myId != kArchive && hisId != kArchive) {
+			_albumId = hisId;
 			return true;
 		}
 	}
@@ -109,18 +130,18 @@ void Widget::selectionAction(SelectionAction action) {
 
 rpl::producer<QString> Widget::title() {
 	const auto peer = controller()->key().storiesPeer();
-	return (controller()->key().storiesTab() == Tab::Archive)
+	return (controller()->key().storiesAlbumId() == ArchiveId())
 		? tr::lng_stories_archive_title()
 		: (peer && peer->isSelf())
 		? tr::lng_menu_my_profile()
 		: tr::lng_stories_my_title();
 }
 
-std::shared_ptr<Info::Memento> Make(not_null<PeerData*> peer, Tab tab) {
+std::shared_ptr<Info::Memento> Make(not_null<PeerData*> peer, int albumId) {
 	return std::make_shared<Info::Memento>(
 		std::vector<std::shared_ptr<ContentMemento>>(
 			1,
-			std::make_shared<Memento>(peer, tab)));
+			std::make_shared<Memento>(peer, albumId, 0)));
 }
 
 } // namespace Info::Stories

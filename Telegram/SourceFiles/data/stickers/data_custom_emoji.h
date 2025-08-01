@@ -84,6 +84,7 @@ public:
 	[[nodiscard]] Session &owner() const;
 
 	[[nodiscard]] QString registerInternalEmoji(
+		const QString &key,
 		QImage emoji,
 		QMargins padding = {},
 		bool textColor = true);
@@ -127,6 +128,7 @@ private:
 		DocumentId documentId,
 		SizeTag tag,
 		int sizeOverride = 0);
+	[[nodiscard]] QString registerImageEmoji(QImage emoji, bool textColor);
 
 	void request();
 	void requestFinished();
@@ -192,6 +194,8 @@ private:
 
 	std::vector<InternalEmojiData> _internalEmoji;
 	base::flat_map<not_null<const style::icon*>, QString> _iconEmoji;
+
+	base::flat_map<QString, QString> _imageEmoji;
 
 #if 0 // inject-to-on_main
 	crl::time _repaintsLastAdded = 0;

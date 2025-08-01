@@ -58,6 +58,30 @@ namespace {
 	return options;
 }
 
+[[nodiscard]] int FindStarsForResale(const MTPVector<MTPStarsAmount> *list) {
+	if (!list) {
+		return 0;
+	}
+	for (const auto &amount : list->v) {
+		if (amount.type() == mtpc_starsAmount) {
+			return int(amount.c_starsAmount().vamount().v);
+		}
+	}
+	return 0;
+}
+
+[[nodiscard]] int64 FindTonForResale(const MTPVector<MTPStarsAmount> *list) {
+	if (!list) {
+		return 0;
+	}
+	for (const auto &amount : list->v) {
+		if (amount.type() == mtpc_starsTonAmount) {
+			return int64(amount.c_starsTonAmount().vamount().v);
+		}
+	}
+	return 0;
+}
+
 } // namespace
 
 Premium::Premium(not_null<ApiWrap*> api)
@@ -871,8 +895,10 @@ std::optional<Data::StarGift> FromTL(
 					? peerFromMTP(*data.vowner_id())
 					: PeerId()),
 				.releasedBy = releasedBy,
+				.nanoTonForResale = FindTonForResale(data.vresell_amount()),
+				.starsForResale = FindStarsForResale(data.vresell_amount()),
 				.number = data.vnum().v,
-				.starsForResale = int(data.vresell_stars().value_or_empty()),
+				.onlyAcceptTon = data.is_resale_ton_only(),
 				.model = *model,
 				.pattern = *pattern,
 			}),
@@ -880,6 +906,7 @@ std::optional<Data::StarGift> FromTL(
 			.releasedBy = releasedBy,
 			.limitedLeft = (total - data.vavailability_issued().v),
 			.limitedCount = total,
+			.resellTonOnly = data.is_resale_ton_only(),
 			.requirePremium = data.is_require_premium(),
 		};
 		const auto unique = result.unique.get();

@@ -2156,7 +2156,7 @@ void HistoryWidget::setupGiftToChannelButton() {
 	) | rpl::start_with_next([=](bool muteUnmute, bool joinChannel, bool discuss) {
 		const auto newParent = (muteUnmute && !joinChannel && !discuss)
 			? _muteUnmute.data()
-			: (joinChannel && !muteUnmute && discuss)
+			: (joinChannel && !muteUnmute)
 			? _joinChannel.data()
 			: nullptr;
 		if (newParent) {

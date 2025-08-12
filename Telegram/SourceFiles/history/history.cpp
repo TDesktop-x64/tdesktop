@@ -1455,6 +1455,9 @@ void History::newItemAdded(not_null<HistoryItem*> item) {
 	if (const auto sublist = item->savedSublist()) {
 		sublist->applyItemAdded(item);
 	}
+	if (const auto streamed = _streamedDrafts.get()) {
+		streamed->applyItemAdded(item);
+	}
 	if (const auto media = item->media()) {
 		if (const auto gift = media->gift()) {
 			if (const auto unique = gift->unique.get()) {

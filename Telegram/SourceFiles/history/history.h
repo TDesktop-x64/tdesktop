@@ -23,6 +23,7 @@ class HistoryItem;
 struct HistoryItemCommonFields;
 struct HistoryMessageMarkupData;
 class HistoryMainElementDelegateMixin;
+class HistoryStreamedDrafts;
 struct LanguageId;
 
 namespace Data {
@@ -90,6 +91,8 @@ public:
 	[[nodiscard]] Data::HistoryMessages &messages();
 	[[nodiscard]] const Data::HistoryMessages &messages() const;
 	[[nodiscard]] Data::HistoryMessages *maybeMessages();
+
+	[[nodiscard]] HistoryStreamedDrafts &streamedDrafts();
 
 	[[nodiscard]] HistoryItem *joinedMessageInstance() const;
 	void checkLocalMessages();
@@ -641,6 +644,7 @@ private:
 	std::unordered_set<std::unique_ptr<HistoryItem>> _items;
 
 	std::unique_ptr<Data::HistoryMessages> _messages;
+	std::unique_ptr<HistoryStreamedDrafts> _streamedDrafts;
 
 	// This almost always is equal to _lastMessage. The only difference is
 	// for a group that migrated to a supergroup. Then _lastMessage can

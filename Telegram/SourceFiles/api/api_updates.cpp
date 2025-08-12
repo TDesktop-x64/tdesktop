@@ -51,6 +51,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_helpers.h"
+#include "history/history_streamed_drafts.h"
 #include "history/history_unread_things.h"
 #include "core/application.h"
 #include "storage/storage_account.h"
@@ -1096,6 +1097,9 @@ void Updates::handleSendActionUpdate(
 	const auto from = (fromId == session().userPeerId())
 		? session().user().get()
 		: session().data().peerLoaded(fromId);
+	const auto when = requestingDifference()
+		? 0
+		: base::unixtime::now();
 	if (action.type() == mtpc_speakingInGroupCallAction) {
 		handleSpeakingInCall(peer, fromId, from);
 	}
@@ -1109,11 +1113,10 @@ void Updates::handleSendActionUpdate(
 		handleEmojiInteraction(peer, qs(data.vemoticon()));
 		return;
 	} else if (action.type() == mtpc_sendMessageTextDraftAction) {
+		const auto &data = action.c_sendMessageTextDraftAction();
+		history->streamedDrafts().apply(rootId, fromId, when, data);
 		return;
 	}
-	const auto when = requestingDifference()
-		? 0
-		: base::unixtime::now();
 	session().data().sendActionManager().registerFor(
 		history,
 		rootId,

@@ -15,6 +15,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item.h"
 #include "history/history_item_components.h"
 #include "history/history_item_helpers.h"
+#include "history/history_streamed_drafts.h"
 #include "history/history_translation.h"
 #include "history/history_unread_things.h"
 #include "core/ui_integration.h"
@@ -3749,6 +3750,13 @@ void History::checkLocalMessages() {
 	}
 }
 
+HistoryStreamedDrafts &History::streamedDrafts() {
+	if (!_streamedDrafts) {
+		_streamedDrafts = std::make_unique<HistoryStreamedDrafts>(this);
+	}
+	return *_streamedDrafts;
+}
+
 HistoryItem *History::joinedMessageInstance() const {
 	return _joinedMessage;
 }
@@ -3907,6 +3915,7 @@ void History::clear(ClearType type, bool markEmpty) {
 	_unreadBarView = nullptr;
 	_firstUnreadView = nullptr;
 	removeJoinedMessage();
+	base::take(_streamedDrafts);
 
 	forgetScrollState();
 	blocks.clear();

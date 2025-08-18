@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_streamed_drafts.h"
 
 #include "api/api_text_entities.h"
+#include "data/data_forum_topic.h"
 #include "data/data_session.h"
 #include "history/history.h"
 #include "history/history_item.h"
@@ -34,6 +35,9 @@ void HistoryStreamedDrafts::apply(
 		PeerId fromId,
 		TimeId when,
 		const MTPDsendMessageTextDraftAction &data) {
+	if (!rootId) {
+		rootId = Data::ForumTopic::kGeneralId;
+	}
 	if (!when) {
 		clear(rootId);
 		return;
@@ -49,9 +53,12 @@ void HistoryStreamedDrafts::apply(
 	_drafts.emplace(rootId, Draft{
 		.message = _history->addNewLocalMessage({
 			.id = _history->owner().nextLocalMessageId(),
-			.flags = MessageFlag::Local,
+			.flags = MessageFlag::Local | MessageFlag::HasReplyInfo,
 			.from = fromId,
-			.replyTo = { .topicRootId = rootId },
+			.replyTo = {
+				.messageId = { _history->peer->id, rootId },
+				.topicRootId = rootId,
+			},
 			.date = when,
 		}, text, MTP_messageMediaEmpty()),
 		.randomId = randomId,

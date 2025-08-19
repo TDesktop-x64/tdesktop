@@ -1463,3 +1463,4 @@ saveMusicInfoMenu: Menu(defaultMenu) {
 }
 
 newBotThreadDown: icon {{ "history_down_arrow", msgServiceFg }};
+newBotThreadTopSkip: 24px;

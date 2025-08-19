@@ -138,6 +138,23 @@ private:
 
 };
 
+class NewBotThreadDottedLine final : public MediaGenericPart {
+public:
+	explicit NewBotThreadDottedLine(not_null<Element*> parent);
+
+	void draw(
+		Painter &p,
+		not_null<const MediaGeneric*> owner,
+		const PaintContext &context,
+		int outerWidth) const override;
+	QSize countOptimalSize() override;
+	QSize countCurrentSize(int newWidth) override;
+
+private:
+	const not_null<Element*> _parent;
+
+};
+
 class NewBotThreadDownIcon final : public MediaGenericPart {
 public:
 	void draw(
@@ -145,7 +162,6 @@ public:
 		not_null<const MediaGeneric*> owner,
 		const PaintContext &context,
 		int outerWidth) const override;
-
 	QSize countOptimalSize() override;
 	QSize countCurrentSize(int newWidth) override;
 
@@ -230,6 +246,33 @@ QSize NewBotThreadDownIcon::countOptimalSize() {
 
 QSize NewBotThreadDownIcon::countCurrentSize(int newWidth) {
 	return st::newBotThreadDown.size();
+}
+
+NewBotThreadDottedLine::NewBotThreadDottedLine(not_null<Element*> parent)
+: _parent(parent) {
+}
+
+void NewBotThreadDottedLine::draw(
+		Painter &p,
+		not_null<const MediaGeneric*> owner,
+		const PaintContext &context,
+		int outerWidth) const {
+	const auto skip = st::monoforumBarUserpicSkip;
+	auto pen = context.st->msgServiceBg()->p;
+	pen.setWidthF(skip);
+	pen.setCapStyle(Qt::RoundCap);
+	pen.setDashPattern({ 2., 2. });
+	p.setPen(pen);
+	const auto top = -st::newBotThreadTopSkip / 2;
+	p.drawLine(context.viewport.x(), top, context.viewport.width(), top);
+}
+
+QSize NewBotThreadDottedLine::countOptimalSize() {
+	return { 0, 0 };
+}
+
+QSize NewBotThreadDottedLine::countCurrentSize(int newWidth) {
+	return { 0, 0 };
 }
 
 auto GenerateChatIntro(
@@ -322,12 +365,13 @@ auto GenerateNewBotThread(
 		};
 		const auto title = tr::lng_bot_new_thread_title(tr::now);
 		const auto description = tr::lng_bot_new_thread_about(tr::now);
+		push(std::make_unique<NewBotThreadDottedLine>(parent));
 		pushText(Ui::Text::Bold(title), st::chatIntroTitleMargin);
 		pushText({ description }, st::chatIntroMargin);
 		push(std::make_unique<NewBotThreadDownIcon>());
 
 		parent->addVerticalMargins(
-			st::msgServiceMargin.bottom(),
+			st::newBotThreadTopSkip,
 			st::msgServiceMargin.top());
 	};
 }

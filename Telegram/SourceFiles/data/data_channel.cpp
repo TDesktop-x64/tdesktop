@@ -237,7 +237,8 @@ void ChannelData::setFlags(ChannelDataFlags which) {
 		| Flag::CallNotEmpty
 		| Flag::SimilarExpanded
 		| Flag::Signatures
-		| Flag::SignatureProfiles)) {
+		| Flag::SignatureProfiles
+		| Flag::ForumTabs)) {
 		if (const auto history = this->owner().historyLoaded(this)) {
 			if (diff & Flag::CallNotEmpty) {
 				history->updateChatListEntry();
@@ -263,6 +264,9 @@ void ChannelData::setFlags(ChannelDataFlags which) {
 			}
 			if (diff & (Flag::Signatures | Flag::SignatureProfiles)) {
 				session().changes().peerUpdated(this, UpdateFlag::Rights);
+			}
+			if (diff & Flag::ForumTabs) {
+				history->forumTabsChanged(which & Flag::ForumTabs);
 			}
 		}
 	}

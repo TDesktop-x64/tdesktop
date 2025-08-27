@@ -466,8 +466,7 @@ void AddTableRow(
 }
 
 [[nodiscard]] object_ptr<Ui::RpWidget> MakeNonUniqueStatusTableValue(
-		not_null<Ui::TableLayout*> table,
-		Fn<void()> startUpgrade) {
+		not_null<Ui::TableLayout*> table) {
 	auto result = object_ptr<Ui::RpWidget>(table);
 	const auto raw = result.data();
 
@@ -477,34 +476,10 @@ void AddTableRow(
 		table->st().defaultValue,
 		st::defaultPopupMenu);
 
-	const auto upgrade = startUpgrade
-		? Ui::CreateChild<Ui::RoundButton>(
-			raw,
-			tr::lng_gift_unique_status_upgrade(),
-			table->st().smallButton)
-		: (Ui::RoundButton*)(nullptr);
-	if (upgrade) {
-		using namespace Ui;
-		upgrade->setTextTransform(RoundButton::TextTransform::NoTransform);
-		upgrade->setClickedCallback(startUpgrade);
-	}
-
-	rpl::combine(
-		raw->widthValue(),
-		upgrade ? upgrade->widthValue() : rpl::single(0)
-	) | rpl::start_with_next([=](int width, int toggleWidth) {
-		const auto toggleSkip = toggleWidth
-			? (st::normalFont->spacew + toggleWidth)
-			: 0;
-		label->resizeToNaturalWidth(width - toggleSkip);
+	raw->widthValue(
+	) | rpl::start_with_next([=](int width) {
+		label->resizeToNaturalWidth(width);
 		label->moveToLeft(0, 0, width);
-		if (upgrade) {
-			upgrade->moveToLeft(
-				label->width() + st::normalFont->spacew,
-				(table->st().defaultValue.style.font->ascent
-					- table->st().smallButton.style.font->ascent),
-				width);
-		}
 	}, label->lifetime());
 
 	label->heightValue() | rpl::start_with_next([=](int height) {
@@ -766,7 +741,8 @@ void GiftCodeBox(
 					std::move(shareLink),
 					Ui::Text::WithEntities)),
 			st::giveawayGiftCodeFooter),
-		st::giveawayGiftCodeFooterMargin);
+		st::giveawayGiftCodeFooterMargin,
+		style::al_top);
 	footer->setClickHandlerFilter([=](const auto &...) {
 		ShareWithFriend(controller, slug);
 		return false;
@@ -908,7 +884,8 @@ void GiftCodePendingBox(
 			box,
 			tr::lng_gift_link_pending_footer(),
 			st::giveawayGiftCodeFooter),
-		st::giveawayGiftCodeFooterMargin);
+		st::giveawayGiftCodeFooterMargin,
+		style::al_top);
 
 	const auto close = Ui::CreateChild<Ui::IconButton>(
 		box.get(),
@@ -1013,12 +990,11 @@ void GiveawayInfoBox(
 			label->setTextColorOverride(st::windowActiveTextFg->c);
 		}
 		const auto result = box->addRow(
-			object_ptr<Ui::PaddingWrap<Ui::CenterWrap<Ui::FlatLabel>>>(
+			object_ptr<Ui::PaddingWrap<Ui::FlatLabel>>(
 				box.get(),
-				object_ptr<Ui::CenterWrap<Ui::FlatLabel>>(
-					box.get(),
-					std::move(label)),
-				QMargins(0, skip, 0, skip)));
+				std::move(label),
+				QMargins(0, skip, 0, skip)),
+			style::al_justify);
 		result->paintRequest() | rpl::start_with_next([=] {
 			auto p = QPainter(result);
 			p.setPen(Qt::NoPen);
@@ -1211,7 +1187,8 @@ void GiveawayInfoBox(
 						: tr::lng_prizes_cancelled()),
 					st::giveawayRefundedLabel),
 				st::giveawayRefundedPadding),
-			{ padding.left(), 0, padding.right(), padding.bottom() });
+			{ padding.left(), 0, padding.right(), padding.bottom() },
+			style::al_top);
 		const auto bg = wrap->lifetime().make_state<Ui::RoundRect>(
 			st::boxRadius,
 			st::attentionBoxButton.textBgOver);
@@ -1525,7 +1502,7 @@ void AddStarGiftTable(
 		AddTableRow(
 			table,
 			tr::lng_gift_unique_status(),
-			MakeNonUniqueStatusTableValue(table, std::move(startUpgrade)),
+			MakeNonUniqueStatusTableValue(table),
 			marginWithButton);
 	}
 	if (unique) {
@@ -1674,7 +1651,8 @@ void AddCreditsHistoryEntryTable(
 			show,
 			peerId);
 	}
-	if (actorId || (!entry.starrefCommission && peerId)) {
+	if (!entry.postsSearch
+		&& (actorId || (!entry.starrefCommission && peerId))) {
 		auto text = entry.starrefCommission
 			? tr::lng_credits_box_history_entry_referred()
 			: entry.in

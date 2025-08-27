@@ -99,6 +99,7 @@ class SectionMemento;
 class Controller;
 class FiltersMenu;
 class ChatPreviewManager;
+class ChatSwitchProcess;
 
 struct PeerByLinkInfo;
 struct SeparateId;
@@ -122,6 +123,21 @@ private:
 	Dialogs::Key _chat;
 	base::weak_ptr<Data::ForumTopic> _weak;
 	QDate _date;
+
+};
+
+class ForumThreadClickHandler : public ClickHandler {
+public:
+	explicit ForumThreadClickHandler(not_null<HistoryItem*> item);
+
+	void update(not_null<HistoryItem*> item);
+	void onClick(ClickContext context) const override;
+
+private:
+	[[nodiscard]] base::weak_ptr<Data::Thread> resolveThread(
+		not_null<HistoryItem*> item) const;
+
+	base::weak_ptr<Data::Thread> _thread;
 
 };
 
@@ -785,6 +801,8 @@ private:
 	std::weak_ptr<Ui::ChatTheme> _chatStyleTheme;
 	std::deque<std::shared_ptr<Ui::ChatTheme>> _lastUsedCustomChatThemes;
 	rpl::variable<PeerThemeOverride> _peerThemeOverride;
+
+	std::unique_ptr<ChatSwitchProcess> _chatSwitchProcess;
 
 	base::has_weak_ptr _storyOpenGuard;
 

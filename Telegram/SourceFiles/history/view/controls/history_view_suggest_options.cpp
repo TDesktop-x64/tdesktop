@@ -152,16 +152,17 @@ StarsTonPriceInput AddStarsTonPriceInput(
 
 	const auto session = args.session;
 	const auto added = st::boxRowPadding - st::defaultSubsectionTitlePadding;
-	const auto manager = &session->data().customEmojiManager();
+	auto helper = Ui::Text::CustomEmojiHelper();
 	const auto makeIcon = [&](
 			not_null<QWidget*> parent,
-			TextWithEntities text) {
+			Ui::Text::PaletteDependentEmoji emoji) {
+		auto text = helper.paletteDependent(std::move(emoji));
 		return Ui::CreateChild<Ui::FlatLabel>(
 			parent,
-			rpl::single(text),
+			rpl::single(std::move(text)),
 			st::defaultFlatLabel,
 			st::defaultPopupMenu,
-			Core::TextContext({ .session = session }));
+			helper.context());
 	};
 
 	const auto starsWrap = container->add(
@@ -193,7 +194,9 @@ StarsTonPriceInput AddStarsTonPriceInput(
 			: QString()),
 		args.starsMax);
 	const auto starsField = ownedStarsField.data();
-	const auto starsIcon = makeIcon(starsField, manager->creditsEmoji());
+	const auto starsIcon = makeIcon(
+		starsField,
+		Ui::Earn::IconCreditsEmoji());
 
 	starsFieldWrap->widthValue() | rpl::start_with_next([=](int width) {
 		starsIcon->move(st::starsFieldIconPosition);
@@ -241,14 +244,7 @@ StarsTonPriceInput AddStarsTonPriceInput(
 				? (args.price.whole() * Ui::kNanosInOne + args.price.nano())
 				: 0)));
 	const auto tonField = ownedTonField.data();
-	const auto tonIcon = makeIcon(tonField, Ui::Text::SingleCustomEmoji(
-		manager->registerInternalEmoji(
-			u"ton_price_field_emoji"_q,
-			Ui::Earn::IconCurrencyColored(
-				st::tonFieldIconSize,
-				st::currencyFg->c),
-			st::channelEarnCurrencyCommonMargins,
-			false)));
+	const auto tonIcon = makeIcon(tonField, Ui::Earn::IconCurrencyEmoji());
 
 	tonFieldWrap->widthValue() | rpl::start_with_next([=](int width) {
 		tonIcon->move(st::tonFieldIconPosition);
@@ -393,12 +389,12 @@ void ChooseSuggestPriceBox(
 		box->setNoContentMargin(true);
 
 		Ui::AddSkip(container, st::boxTitleHeight * 1.1);
-		box->addRow(object_ptr<Ui::CenterWrap<>>(
-			box,
+		box->addRow(
 			object_ptr<Ui::FlatLabel>(
 				box,
 				std::move(title),
-				st::settingsPremiumUserTitle)));
+				st::settingsPremiumUserTitle),
+			style::al_top);
 	}
 
 	state->buttons.push_back({
@@ -652,15 +648,11 @@ void ChooseSuggestPriceBox(
 		priceInput.submits
 	) | rpl::start_with_next(state->save, box->lifetime());
 
+	auto helper = Ui::Text::CustomEmojiHelper();
 	const auto button = box->addButton(rpl::single(QString()), state->save);
-	const auto coloredTonIcon = Ui::Text::SingleCustomEmoji(
-		session->data().customEmojiManager().registerInternalEmoji(
-			u"ton_price_suggest_save"_q,
-			Ui::Earn::IconCurrencyColored(
-				st::tonFieldIconSize,
-				st::currencyFg->c),
-			st::suggestPriceTonIconMargins));
-	button->setContext(Core::TextContext({ .session = &peer->session() }));
+	const auto coloredTonIcon = helper.paletteDependent(
+		Ui::Earn::IconCurrencyEmoji());
+	button->setContext(helper.context());
 	button->setText(state->price.value(
 	) | rpl::map([=](CreditsAmount price) {
 		if (args.mode == SuggestMode::Change) {
@@ -675,7 +667,7 @@ void ChooseSuggestPriceBox(
 			return tr::lng_suggest_options_offer(
 				tr::now,
 				lt_amount,
-				TextWithEntities{ coloredTonIcon }.append(
+				Ui::Text::IconEmoji(&st::tonIconEmoji).append(
 					Lang::FormatCreditsAmountDecimal(price)),
 				Ui::Text::WithEntities);
 		}
@@ -794,19 +786,19 @@ void InsufficientTonBox(
 	const auto nano = add.whole() * Ui::kNanosInOne + add.nano();
 	const auto amount = Ui::FormatTonAmount(nano).full;
 	box->addRow(
-		object_ptr<Ui::CenterWrap<Ui::FlatLabel>>(
+		object_ptr<Ui::FlatLabel>(
 			box,
-			object_ptr<Ui::FlatLabel>(
-				box,
-				tr::lng_suggest_low_ton_title(tr::now, lt_amount, amount),
-				st::boxTitle)),
-		st::boxRowPadding + st::lowTonTitlePadding);
+			tr::lng_suggest_low_ton_title(tr::now, lt_amount, amount),
+			st::boxTitle),
+		st::boxRowPadding + st::lowTonTitlePadding,
+		style::al_top);
 	const auto label = box->addRow(
 		object_ptr<Ui::FlatLabel>(
 			box,
 			tr::lng_suggest_low_ton_text(Ui::Text::RichLangValue),
 			st::lowTonText),
-		st::boxRowPadding + st::lowTonTextPadding);
+		st::boxRowPadding + st::lowTonTextPadding,
+		style::al_top);
 	label->setTryMakeSimilarLines(true);
 	label->resizeToWidth(
 		st::boxWidth - st::boxRowPadding.left() - st::boxRowPadding.right());
@@ -901,20 +893,15 @@ void SuggestOptions::updateTexts() {
 }
 
 TextWithEntities SuggestOptions::composeText() const {
-	const auto manager = &_peer->owner().customEmojiManager();
-	const auto top = st::giftBoxByStarsStarTop;
+	auto helper = Ui::Text::CustomEmojiHelper();
 	const auto amount = _values.price().ton()
-		? Ui::Text::SingleCustomEmoji(
-			manager->registerInternalEmoji(
-				u"ton_price_preview_emoji"_q,
-				Ui::Earn::IconCurrencyColored(
-					st::suggestBarTonIconSize,
-					st::currencyFg->c),
-				st::suggestBarTonIconMargins,
-				false)).append(
-					Lang::FormatCreditsAmountDecimal(_values.price()))
-		: manager->ministarEmoji({ 0, top, 0, 0 }).append(
-			Lang::FormatCreditsAmountDecimal(_values.price()));
+		? helper.paletteDependent(Ui::Earn::IconCurrencyEmoji({
+			.size = st::suggestBarTonIconSize,
+			.margin = st::suggestBarTonIconMargins,
+		})).append(Lang::FormatCreditsAmountDecimal(_values.price()))
+		: helper.paletteDependent(
+			Ui::Earn::IconCreditsEmojiSmall()
+		).append(Lang::FormatCreditsAmountDecimal(_values.price()));
 	const auto date = langDateTime(base::unixtime::parse(_values.date));
 	if (!_values.price() && !_values.date) {
 		return tr::lng_suggest_bar_text(tr::now, Ui::Text::WithEntities);

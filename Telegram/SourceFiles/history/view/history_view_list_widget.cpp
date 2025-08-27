@@ -1994,7 +1994,7 @@ void ListWidget::updateSize() {
 
 void ListWidget::resizeToWidth(int newWidth, int minHeight) {
 	_minHeight = minHeight;
-	TWidget::resizeToWidth(newWidth);
+	RpWidget::resizeToWidth(newWidth);
 	restoreScrollPosition();
 }
 
@@ -3206,7 +3206,7 @@ rpl::producer<bool> ListWidget::touchMaybeSelectingValue() const {
 void ListWidget::enterEventHook(QEnterEvent *e) {
 	_mouseActive = true;
 	mouseActionUpdate(QCursor::pos());
-	return TWidget::enterEventHook(e);
+	return RpWidget::enterEventHook(e);
 }
 
 void ListWidget::leaveEventHook(QEvent *e) {
@@ -3226,7 +3226,7 @@ void ListWidget::leaveEventHook(QEvent *e) {
 		setCursor(_cursor);
 	}
 	_mouseActive = false;
-	return TWidget::leaveEventHook(e);
+	return RpWidget::leaveEventHook(e);
 }
 
 void ListWidget::updateDragSelection() {

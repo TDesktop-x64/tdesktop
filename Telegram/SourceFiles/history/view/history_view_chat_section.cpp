@@ -468,7 +468,7 @@ ChatWidget::~ChatWidget() {
 	if (_repliesRootId) {
 		controller()->sendingAnimation().clear();
 	}
-	if (_subsectionTabs) {
+	if (_subsectionTabs && !_subsectionTabs->dying()) {
 		_subsectionTabsLifetime.destroy();
 		controller()->saveSubsectionTabs(base::take(_subsectionTabs));
 	}
@@ -820,6 +820,11 @@ void ChatWidget::setupComposeControls() {
 	_composeControls->sendRequests(
 	) | rpl::start_with_next([=](Api::SendOptions options) {
 		send(options);
+	}, lifetime());
+
+	_composeControls->scrollToMaxRequests(
+	) | rpl::start_with_next([=] {
+		listScrollTo(_scroll->scrollTopMax());
 	}, lifetime());
 
 	_composeControls->sendVoiceRequests(

@@ -30,6 +30,10 @@ constexpr auto kCountLimit = 256; // How many shortcuts can be in json file.
 rpl::event_stream<not_null<Request*>> RequestsStream;
 bool Paused/* = false*/;
 
+Qt::Key ChatSwitchModifier/* = Qt::Key()*/;
+bool ChatSwitchStarted/* = false*/;
+rpl::event_stream<ChatSwitchRequest> ChatSwitchStream;
+
 const auto AutoRepeatCommands = base::flat_set<Command>{
 	Command::MediaPrevious,
 	Command::MediaNext,
@@ -113,6 +117,8 @@ const auto CommandByName = base::flat_map<QString, Command>{
 	{ u"show_chat_menu"_q    , Command::ShowChatMenu },
 	{ u"show_chat_preview"_q , Command::ShowChatPreview },
 
+	{ u"record_voice"_q      , Command::RecordVoice },
+
 	// Shortcuts that have no default values.
 	{ u"message"_q                       , Command::JustSendMessage },
 	{ u"message_silently"_q              , Command::SendSilentMessage },
@@ -120,6 +126,7 @@ const auto CommandByName = base::flat_map<QString, Command>{
 	{ u"media_viewer_video_fullscreen"_q , Command::MediaViewerFullscreen },
 	{ u"show_scheduled"_q                , Command::ShowScheduled },
 	{ u"archive_chat"_q                  , Command::ArchiveChat },
+	{ u"record_round"_q                  , Command::RecordRound },
 	//
 	{ u"fast_forward"_q      , Command::FastForward },
 	{ u"fast_copy"_q         , Command::FastCopy },
@@ -143,6 +150,7 @@ const base::flat_map<Command, QString> &CommandNames() {
 	Command::MediaViewerFullscreen,
 	Command::ShowScheduled,
 	Command::ArchiveChat,
+	Command::RecordRound,
 };
 
 class Manager {
@@ -155,6 +163,7 @@ public:
 	void toggleMedia(bool toggled);
 	void toggleSupport(bool toggled);
 	void listen(not_null<QWidget*> widget);
+	[[nodiscard]] bool handles(const QKeySequence &sequence) const;
 
 	[[nodiscard]] const QStringList &errors() const;
 
@@ -360,6 +369,10 @@ void Manager::listen(not_null<QWidget*> widget) {
 	}
 }
 
+bool Manager::handles(const QKeySequence &sequence) const {
+	return _shortcuts.contains(sequence);
+}
+
 void Manager::pruneListened() {
 	for (auto i = begin(_listened); i != end(_listened);) {
 		if (i->data()) {
@@ -470,10 +483,6 @@ void Manager::fillDefaults() {
 	set(u"ctrl+pgup"_q, Command::ChatPrevious);
 	set(u"alt+up"_q, Command::ChatPrevious);
 
-	set(u"%1+tab"_q.arg(ctrl), Command::ChatNext);
-	set(u"%1+shift+tab"_q.arg(ctrl), Command::ChatPrevious);
-	set(u"%1+backtab"_q.arg(ctrl), Command::ChatPrevious);
-
 	set(u"ctrl+alt+home"_q, Command::ChatFirst);
 	set(u"ctrl+alt+end"_q, Command::ChatLast);
 
@@ -512,7 +521,9 @@ void Manager::fillDefaults() {
 
 	set(u"ctrl+\\"_q, Command::ShowChatMenu);
 	set(u"ctrl+]"_q, Command::ShowChatPreview);
-	
+
+	set(u"ctrl+r"_q, Command::RecordVoice);
+
 	set(u"alt+f"_q, Command::FastForward);
 	set(u"alt+c"_q, Command::FastCopy);
 	
@@ -799,6 +810,72 @@ bool HandleEvent(
 		not_null<QObject*> object,
 		not_null<QShortcutEvent*> event) {
 	return Launch(Data.lookup(object));
+}
+
+void CancelChatSwitch(Qt::Key result) {
+	ChatSwitchModifier = Qt::Key();
+	if (ChatSwitchStarted) {
+		ChatSwitchStarted = false;
+		ChatSwitchStream.fire({ .action = result });
+	}
+}
+
+rpl::producer<ChatSwitchRequest> ChatSwitchRequests() {
+	return ChatSwitchStream.events();
+}
+
+bool HandlePossibleChatSwitch(not_null<QKeyEvent*> event) {
+	const auto type = event->type();
+	if (Paused) {
+		return false;
+	} else if (type == QEvent::ShortcutOverride) {
+		const auto key = Qt::Key(event->key());
+		if (key == Qt::Key_Escape) {
+			CancelChatSwitch(Qt::Key_Escape);
+			return false;
+		} else if (key == Qt::Key_Return || key == Qt::Key_Enter) {
+			CancelChatSwitch(Qt::Key_Enter);
+			return false;
+		}
+		const auto ctrl = Platform::IsMac()
+			? Qt::MetaModifier
+			: Qt::ControlModifier;
+
+		if (Data.handles(ctrl | Qt::ShiftModifier | Qt::Key_Tab)
+			&& Data.handles(QKeySequence(ctrl | Qt::Key_Tab))
+			&& Data.handles(QKeySequence(ctrl | Qt::Key_Backtab))) {
+			return false;
+		} else if (key == Qt::Key_Control || key == Qt::Key_Meta) {
+			ChatSwitchModifier = key;
+		} else if (key == Qt::Key_Tab || key == Qt::Key_Backtab) {
+			const auto modifiers = event->modifiers();
+			if (modifiers & ctrl) {
+				if (Data.handles(modifiers | key)) {
+					return false;
+				}
+				if (ChatSwitchModifier == Qt::Key()) {
+					ChatSwitchModifier = Platform::IsMac()
+						? Qt::Key_Meta
+						: Qt::Key_Control;
+				}
+				const auto action = (modifiers & Qt::ShiftModifier)
+					? Qt::Key_Backtab
+					: key;
+				const auto started = !std::exchange(ChatSwitchStarted, true);
+				ChatSwitchStream.fire({
+					.action = action,
+					.started = started,
+				});
+				return true;
+			}
+		}
+	} else if (type == QEvent::KeyRelease) {
+		const auto key = Qt::Key(event->key());
+		if (key == ChatSwitchModifier) {
+			CancelChatSwitch(Qt::Key_Enter);
+		}
+	}
+	return false;
 }
 
 void ToggleMediaShortcuts(bool toggled) {

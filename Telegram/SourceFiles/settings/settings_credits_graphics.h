@@ -74,6 +74,7 @@ void FillCreditOptions(
 	not_null<PeerData*> peer,
 	CreditsAmount minCredits,
 	Fn<void()> paid,
+	rpl::producer<> showFinishes,
 	rpl::producer<QString> subtitle,
 	std::vector<Data::CreditTopupOption> preloadedTopupOptions);
 
@@ -114,6 +115,7 @@ struct CreditsEntryBoxStyleOverrides {
 	const style::FlatLabel *tableValueMessage = nullptr;
 	const style::icon *link = nullptr;
 	const style::icon *share = nullptr;
+	const style::icon *theme = nullptr;
 	const style::icon *transfer = nullptr;
 	const style::icon *wear = nullptr;
 	const style::icon *takeoff = nullptr;
@@ -133,6 +135,11 @@ void GenericCreditsEntryBox(
 	std::shared_ptr<ChatHelpers::Show> show,
 	const Data::CreditsHistoryEntry &e,
 	const Data::SubscriptionEntry &s,
+	CreditsEntryBoxStyleOverrides st = {});
+void UniqueGiftValueBox(
+	not_null<Ui::GenericBox*> box,
+	std::shared_ptr<ChatHelpers::Show> show,
+	const Data::CreditsHistoryEntry &e,
 	CreditsEntryBoxStyleOverrides st = {});
 void ReceiptCreditsBox(
 	not_null<Ui::GenericBox*> box,
@@ -173,8 +180,7 @@ void GlobalStarGiftBox(
 [[nodiscard]] Data::SavedStarGiftId EntryToSavedStarGiftId(
 	not_null<Main::Session*> session,
 	const Data::CreditsHistoryEntry &entry);
-void SavedStarGiftBox(
-	not_null<Ui::GenericBox*> box,
+void ShowSavedStarGiftBox(
 	not_null<Window::SessionController*> controller,
 	not_null<PeerData*> owner,
 	const Data::SavedStarGift &data,
@@ -190,11 +196,10 @@ void FillSavedStarGiftMenu(
 	SavedStarGiftMenuType type,
 	CreditsEntryBoxStyleOverrides st = {});
 
-void StarGiftViewBox(
-	not_null<Ui::GenericBox*> box,
+void ShowStarGiftViewBox(
 	not_null<Window::SessionController*> controller,
 	const Data::GiftCode &data,
-	not_null<HistoryItem*> item);
+	FullMsgId itemId);
 void ShowRefundInfoBox(
 	not_null<Window::SessionController*> controller,
 	FullMsgId refundItemId);

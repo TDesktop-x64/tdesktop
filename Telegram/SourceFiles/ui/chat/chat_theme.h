@@ -16,6 +16,10 @@ class palette;
 struct colorizer;
 } // namespace style
 
+namespace Ui::Text {
+class CustomEmoji;
+} // namespace Ui::Text
+
 namespace Ui {
 
 class ChatStyle;
@@ -29,6 +33,9 @@ struct ChatThemeBackground {
 	QImage gradientForFill;
 	std::optional<QColor> colorForFill;
 	std::vector<QColor> colors;
+	std::vector<QRectF> giftSymbols;
+	QImage giftSymbolFrame;
+	uint64_t giftId = 0;
 	float64 patternOpacity = 1.;
 	int gradientRotation = 0;
 	bool isPattern = false;
@@ -46,6 +53,8 @@ struct ChatThemeBackgroundData {
 	QString key;
 	QString path;
 	QByteArray bytes;
+	QImage giftSymbolFrame;
+	uint64 giftId = 0;
 	bool gzipSvg = false;
 	std::vector<QColor> colors;
 	bool isPattern = false;
@@ -87,6 +96,8 @@ struct CacheBackgroundResult {
 	QSize area;
 	int x = 0;
 	int y = 0;
+	QRect giftArea;
+	int giftRotation = 0;
 	bool waitingForNegativePattern = false;
 };
 
@@ -101,6 +112,9 @@ struct CachedBackground {
 	QSize area;
 	int x = 0;
 	int y = 0;
+	QRect giftArea;
+	int giftRotation = 0;
+	mutable std::unique_ptr<Text::CustomEmoji> gift;
 	bool waitingForNegativePattern = false;
 };
 
@@ -200,7 +214,9 @@ private:
 	BackgroundState _backgroundState;
 	Animations::Simple _backgroundFade;
 	CacheBackgroundRequest _backgroundCachingRequest;
+	CacheBackgroundRequest _nextCachingRequest;
 	CacheBackgroundResult _backgroundNext;
+	int _backgroundVersion = 0;
 	QSize _cacheBackgroundArea;
 	crl::time _lastBackgroundAreaChangeTime = 0;
 	std::optional<base::Timer> _cacheBackgroundTimer;
@@ -238,10 +254,15 @@ struct ChatBackgroundRects {
 	const QImage &image);
 [[nodiscard]] QImage PrepareImageForTiled(const QImage &prepared);
 
-[[nodiscard]] QImage ReadBackgroundImage(
+struct BackgroundImageFields {
+	QImage image;
+	std::vector<QRectF> giftSymbols;
+};
+[[nodiscard]] BackgroundImageFields ReadBackgroundImage(
 	const QString &path,
 	const QByteArray &content,
-	bool gzipSvg);
+	bool gzipSvg,
+	bool findGiftSymbols = false);
 [[nodiscard]] QImage GenerateBackgroundImage(
 	QSize size,
 	const std::vector<QColor> &bg,
@@ -260,5 +281,7 @@ struct ChatBackgroundRects {
 	int rotation);
 [[nodiscard]] ChatThemeBackground PrepareBackgroundImage(
 	const ChatThemeBackgroundData &data);
+[[nodiscard]] QImage PrepareGiftSymbol(
+	const std::unique_ptr<Text::CustomEmoji> &emoji);
 
 } // namespace Ui

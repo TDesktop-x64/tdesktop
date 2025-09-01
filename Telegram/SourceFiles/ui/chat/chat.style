@@ -528,6 +528,7 @@ historyVoiceMessageOutTTLSelected: icon {{ "chat/mini_media_once", historyFileOu
 historyTranscribeSkip: 10px;
 historyTranscribeSize: size(28px, 22px);
 historyTranscribeRadius: 4px;
+historyTranscribeLoadingSize: 24px;
 historyTranscribeInIcon: icon {{ "chat/voice_to_text", msgFileInBg }};
 historyTranscribeInIconSelected: icon {{ "chat/voice_to_text", msgFileInBgSelected }};
 historyTranscribeOutIcon: icon {{ "chat/voice_to_text", msgFileOutBg }};
@@ -947,6 +948,8 @@ msgServiceStarGiftBoxWidth: 224px;
 msgServiceStarGiftByWidth: 272px;
 msgServiceStarGiftStickerTop: 24px;
 msgServiceStarGiftStickerSize: 100px;
+msgServiceGiftThemeStickerSize: 64px;
+msgServiceGiftThemeStickerPadding: margins(18px, 18px, 18px, 18px);
 
 historySponsorInfoItem: FlatLabel(defaultFlatLabel) {
 	style: TextStyle(defaultTextStyle) {
@@ -1444,4 +1447,10 @@ groupMembersWidgetList: PeerList(defaultPeerList) {
 		}
 		nameFgChecked: contactsNameFg;
 	}
+}
+
+saveMusicInfoMenu: Menu(defaultMenu) {
+	itemBgOver: windowBg;
+	itemFgOver: windowFg;
+	itemPadding: margins(17px, 4px, 17px, 3px);
 }

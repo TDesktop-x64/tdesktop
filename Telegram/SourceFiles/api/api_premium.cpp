@@ -863,6 +863,7 @@ std::optional<Data::StarGift> FromTL(
 			.perUserRemains = data.vper_user_remains().value_or_empty(),
 			.firstSaleDate = data.vfirst_sale_date().value_or_empty(),
 			.lastSaleDate = data.vlast_sale_date().value_or_empty(),
+			.lockedUntilDate = data.vlocked_until_date().value_or_empty(),
 			.requirePremium = data.is_require_premium(),
 			.upgradable = data.vupgrade_stars().has_value(),
 			.birthday = data.is_birthday(),
@@ -890,13 +891,20 @@ std::optional<Data::StarGift> FromTL(
 		const auto releasedById = data.vreleased_by()
 			? peerFromMTP(*data.vreleased_by())
 			: PeerId();
+		const auto themeUserId = data.vtheme_peer()
+			? peerFromMTP(*data.vtheme_peer())
+			: PeerId();
 		const auto releasedBy = releasedById
 			? session->data().peer(releasedById).get()
 			: nullptr;
+		const auto themeUser = themeUserId
+			? session->data().peer(themeUserId).get()
+			: nullptr;
 		auto result = Data::StarGift{
-			.id = uint64(data.vid().v),
+			.id = data.vid().v,
 			.unique = std::make_shared<Data::UniqueGift>(Data::UniqueGift{
 				.id = data.vid().v,
+				.initialGiftId = data.vgift_id().v,
 				.slug = qs(data.vslug()),
 				.title = qs(data.vtitle()),
 				.ownerAddress = qs(data.vowner_address().value_or_empty()),
@@ -905,12 +913,23 @@ std::optional<Data::StarGift> FromTL(
 					? peerFromMTP(*data.vowner_id())
 					: PeerId()),
 				.releasedBy = releasedBy,
+				.themeUser = themeUser,
 				.nanoTonForResale = FindTonForResale(data.vresell_amount()),
 				.starsForResale = FindStarsForResale(data.vresell_amount()),
 				.number = data.vnum().v,
 				.onlyAcceptTon = data.is_resale_ton_only(),
+				.canBeTheme = data.is_theme_available(),
 				.model = *model,
 				.pattern = *pattern,
+				.value = (data.vvalue_amount()
+					? std::make_shared<Data::UniqueGiftValue>(
+						Data::UniqueGiftValue{
+							.currency = qs(
+								data.vvalue_currency().value_or_empty()),
+							.valuePrice = int64(
+								data.vvalue_amount().value_or_empty()),
+						})
+					: nullptr),
 			}),
 			.document = model->document,
 			.releasedBy = releasedBy,
@@ -967,6 +986,8 @@ std::optional<Data::SavedStarGift> FromTL(
 		.starsConverted = int64(data.vconvert_stars().value_or_empty()),
 		.starsUpgradedBySender = int64(
 			data.vupgrade_stars().value_or_empty()),
+		.giftPrepayUpgradeHash = qs(
+			data.vprepaid_upgrade_hash().value_or_empty()),
 		.fromId = (data.vfrom_id()
 			? peerFromMTP(*data.vfrom_id())
 			: PeerId()),

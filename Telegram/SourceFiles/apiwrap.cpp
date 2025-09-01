@@ -44,6 +44,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_forum_topic.h"
 #include "data/data_forum.h"
 #include "data/data_saved_messages.h"
+#include "data/data_saved_music.h"
 #include "data/data_saved_sublist.h"
 #include "data/data_search_controller.h"
 #include "data/data_session.h"
@@ -2515,6 +2516,17 @@ void ApiWrap::refreshFileReference(
 				request(MTPmessages_GetScheduledMessages(
 					item->history()->peer->input,
 					MTP_vector<MTPint>(1, MTP_int(realId))));
+			} else if (item->isSavedMusicItem()) {
+				const auto user = item->history()->peer->asUser();
+				const auto media = item->media();
+				const auto document = media ? media->document() : nullptr;
+				if (user && document) {
+					request(MTPusers_GetSavedMusicByID(
+						user->inputUser,
+						MTP_vector<MTPInputDocument>(1, document->mtpInput())));
+				} else {
+					fail();
+				}
 			} else if (item->isBusinessShortcut()) {
 				const auto &shortcuts = _session->data().shortcutMessages();
 				const auto realId = shortcuts.lookupId(item);
@@ -3386,8 +3398,8 @@ void ApiWrap::finishForwarding(const SendAction &action) {
 			return;
 		}
 
-		forwardMessages(std::move(toForward), action);
 		history->setForwardDraft(topicRootId, monoforumPeerId, {});
+		forwardMessages(std::move(toForward), action);
 	}
 
 	_session->data().sendHistoryChangeNotifications();
@@ -3407,6 +3419,22 @@ void ApiWrap::forwardMessages(
 	Expects(!draft.items.empty());
 
 	auto &histories = _session->data().histories();
+
+	for (auto i = begin(draft.items); i != end(draft.items);) {
+		const auto item = *i;
+		if (item->isSavedMusicItem()) {
+			SendExistingDocument(MessageToSend(action), item->media()->document());
+			i = draft.items.erase(i);
+		} else {
+			++i;
+		}
+	}
+	if (draft.items.empty()) {
+		if (successCallback) {
+			successCallback();
+		}
+		return;
+	}
 
 	struct SharedCallback {
 		int requestsLeft = 0;

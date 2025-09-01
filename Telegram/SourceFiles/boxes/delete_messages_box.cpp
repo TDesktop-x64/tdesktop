@@ -195,7 +195,6 @@ void DeleteMessagesBox::prepare() {
 		if (_moderateDeleteAll) {
 			const auto search = lifetime().make_state<Api::MessagesSearch>(
 				_session->data().message(_ids.front())->history());
-
 			_deleteAll.create(
 				this,
 				tr::lng_delete_all_from_user(
@@ -225,12 +224,14 @@ void DeleteMessagesBox::prepare() {
 			search->searchMessages({ .from = _moderateFrom });
 		}
 	} else {
-		details.text = (_ids.size() == 1)
+		details.text = hasSavedMusicMessages()
+			? tr::lng_selected_remove_saved_music(tr::now)
+			: (_ids.size() == 1)
 			? tr::lng_selected_delete_sure_this(tr::now)
 			: tr::lng_selected_delete_sure(tr::now, lt_count, _ids.size());
 		if (const auto peer = checkFromSinglePeer()) {
 			auto count = int(_ids.size());
-			if (hasScheduledMessages()) {
+			if (hasScheduledMessages() || hasSavedMusicMessages()) {
 			} else if (auto revoke = revokeText(peer)) {
 				const auto &settings = Core::App().settings();
 				const auto revokeByDefault
@@ -314,40 +315,59 @@ void DeleteMessagesBox::prepare() {
 		addButton(tr::lng_about_done(), [=] { closeBox(); });
 	}
 
-	auto fullHeight = st::boxPadding.top()
-		+ _text->height()
-		+ st::boxPadding.bottom();
-	if (_moderateFrom) {
-		fullHeight += st::boxMediumSkip;
-		if (_banUser) {
-			fullHeight += _banUser->heightNoMargins() + st::boxLittleSkip;
-		}
-		fullHeight += _reportSpam->heightNoMargins();
-		if (_deleteAll) {
-			fullHeight += st::boxLittleSkip + _deleteAll->heightNoMargins();
-		}
+	const auto &padding = st::boxPadding;
+	rpl::combine(
+		widthValue(),
+		_text->naturalWidthValue()
+	) | rpl::start_with_next([=](int full, int) {
+		_text->resizeToNaturalWidth(full - padding.left() - padding.right());
+
+		auto fullHeight = st::boxPadding.top()
+			+ _text->height()
+			+ st::boxPadding.bottom();
+		if (_moderateFrom) {
+			fullHeight += st::boxMediumSkip;
+			if (_banUser) {
+				fullHeight += _banUser->heightNoMargins() + st::boxLittleSkip;
+			}
+			fullHeight += _reportSpam->heightNoMargins();
+			if (_deleteAll) {
+				fullHeight += st::boxLittleSkip + _deleteAll->heightNoMargins();
+			}
 		if (GetEnhancedInt("always_delete_for") == 1 || GetEnhancedInt("always_delete_for") == 3) {
 			_deleteAll->setChecked(true);
 		}
-	} else if (_revoke) {
-		fullHeight += st::boxMediumSkip + _revoke->heightNoMargins();
+		} else if (_revoke) {
+			fullHeight += st::boxMediumSkip + _revoke->heightNoMargins();
 		if (GetEnhancedInt("always_delete_for") == 2 || GetEnhancedInt("always_delete_for") == 3) {
 			_revoke->setChecked(true);
 		}
-	}
-	if (_autoDeleteSettings) {
-		fullHeight += st::boxMediumSkip
-			+ _autoDeleteSettings->height()
-			+ st::boxLittleSkip;
-	}
-	setDimensions(st::boxWidth, fullHeight);
-	_fullHeight = fullHeight;
+		}
+		if (_autoDeleteSettings) {
+			fullHeight += st::boxMediumSkip
+				+ _autoDeleteSettings->height()
+				+ st::boxLittleSkip;
+		}
+		setDimensions(st::boxWidth, fullHeight);
+		_fullHeight = fullHeight;
+	}, lifetime());
 }
 
 bool DeleteMessagesBox::hasScheduledMessages() const {
 	for (const auto &fullId : _ids) {
 		if (const auto item = _session->data().message(fullId)) {
 			if (item->isScheduled()) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+bool DeleteMessagesBox::hasSavedMusicMessages() const {
+	for (const auto &fullId : _ids) {
+		if (const auto item = _session->data().message(fullId)) {
+			if (item->isSavedMusicItem()) {
 				return true;
 			}
 		}
@@ -568,6 +588,9 @@ void DeleteMessagesBox::deleteAndClear() {
 		// deleteMessages can initiate closing of the current section,
 		// which will cause this box to be destroyed.
 		const auto weak = base::make_weak(this);
+		if (hasSavedMusicMessages()) {
+			uiShow()->showToast(tr::lng_saved_music_removed(tr::now));
+		}
 		if (const auto callback = _deleteConfirmedCallback) {
 			callback();
 		}

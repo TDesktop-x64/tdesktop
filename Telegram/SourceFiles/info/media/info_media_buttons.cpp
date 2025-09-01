@@ -25,6 +25,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/info_memento.h"
 #include "info/peer_gifts/info_peer_gifts_widget.h"
 #include "info/profile/info_profile_values.h"
+#include "info/saved/info_saved_music_widget.h"
 #include "info/stories/info_stories_widget.h"
 #include "main/main_session.h"
 #include "ui/text/text_utilities.h"

@@ -910,11 +910,9 @@ void InnerWidget::fill() {
 					anim::interpolateF(.5, 1., value)));
 		};
 		colorText(withdrawalEnabled ? 1. : 0.);
-#ifndef _DEBUG
 		button->setAttribute(
 			Qt::WA_TransparentForMouseEvents,
-			!withdrawalEnabled);
-#endif
+			!withdrawalEnabled && (value.value() > 0.01));
 
 		Api::HandleWithdrawalButton(
 			{ .currencyReceiver = _peer },
@@ -1065,7 +1063,8 @@ void InnerWidget::fill() {
 		if (hasCurrencyTab) {
 			Ui::AddSkip(listsContainer);
 
-			const auto historyList = tabCurrencyList->entity();
+			const auto historyList = tabCurrencyList->entity()->add(
+				object_ptr<Ui::VerticalLayout>(tabCurrencyList->entity()));
 			const auto addHistoryEntry = [=](
 					const Data::CreditsHistoryEntry &entry,
 					const tr::phrase<> &text) {
@@ -1278,9 +1277,10 @@ void InnerWidget::fill() {
 					const auto rightWrapPadding = rect::m::sum::h(padding)
 						+ minorLabel->width()
 						+ majorLabel->width();
-					wrap->setPadding(st::channelEarnHistoryOuter
-						+ QMargins(padding.left(), 0, rightWrapPadding, 0));
-					button->resize(g.size());
+					const auto additional = st::channelEarnHistoryOuter
+						+ QMargins(padding.left(), 0, rightWrapPadding, 0);
+					wrap->setPadding(additional);
+					button->resize((g + additional).size());
 					button->lower();
 				}, wrap->lifetime());
 			};
@@ -1312,23 +1312,17 @@ void InnerWidget::fill() {
 					= lifetime().make_state<ShowMoreState>(_peer);
 				state->token = firstSlice.token;
 				state->showed = firstSlice.list.size();
-				const auto max = firstSlice.total;
-				const auto wrap = listsContainer->add(
+				const auto wrap = tabCurrencyList->entity()->add(
 					object_ptr<Ui::SlideWrap<Ui::SettingsButton>>(
-						listsContainer,
+						tabCurrencyList->entity(),
 						object_ptr<Ui::SettingsButton>(
-							listsContainer,
-							tr::lng_channel_earn_history_show_more(
-								lt_count,
-								state->showed.value(
-								) | rpl::map(
-									max - rpl::mappers::_1
-								) | tr::to_count()),
+							tabCurrencyList->entity(),
+							tr::lng_channels_your_more(),
 							st::statisticsShowMoreButton)));
 				const auto button = wrap->entity();
 				Ui::AddToggleUpDownArrowToMoreButton(button);
 
-				wrap->toggle(true, anim::type::instant);
+				wrap->toggle(!firstSlice.allLoaded, anim::type::instant);
 				const auto handleReceived = [=](
 						Data::EarnHistorySlice slice) {
 					state->loading = false;

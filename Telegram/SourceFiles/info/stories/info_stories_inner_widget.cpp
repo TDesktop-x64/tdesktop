@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "apiwrap.h"
 #include "boxes/share_box.h"
 #include "data/data_peer.h"
+#include "data/data_saved_music.h"
 #include "data/data_session.h"
 #include "data/data_stories.h"
 #include "data/data_user.h"

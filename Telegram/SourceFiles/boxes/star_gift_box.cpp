@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_credits.h"
 #include "api/api_global_privacy.h"
 #include "api/api_premium.h"
+#include "api/api_text_entities.h"
 #include "base/event_filter.h"
 #include "base/qt_signal_producer.h"
 #include "base/random.h"
@@ -70,6 +71,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/settings_credits_graphics.h"
 #include "settings/settings_premium.h"
 #include "ui/boxes/boost_box.h"
+#include "ui/boxes/confirm_box.h"
 #include "ui/chat/chat_style.h"
 #include "ui/chat/chat_theme.h"
 #include "ui/controls/emoji_button.h"
@@ -1160,7 +1162,9 @@ void PreviewWrap::paintEvent(QPaintEvent *e) {
 		const auto user = session->user();
 		const auto requestId = session->api().request(
 			MTPpayments_GetSavedStarGifts(
-			MTP_flags(Flag::f_exclude_limited | Flag::f_exclude_unlimited),
+			MTP_flags(Flag::f_exclude_upgradable
+				| Flag::f_exclude_unupgradable
+				| Flag::f_exclude_unlimited),
 			user->input,
 			MTP_int(0), // collection_id
 			MTP_string(offset),
@@ -1256,7 +1260,7 @@ struct ResaleTabs {
 	object_ptr<RpWidget> widget;
 };
 [[nodiscard]] ResaleTabs MakeResaleTabs(
-		not_null<Window::SessionController*> window,
+		std::shared_ptr<ChatHelpers::Show> show,
 		not_null<PeerData*> peer,
 		const ResaleGiftsDescriptor &info,
 		rpl::producer<ResaleFilter> filter) {
@@ -1338,7 +1342,7 @@ struct ResaleTabs {
 			action->setClickedCallback(std::move(callback));
 			menu->addAction(std::move(action));
 		};
-		auto context = Core::TextContext({ .session = &window->session() });
+		auto context = Core::TextContext({ .session = &show->session() });
 		context.customEmojiFactory = [original = context.customEmojiFactory](
 				QStringView data,
 				const Ui::Text::MarkedContext &context) {
@@ -2084,6 +2088,23 @@ void ShowGiftUpgradedToast(
 	}
 }
 
+void ShowUpgradeGiftedToast(
+		base::weak_ptr<Window::SessionController> weak,
+		not_null<PeerData*> peer) {
+	if (const auto strong = weak.get()) {
+		strong->showToast({
+			.title = tr::lng_gift_upgrade_gifted_title(tr::now),
+			.text = { (peer->isBroadcast()
+				? tr::lng_gift_upgrade_gifted_about_channel
+				: tr::lng_gift_upgrade_gifted_about)(
+					tr::now,
+					lt_name,
+					peer->shortName()) },
+			.duration = kUpgradeDoneToastDuration,
+		});
+	}
+}
+
 void SendStarsFormRequest(
 		std::shared_ptr<Main::SessionShow> show,
 		Settings::SmallBalanceResult result,
@@ -2128,9 +2149,17 @@ void UpgradeGift(
 	auto formDone = [=](
 			Payments::CheckoutResult result,
 			const MTPUpdates *updates) {
-		if (result == Payments::CheckoutResult::Paid && updates) {
+		if (result == Payments::CheckoutResult::Paid) {
 			if (const auto strong = weak.get()) {
-				ShowGiftUpgradedToast(strong, session, *updates);
+				const auto owner = savedId.isUser()
+					? strong->session().user().get()
+					: savedId.chat();
+				if (owner) {
+					owner->owner().nextForUpgradeGiftInvalidate(owner);
+				}
+			}
+			if (updates) {
+				ShowGiftUpgradedToast(weak, session, *updates);
 			}
 		}
 		done(result);
@@ -2157,6 +2186,29 @@ void UpgradeGift(
 		MTP_inputInvoiceStarGiftUpgrade(
 			MTP_flags(keepDetails ? Flag::f_keep_original_details : Flag()),
 			Api::InputSavedStarGiftId(savedId)),
+		std::move(formDone));
+}
+
+void GiftUpgrade(
+		not_null<Window::SessionController*> window,
+		not_null<PeerData*> peer,
+		QString giftPrepayUpgradeHash,
+		int stars,
+		Fn<void(Payments::CheckoutResult)> done) {
+	const auto weak = base::make_weak(window);
+	auto formDone = [=](
+			Payments::CheckoutResult result,
+			const MTPUpdates *updates) {
+		if (result == Payments::CheckoutResult::Paid) {
+			ShowUpgradeGiftedToast(weak, peer);
+		}
+		done(result);
+	};
+	RequestStarsFormAndSubmit(
+		window->uiShow(),
+		MTP_inputInvoiceStarGiftPrepaidUpgrade(
+			peer->input,
+			MTP_string(giftPrepayUpgradeHash)),
 		std::move(formDone));
 }
 
@@ -2312,6 +2364,27 @@ void AddSoldLeftSlider(
 			.availableWidth = right,
 		});
 	}, slider->lifetime());
+}
+
+void CheckMaybeGiftLocked(
+		not_null<Window::SessionController*> window,
+		uint64 giftId,
+		Fn<void()> send) {
+	const auto session = &window->session();
+	session->api().request(MTPpayments_CheckCanSendGift(
+		MTP_long(giftId)
+	)).done(crl::guard(window, [=](
+			const MTPpayments_CheckCanSendGiftResult &result) {
+		result.match([&](const MTPDpayments_checkCanSendGiftResultOk &) {
+			send();
+		}, [&](const MTPDpayments_checkCanSendGiftResultFail &data) {
+			window->show(Ui::MakeInformBox({
+				.text = Api::ParseTextWithEntities(session, data.vreason()),
+				.title = tr::lng_gift_locked_title(),
+			}));
+		});
+	})).fail(crl::guard(window, [=] {
+	})).send();
 }
 
 void SendGiftBox(
@@ -2687,13 +2760,6 @@ void SendGiftBox(
 	};
 }
 
-[[nodiscard]] rpl::lifetime ShowStarGiftResale(
-	not_null<Window::SessionController*> controller,
-	not_null<PeerData*> peer,
-	uint64 giftId,
-	QString title,
-	Fn<void()> finishRequesting);
-
 [[nodiscard]] object_ptr<RpWidget> MakeGiftsList(
 		not_null<Window::SessionController*> window,
 		not_null<PeerData*> peer,
@@ -2784,21 +2850,41 @@ void SendGiftBox(
 					raw,
 					&state->delegate);
 			}
+			const auto raw = button.get();
 			if (validated[index]) {
 				return;
 			}
-			button->show();
+			raw->show();
 			validated[index] = true;
 			const auto &descriptor = state->list[state->order[index]];
-			button->setDescriptor(descriptor, GiftButton::Mode::Full);
-			button->setClickedCallback([=] {
+			raw->setDescriptor(descriptor, GiftButton::Mode::Full);
+			raw->setClickedCallback([=] {
 				const auto star = std::get_if<GiftTypeStars>(&descriptor);
+				const auto send = crl::guard(raw, [=] {
+					window->show(Box(
+						SendGiftBox,
+						window,
+						peer,
+						state->api,
+						descriptor));
+				});
 				const auto unique = star ? star->info.unique : nullptr;
-				if (star
-					&& star->info.requirePremium
-					&& !peer->session().premium()) {
+				const auto premiumNeeded = star && star->info.requirePremium;
+				if (premiumNeeded && !peer->session().premium()) {
 					Settings::ShowPremiumGiftPremium(window, star->info);
-					return;
+				} else if (star
+					&& star->info.lockedUntilDate
+					&& star->info.lockedUntilDate > base::unixtime::now()) {
+					const auto ready = crl::guard(raw, [=] {
+						if (premiumNeeded && !peer->session().premium()) {
+							Settings::ShowPremiumGiftPremium(
+								window,
+								v::get<GiftTypeStars>(descriptor).info);
+						} else {
+							send();
+						}
+					});
+					CheckMaybeGiftLocked(window, star->info.id, ready);
 				} else if (unique && star->mine && !peer->isSelf()) {
 					if (ShowTransferGiftLater(window->uiShow(), unique)) {
 						return;
@@ -2842,7 +2928,7 @@ void SendGiftBox(
 							Api::InputSavedStarGiftId(savedId, unique),
 							peer->input),
 						formReady);
-				} else if (star && star->info.unique && star->resale) {
+				} else if (unique && star->resale) {
 					window->show(Box(
 						Settings::GlobalStarGiftBox,
 						window->uiShow(),
@@ -2867,15 +2953,10 @@ void SendGiftBox(
 				} else if (star && IsSoldOut(star->info)) {
 					window->show(Box(SoldOutBox, window, *star));
 				} else {
-					window->show(Box(
-						SendGiftBox,
-						window,
-						peer,
-						state->api,
-						descriptor));
+					send();
 				}
 			});
-			button->setGeometry(QRect(QPoint(x, y), single), extend);
+			raw->setGeometry(QRect(QPoint(x, y), single), extend);
 		};
 		y += rowFrom * singleh;
 		for (auto row = rowFrom; row != rowTill; ++row) {
@@ -3311,7 +3392,7 @@ void GiftResaleBox(
 	}, content->lifetime());
 
 	auto tabs = MakeResaleTabs(
-		window,
+		window->uiShow(),
 		peer,
 		state->data,
 		state->filter.value());
@@ -3395,30 +3476,6 @@ void GiftResaleBox(
 			});
 		}
 	}));
-}
-
-[[nodiscard]] rpl::lifetime ShowStarGiftResale(
-		not_null<Window::SessionController*> controller,
-		not_null<PeerData*> peer,
-		uint64 giftId,
-		QString title,
-		Fn<void()> finishRequesting) {
-	const auto weak = base::make_weak(controller);
-	const auto session = &controller->session();
-	return ResaleGiftsSlice(
-		session,
-		giftId
-	) | rpl::start_with_next([=](ResaleGiftsDescriptor &&info) {
-		if (const auto onstack = finishRequesting) {
-			onstack();
-		}
-		if (!info.giftId || !info.count) {
-			return;
-		}
-		info.title = title;
-		controller->show(
-			Box(GiftResaleBox, controller, peer, std::move(info)));
-	});
 }
 
 struct CustomList {
@@ -4894,15 +4951,33 @@ void UpgradeBox(
 
 	infoRow(
 		tr::lng_gift_upgrade_unique_title(),
-		tr::lng_gift_upgrade_unique_about(),
+		(args.savedId
+			? tr::lng_gift_upgrade_unique_about()
+			: (args.peer->isBroadcast()
+				? tr::lng_gift_upgrade_unique_about_channel
+				: tr::lng_gift_upgrade_unique_about_user)(
+					lt_name,
+					rpl::single(args.peer->shortName()))),
 		&st::menuIconUnique);
 	infoRow(
 		tr::lng_gift_upgrade_transferable_title(),
-		tr::lng_gift_upgrade_transferable_about(),
+		(args.savedId
+			? tr::lng_gift_upgrade_transferable_about()
+			: (args.peer->isBroadcast()
+				? tr::lng_gift_upgrade_transferable_about_channel
+				: tr::lng_gift_upgrade_transferable_about_user)(
+					lt_name,
+					rpl::single(args.peer->shortName()))),
 		&st::menuIconReplace);
 	infoRow(
 		tr::lng_gift_upgrade_tradable_title(),
-		tr::lng_gift_upgrade_tradable_about(),
+		(args.savedId
+			? tr::lng_gift_upgrade_tradable_about()
+			: (args.peer->isBroadcast()
+				? tr::lng_gift_upgrade_tradable_about_channel
+				: tr::lng_gift_upgrade_tradable_about_user)(
+					lt_name,
+					rpl::single(args.peer->shortName()))),
 		&st::menuIconTradable);
 
 	struct State {
@@ -4910,9 +4985,11 @@ void UpgradeBox(
 		bool preserveDetails = false;
 	};
 	const auto state = std::make_shared<State>();
-	const auto preview = !args.savedId;
+	const auto gifting = !args.savedId
+		&& !args.giftPrepayUpgradeHash.isEmpty();
+	const auto preview = !args.savedId && !gifting;
 
-	if (!preview) {
+	if (!preview && !gifting) {
 		const auto skip = st::defaultVerticalListSkip;
 		container->add(
 			object_ptr<PlainShadow>(container),
@@ -4936,6 +5013,9 @@ void UpgradeBox(
 	}
 
 	box->setStyle(preview ? st::giftBox : st::upgradeGiftBox);
+	if (gifting) {
+		box->setWidth(st::boxWideWidth);
+	}
 
 	const auto cost = args.cost;
 	auto buttonText = preview ? tr::lng_box_ok() : rpl::single(QString());
@@ -4959,11 +5039,18 @@ void UpgradeBox(
 				}
 			}
 		};
-		UpgradeGift(controller, args.savedId, keepDetails, cost, done);
+		if (gifting) {
+			GiftUpgrade(
+				controller,
+				args.peer,
+				args.giftPrepayUpgradeHash,
+				cost,
+				done);
+		} else {
+			UpgradeGift(controller, args.savedId, keepDetails, cost, done);
+		}
 	});
 	if (!preview) {
-		auto helper = Ui::Text::CustomEmojiHelper();
-		auto star = helper.paletteDependent(Ui::Earn::IconCreditsEmoji());
 		SetButtonMarkedLabel(
 			button,
 			(cost
@@ -4975,7 +5062,7 @@ void UpgradeBox(
 						CreditsAmount{ cost }))),
 					Ui::Text::WithEntities)
 				: tr::lng_gift_upgrade_confirm(Ui::Text::WithEntities)),
-			helper.context(),
+			{},
 			st::creditsBoxButtonLabel,
 			&st::giftBox.button.textFg);
 	}
@@ -5339,4 +5426,30 @@ void ShowResaleGiftBoughtToast(
 		.duration = kUpgradeDoneToastDuration,
 	});
 }
+
+rpl::lifetime ShowStarGiftResale(
+		not_null<Window::SessionController*> controller,
+		not_null<PeerData*> peer,
+		uint64 giftId,
+		QString title,
+		Fn<void()> finishRequesting) {
+	const auto weak = base::make_weak(controller);
+	const auto session = &controller->session();
+	return ResaleGiftsSlice(
+		session,
+		giftId
+	) | rpl::start_with_next([=](ResaleGiftsDescriptor &&info) {
+		if (const auto onstack = finishRequesting) {
+			onstack();
+		}
+		if (!info.giftId || !info.count) {
+			return;
+		}
+		info.title = title;
+		if (const auto strong = weak.get()) {
+			strong->show(Box(GiftResaleBox, strong, peer, std::move(info)));
+		}
+	});
+}
+
 } // namespace Ui

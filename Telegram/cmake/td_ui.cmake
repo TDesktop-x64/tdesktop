@@ -88,6 +88,7 @@ PRIVATE
 
     data/raw/raw_countries_bounds.cpp
     data/raw/raw_countries_bounds.h
+    data/data_authorization.h
     data/data_birthday.cpp
     data/data_birthday.h
     data/data_channel_earn.h
@@ -145,6 +146,8 @@ PRIVATE
 
     info/profile/info_profile_icon.cpp
     info/profile/info_profile_icon.h
+    info/profile/info_profile_music_button.cpp
+    info/profile/info_profile_music_button.h
     info/userpic/info_userpic_bubble_wrap.cpp
     info/userpic/info_userpic_bubble_wrap.h
     info/userpic/info_userpic_color_circle_button.cpp
@@ -447,6 +450,8 @@ PRIVATE
     ui/text/format_song_name.h
     ui/text/format_values.cpp
     ui/text/format_values.h
+    ui/text/text_lottie_custom_emoji.cpp
+    ui/text/text_lottie_custom_emoji.h
     ui/text/text_options.cpp
     ui/text/text_options.h
 

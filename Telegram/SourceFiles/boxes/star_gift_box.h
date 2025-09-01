@@ -110,6 +110,7 @@ struct StarGiftUpgradeArgs {
 	Fn<void(bool)> ready;
 	not_null<PeerData*> peer;
 	Data::SavedStarGiftId savedId;
+	QString giftPrepayUpgradeHash;
 	int cost = 0;
 	bool canAddSender = false;
 	bool canAddComment = false;
@@ -156,5 +157,12 @@ void ShowResaleGiftBoughtToast(
 	std::shared_ptr<Main::SessionShow> show,
 	not_null<PeerData*> to,
 	const Data::UniqueGift &gift);
+
+[[nodiscard]] rpl::lifetime ShowStarGiftResale(
+	not_null<Window::SessionController*> controller,
+	not_null<PeerData*> peer,
+	uint64 giftId,
+	QString title,
+	Fn<void()> finishRequesting);
 
 } // namespace Ui

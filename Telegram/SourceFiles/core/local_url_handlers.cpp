@@ -648,7 +648,9 @@ bool ResolveUsernameOrPhone(
 	const auto threadId = topicId ? topicId : threadParam.toInt();
 	const auto gameParam = params.value(u"game"_q);
 	const auto videot = params.value(u"t"_q);
-
+	if (params.contains(u"direct"_q)) {
+		resolveType = ResolveType::ChannelDirect;
+	}
 	if (!gameParam.isEmpty() && validDomain(gameParam)) {
 		startToken = gameParam;
 		resolveType = ResolveType::ShareGame;
@@ -1143,7 +1145,17 @@ bool ShowCollectibleUsername(
 	}
 	const auto username = match->captured(1);
 	const auto peerId = PeerId(match->captured(2).toULongLong());
-	controller->resolveCollectible(peerId, username);
+	const auto weak = base::make_weak(controller);
+	controller->resolveCollectible(peerId, username, [=](const QString &e) {
+		if (e == u"COLLECTIBLE_NOT_FOUND"_q) {
+			if (const auto strong = weak.get()) {
+				TextUtilities::SetClipboardText({
+					strong->session().createInternalLinkFull(username)
+				});
+				strong->showToast(tr::lng_username_copied(tr::now));
+			}
+		}
+	});
 	return true;
 }
 
@@ -1362,8 +1374,9 @@ bool ResolveTestChatTheme(
 		qthelp::UrlParamNameTransform::ToLower);
 	if (const auto history = controller->activeChatCurrent().history()) {
 		controller->clearCachedChatThemes();
-		const auto theme = history->owner().cloudThemes().updateThemeFromLink(
-			history->peer->themeEmoji(),
+		const auto owner = &history->owner();
+		const auto theme = owner->cloudThemes().updateThemeFromLink(
+			history->peer->themeToken(),
 			params);
 		if (theme) {
 			if (!params["export"].isEmpty()) {

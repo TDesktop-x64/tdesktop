@@ -19,6 +19,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/business/data_business_common.h"
 #include "data/business/data_business_info.h"
 #include "data/components/credits.h"
+#include "data/data_cloud_themes.h"
+#include "data/data_saved_music.h"
 #include "data/data_session.h"
 #include "data/data_changes.h"
 #include "data/data_peer_bot_command.h"
@@ -788,7 +790,16 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 	user->setCommonChatsCount(update.vcommon_chats_count().v);
 	user->setPeerGiftsCount(update.vstargifts_count().value_or_empty());
 	user->checkFolder(update.vfolder_id().value_or_empty());
-	user->setThemeEmoji(qs(update.vtheme_emoticon().value_or_empty()));
+	if (const auto theme = update.vtheme()) {
+		theme->match([&](const MTPDchatTheme &data) {
+			user->setThemeToken(qs(data.vemoticon()));
+		}, [&](const MTPDchatThemeUniqueGift &data) {
+			user->setThemeToken(
+				user->owner().cloudThemes().processGiftThemeGetToken(data));
+		});
+	} else {
+		user->setThemeToken(QString());
+	}
 	user->setTranslationDisabled(update.is_translations_disabled());
 	user->setPrivateForwardName(
 		update.vprivate_forward_name().value_or_empty());
@@ -907,6 +918,7 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 	}
 
 	user->owner().stories().apply(user, update.vstories());
+	user->owner().savedMusic().apply(user, update.vsaved_music());
 
 	user->fullUpdated();
 }

@@ -1874,7 +1874,9 @@ void GenericCreditsEntryBox(
 				&& e.hasGiftComment),
 			.canAddMyComment = (giftToSelf && e.hasGiftComment),
 			.addDetailsDefault = (giftToSelf
-				|| (e.starsUpgradedBySender && !e.anonymous)),
+				|| (e.starsUpgradedBySender
+					&& !e.giftUpgradeSeparate
+					&& !e.anonymous)),
 		});
 	};
 
@@ -2095,6 +2097,9 @@ void GenericCreditsEntryBox(
 	const auto toRejoin = (s.cancelled || s.expired)
 		&& rejoinBySlug
 		&& !s.cancelledByBot;
+	//const auto suggestUpgradeNext = uniqueGift
+	//	&& canToggle
+	//	&& e.savedToProfile;
 	auto confirmText = rpl::conditional(
 		state->confirmButtonBusy.value(),
 		rpl::single(QString()),
@@ -2550,6 +2555,7 @@ Data::CreditsHistoryEntry SavedStarGiftEntry(
 		.converted = false,
 		.anonymous = data.anonymous,
 		.stargift = true,
+		.giftUpgradeSeparate = data.upgradeSeparate,
 		.giftPinned = data.pinned,
 		.savedToProfile = !data.hidden,
 		.fromGiftsList = true,
@@ -2654,6 +2660,7 @@ void ShowStarGiftViewBox(
 		.stargift = true,
 		.giftTransferred = data.transferred,
 		.giftRefunded = data.refunded,
+		.giftUpgradeSeparate = data.upgradeSeparate,
 		.savedToProfile = data.saved,
 		.canUpgradeGift = data.upgradable,
 		.hasGiftComment = !data.message.empty(),
@@ -2681,7 +2688,6 @@ void ShowStarGiftViewBox(
 	const auto toChannel = peer->isServiceUser() && data.channel;
 	const auto incoming = !toChannel
 		&& (data.upgrade ? item->out() : !item->out());
-	const auto fromId = incoming ? peer->id : peer->session().userPeerId();
 	const auto toId = incoming ? peer->session().userPeerId() : peer->id;
 	const auto ownerId = data.unique ? data.unique->ownerId : toId;
 	const auto owner = peer->owner().peer(ownerId);

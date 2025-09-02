@@ -920,10 +920,12 @@ void Controller::showWebviewError() {
 }
 
 void Controller::showWebviewError(TextWithEntities text) {
-	auto error = Ui::CreateChild<Ui::PaddingWrap<Ui::FlatLabel>>(
-		_container,
+	const auto wrap = Ui::CreateChild<Ui::RpWidget>(_container);
+
+	const auto error = Ui::CreateChild<Ui::PaddingWrap<Ui::FlatLabel>>(
+		wrap,
 		object_ptr<Ui::FlatLabel>(
-			_container,
+			wrap,
 			rpl::single(text),
 			st::paymentsCriticalError),
 		st::paymentsCriticalErrorPadding);
@@ -937,10 +939,16 @@ void Controller::showWebviewError(TextWithEntities text) {
 		File::OpenUrl(entity.data);
 		return false;
 	});
-	error->show();
+	wrap->show();
+
+	wrap->widthValue() | rpl::start_with_next([=](int width) {
+		error->resizeToWidth(width);
+		wrap->resize(width, error->height());
+	}, wrap->lifetime());
+
 	_container->sizeValue() | rpl::start_with_next([=](QSize size) {
-		error->setGeometry(0, 0, size.width(), size.height() * 2 / 3);
-	}, error->lifetime());
+		wrap->setGeometry(0, 0, size.width(), size.height() * 2 / 3);
+	}, wrap->lifetime());
 }
 
 void Controller::showInWindow(

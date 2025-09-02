@@ -245,7 +245,7 @@ BaseLayout *MusicProvider::lookupLayout(const HistoryItem *item) {
 }
 
 bool MusicProvider::isMyItem(not_null<const HistoryItem*> item) {
-	return IsStoryMsgId(item->id) && (item->history()->peer == _peer);
+	return item->isSavedMusicItem() && (item->history()->peer == _peer);
 }
 
 bool MusicProvider::isAfter(
@@ -273,12 +273,7 @@ BaseLayout *MusicProvider::getLayout(
 std::unique_ptr<BaseLayout> MusicProvider::createLayout(
 		not_null<HistoryItem*> item,
 		not_null<Overview::Layout::Delegate*> delegate) {
-	const auto peer = item->history()->peer;
-
 	using namespace Overview::Layout;
-	const auto options = MediaOptions{
-	};
-
 	if (const auto media = item->media()) {
 		if (const auto file = media->document()) {
 			return std::make_unique<Document>(
@@ -340,7 +335,7 @@ QString MusicProvider::showInFolderPath(
 }
 
 int64 MusicProvider::scrollTopStatePosition(not_null<HistoryItem*> item) {
-	return StoryIdFromMsgId(item->id);
+	return item->id.bare;
 }
 
 HistoryItem *MusicProvider::scrollTopStateItem(ListScrollTopState state) {

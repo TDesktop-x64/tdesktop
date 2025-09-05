@@ -448,6 +448,8 @@ QSize Document::countOptimalSize() {
 				? Lottie::IconDescriptor{
 					.name = u"transcribe_loading"_q,
 					.sizeOverride = Size(st::historyTranscribeLoadingSize),
+					.color = &st::historyTextInFg,
+					.colorizeUsingAlpha = true,
 				}
 				: Lottie::IconDescriptor();
 			auto text = (entry.requestId || !entry.shown)

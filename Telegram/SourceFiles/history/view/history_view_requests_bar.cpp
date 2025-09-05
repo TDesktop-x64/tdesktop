@@ -26,6 +26,8 @@ rpl::producer<Ui::RequestsBarContent> RequestsBarContentByPeer(
 		not_null<PeerData*> peer,
 		int userpicSize,
 		bool showInForum) {
+	Expects(peer->isChat() || peer->isChannel());
+
 	struct State {
 		explicit State(not_null<PeerData*> peer)
 		: peer(peer) {

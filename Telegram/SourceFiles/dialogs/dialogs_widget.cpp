@@ -2015,7 +2015,7 @@ void Widget::refreshTopBars() {
 		updateSearchFromVisibility(true);
 	}
 	_forumSearchRequested = false;
-	if (_openedForum) {
+	if (_openedForum && _openedForum->peer()->isChannel()) {
 		const auto peer = _openedForum->peer();
 		peer->updateFull();
 

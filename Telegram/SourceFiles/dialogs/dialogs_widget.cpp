@@ -2761,9 +2761,9 @@ void Widget::searchTopics() {
 		return;
 	}
 	_api.request(base::take(_topicSearchRequest)).cancel();
-	_topicSearchRequest = _api.request(MTPchannels_GetForumTopics(
-		MTP_flags(MTPchannels_GetForumTopics::Flag::f_q),
-		_openedForum->channel()->inputChannel,
+	_topicSearchRequest = _api.request(MTPmessages_GetForumTopics(
+		MTP_flags(MTPmessages_GetForumTopics::Flag::f_q),
+		_openedForum->channel()->input,
 		MTP_string(_topicSearchQuery),
 		MTP_int(_topicSearchOffsetDate),
 		MTP_int(_topicSearchOffsetId),

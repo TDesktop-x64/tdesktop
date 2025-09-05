@@ -142,9 +142,9 @@ void Forum::requestTopics() {
 	}
 	const auto firstLoad = !_offset.date;
 	const auto loadCount = firstLoad ? kTopicsFirstLoad : kTopicsPerPage;
-	_requestId = session().api().request(MTPchannels_GetForumTopics(
+	_requestId = session().api().request(MTPmessages_GetForumTopics(
 		MTP_flags(0),
-		channel()->inputChannel,
+		channel()->input,
 		MTPstring(), // q
 		MTP_int(_offset.date),
 		MTP_int(_offset.id),
@@ -404,8 +404,8 @@ void Forum::requestSomeStale() {
 	_staleRequestId = histories.sendRequest(_history, type, [=](
 			Fn<void()> finish) {
 		return session().api().request(
-			MTPchannels_GetForumTopicsByID(
-				channel()->inputChannel,
+			MTPmessages_GetForumTopicsByID(
+				channel()->input,
 				MTP_vector<MTPint>(rootIds))
 		).done([=](const MTPmessages_ForumTopics &result) {
 			_staleRequestId = 0;

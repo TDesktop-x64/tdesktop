@@ -1108,6 +1108,8 @@ void Updates::handleSendActionUpdate(
 		const auto &data = action.c_sendMessageEmojiInteractionSeen();
 		handleEmojiInteraction(peer, qs(data.vemoticon()));
 		return;
+	} else if (action.type() == mtpc_sendMessageTextDraftAction) {
+		return;
 	}
 	const auto when = requestingDifference()
 		? 0

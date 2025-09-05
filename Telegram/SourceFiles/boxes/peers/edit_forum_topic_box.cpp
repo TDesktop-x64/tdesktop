@@ -554,13 +554,13 @@ void EditForumTopicBox(
 			topic->applyIconId(state->iconId.current());
 			box->closeBox();
 		} else {
-			using Flag = MTPchannels_EditForumTopic::Flag;
+			using Flag = MTPmessages_EditForumTopic::Flag;
 			const auto api = &forum->session().api();
 			const auto weak = base::make_weak(box);
-			state->requestId = api->request(MTPchannels_EditForumTopic(
+			state->requestId = api->request(MTPmessages_EditForumTopic(
 				MTP_flags(Flag::f_title
 					| (topic->isGeneral() ? Flag() : Flag::f_icon_emoji_id)),
-				topic->channel()->inputChannel,
+				topic->channel()->input,
 				MTP_int(rootId),
 				MTP_string(title->getLastText().trimmed()),
 				MTP_long(state->iconId.current()),

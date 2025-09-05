@@ -1808,8 +1808,8 @@ void PeerMenuDeleteTopic(
 		not_null<ChannelData*> channel,
 		MsgId rootId) {
 	const auto api = &channel->session().api();
-	api->request(MTPchannels_DeleteTopicHistory(
-		channel->inputChannel,
+	api->request(MTPmessages_DeleteTopicHistory(
+		channel->input,
 		MTP_int(rootId)
 	)).done([=](const MTPmessages_AffectedHistory &result) {
 		const auto offset = api->applyAffectedHistory(channel, result);

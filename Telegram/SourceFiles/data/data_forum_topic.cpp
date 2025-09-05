@@ -463,9 +463,9 @@ void ForumTopic::setClosedAndSave(bool closed) {
 
 	const auto api = &session().api();
 	const auto weak = base::make_weak(this);
-	api->request(MTPchannels_EditForumTopic(
-		MTP_flags(MTPchannels_EditForumTopic::Flag::f_closed),
-		channel()->inputChannel,
+	api->request(MTPmessages_EditForumTopic(
+		MTP_flags(MTPmessages_EditForumTopic::Flag::f_closed),
+		channel()->input,
 		MTP_int(_rootId),
 		MTPstring(), // title
 		MTPlong(), // icon_emoji_id

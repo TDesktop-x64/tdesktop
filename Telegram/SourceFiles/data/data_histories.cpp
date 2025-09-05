@@ -1054,11 +1054,11 @@ void Histories::sendCreateTopicRequest(
 		randomId,
 		{ history->peer->id, rootId });
 	const auto api = &session().api();
-	using Flag = MTPchannels_CreateForumTopic::Flag;
-	api->request(MTPchannels_CreateForumTopic(
+	using Flag = MTPmessages_CreateForumTopic::Flag;
+	api->request(MTPmessages_CreateForumTopic(
 		MTP_flags(Flag::f_icon_color
 			| (topic->iconId() ? Flag::f_icon_emoji_id : Flag(0))),
-		history->peer->asChannel()->inputChannel,
+		history->peer->input,
 		MTP_string(topic->title()),
 		MTP_int(topic->colorId()),
 		MTP_long(topic->iconId()),

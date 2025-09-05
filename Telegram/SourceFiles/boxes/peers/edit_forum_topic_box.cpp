@@ -410,9 +410,12 @@ void EditForumTopicBox(
 	const auto topic = (!creating && forum->peer->forum())
 		? forum->peer->forum()->topicFor(rootId)
 		: nullptr;
+	const auto bot = forum->peer->isBot();
 	const auto created = topic && !topic->creating();
 	box->setTitle(creating
 		? tr::lng_forum_topic_new()
+		: bot
+		? tr::lng_bot_thread_edit()
 		: tr::lng_forum_topic_edit());
 
 	box->setMaxHeight(st::editTopicMaxHeight);
@@ -440,7 +443,9 @@ void EditForumTopicBox(
 		object_ptr<Ui::InputField>(
 			box,
 			st::defaultInputField,
-			tr::lng_forum_topic_title(),
+			(bot
+				? tr::lng_bot_thread_title()
+				: tr::lng_forum_topic_title()),
 			topic ? topic->title() : QString()),
 		st::editTopicTitleMargin);
 	box->setFocusCallback([=] {
@@ -492,7 +497,9 @@ void EditForumTopicBox(
 	}, title->lifetime());
 
 	if (!topic || !topic->isGeneral()) {
-		Ui::AddDividerText(top, tr::lng_forum_choose_title_and_icon());
+		Ui::AddDividerText(top, bot
+			? tr::lng_bot_thread_choose_title_and_icon()
+			: tr::lng_forum_choose_title_and_icon());
 
 		box->setScrollStyle(st::reactPanelScroll);
 

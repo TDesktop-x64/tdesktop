@@ -371,7 +371,7 @@ auto GenerateNewBotThread(
 		push(std::make_unique<NewBotThreadDownIcon>());
 
 		parent->addVerticalMargins(
-			st::newBotThreadTopSkip,
+			st::newBotThreadTopSkip - st::msgServiceMargin.top(),
 			st::msgServiceMargin.top());
 	};
 }

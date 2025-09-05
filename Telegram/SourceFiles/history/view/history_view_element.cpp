@@ -1217,9 +1217,10 @@ auto Element::contextDependentServiceText() -> TextWithLinks {
 		return Ui::Text::Link(from->name(), index);
 	};
 	const auto placeholderLink = [&] {
-		return Ui::Text::Link(
-			tr::lng_action_topic_placeholder(tr::now),
-			topicUrl);
+		const auto linkText = history()->peer->isBot()
+			? tr::lng_action_topic_bot_thread(tr::now)
+			: tr::lng_action_topic_placeholder(tr::now);
+		return Ui::Text::Link(linkText, topicUrl);
 	};
 	const auto wrapTopic = [&](
 			const QString &title,

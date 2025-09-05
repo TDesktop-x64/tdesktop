@@ -333,7 +333,7 @@ bool ForumTopic::canDelete() const {
 }
 
 bool ForumTopic::canToggleClosed() const {
-	return !creating() && canEdit();
+	return !creating() && canEdit() && !_forum->peer()->isBot();
 }
 
 bool ForumTopic::canTogglePinned() const {

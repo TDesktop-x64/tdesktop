@@ -5519,6 +5519,9 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 
 	auto prepareTopicEdit = [&](const MTPDmessageActionTopicEdit &action) {
 		auto result = PreparedServiceText();
+		const auto linkText = history()->peer->isBot()
+			? tr::lng_action_topic_bot_thread(tr::now)
+			: tr::lng_action_topic_placeholder(tr::now);
 		if (const auto closed = action.vclosed()) {
 			result.text = { mtpIsTrue(*closed)
 				? tr::lng_action_topic_closed_inside(tr::now)
@@ -5536,7 +5539,7 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 						lt_from,
 						fromLinkText(), // Link 1.
 						lt_link,
-						{ tr::lng_action_topic_placeholder(tr::now) },
+						{ linkText },
 						lt_emoji,
 						Data::SingleCustomEmoji(iconId),
 						Ui::Text::WithEntities);
@@ -5547,7 +5550,7 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 						lt_from,
 						fromLinkText(), // Link 1.
 						lt_link,
-						{ tr::lng_action_topic_placeholder(tr::now) },
+						{ linkText },
 						Ui::Text::WithEntities);
 				}
 			}
@@ -5558,7 +5561,7 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 				lt_from,
 				fromLinkText(), // Link 1.
 				lt_link,
-				{ tr::lng_action_topic_placeholder(tr::now) },
+				{ linkText },
 				lt_title,
 				Data::ForumTopicIconWithTitle(
 					topicRootId(),

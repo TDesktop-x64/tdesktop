@@ -2158,7 +2158,9 @@ void DetailsFiller::addShowTopicsListButton(
 	};
 	AddMainButton(
 		_wrap,
-		tr::lng_forum_show_topics_list(),
+		(forum->peer()->isBot()
+			? tr::lng_bot_show_threads_list()
+			: tr::lng_forum_show_topics_list()),
 		std::move(showTopicsVisible),
 		callback,
 		tracker);

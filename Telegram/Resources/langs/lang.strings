@@ -1625,6 +1625,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_info_group_title" = "Group Info";
 "lng_info_channel_title" = "Channel Info";
 "lng_info_topic_title" = "Topic Info";
+"lng_info_thread_title" = "Thread Info";
 "lng_profile_enable_notifications" = "Notifications";
 "lng_profile_send_message" = "Send Message";
 "lng_profile_open_app" = "Open App";
@@ -2282,6 +2283,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_action_topic_hidden" = "\"{topic}\" was hidden";
 "lng_action_topic_unhidden" = "\"{topic}\" was unhidden";
 "lng_action_topic_placeholder" = "topic";
+"lng_action_topic_bot_thread" = "thread";
 "lng_action_topic_renamed" = "{from} renamed the {link} to \"{title}\"";
 "lng_action_topic_icon_changed" = "{from} changed the {link} icon to {emoji}";
 "lng_action_topic_icon_removed" = "{from} removed the {link} icon";
@@ -2582,6 +2584,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_bot_new_chat" = "New Chat";
 "lng_bot_new_thread_title" = "New Thread";
 "lng_bot_new_thread_about" = "Type any message to create a new thread.";
+"lng_bot_show_threads_list" = "Show Threads List";
 
 "lng_attach_failed" = "Failed";
 "lng_attach_file" = "File";
@@ -4363,6 +4366,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_context_view_group" = "View group info";
 "lng_context_view_channel" = "View channel info";
 "lng_context_view_topic" = "View topic info";
+"lng_context_view_thread" = "View thread info";
 "lng_context_hide_psa" = "Hide this announcement";
 "lng_context_pin_to_top" = "Pin";
 "lng_context_unpin_from_top" = "Unpin";
@@ -6446,6 +6450,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_ringtones_toast_added" = "Sound added!";
 "lng_ringtones_error_max_size" = "Sorry, but your file is too big. The maximum size for ringtones is {size}.";
 "lng_ringtones_error_max_duration" = "Sorry, but your file is too long. The maximum duration for ringtones is {duration}.";
+
+"lng_bot_thread_edit" = "Edit Thread";
+"lng_bot_thread_title" = "Thread Name";
+"lng_bot_thread_choose_title_and_icon" = "Choose a thread name and icon";
 
 "lng_forum_topic_new" = "New Topic";
 "lng_forum_topic_edit" = "Edit Topic";

@@ -484,7 +484,10 @@ void Filler::addToggleTopicClosed() {
 	}
 	const auto closed = _topic->closed();
 	const auto weak = base::make_weak(_topic);
-	_addAction(closed ? tr::lng_forum_topic_reopen(tr::now) : tr::lng_forum_topic_close(tr::now), [=] {
+	const auto text = closed
+		? tr::lng_forum_topic_reopen(tr::now)
+		: tr::lng_forum_topic_close(tr::now);
+	_addAction(text, [=] {
 		if (const auto topic = weak.get()) {
 			topic->setClosedAndSave(!closed);
 		}
@@ -575,7 +578,9 @@ void Filler::addInfo() {
 	const auto controller = _controller;
 	const auto weak = base::make_weak(_thread);
 	const auto text = _thread->asTopic()
-		? tr::lng_context_view_topic(tr::now)
+		? (_thread->peer()->isBot()
+			? tr::lng_context_view_thread(tr::now)
+			: tr::lng_context_view_topic(tr::now))
 		: (infoPeer->isChat() || infoPeer->isMegagroup())
 		? tr::lng_context_view_group(tr::now)
 		: infoPeer->isUser()
@@ -1092,7 +1097,10 @@ void Filler::addManageTopic() {
 	const auto history = _topic->history();
 	const auto rootId = _topic->rootId();
 	const auto navigation = _controller;
-	_addAction(tr::lng_forum_topic_edit(tr::now), [=] {
+	const auto text = _topic->forum()->peer()->isBot()
+		? tr::lng_bot_thread_edit(tr::now)
+		: tr::lng_forum_topic_edit(tr::now);
+	_addAction(text, [=] {
 		navigation->show(
 			Box(EditForumTopicBox, navigation, history, rootId));
 	}, &st::menuIconEdit);
@@ -1366,7 +1374,7 @@ void Filler::fill() {
 }
 
 void Filler::addCreateTopic() {
-	if (!_peer || !_peer->canCreateTopics()) {
+	if (!_peer || !_peer->canCreateTopics() || _peer->isBot()) {
 		return;
 	}
 	const auto peer = _peer;

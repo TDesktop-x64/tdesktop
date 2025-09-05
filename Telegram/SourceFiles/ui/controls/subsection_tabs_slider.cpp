@@ -544,19 +544,22 @@ std::unique_ptr<SubsectionButton> HorizontalSlider::makeButton(
 		std::move(data));
 }
 
-std::shared_ptr<DynamicImage> MakeAllSubsectionsThumbnail(
+std::shared_ptr<DynamicImage> MakeIconSubsectionsThumbnail(
+		const style::icon &icon,
 		Fn<QColor()> textColor) {
 	class Image final : public DynamicImage {
 	public:
-		Image(Fn<QColor()> textColor) : _textColor(std::move(textColor)) {
+		Image(const style::icon &icon, Fn<QColor()> textColor)
+		: _icon(icon)
+		, _textColor(std::move(textColor)) {
 			Expects(_textColor != nullptr);
 		}
 
-		std::shared_ptr<DynamicImage> clone() {
-			return std::make_shared<Image>(_textColor);
+		std::shared_ptr<DynamicImage> clone() override {
+			return std::make_shared<Image>(_icon, _textColor);
 		}
 
-		QImage image(int size) {
+		QImage image(int size) override {
 			const auto ratio = style::DevicePixelRatio();
 			const auto full = size * ratio;
 			const auto color = _textColor();
@@ -570,7 +573,7 @@ std::shared_ptr<DynamicImage> MakeAllSubsectionsThumbnail(
 			}
 			_color = color;
 			if (_mask.isNull()) {
-				_mask = st::foldersAll.instance(QColor(255, 255, 255));
+				_mask = _icon.instance(QColor(255, 255, 255));
 			}
 			const auto position = ratio * QPoint(
 				(size - (_mask.width() / ratio)) / 2,
@@ -587,7 +590,7 @@ std::shared_ptr<DynamicImage> MakeAllSubsectionsThumbnail(
 			}
 			return _cache;
 		}
-		void subscribeToUpdates(Fn<void()> callback) {
+		void subscribeToUpdates(Fn<void()> callback) override {
 			if (!callback) {
 				_cache = QImage();
 				_mask = QImage();
@@ -595,13 +598,28 @@ std::shared_ptr<DynamicImage> MakeAllSubsectionsThumbnail(
 		}
 
 	private:
+		const style::icon &_icon;
 		Fn<QColor()> _textColor;
 		QImage _mask;
 		QImage _cache;
 		QColor _color;
 
 	};
-	return std::make_shared<Image>(std::move(textColor));
+	return std::make_shared<Image>(icon, std::move(textColor));
+}
+
+std::shared_ptr<DynamicImage> MakeAllSubsectionsThumbnail(
+		Fn<QColor()> textColor) {
+	return MakeIconSubsectionsThumbnail(
+		st::foldersAll,
+		std::move(textColor));
+}
+
+std::shared_ptr<DynamicImage> MakeNewChatSubsectionsThumbnail(
+		Fn<QColor()> textColor) {
+	return MakeIconSubsectionsThumbnail(
+		st::foldersUnread,
+		std::move(textColor));
 }
 
 } // namespace Ui

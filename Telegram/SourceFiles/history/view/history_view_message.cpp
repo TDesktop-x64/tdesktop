@@ -1142,11 +1142,21 @@ int Message::marginTop() const {
 	if (const auto service = Get<ServicePreMessage>()) {
 		result += service->height;
 	}
+	if (const auto margins = Get<ViewAddedMargins>()) {
+		result += margins->top;
+	}
 	return result;
 }
 
 int Message::marginBottom() const {
-	return isHidden() ? 0 : st::msgMargin.bottom();
+	if (isHidden()) {
+		return 0;
+	}
+	auto result = st::msgMargin.bottom();
+	if (const auto margins = Get<ViewAddedMargins>()) {
+		result += margins->bottom;
+	}
+	return result;
 }
 
 void Message::draw(Painter &p, const PaintContext &context) const {

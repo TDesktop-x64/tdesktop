@@ -15,6 +15,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_sending.h"
 #include "api/api_send_progress.h"
 #include "api/api_unread_things.h"
+#include "base/random.h"
 #include "ui/boxes/confirm_box.h"
 #include "boxes/delete_messages_box.h"
 #include "boxes/send_credits_box.h"
@@ -104,6 +105,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/controls/history_view_voice_record_bar.h"
 #include "history/view/controls/history_view_webpage_processor.h"
 #include "history/view/reactions/history_view_reactions_button.h"
+#include "history/view/history_view_chat_section.h"
 #include "history/view/history_view_cursor_state.h"
 #include "history/view/history_view_service_message.h"
 #include "history/view/history_view_element.h"
@@ -977,6 +979,21 @@ HistoryWidget::HistoryWidget(
 
 	session().api().sendActions(
 	) | rpl::filter([=](const Api::SendAction &action) {
+		if (_creatingBotTopic
+			&& action.history == _creatingBotTopic->owningHistory()
+			&& action.replyTo.topicRootId == _creatingBotTopic->rootId()) {
+			Ui::PostponeCall(_creatingBotTopic, [=] {
+				using namespace HistoryView;
+				const auto topic = base::take(_creatingBotTopic);
+				controller->showSection(
+					std::make_shared<ChatMemento>(ChatViewId{
+						.history = topic->owningHistory(),
+						.repliesRootId = topic->rootId(),
+					}),
+					Window::SectionShow::Way::ClearStack);
+			});
+			return false;
+		}
 		return (action.history == _history);
 	}) | rpl::start_with_next([=](const Api::SendAction &action) {
 		const auto lastKeyboardUsed = lastForceReplyReplied(
@@ -1786,6 +1803,9 @@ void HistoryWidget::orderWidgets() {
 	}
 	if (_emojiSuggestions) {
 		_emojiSuggestions->raise();
+	}
+	if (_attachBotsMenu) {
+		_attachBotsMenu->raise();
 	}
 	_attachDragAreas.document->raise();
 	_attachDragAreas.photo->raise();
@@ -2863,6 +2883,10 @@ void HistoryWidget::setHistory(History *history) {
 		const auto wasMigrated = base::take(_migrated);
 		unloadHeavyViewParts(wasHistory);
 		unloadHeavyViewParts(wasMigrated);
+		if (const auto wasCreatingBotTopic = base::take(_creatingBotTopic)) {
+			wasCreatingBotTopic->forum()->discardCreatingId(
+				wasCreatingBotTopic->rootId());
+		}
 	}
 	if (history) {
 		_history = history;
@@ -4633,6 +4657,22 @@ Api::SendAction HistoryWidget::prepareSendAction(
 		Api::SendOptions options) const {
 	auto result = Api::SendAction(_history, options);
 	result.replyTo = replyTo();
+
+	if (const auto forum = _history->asForum()) {
+		if (_history->peer->isBot()) {
+			if (!_creatingBotTopic) {
+				const auto &colors = Data::ForumTopicColorIds();
+				const auto colorId = colors[base::RandomIndex(colors.size())];
+				_creatingBotTopic = forum->topicFor(forum->reserveCreatingId(
+					tr::lng_bot_new_chat(tr::now),
+					colorId,
+					DocumentId()));
+			}
+			result = Api::SendAction(_creatingBotTopic, options);
+			result.replyTo.topicRootId = _creatingBotTopic->rootId();
+		}
+	}
+
 	result.options.suggest = suggestOptions();
 	result.options.sendAs = _sendAs
 		? _history->session().sendAsPeers().resolveChosen(
@@ -6723,7 +6763,7 @@ FullReplyTo HistoryWidget::replyTo() const {
 		? _replyTo
 		: _kbReplyTo
 		? FullReplyTo{ _kbReplyTo->fullId() }
-		: (_peer && _peer->forum())
+		: (_peer && _peer->forum() && !_peer->isBot())
 		? FullReplyTo{ .topicRootId = Data::ForumTopic::kGeneralId }
 		: FullReplyTo();
 }

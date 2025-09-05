@@ -30,6 +30,7 @@ class Error;
 } // namespace MTP
 
 namespace Data {
+class ForumTopic;
 class PhotoMedia;
 struct SendError;
 } // namespace Data
@@ -779,6 +780,7 @@ private:
 	QPointer<HistoryInner> _list;
 	History *_migrated = nullptr;
 	History *_history = nullptr;
+	mutable Data::ForumTopic *_creatingBotTopic = nullptr;
 	rpl::lifetime _historySponsoredPreloading;
 
 	// Initial updateHistoryGeometry() was called.

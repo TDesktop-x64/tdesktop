@@ -965,6 +965,17 @@ bool Element::isLastAndSelfMessage() const {
 	return false;
 }
 
+void Element::addVerticalMargins(int top, int bottom) {
+	if (top || bottom) {
+		AddComponents(ViewAddedMargins::Bit());
+		const auto margins = Get<ViewAddedMargins>();
+		margins->top = top;
+		margins->bottom = bottom;
+	} else {
+		RemoveComponents(ViewAddedMargins::Bit());
+	}
+}
+
 void Element::setPendingResize() {
 	_flags |= Flag::NeedsResize;
 	if (_context == Context::History) {

@@ -349,6 +349,11 @@ struct PurchasedTag : RuntimeComponent<PurchasedTag, Element> {
 	Ui::Text::String text;
 };
 
+struct ViewAddedMargins : RuntimeComponent<ViewAddedMargins, Element> {
+	int top = 0;
+	int bottom = 0;
+};
+
 struct TopicButton {
 	std::unique_ptr<Ui::RippleAnimation> ripple;
 	ClickHandlerPtr link;
@@ -416,6 +421,8 @@ public:
 
 	[[nodiscard]] virtual int marginTop() const = 0;
 	[[nodiscard]] virtual int marginBottom() const = 0;
+
+	void addVerticalMargins(int top, int bottom);
 
 	void setPendingResize();
 	[[nodiscard]] bool pendingResize() const;

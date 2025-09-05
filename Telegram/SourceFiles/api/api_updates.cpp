@@ -1956,7 +1956,7 @@ void Updates::feedUpdate(const MTPUpdate &update) {
 		auto &d = update.c_updateUserTyping();
 		handleSendActionUpdate(
 			peerFromUser(d.vuser_id()),
-			0,
+			d.vtop_msg_id().value_or_empty(),
 			peerFromUser(d.vuser_id()),
 			d.vaction());
 	} break;

@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/qt/qt_key_modifiers.h"
 #include "core/ui_integration.h"
 #include "data/stickers/data_custom_emoji.h"
+#include "data/data_changes.h"
 #include "data/data_channel.h"
 #include "data/data_forum.h"
 #include "data/data_forum_topic.h"
@@ -397,6 +398,11 @@ void SubsectionTabs::startFillingSlider(
 						).append(' ').append(peer->shortName()),
 					});
 				}
+			} else if (item.thread->peer()->isBot()) {
+				sections.push_back({
+					.text = { tr::lng_bot_new_chat(tr::now) },
+					.userpic = Ui::MakeNewChatSubsectionsThumbnail(textFg),
+				});
 			} else {
 				sections.push_back({
 					.text = { tr::lng_filters_all_short(tr::now) },
@@ -655,6 +661,16 @@ void SubsectionTabs::track() {
 		) | rpl::filter([=](const Event &event) {
 			const auto topic = event.filterId ? nullptr : event.key.topic();
 			return (topic && topic->forum() == forum);
+		}) | rpl::start_with_next([=] {
+			scheduleRefresh();
+		}, _lifetime);
+
+		forum->session().changes().topicUpdates(
+			Data::TopicUpdate::Flag::Title
+			| Data::TopicUpdate::Flag::IconId
+			| Data::TopicUpdate::Flag::ColorId
+		) | rpl::filter([=](const Data::TopicUpdate &update) {
+			return update.topic->forum() == forum;
 		}) | rpl::start_with_next([=] {
 			scheduleRefresh();
 		}, _lifetime);

@@ -1044,8 +1044,6 @@ int Histories::sendRequest(
 void Histories::sendCreateTopicRequest(
 		not_null<History*> history,
 		MsgId rootId) {
-	Expects(history->peer->isChannel());
-
 	const auto forum = history->asForum();
 	Assert(forum != nullptr);
 	const auto topic = forum->topicFor(rootId);
@@ -1058,7 +1056,8 @@ void Histories::sendCreateTopicRequest(
 	using Flag = MTPmessages_CreateForumTopic::Flag;
 	api->request(MTPmessages_CreateForumTopic(
 		MTP_flags(Flag::f_icon_color
-			| (topic->iconId() ? Flag::f_icon_emoji_id : Flag(0))),
+			| (topic->iconId() ? Flag::f_icon_emoji_id : Flag())
+			| (history->peer->isBot() ? Flag::f_title_missing : Flag())),
 		history->peer->input,
 		MTP_string(topic->title()),
 		MTP_int(topic->colorId()),

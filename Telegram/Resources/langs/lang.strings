@@ -2579,6 +2579,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_bot_allow_write_title" = "Allow messaging";
 "lng_bot_allow_write" = "Do you want to allow this bot to send you messages?";
 "lng_bot_allow_write_confirm" = "Allow";
+"lng_bot_new_chat" = "New Chat";
+"lng_bot_new_thread_title" = "New Thread";
+"lng_bot_new_thread_about" = "Type any message to create a new thread.";
 
 "lng_attach_failed" = "Failed";
 "lng_attach_file" = "File";

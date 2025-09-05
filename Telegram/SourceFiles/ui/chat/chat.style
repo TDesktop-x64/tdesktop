@@ -1461,3 +1461,5 @@ saveMusicInfoMenu: Menu(defaultMenu) {
 	itemFgOver: windowFg;
 	itemPadding: margins(17px, 4px, 17px, 3px);
 }
+
+newBotThreadDown: icon {{ "history_down_arrow", msgServiceFg }};

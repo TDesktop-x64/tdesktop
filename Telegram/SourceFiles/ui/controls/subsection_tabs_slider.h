@@ -170,5 +170,7 @@ private:
 
 [[nodiscard]] std::shared_ptr<DynamicImage> MakeAllSubsectionsThumbnail(
 	Fn<QColor()> textColor);
+[[nodiscard]] std::shared_ptr<DynamicImage> MakeNewChatSubsectionsThumbnail(
+	Fn<QColor()> textColor);
 
 } // namespace Ui

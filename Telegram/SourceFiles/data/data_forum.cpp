@@ -589,7 +589,8 @@ ForumTopic *Forum::enforceTopicFor(MsgId rootId) {
 }
 
 bool Forum::topicDeleted(MsgId rootId) const {
-	return _topicsDeleted.contains(rootId);
+	return _topicsDeleted.contains(rootId)
+		|| (rootId == ForumTopic::kGeneralId && peer()->isBot());
 }
 
 rpl::producer<> Forum::chatsListChanges() const {

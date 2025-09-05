@@ -840,11 +840,8 @@ bool SubsectionTabs::switchTo(
 
 bool SubsectionTabs::UsedFor(not_null<Data::Thread*> thread) {
 	const auto history = thread->owningHistory();
-	if (history->amMonoforumAdmin()) {
-		return true;
-	}
-	const auto channel = history->peer->asChannel();
-	return channel && channel->useSubsectionTabs();
+	return history->amMonoforumAdmin()
+		|| history->peer->useSubsectionTabs();
 }
 
 } // namespace HistoryView

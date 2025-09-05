@@ -1281,7 +1281,7 @@ Window::SessionController *Manager::openNotificationMessage(
 
 	const auto separateId = !topic
 		? Window::SeparateId(history->peer)
-		: history->peer->asChannel()->useSubsectionTabs()
+		: history->peer->useSubsectionTabs()
 		? Window::SeparateId(Window::SeparateType::Chat, topic)
 		: Window::SeparateId(Window::SeparateType::Forum, history);
 	const auto separate = Core::App().separateWindowFor(separateId);

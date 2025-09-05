@@ -1600,7 +1600,7 @@ void ChatWidget::validateSubsectionTabs() {
 }
 
 void ChatWidget::refreshJoinGroupButton() {
-	if (!_repliesRootId) {
+	if (!_repliesRootId || !_peer->isChannel()) {
 		return;
 	}
 	const auto set = [&](std::unique_ptr<Ui::FlatButton> button) {

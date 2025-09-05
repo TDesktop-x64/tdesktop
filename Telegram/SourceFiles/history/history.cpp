@@ -3171,7 +3171,7 @@ void History::tryMarkForumIntervalRead(
 		MsgId wasInboxReadBefore,
 		MsgId nowInboxReadBefore) {
 	if (!isForum()
-		|| !peer->asChannel()->useSubsectionTabs()
+		|| !peer->useSubsectionTabs()
 		|| (nowInboxReadBefore <= wasInboxReadBefore)) {
 		return;
 	} else if (loadedAtBottom() && nowInboxReadBefore >= minMsgId()) {
@@ -3477,10 +3477,8 @@ bool History::suggestDraftAllowed() const {
 bool History::hasForumThreadBars() const {
 	if (amMonoforumAdmin()) {
 		return true;
-	} else if (const auto channel = peer->asChannel()) {
-		return channel->forum() && channel->useSubsectionTabs();
 	}
-	return false;
+	return peer->useSubsectionTabs();
 }
 
 void History::forumTabsChanged(bool forumTabs) {

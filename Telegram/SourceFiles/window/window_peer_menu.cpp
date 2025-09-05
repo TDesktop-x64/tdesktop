@@ -699,7 +699,7 @@ void Filler::addNewWindow() {
 		if (const auto strong = weak.get()) {
 			const auto forum = !strong->asTopic()
 				&& peer->isForum()
-				&& !peer->asChannel()->useSubsectionTabs();
+				&& !peer->useSubsectionTabs();
 			controller->showInNewWindow(SeparateId(
 				forum ? SeparateType::Forum : SeparateType::Chat,
 				strong));
@@ -1429,6 +1429,7 @@ void Filler::addViewAsMessages() {
 void Filler::addViewAsTopics() {
 	if (!_peer
 		|| !_peer->isForum()
+		|| !_peer->isChannel()
 		|| (_peer->asChannel()->flags() & ChannelDataFlag::ForumTabs)
 		|| !_controller->adaptive().isOneColumn()) {
 		return;
@@ -2815,7 +2816,7 @@ base::weak_qptr<Ui::BoxContent> ShowForwardMessagesBox(
 				return true;
 			}
 			const auto id = SeparateId(
-				((peer->isForum() && !peer->asChannel()->useSubsectionTabs())
+				((peer->isForum() && !peer->useSubsectionTabs())
 					? SeparateType::Forum
 					: SeparateType::Chat),
 				thread);

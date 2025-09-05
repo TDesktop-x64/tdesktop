@@ -12,7 +12,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/effects/emoji_fly_animation.h"
 #include "ui/abstract_button.h"
 #include "ui/vertical_list.h"
-#include "data/data_channel.h"
 #include "data/data_document.h"
 #include "data/data_forum.h"
 #include "data/data_forum_icons.h"
@@ -515,8 +514,7 @@ void EditForumTopicBox(
 	}
 
 	const auto create = [=] {
-		const auto channel = forum->peer->asChannel();
-		if (!channel || !channel->isForum()) {
+		if (!forum->peer->isForum()) {
 			box->closeBox();
 			return;
 		} else if (title->getLastText().trimmed().isEmpty()) {
@@ -527,7 +525,7 @@ void EditForumTopicBox(
 		controller->showSection(
 			std::make_shared<ChatMemento>(ChatViewId{
 				.history = forum,
-				.repliesRootId = channel->forum()->reserveCreatingId(
+				.repliesRootId = forum->peer->forum()->reserveCreatingId(
 					title->getLastText().trimmed(),
 					state->defaultIcon.current().colorId,
 					state->iconId.current()),

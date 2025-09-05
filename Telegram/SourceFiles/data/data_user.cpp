@@ -12,6 +12,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_sensitive_content.h"
 #include "api/api_statistics.h"
 #include "base/timer_rpl.h"
+#include "core/application.h"
 #include "storage/localstorage.h"
 #include "storage/storage_account.h"
 #include "storage/storage_user_photos.h"
@@ -34,6 +35,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_peer_photo.h"
 #include "apiwrap.h"
 #include "lang/lang_keys.h"
+#include "window/notifications_manager.h"
 #include "styles/style_chat.h"
 
 namespace {
@@ -496,10 +498,10 @@ void UserData::setAccessHash(uint64 accessHash) {
 
 void UserData::setFlags(UserDataFlags which) {
 	if (!isBot()) {
-		which &= ~UserDataFlag::Forum;
+		which &= ~Flag::Forum;
 	}
 	const auto diff = flags() ^ which;
-	if (diff & UserDataFlag::Deleted) {
+	if (diff & Flag::Deleted) {
 		invalidateEmptyUserpic();
 	}
 	// Let Data::Forum live till the end of _flags.set.
@@ -515,8 +517,20 @@ void UserData::setFlags(UserDataFlags which) {
 			info->ensureForum(this);
 		}
 	}
-	_flags.set((flags() & UserDataFlag::Self)
-		| (which & ~UserDataFlag::Self));
+	_flags.set((flags() & Flag::Self) | (which & ~Flag::Self));
+	if (diff & Flag::Forum) {
+		if (const auto history = this->owner().historyLoaded(this)) {
+			if (diff & Flag::Forum) {
+				Core::App().notifications().clearFromHistory(history);
+				history->updateChatListEntryHeight();
+				if (history->inChatList()) {
+					if (const auto forum = this->forum()) {
+						forum->preloadTopics();
+					}
+				}
+			}
+		}
+	}
 	if (const auto raw = takenForum.get()) {
 		owner().forumIcons().clearUserpicsReset(raw);
 	}

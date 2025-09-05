@@ -2142,14 +2142,14 @@ void DetailsFiller::addShowTopicsListButton(
 	using namespace rpl::mappers;
 
 	const auto window = _controller->parentController();
-	const auto channel = forum->channel();
+	const auto peer = forum->peer();
 	auto showTopicsVisible = rpl::combine(
 		window->adaptive().oneColumnValue(),
 		window->shownForum().value(),
 		_1 || (_2 != forum));
 	const auto callback = [=] {
-		if (const auto forum = channel->forum()) {
-			if (channel->useSubsectionTabs()) {
+		if (const auto forum = peer->forum()) {
+			if (peer->useSubsectionTabs()) {
 				window->searchInChat(forum->history());
 			} else {
 				window->showForum(forum);

@@ -415,8 +415,12 @@ void TogglePinnedThread(
 			controller->content()->dialogsToUp();
 		}
 	} else if (const auto topic = entry->asTopic()) {
+		const auto channel = topic->channel();
+		if (!channel) {
+			return;
+		}
 		owner->session().api().request(MTPchannels_UpdatePinnedForumTopic(
-			topic->channel()->inputChannel,
+			channel->inputChannel,
 			MTP_int(topic->rootId()),
 			MTP_bool(isPinned)
 		)).done([=](const MTPUpdates &result) {
@@ -1063,6 +1067,9 @@ void Filler::addTopicLink() {
 		return;
 	}
 	const auto channel = _topic->channel();
+	if (!channel) {
+		return;
+	}
 	const auto id = _topic->rootId();
 	const auto controller = _controller;
 	_addAction(tr::lng_context_copy_topic_link(tr::now), [=] {
@@ -1805,17 +1812,17 @@ void PeerMenuDeleteTopicWithConfirmation(
 
 void PeerMenuDeleteTopic(
 		not_null<Window::SessionNavigation*> navigation,
-		not_null<ChannelData*> channel,
+		not_null<PeerData*> peer,
 		MsgId rootId) {
-	const auto api = &channel->session().api();
+	const auto api = &peer->session().api();
 	api->request(MTPmessages_DeleteTopicHistory(
-		channel->input,
+		peer->input,
 		MTP_int(rootId)
 	)).done([=](const MTPmessages_AffectedHistory &result) {
-		const auto offset = api->applyAffectedHistory(channel, result);
+		const auto offset = api->applyAffectedHistory(peer, result);
 		if (offset > 0) {
-			PeerMenuDeleteTopic(navigation, channel, rootId);
-		} else if (const auto forum = channel->forum()) {
+			PeerMenuDeleteTopic(navigation, peer, rootId);
+		} else if (const auto forum = peer->forum()) {
 			forum->applyTopicDeleted(rootId);
 		}
 	}).send();
@@ -1824,7 +1831,7 @@ void PeerMenuDeleteTopic(
 void PeerMenuDeleteTopic(
 		not_null<Window::SessionNavigation*> navigation,
 		not_null<Data::ForumTopic*> topic) {
-	PeerMenuDeleteTopic(navigation, topic->channel(), topic->rootId());
+	PeerMenuDeleteTopic(navigation, topic->peer(), topic->rootId());
 }
 
 void PeerMenuShareContactBox(

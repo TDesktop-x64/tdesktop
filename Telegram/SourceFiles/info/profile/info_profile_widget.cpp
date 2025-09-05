@@ -50,7 +50,7 @@ Memento::Memento(
 }
 
 Memento::Memento(not_null<Data::ForumTopic*> topic)
-: ContentMemento(topic->channel(), topic, nullptr, 0) {
+: ContentMemento(topic->peer(), topic, nullptr, 0) {
 }
 
 Memento::Memento(not_null<Data::SavedSublist*> sublist)

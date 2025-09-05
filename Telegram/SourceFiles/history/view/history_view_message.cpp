@@ -1096,7 +1096,7 @@ void Message::refreshTopicButton() {
 	if (isAttachedToPrevious() || delegate()->elementHideTopicButton(this)) {
 		_topicButton = nullptr;
 	} else if (const auto topic = item->topic()) {
-		if (topic->channel()->useSubsectionTabs()) {
+		if (topic->peer()->useSubsectionTabs()) {
 			_topicButton = nullptr;
 			return;
 		}

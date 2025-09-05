@@ -693,7 +693,9 @@ bool PeerData::canCreateTodoLists() const {
 }
 
 bool PeerData::canCreateTopics() const {
-	if (const auto channel = asChannel()) {
+	if (const auto bot = asBot()) {
+		return bot->isForum();
+	} else if (const auto channel = asChannel()) {
 		return channel->isForum()
 			&& !channel->amRestricted(ChatRestriction::CreateTopics);
 	}
@@ -701,7 +703,9 @@ bool PeerData::canCreateTopics() const {
 }
 
 bool PeerData::canManageTopics() const {
-	if (const auto channel = asChannel()) {
+	if (const auto bot = asBot()) {
+		return bot->isForum();
+	} else if (const auto channel = asChannel()) {
 		return channel->isForum()
 			&& (channel->amCreator()
 				|| (channel->adminRights() & ChatAdminRight::ManageTopics));
@@ -1436,7 +1440,9 @@ bool PeerData::isBroadcast() const {
 }
 
 bool PeerData::isForum() const {
-	if (const auto channel = asChannel()) {
+	if (const auto bot = asBot()) {
+		return bot->isForum();
+	} else if (const auto channel = asChannel()) {
 		return channel->isForum();
 	}
 	return false;
@@ -1517,7 +1523,9 @@ Ui::BotVerifyDetails *PeerData::botVerifyDetails() const {
 }
 
 Data::Forum *PeerData::forum() const {
-	if (const auto channel = asChannel()) {
+	if (const auto bot = asBot()) {
+		return bot->forum();
+	} else if (const auto channel = asChannel()) {
 		return channel->forum();
 	}
 	return nullptr;
@@ -1547,6 +1555,28 @@ Data::SavedSublist *PeerData::monoforumSublistFor(
 		return monoforum->sublistLoaded(owner().peer(sublistPeerId));
 	}
 	return nullptr;
+}
+
+bool PeerData::useSubsectionTabs() const {
+	if (const auto bot = asBot()) {
+		return bot->isForum();
+	} else if (const auto channel = asChannel()) {
+		return channel->useSubsectionTabs();
+	}
+	return false;
+}
+
+bool PeerData::viewForumAsMessages() const {
+	if (const auto channel = asChannel()) {
+		return channel->viewForumAsMessages();
+	}
+	return false;
+}
+
+void PeerData::processTopics(const MTPVector<MTPForumTopic> &topics) {
+	if (const auto forum = this->forum()) {
+		forum->applyReceivedTopics(topics);
+	}
 }
 
 bool PeerData::allowsForwarding() const {

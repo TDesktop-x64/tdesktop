@@ -1617,8 +1617,8 @@ void Element::recountThreadBarInBlocks() {
 	const auto item = data();
 	const auto topic = item->topic();
 	const auto sublist = item->savedSublist();
-	const auto parentChat = (topic && topic->channel()->useSubsectionTabs())
-		? topic->channel().get()
+	const auto parentChat = (topic && topic->peer()->useSubsectionTabs())
+		? topic->peer().get()
 		: sublist
 		? sublist->parentChat()
 		: nullptr;
@@ -1632,7 +1632,7 @@ void Element::recountThreadBarInBlocks() {
 		if (const auto previous = previousDisplayedInBlocks()) {
 			const auto prev = previous->data();
 			if (const auto prevTopic = prev->topic()) {
-				Assert(prevTopic->channel() == parentChat);
+				Assert(prevTopic->peer() == parentChat);
 				const auto topicRootId = topic->rootId();
 				if (prevTopic->rootId() == topicRootId) {
 					return nullptr;

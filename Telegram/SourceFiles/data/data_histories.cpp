@@ -548,6 +548,7 @@ void Histories::requestFakeChatListMessage(
 			_fakeChatListRequests.erase(history);
 			history->setFakeChatListMessageFrom(MTP_messages_messages(
 				MTP_vector<MTPMessage>(0),
+				MTP_vector<MTPForumTopic>(0),
 				MTP_vector<MTPChat>(0),
 				MTP_vector<MTPUser>(0)));
 			finish();

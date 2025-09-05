@@ -271,6 +271,10 @@ public:
 	[[nodiscard]] Data::SavedSublist *monoforumSublistFor(
 		PeerId sublistPeerId) const;
 
+	[[nodiscard]] bool useSubsectionTabs() const;
+	[[nodiscard]] bool viewForumAsMessages() const;
+	void processTopics(const MTPVector<MTPForumTopic> &topics);
+
 	[[nodiscard]] Data::PeerNotifySettings &notify() {
 		return _notify;
 	}

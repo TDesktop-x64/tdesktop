@@ -362,6 +362,9 @@ void ApiWrap::savePinnedOrder(Data::Folder *folder) {
 }
 
 void ApiWrap::savePinnedOrder(not_null<Data::Forum*> forum) {
+	if (!forum->channel()) {
+		return;
+	}
 	const auto &order = _session->data().pinnedChatsOrder(forum);
 	const auto input = [](Dialogs::Key key) {
 		if (const auto topic = key.topic()) {
@@ -1889,7 +1892,7 @@ void ApiWrap::sendNotifySettingsUpdates() {
 	for (const auto topic : base::take(_updateNotifyTopics)) {
 		request(MTPaccount_UpdateNotifySettings(
 			MTP_inputNotifyForumTopic(
-				topic->channel()->input,
+				topic->peer()->input,
 				MTP_int(topic->rootId())),
 			topic->notify().serialize()
 		)).afterDelay(kSmallDelayMs).send();
@@ -3054,18 +3057,20 @@ void ApiWrap::requestMessageAfterDate(
 				return &messages.vmessages().v;
 			};
 			const auto list = result.match([&](
-				const MTPDmessages_messages &data) {
+					const MTPDmessages_messages &data) {
+				peer->processTopics(data.vtopics());
 				return handleMessages(data);
 			}, [&](const MTPDmessages_messagesSlice &data) {
+				peer->processTopics(data.vtopics());
 				return handleMessages(data);
 			}, [&](const MTPDmessages_channelMessages &data) {
 				if (const auto channel = peer->asChannel()) {
 					channel->ptsReceived(data.vpts().v);
-					channel->processTopics(data.vtopics());
 				} else {
 					LOG(("API Error: received messages.channelMessages when "
 						"no channel was passed! (ApiWrap::jumpToDate)"));
 				}
+				peer->processTopics(data.vtopics());
 				return handleMessages(data);
 			}, [&](const MTPDmessages_messagesNotModified &) {
 				LOG(("API Error: received messages.messagesNotModified! "

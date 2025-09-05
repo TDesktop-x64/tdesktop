@@ -983,7 +983,7 @@ void ChooseTopicSearchController::searchQuery(const QString &query) {
 void ChooseTopicSearchController::searchOnServer() {
 	_requestId = _api.request(MTPmessages_GetForumTopics(
 		MTP_flags(MTPmessages_GetForumTopics::Flag::f_q),
-		_forum->channel()->input,
+		_forum->peer()->input,
 		MTP_string(_query),
 		MTP_int(_offsetDate),
 		MTP_int(_offsetId),

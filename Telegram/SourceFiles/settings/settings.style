@@ -311,6 +311,8 @@ settingsFilterDividerLabelPadding: margins(0px, 16px, 0px, 22px);
 settingsFilterIconSize: 74px;
 settingsFilterIconPadding: margins(0px, 17px, 0px, 5px);
 
+settingsFilterTagPreviewSkip: 14px;
+
 settingsDeviceName: InputField(defaultInputField) {
 	textBg: transparent;
 	textMargins: margins(1px, 3px, 1px, 4px);

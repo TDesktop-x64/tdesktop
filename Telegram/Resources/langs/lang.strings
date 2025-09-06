@@ -1950,6 +1950,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_manage_monoforum_price" = "Price for each message";
 "lng_manage_monoforum_about" = "Allow users to send messages to your channel, with the option to charge a fee for each message.";
 "lng_manage_monoforum_price_about" = "Your channel will receive {percent} of the selected fee ({amount}) for each incoming message.";
+"lng_manage_monoforum_link_subtitle" = "Link to direct messages";
 
 "lng_manage_history_visibility_title" = "Chat history for new members";
 "lng_manage_history_visibility_shown" = "Visible";

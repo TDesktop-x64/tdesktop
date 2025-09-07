@@ -10,7 +10,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/image/image_prepare.h"
 #include "ui/widgets/shadow.h"
 #include "ui/painter.h"
-#include "styles/style_calls.h" // st::callShadow.
+#include "styles/style_media_view.h"
+#include "styles/style_widgets.h"
 
 namespace Media::View {
 namespace {
@@ -183,7 +184,11 @@ void Pip::RendererSW::paintTransformedImage(
 	const auto rect = geometry.inner;
 	const auto rotation = geometry.rotation;
 	if (geometry.useTransparency) {
-		Ui::Shadow::paint(*_p, rect, geometry.outer.width(), st::callShadow);
+		Ui::Shadow::paint(
+			*_p,
+			rect,
+			geometry.outer.width(),
+			PipShadow());
 	}
 
 	if (UsePainterRotation(rotation)) {

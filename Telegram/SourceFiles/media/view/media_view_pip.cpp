@@ -330,6 +330,10 @@ QImage RotateFrameImage(QImage image, int rotation) {
 	return image.transformed(transform);
 }
 
+const style::Shadow &PipShadow() {
+	return st::mediaviewPipShadow;
+}
+
 PipPanel::PipPanel(
 	QWidget *parent,
 	Fn<Ui::GL::ChosenRenderer(Ui::GL::Capabilities)> renderer)
@@ -868,7 +872,7 @@ void PipPanel::updateDecorations() {
 	});
 	const auto position = countPosition();
 	const auto use = Ui::Platform::TranslucentWindowsSupported();
-	const auto full = use ? st::callShadow.extend : style::margins();
+	const auto full = use ? PipShadow().extend : style::margins();
 	const auto padding = style::margins(
 		(position.attached & RectPart::Left) ? 0 : full.left(),
 		(position.attached & RectPart::Top) ? 0 : full.top(),

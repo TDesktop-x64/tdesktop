@@ -311,8 +311,17 @@ void CaptionBox(
 		}
 	}
 
-	const auto send = [=](Api::SendOptions options) {
-		done(std::move(options), input->getTextWithTags());
+	const auto send = [=, show = controller->uiShow()](
+			Api::SendOptions options) {
+		const auto textWithTags = input->getTextWithTags();
+		const auto remove = Ui::ComputeFieldCharacterCount(input)
+			- Data::PremiumLimits(&show->session()).captionLengthCurrent();
+		if (remove > 0) {
+			show->showToast(
+				tr::lng_edit_limit_reached(tr::now, lt_count, remove));
+			return;
+		}
+		done(std::move(options), textWithTags);
 	};
 	const auto confirm = box->addButton(
 		std::move(confirmText),
@@ -385,6 +394,16 @@ void EditCaptionBox(
 		}
 		if (!(item->media() && item->media()->allowsEditCaption())) {
 			show->showToast(tr::lng_edit_error(tr::now));
+			return;
+		}
+		const auto textLength = textWithTags.text.size();
+		const auto limit = Data::PremiumLimits(
+			&item->history()->session()).captionLengthCurrent();
+		if (textLength > limit) {
+			show->showToast(tr::lng_edit_limit_reached(
+				tr::now,
+				lt_count,
+				textLength - limit));
 			return;
 		}
 		auto text = TextWithEntities{

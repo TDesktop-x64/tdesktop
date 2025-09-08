@@ -3662,7 +3662,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_gift_self_about" = "Buy yourself a gift to display on your page or reserve for later.\n\nLimited-edition gifts upgraded to collectibles can be gifted to others later.";
 "lng_gift_channel_title" = "Send a Gift";
 "lng_gift_channel_about" = "Select a gift to show appreciation for {name}.";
-"lng_gift_released_by" = "Released by {name}";
+"lng_gift_released_by" = "released by {name}";
 "lng_gift_unique_owner" = "Owner";
 "lng_gift_unique_address_copied" = "Address copied to clipboard.";
 "lng_gift_unique_status" = "Status";

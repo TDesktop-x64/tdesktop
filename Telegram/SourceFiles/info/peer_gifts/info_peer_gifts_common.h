@@ -266,7 +266,9 @@ private:
 	not_null<Main::Session*> session,
 	const GiftDescriptor &descriptor);
 
-[[nodiscard]] QImage ValidateRotatedBadge(const GiftBadge &badge, int added);
+[[nodiscard]] QImage ValidateRotatedBadge(
+	const GiftBadge &badge,
+	QMargins padding);
 
 void SelectGiftToUnpin(
 	std::shared_ptr<ChatHelpers::Show> show,

@@ -119,7 +119,7 @@ TextBubblePart::TextBubblePart(
 : MediaGenericTextPart(
 	std::move(text),
 	margins,
-	st::defaultTextStyle,
+	st::uniqueGiftReleasedBy.style,
 	{},
 	{},
 	style::al_top)
@@ -132,6 +132,7 @@ void TextBubblePart::draw(
 		not_null<const MediaGeneric*> owner,
 		const PaintContext &context,
 		int outerWidth) const {
+	auto hq = PainterHighQualityEnabler(p);
 	p.setPen(Qt::NoPen);
 	p.setOpacity(0.5);
 	p.setBrush(_backdrop.patternColor);
@@ -369,7 +370,7 @@ auto GenerateUniqueGiftMedia(
 			st::chatUniqueTitlePadding);
 		pushText(
 			Ui::Text::Bold(Data::UniqueGiftName(*gift)),
-			st::defaultTextStyle,
+			st::chatUniqueTextStyle,
 			gift->backdrop.textColor,
 			st::chatUniqueTextPadding);
 
@@ -396,9 +397,12 @@ auto GenerateUniqueGiftMedia(
 			{ tr::lng_gift_unique_backdrop(tr::now), name(gift->backdrop) },
 			{ tr::lng_gift_unique_symbol(tr::now), name(gift->pattern) },
 		};
+		const auto tableAddedMargins = gift->releasedBy
+			? QMargins(0, st::chatUniqueAuthorSkip, 0, 0)
+			: QMargins();
 		push(std::make_unique<AttributeTable>(
 			std::move(attributes),
-			st::chatUniqueTextPadding,
+			st::chatUniqueTextPadding + tableAddedMargins,
 			[c = gift->backdrop.textColor](const auto&) { return c; },
 			[](const auto&) { return QColor(255, 255, 255); }));
 
@@ -440,13 +444,15 @@ auto UniqueGiftBg(
 		auto hq = PainterHighQualityEnabler(p);
 		p.setPen(Qt::NoPen);
 		const auto webpreview = (media.get() != view->media());
+		const auto sub = webpreview ? 0 : (st::chatUniqueGiftBorder / 2);
 		const auto thickness = webpreview ? 0 : st::chatUniqueGiftBorder * 2;
+		const auto removed = thickness + sub;
 		const auto radius = webpreview
 			? st::roundRadiusLarge
-			: (st::msgServiceGiftBoxRadius - thickness);
+			: (st::msgServiceGiftBoxRadius - thickness + sub);
 		const auto full = QRect(0, 0, media->width(), media->height());
 		const auto inner = full.marginsRemoved(
-			{ thickness, thickness, thickness, thickness });
+			{ removed, removed, removed, removed });
 		if (!webpreview) {
 			auto pen = context.st->msgServiceBg()->p;
 			pen.setWidthF(thickness);
@@ -478,12 +484,10 @@ auto UniqueGiftBg(
 			outer);
 		p.setClipping(false);
 
-		const auto add = webpreview ? 0 : style::ConvertScale(2);
-		p.setClipRect(
-			inner.x() - add,
-			inner.y() - add,
-			inner.width() + 2 * add,
-			inner.height() + 2 * add);
+		const auto padding = webpreview
+			? QMargins()
+			: st::chatUniqueGiftBadgePadding;
+		p.setClipRect(inner.marginsAdded(padding));
 		auto badge = Info::PeerGifts::GiftBadge{
 			.text = tr::lng_gift_collectible_tag(tr::now),
 			.bg1 = gift->backdrop.edgeColor,
@@ -492,13 +496,13 @@ auto UniqueGiftBg(
 		};
 		if (state->badgeCache.isNull() || state->badgeKey != badge) {
 			state->badgeKey = badge;
-			state->badgeCache = ValidateRotatedBadge(badge, add);
+			state->badgeCache = ValidateRotatedBadge(badge, padding);
 		}
 		const auto badgeRatio = state->badgeCache.devicePixelRatio();
 		const auto badgeWidth = state->badgeCache.width() / badgeRatio;
 		p.drawImage(
-			inner.x() + inner.width() + add - badgeWidth,
-			inner.y() - add,
+			inner.x() + inner.width() - badgeWidth,
+			inner.y(),
 			state->badgeCache);
 		p.setClipping(false);
 	};
@@ -569,9 +573,9 @@ AttributeTable::AttributeTable(
 	for (const auto &entry : entries) {
 		_parts.emplace_back();
 		auto &part = _parts.back();
-		part.label.setText(st::defaultTextStyle, entry.label);
+		part.label.setText(st::chatUniqueTextStyle, entry.label);
 		part.value.setMarkedText(
-			st::defaultTextStyle,
+			st::chatUniqueTextStyle,
 			entry.value,
 			kMarkupTextOptions,
 			context);

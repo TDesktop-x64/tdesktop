@@ -118,8 +118,8 @@ ComposedBadge::ComposedBadge(
 		) | rpl::map([=] {
 			auto &owner = session->data();
 			return Badge::UnreadBadge{
-				owner.unreadBadge(),
-				owner.unreadBadgeMuted(),
+				owner.unreadWithMentionsBadge(),
+				owner.unreadWithMentionsBadgeMuted(),
 			};
 		}));
 		rpl::combine(

@@ -65,6 +65,9 @@ QRect MediaPreviewWidget::updateArea() const {
 	const auto adjusted = position
 		- (premium
 			? QPoint(size.width() - (size.width() / 2), size.height() / 2)
+			: QPoint())
+		+ (!_customPadding.isNull()
+			? QPoint(0, _customPadding.top())
 			: QPoint());
 	return QRect(adjusted, size * (premium ? 2 : 1));
 }
@@ -107,7 +110,14 @@ void MediaPreviewWidget::paintEvent(QPaintEvent *e) {
 //		w = qMax(qRound(w * (st::stickerPreviewMin + ((1. - st::stickerPreviewMin) * shown)) / 2.) * 2 + int(w % 2), 1);
 //		h = qMax(qRound(h * (st::stickerPreviewMin + ((1. - st::stickerPreviewMin) * shown)) / 2.) * 2 + int(h % 2), 1);
 	}
-	p.fillRect(r, st::stickerPreviewBg);
+	if (_backgroundMargins.isNull()) {
+		p.fillRect(r, st::stickerPreviewBg);
+	} else {
+		p.fillRect(rect() - _backgroundMargins, st::stickerPreviewBg);
+	}
+	if (!_customPadding.isNull()) {
+		p.translate(0, _customPadding.top());
+	}
 	const auto position = innerPosition({ w, h });
 	if (image.isNull()) {
 		p.drawPixmap(position, pixmap);
@@ -262,6 +272,17 @@ void MediaPreviewWidget::resetGifAndCache() {
 	_cachedSize = QSize();
 }
 
+void MediaPreviewWidget::setCustomPadding(const QMargins &padding) {
+	_customPadding = padding;
+	_cachedSize = QSize();
+	update();
+}
+
+void MediaPreviewWidget::setBackgroundMargins(const QMargins &margins) {
+	_backgroundMargins = margins;
+	update();
+}
+
 QSize MediaPreviewWidget::currentDimensions() const {
 	if (!_cachedSize.isEmpty()) {
 		return _cachedSize;
@@ -294,14 +315,17 @@ QSize MediaPreviewWidget::currentDimensions() const {
 		}
 	}
 	result = QSize(qMax(style::ConvertScale(result.width()), 1), qMax(style::ConvertScale(result.height()), 1));
-	if (result.width() > box.width()) {
-		result.setHeight(qMax((box.width() * result.height()) / result.width(), 1));
-		result.setWidth(box.width());
+
+	if (!_customPadding.isNull()) {
+		const auto emojiHeight = _emojiList.empty() ? 0 : (_emojiSize * 3);
+		const auto widgetBox = QSize(
+			width() - _customPadding.left() - _customPadding.right(),
+			height() - _customPadding.top() - _customPadding.bottom() - emojiHeight);
+		result = result.scaled(widgetBox, Qt::KeepAspectRatio);
+	} else {
+		result = result.scaled(box, Qt::KeepAspectRatio);
 	}
-	if (result.height() > box.height()) {
-		result.setWidth(qMax((box.height() * result.width()) / result.height(), 1));
-		result.setHeight(box.height());
-	}
+
 	if (_photo) {
 		_cachedSize = result;
 	}

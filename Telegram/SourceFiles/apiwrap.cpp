@@ -362,9 +362,6 @@ void ApiWrap::savePinnedOrder(Data::Folder *folder) {
 }
 
 void ApiWrap::savePinnedOrder(not_null<Data::Forum*> forum) {
-	if (!forum->channel()) {
-		return;
-	}
 	const auto &order = _session->data().pinnedChatsOrder(forum);
 	const auto input = [](Dialogs::Key key) {
 		if (const auto topic = key.topic()) {
@@ -378,9 +375,9 @@ void ApiWrap::savePinnedOrder(not_null<Data::Forum*> forum) {
 		order,
 		ranges::back_inserter(topics),
 		input);
-	request(MTPchannels_ReorderPinnedForumTopics(
-		MTP_flags(MTPchannels_ReorderPinnedForumTopics::Flag::f_force),
-		forum->channel()->inputChannel,
+	request(MTPmessages_ReorderPinnedForumTopics(
+		MTP_flags(MTPmessages_ReorderPinnedForumTopics::Flag::f_force),
+		forum->peer()->input,
 		MTP_vector(topics)
 	)).done([=](const MTPUpdates &result) {
 		applyUpdates(result);

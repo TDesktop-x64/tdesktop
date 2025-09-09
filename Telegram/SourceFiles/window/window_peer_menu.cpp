@@ -415,12 +415,9 @@ void TogglePinnedThread(
 			controller->content()->dialogsToUp();
 		}
 	} else if (const auto topic = entry->asTopic()) {
-		const auto channel = topic->channel();
-		if (!channel) {
-			return;
-		}
-		owner->session().api().request(MTPchannels_UpdatePinnedForumTopic(
-			channel->inputChannel,
+		const auto peer = topic->peer();
+		owner->session().api().request(MTPmessages_UpdatePinnedForumTopic(
+			peer->input,
 			MTP_int(topic->rootId()),
 			MTP_bool(isPinned)
 		)).done([=](const MTPUpdates &result) {

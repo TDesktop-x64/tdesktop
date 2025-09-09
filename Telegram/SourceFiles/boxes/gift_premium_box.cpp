@@ -587,6 +587,41 @@ void AddTableRow(
 	return MakeValueWithSmallButton(table, label, std::move(text), handler);
 }
 
+void AddUniqueGiftPropertyRows(
+		not_null<Ui::RpWidget*> container,
+		not_null<Ui::TableLayout*> table,
+		not_null<Data::UniqueGift*> unique) {
+	const auto tooltip = std::make_shared<InfoTooltipData>(InfoTooltipData{
+		.parent = container,
+	});
+	const auto showTooltip = [=](
+			not_null<Ui::RpWidget*> widget,
+			rpl::producer<TextWithEntities> text) {
+		ShowInfoTooltip(tooltip, widget, std::move(text), kTooltipDuration);
+	};
+	const auto showRarity = [=](
+			not_null<Ui::RpWidget*> widget,
+			int rarity) {
+		const auto percent = QString::number(rarity / 10.) + '%';
+		showTooltip(widget, tr::lng_gift_unique_rarity(
+			lt_percent,
+			rpl::single(TextWithEntities{ percent }),
+			Ui::Text::WithEntities));
+	};
+	AddTableRow(
+		table,
+		tr::lng_gift_unique_model(),
+		MakeAttributeValue(table, unique->model, showRarity));
+	AddTableRow(
+		table,
+		tr::lng_gift_unique_backdrop(),
+		MakeAttributeValue(table, unique->backdrop, showRarity));
+	AddTableRow(
+		table,
+		tr::lng_gift_unique_symbol(),
+		MakeAttributeValue(table, unique->pattern, showRarity));
+}
+
 [[nodiscard]] object_ptr<Ui::RpWidget> MakeStarGiftStarsValue(
 		not_null<Ui::TableLayout*> table,
 		std::shared_ptr<ChatHelpers::Show> show,
@@ -1405,7 +1440,7 @@ void AddStarGiftTable(
 		const Data::CreditsHistoryEntry &entry,
 		Fn<void()> convertToStars,
 		Fn<void()> startUpgrade) {
-	auto table = container->add(
+	const auto table = container->add(
 		object_ptr<Ui::TableLayout>(
 			container,
 			st.table ? *st.table : st::giveawayGiftCodeTable),
@@ -1544,27 +1579,7 @@ void AddStarGiftTable(
 			rpl::single(Ui::Text::WithEntities(langDateTime(entry.date))));
 	}
 	if (unique) {
-		const auto showRarity = [=](
-				not_null<Ui::RpWidget*> widget,
-				int rarity) {
-			const auto percent = QString::number(rarity / 10.) + '%';
-			showTooltip(widget, tr::lng_gift_unique_rarity(
-				lt_percent,
-				rpl::single(TextWithEntities{ percent }),
-				Ui::Text::WithEntities));
-		};
-		AddTableRow(
-			table,
-			tr::lng_gift_unique_model(),
-			MakeAttributeValue(table, unique->model, showRarity));
-		AddTableRow(
-			table,
-			tr::lng_gift_unique_backdrop(),
-			MakeAttributeValue(table, unique->backdrop, showRarity));
-		AddTableRow(
-			table,
-			tr::lng_gift_unique_symbol(),
-			MakeAttributeValue(table, unique->pattern, showRarity));
+		AddUniqueGiftPropertyRows(container, table, unique);
 	} else {
 		AddTableRow(
 			table,
@@ -1696,6 +1711,25 @@ void AddStarGiftTable(
 			std::move(label),
 			st::giveawayGiftCodeLabelMargin,
 			st::giveawayGiftCodeValueMargin);
+	}
+}
+
+void AddTransferGiftTable(
+		std::shared_ptr<ChatHelpers::Show> show,
+		not_null<Ui::VerticalLayout*> container,
+		std::shared_ptr<Data::UniqueGift> unique) {
+	const auto table = container->add(
+		object_ptr<Ui::TableLayout>(
+			container,
+			st::giveawayGiftCodeTable),
+		st::giveawayGiftCodeTableMargin);
+	AddUniqueGiftPropertyRows(container, table, unique.get());
+	if (const auto value = unique->value.get()) {
+		AddTableRow(
+			table,
+			tr::lng_gift_unique_value(),
+			rpl::single(
+				FormatValuePrice(value->valuePrice, value->currency, true)));
 	}
 }
 

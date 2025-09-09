@@ -11,16 +11,18 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_credits.h"
 #include "api/api_cloud_password.h"
 #include "base/unixtime.h"
+#include "boxes/filters/edit_filter_chats_list.h" // CreatePe...tionSubtitle.
+#include "boxes/peers/replace_boost_box.h"
+#include "boxes/gift_premium_box.h"
 #include "boxes/passcode_box.h"
+#include "boxes/peer_list_box.h"
+#include "boxes/peer_list_controllers.h"
+#include "boxes/star_gift_box.h"
 #include "data/data_cloud_themes.h"
 #include "data/data_session.h"
 #include "data/data_star_gift.h"
 #include "data/data_thread.h"
 #include "data/data_user.h"
-#include "boxes/filters/edit_filter_chats_list.h" // CreatePe...tionSubtitle.
-#include "boxes/peer_list_box.h"
-#include "boxes/peer_list_controllers.h"
-#include "boxes/star_gift_box.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "payments/payments_checkout_process.h"
@@ -578,17 +580,16 @@ void ShowTransferToBox(
 		Fn<void()> closeParentBox) {
 	const auto stars = gift->starsForTransfer;
 	controller->show(Box([=](not_null<Ui::GenericBox*> box) {
-		box->setTitle(tr::lng_gift_transfer_title(
-			lt_name,
-			rpl::single(UniqueGiftName(*gift))));
-
 		auto transfer = (stars > 0)
 			? tr::lng_gift_transfer_button_for(
 				lt_price,
-				tr::lng_action_gift_for_stars(
-					lt_count,
-					rpl::single(stars * 1.)))
-			: tr::lng_gift_transfer_button();
+				rpl::single(Ui::Text::IconEmoji(
+					&st::starIconEmoji
+				).append(Lang::FormatCreditsAmountDecimal(
+					CreditsAmount(stars)
+				))),
+				Ui::Text::WithEntities)
+			: tr::lng_gift_transfer_button(Ui::Text::WithEntities);
 
 		struct State {
 			bool sent = false;
@@ -621,6 +622,10 @@ void ShowTransferToBox(
 			TransferGift(controller, peer, gift, savedId, done);
 		};
 
+		box->addRow(
+			CreateGiftTransfer(box->verticalLayout(), gift, peer),
+			QMargins(0, st::boxPadding.top(), 0, 0));
+
 		Ui::ConfirmBox(box, {
 			.text = (stars > 0)
 				? tr::lng_gift_transfer_sure_for(
@@ -643,6 +648,9 @@ void ShowTransferToBox(
 			.confirmed = std::move(callback),
 			.confirmText = std::move(transfer),
 		});
+
+		const auto show = controller->uiShow();
+		AddTransferGiftTable(show, box->verticalLayout(), gift);
 	}));
 }
 

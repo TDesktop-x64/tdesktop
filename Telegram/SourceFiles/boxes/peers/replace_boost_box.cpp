@@ -11,8 +11,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "apiwrap.h"
 #include "base/event_filter.h"
 #include "base/unixtime.h"
-#include "data/data_premium_limits.h"
 #include "boxes/peer_list_box.h"
+#include "boxes/star_gift_box.h"
+#include "data/stickers/data_custom_emoji.h"
+#include "data/data_premium_limits.h"
 #include "data/data_channel.h"
 #include "data/data_cloud_themes.h"
 #include "data/data_session.h"
@@ -32,8 +34,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/wrap/padding_wrap.h"
 #include "ui/wrap/vertical_layout.h"
 #include "ui/empty_userpic.h"
+#include "ui/dynamic_image.h"
 #include "ui/painter.h"
 #include "styles/style_boxes.h"
+#include "styles/style_credits.h"
 #include "styles/style_premium.h"
 
 namespace {
@@ -826,6 +830,177 @@ object_ptr<Ui::RpWidget> CreateUserpicsWithMoreBadge(
 			q.setPen(st::premiumButtonFg);
 			q.drawText(rect, Qt::AlignCenter, text);
 		}
+		q.end();
+
+		auto p = QPainter(overlay);
+		p.drawImage(0, 0, state->layer);
+	}, overlay->lifetime());
+	return result;
+}
+
+class UniqueGiftBackground final : public Ui::DynamicImage {
+public:
+	UniqueGiftBackground(
+		not_null<Main::Session*> session,
+		std::shared_ptr<Data::UniqueGift> unique)
+	: _session(session)
+	, _unique(std::move(unique)) {
+	}
+
+	std::shared_ptr<Ui::DynamicImage> clone() override {
+		return std::make_shared<UniqueGiftBackground>(_session, _unique);
+	}
+
+	void subscribeToUpdates(Fn<void()> callback) override {
+		_repaint = std::move(callback);
+		if (!_repaint) {
+			_patternEmoji = nullptr;
+		}
+	}
+
+	QImage image(int size) override {
+		if (!_patternEmoji) {
+			_patternEmoji = _session->data().customEmojiManager().create(
+				_unique->pattern.document,
+				[=] { ready(); },
+				Data::CustomEmojiSizeTag::Large);
+			[[maybe_unused]] const auto preload = _patternEmoji->ready();
+		}
+		const auto inner = QRect(0, 0, size, size);
+		const auto ratio = style::DevicePixelRatio();
+		if (_backgroundCache.size() != inner.size() * ratio) {
+			_backgroundCache = QImage(
+				inner.size() * ratio,
+				QImage::Format_ARGB32_Premultiplied);
+			_backgroundCache.fill(Qt::transparent);
+			_backgroundCache.setDevicePixelRatio(ratio);
+
+			const auto radius = st::giftBoxGiftRadius;
+			auto p = QPainter(&_backgroundCache);
+			auto hq = PainterHighQualityEnabler(p);
+			auto gradient = QRadialGradient(
+				inner.center(),
+				inner.width() / 2);
+			gradient.setStops({
+				{ 0., _unique->backdrop.centerColor },
+				{ 1., _unique->backdrop.edgeColor },
+			});
+			p.setBrush(gradient);
+			p.setPen(Qt::NoPen);
+			p.drawRoundedRect(inner, radius, radius);
+			_backroundPatterned = false;
+		}
+		if (!_backroundPatterned && _patternEmoji->ready()) {
+			_backroundPatterned = true;
+			auto p = QPainter(&_backgroundCache);
+			p.setClipRect(inner);
+			const auto skip = inner.width() / 3;
+			Ui::PaintPoints(
+				p,
+				Ui::PatternPointsSmall(),
+				_patternCache,
+				_patternEmoji.get(),
+				*_unique,
+				QRect(-skip, 0, inner.width() + 2 * skip, inner.height()));
+		}
+		return _backgroundCache;
+	}
+
+private:
+	void ready() {
+		if (!_backroundPatterned && _repaint) {
+			_repaint();
+		}
+	}
+
+	const not_null<Main::Session*> _session;
+	const std::shared_ptr<Data::UniqueGift> _unique;
+	Fn<void()> _repaint;
+	std::unique_ptr<Ui::Text::CustomEmoji> _patternEmoji;
+	QImage _backgroundCache;
+	base::flat_map<float64, QImage> _patternCache;
+	bool _backroundPatterned = false;
+
+};
+
+object_ptr<Ui::RpWidget> CreateGiftTransfer(
+		not_null<Ui::RpWidget*> parent,
+		std::shared_ptr<Data::UniqueGift> unique,
+		not_null<PeerData*> to) {
+	struct State {
+		QImage layer;
+		QPoint giftPosition;
+		std::shared_ptr<UniqueGiftBackground> bg;
+		std::shared_ptr<Ui::Text::CustomEmoji> sticker;
+	};
+	const auto st = &st::boostReplaceUserpicsRow;
+	const auto full = st->button.size.height()
+		+ st::boostReplaceIconAdd.y()
+		+ st::lineWidth;
+	auto result = object_ptr<Ui::FixedHeightWidget>(parent, full);
+	const auto raw = result.data();
+	const auto right = CreateChild<Ui::UserpicButton>(raw, to, st->button);
+	const auto overlay = CreateChild<Ui::RpWidget>(raw);
+
+	const auto state = raw->lifetime().make_state<State>();
+	state->bg = std::make_shared<UniqueGiftBackground>(
+		&to->session(),
+		unique);
+	state->bg->subscribeToUpdates([=] {
+		overlay->update();
+	});
+	const auto tag = Data::CustomEmojiSizeTag::Isolated;
+	state->sticker = to->owner().customEmojiManager().create(
+		unique->model.document,
+		[=] { overlay->update(); },
+		tag);
+	overlay->update();
+
+	raw->widthValue(
+	) | rpl::start_with_next([=](int width) {
+		const auto skip = st::boostReplaceUserpicsSkip;
+		const auto total = right->width() + skip + right->width();
+		auto x = (width - total) / 2;
+		state->giftPosition = QPoint(x, 0);
+		x += right->width() + skip;
+		right->moveToLeft(x, 0);
+		overlay->setGeometry(QRect(0, 0, width, raw->height()));
+	}, raw->lifetime());
+
+	overlay->paintRequest(
+	) | rpl::start_with_next([=] {
+		const auto outerw = overlay->width();
+		const auto ratio = style::DevicePixelRatio();
+		if (state->layer.size() != QSize(outerw, full) * ratio) {
+			state->layer = QImage(
+				QSize(outerw, full) * ratio,
+				QImage::Format_ARGB32_Premultiplied);
+			state->layer.setDevicePixelRatio(ratio);
+		}
+		state->layer.fill(Qt::transparent);
+
+		auto q = QPainter(&state->layer);
+		auto hq = PainterHighQualityEnabler(q);
+		const auto from = QRect(state->giftPosition, right->size());
+		const auto esize = Data::FrameSizeFromTag(tag) / ratio;
+		q.drawImage(from, state->bg->image(from.width()));
+		state->sticker->paint(q, {
+			.textColor = st::windowFg->c,
+			.now = crl::now(),
+			.position = from.topLeft() + QPoint(
+				(from.width() - esize) / 2,
+				(from.height() - esize) / 2),
+		});
+
+		const auto size = st::boostReplaceArrow.size();
+		st::boostReplaceArrow.paint(
+			q,
+			(state->giftPosition.x()
+				+ right->width()
+				+ (st::boostReplaceUserpicsSkip - size.width()) / 2),
+			(right->height() - size.height()) / 2,
+			outerw);
+
 		q.end();
 
 		auto p = QPainter(overlay);

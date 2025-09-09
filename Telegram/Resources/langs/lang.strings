@@ -3759,6 +3759,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_gift_upgrade_tradable_about_user" = "{name} will be able to sell the gift on Telegram and NFT marketplaces.";
 "lng_gift_upgrade_tradable_about_channel" = "Admins of {name} will be able to sell the gift on Telegram and NFT marketplaces.";
 "lng_gift_upgrade_button" = "Upgrade for {price}";
+"lng_gift_upgrade_decreases" = "Price decreases in {time}";
+"lng_gift_upgrade_see_table" = "See how this price will decrease {arrow}";
+"lng_gift_upgrade_prices_about" = "Upgrade cost drops every minute.";
+"lng_gift_upgrade_prices_title" = "Upgrade Cost";
+"lng_gift_upgrade_prices_subtitle" = "Users who upgrade their gifts first get collectibles with shorter numbers.";
 "lng_gift_upgrade_free" = "Upgrade for Free";
 "lng_gift_upgrade_confirm" = "Confirm";
 "lng_gift_upgrade_add_my" = "Add my name to the gift";

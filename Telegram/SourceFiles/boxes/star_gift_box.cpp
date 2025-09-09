@@ -74,10 +74,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/boxes/confirm_box.h"
 #include "ui/chat/chat_style.h"
 #include "ui/chat/chat_theme.h"
+#include "ui/controls/button_labels.h"
 #include "ui/controls/emoji_button.h"
 #include "ui/controls/ton_common.h"
 #include "ui/controls/userpic_button.h"
 #include "ui/effects/path_shift_gradient.h"
+#include "ui/effects/premium_bubble.h"
 #include "ui/effects/premium_graphics.h"
 #include "ui/effects/premium_stars_colored.h"
 #include "ui/effects/ripple_animation.h"
@@ -99,6 +101,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/shadow.h"
 #include "ui/wrap/fade_wrap.h"
 #include "ui/wrap/slide_wrap.h"
+#include "ui/wrap/table_layout.h"
 #include "window/themes/window_theme.h"
 #include "window/section_widget.h"
 #include "window/window_controller.h"
@@ -107,6 +110,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_credits.h"
+#include "styles/style_giveaway.h"
 #include "styles/style_info.h"
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
@@ -498,6 +502,24 @@ int TextBubblePart::elisionLines() const {
 
 [[nodiscard]] bool IsSoldOut(const Data::StarGift &info) {
 	return info.limitedCount && !info.limitedLeft;
+}
+
+struct UpgradePrice {
+	TimeId date = 0;
+	int stars = 0;
+};
+
+[[nodiscard]] std::vector<UpgradePrice> ParsePrices(
+		const MTPVector<MTPStarGiftUpgradePrice> &list) {
+	return ranges::views::all(
+		list.v
+	) | ranges::views::transform([](const MTPStarGiftUpgradePrice &price) {
+		const auto &data = price.data();
+		return UpgradePrice{
+			.date = data.vdate().v,
+			.stars = int(data.vupgrade_stars().v),
+		};
+	}) | ranges::to_vector;
 }
 
 PreviewDelegate::PreviewDelegate(
@@ -4816,6 +4838,8 @@ struct UpgradeArgs : StarGiftUpgradeArgs {
 	std::vector<Data::UniqueGiftModel> models;
 	std::vector<Data::UniqueGiftPattern> patterns;
 	std::vector<Data::UniqueGiftBackdrop> backdrops;
+	std::vector<UpgradePrice> prices;
+	std::vector<UpgradePrice> nextPrices;
 };
 
 [[nodiscard]] rpl::producer<Data::UniqueGift> MakeUpgradeGiftStream(
@@ -4895,6 +4919,274 @@ void AddUpgradeGiftCover(
 					rpl::single(args.peer->shortName()))));
 }
 
+class UpgradePriceValue final {
+public:
+	UpgradePriceValue(
+		not_null<Main::Session*> session,
+		uint64 stargiftId,
+		int cost,
+		std::vector<UpgradePrice> all,
+		std::vector<UpgradePrice> next);
+
+	[[nodiscard]] int cost() const;
+	[[nodiscard]] rpl::producer<int> costValue() const;
+	[[nodiscard]] rpl::producer<TimeId> tillNextValue() const;
+
+private:
+	void update();
+	void refresh();
+
+	MTP::Sender _api;
+	uint64 _stargiftId = 0;
+	rpl::variable<int> _cost;
+	rpl::variable<TimeId> _tillNext;
+	std::vector<UpgradePrice> _all;
+	std::vector<UpgradePrice> _next;
+	base::Timer _timer;
+	bool _refreshing = false;
+	bool _finished = false;
+
+};
+
+UpgradePriceValue::UpgradePriceValue(
+	not_null<Main::Session*> session,
+	uint64 stargiftId,
+	int cost,
+	std::vector<UpgradePrice> all,
+	std::vector<UpgradePrice> next)
+: _api(&session->mtp())
+, _stargiftId(stargiftId)
+, _cost(cost)
+, _all(std::move(all))
+, _next(std::move(next))
+, _timer([=] { update(); })
+, _finished(_next.size() < 2) {
+	update();
+	_timer.callEach(1000);
+}
+
+int UpgradePriceValue::cost() const {
+	return _cost.current();
+}
+
+rpl::producer<int> UpgradePriceValue::costValue() const {
+	return _cost.value();
+}
+
+rpl::producer<TimeId> UpgradePriceValue::tillNextValue() const {
+	return _tillNext.value();
+}
+
+void UpgradePriceValue::update() {
+	if (_all.empty() || _next.empty()) {
+		_timer.cancel();
+		return;
+	}
+	const auto now = base::unixtime::now();
+	const auto i = ranges::upper_bound(
+		_all,
+		now,
+		ranges::less(),
+		&UpgradePrice::date);
+	const auto j = ranges::upper_bound(
+		_next,
+		now,
+		ranges::less(),
+		&UpgradePrice::date);
+	const auto full = (i == begin(_all)) ? i->stars : (i - 1)->stars;
+	const auto part = (j == begin(_next)) ? j->stars : (j - 1)->stars;
+	const auto fullDate = (i != end(_all)) ? i->date : TimeId();
+	const auto partDate = (j != end(_next)) ? j->date : TimeId();
+	_cost = std::min({ _cost.current(), part, full});
+	if (int(end(_next) - j) < 3) {
+		refresh();
+	}
+
+	const auto next = std::min({
+		partDate ? partDate : TimeId(INT_MAX),
+		fullDate ? fullDate : TimeId(INT_MAX),
+	});
+	if (next != TimeId(INT_MAX)) {
+		_tillNext = next - now;
+	} else {
+		_tillNext = 0;
+		_timer.cancel();
+	}
+}
+
+void UpgradePriceValue::refresh() {
+	if (_refreshing || _finished) {
+		return;
+	}
+	_api.request(MTPpayments_GetStarGiftUpgradePreview(
+		MTP_long(_stargiftId)
+	)).done([=](const MTPpayments_StarGiftUpgradePreview &result) {
+		const auto &data = result.data();
+		_all = ParsePrices(data.vprices());
+		_next = ParsePrices(data.vnext_prices());
+	}).fail([=] {
+		_finished = true;
+	}).send();
+}
+
+void PricesBox(
+		not_null<Ui::GenericBox*> box,
+		const std::vector<UpgradePrice> &list,
+		rpl::producer<int> cost) {
+	const auto top = box->setPinnedToTopContent(
+		object_ptr<Ui::VerticalLayout>(box));
+	box->setWidth(st::boxWideWidth);
+	box->setStyle(st::boostBox);
+
+	struct State {
+		rpl::variable<int> cost;
+	};
+	const auto state = box->lifetime().make_state<State>();
+	state->cost = std::move(cost);
+	const auto min = list.back().stars;
+	const auto max = std::max(min + 2, list.front().stars);
+	const auto from = 0;
+	const auto till = max - min;
+
+	const auto addSkip = [&](int skip) {
+		top->add(object_ptr<Ui::FixedHeightWidget>(top, skip));
+	};
+
+	const auto ratio = [=](int current) {
+		current = std::clamp(current, from, till);
+		const auto count = (till - from);
+		const auto index = (current - from);
+		if (count <= 2) {
+			return 0.5;
+		}
+		const auto available = st::boxWideWidth
+			- st::boxPadding.left()
+			- st::boxPadding.right();
+		const auto average = available / float64(count);
+		const auto levelWidth = [&](int stars) {
+			return st::normalFont->width(Lang::FormatCountDecimal(stars));
+		};
+		const auto paddings = 2 * st::premiumLineTextSkip;
+		const auto labelLeftWidth = paddings + levelWidth(min);
+		const auto labelRightWidth = paddings + levelWidth(max);
+		const auto first = std::max(average, labelLeftWidth * 1.);
+		const auto last = std::max(average, labelRightWidth * 1.);
+		const auto other = (available - first - last) / (count - 2);
+		return (first + (index - 1) * other) / available;
+	};
+
+	auto bubbleRowState = state->cost.value(
+	) | rpl::map([=](int value) {
+		return Premium::BubbleRowState{
+			.counter = max - value,
+			.ratio = ratio(max - value),
+			.dynamic = true,
+		};
+	});
+	Premium::AddBubbleRow(
+		top,
+		st::starRatingBubble,
+		box->showFinishes(),
+		rpl::duplicate(bubbleRowState),
+		Ui::Premium::BubbleType::StarRating,
+		[=](int value) {
+			return Premium::BubbleText{
+				.counter = Lang::FormatCountDecimal(max - value),
+			};
+		},
+		&st::paidReactBubbleIcon,
+		st::boxRowPadding);
+	addSkip(st::premiumLineTextSkip);
+
+	auto limitState = std::move(
+		bubbleRowState
+	) | rpl::map([=](const Premium::BubbleRowState &state) {
+		return Premium::LimitRowState{
+			.ratio = state.ratio,
+			.dynamic = state.dynamic
+		};
+	});
+	auto left = rpl::single(Lang::FormatCountDecimal(max));
+	auto right = rpl::single(Lang::FormatCountDecimal(min));
+	Premium::AddLimitRow(
+		top,
+		st::upgradePriceLimits,
+		Premium::LimitRowLabels{
+			.leftLabel = std::move(left),
+			.rightLabel = std::move(right),
+			.activeLineBg = [=] { return st::windowBgActive->b; },
+		},
+		std::move(limitState),
+		st::boxRowPadding);
+
+	top->add(
+		object_ptr<Ui::FlatLabel>(
+			top,
+			tr::lng_gift_upgrade_prices_title(),
+			st::infoStarsTitle),
+		st::boxRowPadding + QMargins(0, st::boostTitleSkip / 2, 0, 0),
+		style::al_top);
+	top->add(
+		object_ptr<Ui::FlatLabel>(
+			top,
+			tr::lng_gift_upgrade_prices_subtitle(),
+			st::boostText),
+		(st::boxRowPadding
+			+ QMargins(0, st::boostTextSkip, 0, st::boostBottomSkip)),
+		style::al_top
+	)->setTryMakeSimilarLines(true);
+
+	auto helper = Ui::Text::CustomEmojiHelper();
+	const auto creditsIcon = helper.paletteDependent(
+		Ui::Earn::IconCreditsEmoji());
+	const auto context = helper.context();
+	const auto table = box->addRow(
+		object_ptr<Ui::TableLayout>(box, st::defaultTable),
+		st::boxPadding);
+	for (const auto &price : list) {
+		const auto parsed = base::unixtime::parse(price.date);
+		const auto time = QLocale().toString(
+			parsed.time(),
+			QLocale::ShortFormat);
+		const auto date = tr::lng_month_day(
+			tr::now,
+			lt_month,
+			Lang::MonthSmall(parsed.date().month())(tr::now),
+			lt_day,
+			QString::number(parsed.date().day()));
+		table->addRow(
+			object_ptr<Ui::FlatLabel>(
+				table,
+				time + u", "_q + date,
+				st::defaultTable.defaultLabel),
+			object_ptr<Ui::FlatLabel>(
+				table,
+				rpl::single(
+					base::duplicate(creditsIcon).append(' ').append(
+						Lang::FormatCountDecimal(price.stars))),
+				st::defaultTable.defaultValue,
+				st::defaultPopupMenu,
+				context),
+			st::giveawayGiftCodeLabelMargin,
+			st::giveawayGiftCodeValueMargin);
+	}
+	box->addRow(
+		object_ptr<Ui::FlatLabel>(
+			box,
+			tr::lng_gift_upgrade_prices_about(),
+			st::resalePriceAbout),
+		style::al_top);
+	box->addSkip(st::boxPadding.top());
+
+	box->setMaxHeight(st::boxWideWidth);
+
+	box->addButton(rpl::single(QString()), [=] {
+		box->closeBox();
+	})->setText(rpl::single(Ui::Text::IconEmoji(
+		&st::infoStarsUnderstood
+	).append(' ').append(tr::lng_stars_rating_understood(tr::now))));
+}
+
 void UpgradeBox(
 		not_null<GenericBox*> box,
 		not_null<Window::SessionController*> controller,
@@ -4962,14 +5254,25 @@ void UpgradeBox(
 		&st::menuIconTradable);
 
 	struct State {
-		bool sent = false;
+		base::Timer timer;
+		std::unique_ptr<UpgradePriceValue> cost;
 		bool preserveDetails = false;
+		bool sent = false;
 	};
 	const auto state = std::make_shared<State>();
 	const auto gifting = !args.savedId
 		&& !args.giftPrepayUpgradeHash.isEmpty();
 	const auto preview = !args.savedId && !gifting;
-
+	const auto showPrices = !preview
+		&& (args.prices.size() > 1)
+		&& (args.nextPrices.size() > 1);
+	auto prices = args.prices;
+	state->cost = std::make_unique<UpgradePriceValue>(
+		&controller->session(),
+		args.stargiftId,
+		args.cost,
+		std::move(args.prices),
+		std::move(args.nextPrices));
 	if (!preview && !gifting) {
 		const auto skip = st::defaultVerticalListSkip;
 		container->add(
@@ -4993,12 +5296,15 @@ void UpgradeBox(
 		}, checkbox->lifetime());
 	}
 
-	box->setStyle(preview ? st::giftBox : st::upgradeGiftBox);
+	box->setStyle(preview
+		? st::giftBox
+		: showPrices
+		? st::upgradeGiftWithPricesBox
+		: st::upgradeGiftBox);
 	if (gifting) {
 		box->setWidth(st::boxWideWidth);
 	}
 
-	const auto cost = args.cost;
 	auto buttonText = preview ? tr::lng_box_ok() : rpl::single(QString());
 	const auto button = box->addButton(std::move(buttonText), [=] {
 		if (preview) {
@@ -5008,6 +5314,7 @@ void UpgradeBox(
 			return;
 		}
 		state->sent = true;
+		const auto cost = state->cost->cost();
 		const auto keepDetails = state->preserveDetails;
 		const auto weak = base::make_weak(box);
 		const auto done = [=](Payments::CheckoutResult result) {
@@ -5032,20 +5339,70 @@ void UpgradeBox(
 		}
 	});
 	if (!preview) {
-		SetButtonMarkedLabel(
+		auto costText = [=] {
+			auto costValue = state->cost->costValue(
+			) | rpl::map([](int cost) {
+				return Ui::Text::IconEmoji(
+					&st::starIconEmoji
+				).append(Lang::FormatCreditsAmountDecimal(
+					CreditsAmount{ cost }));
+			});
+			return tr::lng_gift_upgrade_button(
+				lt_price,
+				std::move(costValue),
+				Ui::Text::WithEntities);
+		};
+		auto tillNext = state->cost->tillNextValue(
+		) | rpl::map([](TimeId left) {
+			const auto hours = left / 3600;
+			const auto minutes = (left % 3600) / 60;
+			const auto seconds = left % 60;
+			const auto padded = [](int value) {
+				return u"%1"_q.arg(value, 2, 10, QChar('0'));
+			};
+			return hours
+				? u"%1:%2:%3"_q
+				.arg(hours).arg(padded(minutes)).arg(padded(seconds))
+				: u"%2:%3"_q.arg(padded(minutes)).arg(padded(seconds));
+		}) | Ui::Text::ToWithEntities();
+		Ui::SetButtonTwoLabels(
 			button,
-			(cost
-				? tr::lng_gift_upgrade_button(
-					lt_price,
-					rpl::single(Ui::Text::IconEmoji(
-						&st::starIconEmoji
-					).append(' ').append(Lang::FormatCreditsAmountDecimal(
-						CreditsAmount{ cost }))),
-					Ui::Text::WithEntities)
-				: tr::lng_gift_upgrade_confirm(Ui::Text::WithEntities)),
-			{},
-			st::creditsBoxButtonLabel,
-			&st::giftBox.button.textFg);
+			costText(),
+			tr::lng_gift_upgrade_decreases(
+				lt_time,
+				std::move(tillNext),
+				Ui::Text::WithEntities),
+			st::resaleButtonTitle,
+			st::resaleButtonSubtitle);
+		state->cost->tillNextValue() | rpl::filter([=](TimeId left) {
+			return !left;
+		}) | rpl::take(1) | rpl::start_with_next([=] {
+			while (!button->children().isEmpty()) {
+				delete button->children()[0];
+			}
+			button->setText(costText());
+		}, button->lifetime());
+	}
+	if (showPrices) {
+		const auto link = Ui::CreateChild<Ui::FlatLabel>(
+			button->parentWidget(),
+			tr::lng_gift_upgrade_see_table(
+				lt_arrow,
+				rpl::single(Ui::Text::IconEmoji(&st::textMoreIconEmoji)),
+				[](QString text) { return Ui::Text::Link(text); }),
+			st::resalePriceTableLink);
+		link->setTryMakeSimilarLines(true);
+		button->geometryValue() | rpl::start_with_next([=](QRect geometry) {
+			const auto outer = button->parentWidget()->height();
+			const auto top = geometry.y() + geometry.height();
+			const auto available = outer - top - st::boxRadius;
+			link->resizeToWidth(geometry.width());
+			link->move(geometry.x(), top + (available - link->height()) / 2);
+		}, button->lifetime());
+		link->setClickHandlerFilter([=, list = prices](const auto &...) {
+			controller->show(Box(PricesBox, list, state->cost->costValue()));
+			return false;
+		});
 	}
 
 	AddUniqueCloseButton(box, {});
@@ -5180,6 +5537,8 @@ void ShowStarGiftUpgradeBox(StarGiftUpgradeArgs &&args) {
 		}
 		const auto &data = result.data();
 		auto upgrade = UpgradeArgs{ args };
+		upgrade.prices = ParsePrices(data.vprices());
+		upgrade.nextPrices = ParsePrices(data.vnext_prices());
 		for (const auto &attribute : data.vsample_attributes().v) {
 			attribute.match([&](const MTPDstarGiftAttributeModel &data) {
 				upgrade.models.push_back(Api::FromTL(session, data));

@@ -482,6 +482,8 @@ EmojiListWidget::EmojiListWidget(
 , _features(descriptor.features)
 , _onlyUnicodeEmoji(descriptor.mode == Mode::PeerTitle)
 , _mode(_onlyUnicodeEmoji ? Mode::Full : descriptor.mode)
+, _mediaPreviewParent(descriptor.mediaPreviewParent)
+, _mediaPreviewMargins(descriptor.mediaPreviewMargins)
 , _api(&session().mtp())
 , _staticCount(_mode == Mode::Full ? kEmojiSectionCount : 1)
 , _premiumIcon(_mode == Mode::EmojiStatus
@@ -686,7 +688,8 @@ void EmojiListWidget::showPreview() {
 }
 
 void EmojiListWidget::showPreviewFor(not_null<DocumentData*> document) {
-	if ((_mode == Mode::FullReactions) || (_mode == Mode::RecentReactions)) {
+	if ((_mode == Mode::FullReactions || _mode == Mode::RecentReactions)
+		&& _mediaPreviewParent) {
 		ensureMediaPreview();
 		_mediaPreview->showPreview(document->stickerSetOrigin(), document);
 	} else {
@@ -695,18 +698,24 @@ void EmojiListWidget::showPreviewFor(not_null<DocumentData*> document) {
 }
 
 void EmojiListWidget::ensureMediaPreview() {
+	if (!_mediaPreviewParent) {
+		return;
+	}
 	if (_mediaPreview) {
 		_mediaPreview->raise();
 		return;
 	}
 	const auto controller = Core::App().findWindow(_show->toastParent());
-	const auto sessionController = controller ? controller->sessionController() : nullptr;
+	const auto sessionController = controller
+		? controller->sessionController()
+		: nullptr;
 	if (sessionController) {
-		_mediaPreview.create(parentWidget()->parentWidget(), sessionController);
+		_mediaPreview.create(_mediaPreviewParent, sessionController);
 		_mediaPreview->setCustomPadding(st::emojiPanReactionsPreviewPadding);
-		_mediaPreview->setBackgroundMargins({ 0, 0, st::emojiPanRadius, 0 });
+		_mediaPreview->setBackgroundMargins(_mediaPreviewMargins);
+		_mediaPreview->setCornersSkip(st::emojiPanRadius - st::lineWidth);
 		_mediaPreview->show();
-		_mediaPreview->setGeometry(parentWidget()->parentWidget()->geometry().translated(0, 0));
+		_mediaPreview->setGeometry(_mediaPreviewParent->geometry());
 		_mediaPreview->raise();
 	}
 }

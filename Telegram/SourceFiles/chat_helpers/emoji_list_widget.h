@@ -99,6 +99,8 @@ struct EmojiListDescriptor {
 	base::flat_set<DocumentId> freeEffects;
 	const style::EmojiPan *st = nullptr;
 	ComposeFeatures features;
+	QWidget *mediaPreviewParent = nullptr;
+	QMargins mediaPreviewMargins;
 };
 
 class EmojiListWidget final
@@ -409,6 +411,8 @@ private:
 	const ComposeFeatures _features;
 	const bool _onlyUnicodeEmoji;
 	Mode _mode = Mode::Full;
+	QWidget *_mediaPreviewParent = nullptr;
+	QMargins _mediaPreviewMargins;
 	std::unique_ptr<Ui::TabbedSearch> _search;
 	MTP::Sender _api;
 	const int _staticCount = 0;

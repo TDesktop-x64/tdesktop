@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "chat_helpers/emoji_list_widget.h"
 
+#include "window/window_media_preview.h"
 #include "api/api_peer_photo.h"
 #include "apiwrap.h"
 #include "base/unixtime.h"
@@ -50,6 +51,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "settings/settings_premium.h"
 #include "window/window_session_controller.h"
+#include "window/window_controller.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_menu_icons.h"
 
@@ -677,10 +679,35 @@ void EmojiListWidget::applyNextSearchQuery() {
 void EmojiListWidget::showPreview() {
 	if (const auto over = std::get_if<OverEmoji>(&_pressed)) {
 		if (const auto custom = lookupCustomEmoji(over)) {
-			const auto document = custom.document;
-			_show->showMediaPreview(document->stickerSetOrigin(), document);
+			showPreviewFor(custom.document);
 			_previewShown = true;
 		}
+	}
+}
+
+void EmojiListWidget::showPreviewFor(not_null<DocumentData*> document) {
+	if ((_mode == Mode::FullReactions) || (_mode == Mode::RecentReactions)) {
+		ensureMediaPreview();
+		_mediaPreview->showPreview(document->stickerSetOrigin(), document);
+	} else {
+		_show->showMediaPreview(document->stickerSetOrigin(), document);
+	}
+}
+
+void EmojiListWidget::ensureMediaPreview() {
+	if (_mediaPreview) {
+		_mediaPreview->raise();
+		return;
+	}
+	const auto controller = Core::App().findWindow(_show->toastParent());
+	const auto sessionController = controller ? controller->sessionController() : nullptr;
+	if (sessionController) {
+		_mediaPreview.create(parentWidget()->parentWidget(), sessionController);
+		_mediaPreview->setCustomPadding(st::emojiPanReactionsPreviewPadding);
+		_mediaPreview->setBackgroundMargins({ 0, 0, st::emojiPanRadius, 0 });
+		_mediaPreview->show();
+		_mediaPreview->setGeometry(parentWidget()->parentWidget()->geometry().translated(0, 0));
+		_mediaPreview->raise();
 	}
 }
 
@@ -1763,6 +1790,9 @@ void EmojiListWidget::mouseReleaseEvent(QMouseEvent *e) {
 	}
 
 	if (_previewShown) {
+		if (_mediaPreview) {
+			_mediaPreview->hidePreview();
+		}
 		_previewShown = false;
 		return;
 	} else if (v::is_null(_selected) || _selected != pressed) {
@@ -2739,11 +2769,8 @@ void EmojiListWidget::setSelected(OverState newSelected) {
 	} else if (_previewShown && _pressed != _selected) {
 		if (const auto over = std::get_if<OverEmoji>(&_selected)) {
 			if (const auto custom = lookupCustomEmoji(over)) {
-				const auto document = custom.document;
 				_pressed = _selected;
-				_show->showMediaPreview(
-					document->stickerSetOrigin(),
-					document);
+				showPreviewFor(custom.document);
 			}
 		}
 	}

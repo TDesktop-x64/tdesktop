@@ -58,6 +58,7 @@ struct RepaintRequest;
 
 namespace Window {
 class SessionController;
+class MediaPreviewWidget;
 } // namespace Window
 
 namespace ChatHelpers {
@@ -399,6 +400,8 @@ private:
 		uint64 setId);
 
 	void showPreview();
+	void showPreviewFor(not_null<DocumentData*> document);
+	void ensureMediaPreview();
 
 	void applyNextSearchQuery();
 
@@ -478,6 +481,9 @@ private:
 	base::Timer _showPickerTimer;
 	base::Timer _previewTimer;
 	bool _previewShown = false;
+
+
+	object_ptr<Window::MediaPreviewWidget> _mediaPreview = { nullptr };
 
 	rpl::event_stream<EmojiChosen> _chosen;
 	rpl::event_stream<FileChosen> _customChosen;

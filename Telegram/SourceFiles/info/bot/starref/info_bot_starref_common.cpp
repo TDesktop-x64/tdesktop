@@ -393,11 +393,7 @@ object_ptr<Ui::AbstractButton> MakeLinkLabel(
 		const QString &link,
 		const style::InputField *stOverride) {
 	const auto &st = stOverride ? *stOverride : st::dialogsFilter;
-	const auto text = link.startsWith(u"https://"_q)
-		? link.mid(8)
-		: link.startsWith(u"http://"_q)
-		? link.mid(7)
-		: link;
+	const auto text = Ui::Text::StripUrlProtocol(link);
 	const auto margins = st.textMargins;
 	const auto height = st.heightMin;
 	const auto skip = margins.left();

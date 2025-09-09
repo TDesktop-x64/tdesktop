@@ -7,24 +7,25 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "window/window_media_preview.h"
 
-#include "chat_helpers/stickers_lottie.h"
 #include "chat_helpers/stickers_emoji_pack.h"
-#include "data/data_photo.h"
-#include "data/data_photo_media.h"
-#include "data/data_document.h"
+#include "chat_helpers/stickers_lottie.h"
 #include "data/data_document_media.h"
+#include "data/data_document.h"
+#include "data/data_photo_media.h"
+#include "data/data_photo.h"
 #include "data/data_session.h"
 #include "data/stickers/data_stickers.h"
 #include "history/view/media/history_view_sticker.h"
-#include "ui/image/image.h"
-#include "ui/emoji_config.h"
-#include "ui/ui_utility.h"
 #include "lottie/lottie_single_player.h"
 #include "main/main_session.h"
+#include "ui/emoji_config.h"
+#include "ui/image/image.h"
+#include "ui/rect.h"
+#include "ui/ui_utility.h"
 #include "window/window_session_controller.h"
-#include "styles/style_layers.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_chat.h"
+#include "styles/style_layers.h"
 
 namespace Window {
 namespace {
@@ -64,7 +65,9 @@ QRect MediaPreviewWidget::updateArea() const {
 	const auto premium = _document && _document->isPremiumSticker();
 	const auto adjusted = position
 		- (premium
-			? QPoint(size.width() - (size.width() / 2), size.height() / 2)
+			? QPoint(
+				size.width() - (size.width() / 2),
+				size.height() / 2)
 			: QPoint())
 		+ (!_customPadding.isNull()
 			? QPoint(0, _customPadding.top())
@@ -112,18 +115,24 @@ void MediaPreviewWidget::paintEvent(QPaintEvent *e) {
 	//	: 1;
 	const auto pixmap = image.isNull() ? currentImage() : QPixmap();
 	const auto size = image.isNull() ? pixmap.size() : image.size();
-	int w = size.width() / factor, h = size.height() / factor;
-	auto shown = _a_shown.value(_hiding ? 0. : 1.);
+	const auto w = size.width() / factor;
+	const auto h = size.height() / factor;
+	const auto shown = _a_shown.value(_hiding ? 0. : 1.);
 	if (!_a_shown.animating()) {
 		if (_hiding) {
 			hide();
-			_controller->disableGifPauseReason(Window::GifPauseReason::MediaPreview);
+			_controller->disableGifPauseReason(
+				Window::GifPauseReason::MediaPreview);
 			return;
 		}
 	} else {
 		p.setOpacity(shown);
-//		w = qMax(qRound(w * (st::stickerPreviewMin + ((1. - st::stickerPreviewMin) * shown)) / 2.) * 2 + int(w % 2), 1);
-//		h = qMax(qRound(h * (st::stickerPreviewMin + ((1. - st::stickerPreviewMin) * shown)) / 2.) * 2 + int(h % 2), 1);
+//		w = qMax(qRound(w * (st::stickerPreviewMin
+//			+ ((1. - st::stickerPreviewMin) * shown)) / 2.) * 2
+//			+ int(w % 2), 1);
+//		h = qMax(qRound(h * (st::stickerPreviewMin
+//			+ ((1. - st::stickerPreviewMin) * shown)) / 2.) * 2
+//			+ int(h % 2), 1);
 	}
 	if (_backgroundMargins.isNull()) {
 		p.fillRect(r, st::stickerPreviewBg);
@@ -146,7 +155,8 @@ void MediaPreviewWidget::paintEvent(QPaintEvent *e) {
 	}
 	if (!_emojiList.empty()) {
 		const auto emojiCount = _emojiList.size();
-		const auto emojiWidth = (emojiCount * _emojiSize) + (emojiCount - 1) * st::stickerEmojiSkip;
+		const auto emojiWidth = (emojiCount * _emojiSize)
+			+ (emojiCount - 1) * st::stickerEmojiSkip;
 		auto emojiLeft = (width() - emojiWidth) / 2;
 		const auto esize = Ui::Emoji::GetSizeLarge();
 		for (const auto emoji : _emojiList) {
@@ -235,7 +245,8 @@ void MediaPreviewWidget::startShow() {
 	if (isHidden() || _a_shown.animating()) {
 		if (isHidden()) {
 			show();
-			_controller->enableGifPauseReason(Window::GifPauseReason::MediaPreview);
+			_controller->enableGifPauseReason(
+				Window::GifPauseReason::MediaPreview);
 		}
 		_hiding = false;
 		_a_shown.start([=] { update(); }, 0., 1., st::stickerPreviewDuration);
@@ -265,8 +276,9 @@ void MediaPreviewWidget::fillEmojiString() {
 	if (_photo) {
 		return;
 	}
-	if (auto sticker = _document->sticker()) {
-		if (auto list = _document->owner().stickers().getEmojiListFromSet(_document)) {
+	if (const auto sticker = _document->sticker()) {
+		if (const auto list
+			= _document->owner().stickers().getEmojiListFromSet(_document)) {
 			_emojiList = std::move(*list);
 			while (_emojiList.size() > kStickerPreviewEmojiLimit) {
 				_emojiList.pop_back();
@@ -312,7 +324,8 @@ QSize MediaPreviewWidget::currentDimensions() const {
 		return _cachedSize;
 	}
 
-	QSize result, box;
+	auto result = QSize();
+	auto box = QSize();
 	if (_photo) {
 		result = QSize(_photo->width(), _photo->height());
 		const auto skip = st::defaultBox.margin.top();
@@ -320,7 +333,9 @@ QSize MediaPreviewWidget::currentDimensions() const {
 	} else {
 		result = _document->dimensions;
 		if (result.isEmpty()) {
-			const auto &gif = (_gif && _gif->ready()) ? _gif : _gifThumbnail;
+			const auto &gif = (_gif && _gif->ready())
+				? _gif
+				: _gifThumbnail;
 			if (gif && gif->ready()) {
 				result = QSize(gif->width(), gif->height());
 			}
@@ -334,13 +349,15 @@ QSize MediaPreviewWidget::currentDimensions() const {
 			box = QSize(2 * st::maxStickerSize, 2 * st::maxStickerSize);
 		}
 	}
-	result = QSize(qMax(style::ConvertScale(result.width()), 1), qMax(style::ConvertScale(result.height()), 1));
+	result = QSize(
+		std::max(style::ConvertScale(result.width()), 1),
+		std::max(style::ConvertScale(result.height()), 1));
 
 	if (!_customPadding.isNull()) {
 		const auto emojiHeight = _emojiList.empty() ? 0 : (_emojiSize * 3);
 		const auto widgetBox = QSize(
-			width() - _customPadding.left() - _customPadding.right(),
-			height() - _customPadding.top() - _customPadding.bottom() - emojiHeight);
+			width() - rect::m::sum::h(_customPadding),
+			height() - rect::m::sum::v(_customPadding) - emojiHeight);
 		result = result.scaled(widgetBox, Qt::KeepAspectRatio);
 	} else {
 		result = result.scaled(box, Qt::KeepAspectRatio);
@@ -388,7 +405,9 @@ void MediaPreviewWidget::setupLottie() {
 	} else {
 		const auto size = currentDimensions();
 		_lottie = std::make_unique<Lottie::SinglePlayer>(
-			Lottie::ReadContent(_documentMedia->bytes(), _document->filepath()),
+			Lottie::ReadContent(
+				_documentMedia->bytes(),
+				_document->filepath()),
 			Lottie::FrameRequest{ size * factor },
 			Lottie::Quality::High);
 	}
@@ -418,14 +437,15 @@ QPixmap MediaPreviewWidget::currentImage() const {
 					_document);
 				if (_lottie && _lottie->ready()) {
 					return QPixmap();
-				} else if (const auto image = _documentMedia->getStickerLarge()) {
-					QSize s = currentDimensions();
+				} else if (const auto image
+						= _documentMedia->getStickerLarge()) {
+					const auto s = currentDimensions();
 					_cache = image->pix(s);
 					_cacheStatus = CacheLoaded;
 				} else if (_cacheStatus != CacheThumbLoaded
 					&& _document->hasThumbnail()
 					&& _documentMedia->thumbnail()) {
-					QSize s = currentDimensions();
+					const auto s = currentDimensions();
 					_cache = _documentMedia->thumbnail()->pix(s, blur);
 					if (_document && _document->emojiUsesTextColor()) {
 						_cache = Ui::PixmapFromImage(
@@ -444,18 +464,21 @@ QPixmap MediaPreviewWidget::currentImage() const {
 			if (gif && gif->started()) {
 				const auto paused = _controller->isGifPausedAtLeastFor(
 					Window::GifPauseReason::MediaPreview);
-				return QPixmap::fromImage(gif->current(
-					{ .frame = currentDimensions(), .keepAlpha = webm },
-					paused ? 0 : crl::now()), Qt::ColorOnly);
+				return QPixmap::fromImage(
+					gif->current(
+						{ .frame = currentDimensions(), .keepAlpha = webm },
+						paused ? 0 : crl::now()),
+					Qt::ColorOnly);
 			}
 			if (_cacheStatus != CacheThumbLoaded
 				&& _document->hasThumbnail()) {
-				QSize s = currentDimensions();
+				const auto s = currentDimensions();
 				const auto thumbnail = _documentMedia->thumbnail();
 				if (thumbnail) {
 					_cache = thumbnail->pix(s, blur);
 					_cacheStatus = CacheThumbLoaded;
-				} else if (const auto blurred = _documentMedia->thumbnailInline()) {
+				} else if (const auto blurred
+						= _documentMedia->thumbnailInline()) {
 					_cache = blurred->pix(s, blur);
 					_cacheStatus = CacheThumbLoaded;
 				}
@@ -464,22 +487,23 @@ QPixmap MediaPreviewWidget::currentImage() const {
 	} else if (_photo) {
 		if (_cacheStatus != CacheLoaded) {
 			if (_photoMedia->loaded()) {
-				QSize s = currentDimensions();
+				const auto s = currentDimensions();
 				_cache = _photoMedia->image(Data::PhotoSize::Large)->pix(s);
 				_cacheStatus = CacheLoaded;
 			} else {
 				_photo->load(_origin);
 				if (_cacheStatus != CacheThumbLoaded) {
-					QSize s = currentDimensions();
-					if (const auto thumbnail = _photoMedia->image(
-							Data::PhotoSize::Thumbnail)) {
-						_cache = thumbnail->pix(s, blur);
+					const auto s = currentDimensions();
+					if (const auto thumb
+							= _photoMedia->image(Data::PhotoSize::Thumbnail)) {
+						_cache = thumb->pix(s, blur);
 						_cacheStatus = CacheThumbLoaded;
-					} else if (const auto small = _photoMedia->image(
-							Data::PhotoSize::Small)) {
+					} else if (const auto small
+							= _photoMedia->image(Data::PhotoSize::Small)) {
 						_cache = small->pix(s, blur);
 						_cacheStatus = CacheThumbLoaded;
-					} else if (const auto blurred = _photoMedia->thumbnailInline()) {
+					} else if (const auto blurred
+							= _photoMedia->thumbnailInline()) {
 						_cache = blurred->pix(s, blur);
 						_cacheStatus = CacheThumbLoaded;
 					} else {

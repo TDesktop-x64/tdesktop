@@ -75,6 +75,21 @@ QRect MediaPreviewWidget::updateArea() const {
 void MediaPreviewWidget::paintEvent(QPaintEvent *e) {
 	auto p = QPainter(this);
 
+	if (_cornersSkip > 0) {
+		const auto r = rect() - _backgroundMargins;
+		auto clipRegion = QRegion(r);
+		const auto skip = _cornersSkip;
+		clipRegion -= QRect(r.x(), r.y(), skip, skip);
+		clipRegion -= QRect(r.x() + r.width() - skip, r.y(), skip, skip);
+		clipRegion -= QRect(r.x(), r.y() + r.height() - skip, skip, skip);
+		clipRegion -= QRect(
+			r.x() + r.width() - skip,
+			r.y() + r.height() - skip,
+			skip,
+			skip);
+		p.setClipRegion(clipRegion);
+	}
+
 	const auto r = e->rect();
 	const auto factor = style::DevicePixelRatio();
 	const auto dimensions = currentDimensions();
@@ -280,6 +295,11 @@ void MediaPreviewWidget::setCustomPadding(const QMargins &padding) {
 
 void MediaPreviewWidget::setBackgroundMargins(const QMargins &margins) {
 	_backgroundMargins = margins;
+	update();
+}
+
+void MediaPreviewWidget::setCornersSkip(int pixels) {
+	_cornersSkip = pixels;
 	update();
 }
 

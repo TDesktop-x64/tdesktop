@@ -5672,6 +5672,28 @@ void RequestOurForm(
 			} else {
 				fail(Payments::CheckoutResult::Failed);
 			}
+		}, [&](const MTPDpayments_paymentFormStars &data) {
+			show->session().data().processUsers(data.vusers());
+			const auto currency = qs(data.vinvoice().data().vcurrency());
+			const auto &prices = data.vinvoice().data().vprices().v;
+			if (!prices.empty()) {
+				const auto price = prices.front().data().vamount().v;
+				const auto amount = (currency == Ui::kCreditsCurrency)
+					? CreditsAmount(price)
+					: (currency == u"TON"_q)
+					? CreditsAmount(
+						price / Ui::kNanosInOne,
+						price % Ui::kNanosInOne,
+						CreditsType::Ton)
+					: std::optional<CreditsAmount>();
+				if (amount) {
+					done(data.vform_id().v, *amount, std::nullopt);
+				} else {
+					fail(Payments::CheckoutResult::Failed);
+				}
+			} else {
+				fail(Payments::CheckoutResult::Failed);
+			}
 		}, [&](const auto &) {
 			fail(Payments::CheckoutResult::Failed);
 		});

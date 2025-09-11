@@ -3694,6 +3694,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_gift_unique_info_sender_comment" = "Gifted by {from} to {recipient} on {date} with the comment \"{text}\".";
 "lng_gift_unique_info_reciever" = "Gifted to {recipient} on {date}.";
 "lng_gift_unique_info_reciever_comment" = "Gifted to {recipient} on {date} with the comment \"{text}\".";
+"lng_gift_unique_info_remove_title" = "Remove Description";
+"lng_gift_unique_info_remove_text" = "Do you want to permanently remove this description from your gift?";
+"lng_gift_unique_info_remove_confirm" = "Remove for {cost}";
+"lng_gift_unique_info_removed" = "Removed {name}'s Description!";
 "lng_gift_availability_left#one" = "{count} of {amount} left";
 "lng_gift_availability_left#other" = "{count} of {amount} left";
 "lng_gift_availability_none" = "None of {amount} left";

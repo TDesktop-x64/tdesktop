@@ -6578,6 +6578,8 @@ void HistoryItem::applyAction(const MTPMessageAction &action) {
 				? history()->owner().peer(from).get()
 				: nullptr),
 			.channelSavedId = data.vsaved_id().value_or_empty(),
+			.starsForDetailsRemove = int(
+				data.vdrop_original_details_stars().value_or_empty()),
 			.type = Data::GiftType::StarGift,
 			.transferred = data.is_transferred(),
 			.refunded = data.is_refunded(),

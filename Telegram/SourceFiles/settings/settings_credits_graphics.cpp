@@ -1848,6 +1848,8 @@ void GenericCreditsEntryBox(
 	const auto canGiftUpgrade = !e.uniqueGift
 		&& !e.in
 		&& !e.giftPrepayUpgradeHash.isEmpty();
+	const auto canRemoveDetails = e.uniqueGift
+		&& (e.starsForDetailsRemove > 0);
 	const auto upgradeGuard = std::make_shared<bool>();
 	const auto upgrade = [=] {
 		const auto window = show->resolveWindow();
@@ -1878,6 +1880,31 @@ void GenericCreditsEntryBox(
 					&& !e.giftUpgradeSeparate
 					&& !e.anonymous)),
 		});
+	};
+	const auto removeDetails = [=](Fn<void()> removed) {
+		const auto session = &show->session();
+		const auto unique = e.uniqueGift;
+		const auto savedId = EntryToSavedStarGiftId(session, e);
+		auto done = [=](
+				Payments::CheckoutResult result,
+				const MTPUpdates *updates) {
+			if (result == Payments::CheckoutResult::Paid) {
+				removed();
+
+				const auto name = Data::UniqueGiftName(*unique);
+				show->showToast(tr::lng_gift_unique_info_removed(
+					tr::now,
+					lt_name,
+					Ui::Text::Bold(name),
+					Ui::Text::WithEntities));
+				unique->originalDetails = Data::UniqueGiftOriginalDetails();
+			}
+		};
+		RequestStarsFormAndSubmit(
+			show,
+			MTP_inputInvoiceStarGiftDropOriginalDetails(
+				Api::InputSavedStarGiftId(savedId, e.uniqueGift)),
+			std::move(done));
 	};
 
 	if (isStarGift && e.id.isEmpty()) {
@@ -1933,7 +1960,8 @@ void GenericCreditsEntryBox(
 			st,
 			e,
 			canConvert ? convert : Fn<void()>(),
-			canUpgrade ? upgrade : Fn<void()>());
+			canUpgrade ? upgrade : Fn<void()>(),
+			canRemoveDetails ? removeDetails : Fn<void(Fn<void()>)>());
 	} else {
 		AddCreditsHistoryEntryTable(show, content, st, e);
 		AddSubscriptionEntryTable(show, content, st, s);
@@ -2552,6 +2580,7 @@ Data::CreditsHistoryEntry SavedStarGiftEntry(
 		.starsConverted = int(data.starsConverted),
 		.starsToUpgrade = int(data.info.starsToUpgrade),
 		.starsUpgradedBySender = int(data.starsUpgradedBySender),
+		.starsForDetailsRemove = int(data.starsForDetailsRemove),
 		.converted = false,
 		.anonymous = data.anonymous,
 		.stargift = true,
@@ -2655,6 +2684,7 @@ void ShowStarGiftViewBox(
 		.starsConverted = data.starsConverted,
 		.starsToUpgrade = data.starsToUpgrade,
 		.starsUpgradedBySender = data.starsUpgradedBySender,
+		.starsForDetailsRemove = data.starsForDetailsRemove,
 		.converted = data.converted,
 		.anonymous = data.anonymous,
 		.stargift = true,

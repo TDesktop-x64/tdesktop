@@ -2489,9 +2489,9 @@ void Updates::feedUpdate(const MTPUpdate &update) {
 		}
 	} break;
 
-	case mtpc_updateChannelPinnedTopic: {
-		const auto &d = update.c_updateChannelPinnedTopic();
-		const auto peerId = peerFromChannel(d.vchannel_id());
+	case mtpc_updatePinnedForumTopic: {
+		const auto &d = update.c_updatePinnedForumTopic();
+		const auto peerId = peerFromMTP(d.vpeer());
 		if (const auto peer = session().data().peerLoaded(peerId)) {
 			const auto rootId = d.vtopic_id().v;
 			if (const auto topic = peer->forumTopicFor(rootId)) {
@@ -2502,9 +2502,9 @@ void Updates::feedUpdate(const MTPUpdate &update) {
 		}
 	} break;
 
-	case mtpc_updateChannelPinnedTopics: {
-		const auto &d = update.c_updateChannelPinnedTopics();
-		const auto peerId = peerFromChannel(d.vchannel_id());
+	case mtpc_updatePinnedForumTopics: {
+		const auto &d = update.c_updatePinnedForumTopics();
+		const auto peerId = peerFromMTP(d.vpeer());
 		if (const auto peer = session().data().peerLoaded(peerId)) {
 			if (const auto forum = peer->forum()) {
 				const auto done = [&] {

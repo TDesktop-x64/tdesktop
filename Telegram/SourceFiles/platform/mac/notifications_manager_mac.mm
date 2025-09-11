@@ -13,6 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "platform/platform_specific.h"
 #include "base/platform/mac/base_utilities_mac.h"
 #include "base/random.h"
+#include "lang/lang_keys.h"
 #include "data/data_forum_topic.h"
 #include "data/data_saved_sublist.h"
 #include "data/data_peer.h"
@@ -164,6 +165,16 @@ using Manager = Platform::Notifications::Manager;
 			manager->notificationActivated(my);
 		});
 	}
+	if (notification.activationType == NSUserNotificationActivationTypeAdditionalActionClicked
+		|| notification.activationType == NSUserNotificationActivationTypeActionButtonClicked) {
+		const auto manager = _manager;
+		NSString *actionId = [notificationUserInfo objectForKey:@"actionId"];
+		if ([actionId isEqualToString:@"markAsRead"]) {
+			crl::on_main(manager, [=] {
+				manager->notificationReplied(my, {});
+			});
+		}
+	}
 
 	[center removeDeliveredNotification: notification];
 }
@@ -290,6 +301,16 @@ private:
 	return NS2QString(sounds);
 }
 
+void AddActionIdToNotification(
+		NSUserNotification *notification,
+		NSString *actionId) {
+	NSMutableDictionary *mutableUserInfo
+		= [[notification userInfo] mutableCopy];
+	[mutableUserInfo setObject:actionId forKey:@"actionId"];
+	[notification setUserInfo:mutableUserInfo];
+	[mutableUserInfo release];
+}
+
 Manager::Private::Private(Manager *manager)
 : _managerId(base::RandomValue<uint64>())
 , _managerIdString(QString::number(_managerId))
@@ -348,8 +369,30 @@ void Manager::Private::showNotification(
 	}
 
 	if (!info.options.hideReplyButton
+		&& !info.options.hideMarkAsRead
+		&& [notification respondsToSelector:@selector(setHasReplyButton:)]
+		&& [notification respondsToSelector:@selector(setAdditionalActions:)]) {
+		[notification setHasReplyButton:YES];
+
+		AddActionIdToNotification(notification, @"markAsRead");
+
+		[notification setAdditionalActions:@[
+			[NSUserNotificationAction
+				actionWithIdentifier:@"markAsRead"
+				title:Platform::Q2NSString(
+					tr::lng_context_mark_read(tr::now))]
+		]];
+	} else if (!info.options.hideReplyButton
 		&& [notification respondsToSelector:@selector(setHasReplyButton:)]) {
 		[notification setHasReplyButton:YES];
+	} else if (!info.options.hideMarkAsRead
+		&& [notification respondsToSelector:@selector(setHasActionButton:)]) {
+		[notification setHasActionButton:YES];
+		[notification
+			setActionButtonTitle:Platform::Q2NSString(
+				tr::lng_context_mark_read(tr::now))];
+
+		AddActionIdToNotification(notification, @"markAsRead");
 	}
 
 	const auto sound = info.sound ? info.sound() : Media::Audio::LocalSound();

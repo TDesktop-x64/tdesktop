@@ -634,6 +634,14 @@ void GiftButton::paintEvent(QPaintEvent *e) {
 				&& !unique
 				&& !data.userpic
 				&& !data.info.limitedLeft;
+			const auto yourLeft = data.info.perUserTotal
+				? (data.info.perUserRemains
+					? tr::lng_gift_stars_your_left(
+						tr::now,
+						lt_count,
+						data.info.perUserRemains)
+					: tr::lng_gift_stars_your_finished(tr::now))
+				: QString();
 			return GiftBadge{
 				.text = (onsale
 					? tr::lng_gift_stars_on_sale(tr::now)
@@ -646,9 +654,13 @@ void GiftButton::paintEvent(QPaintEvent *e) {
 					: (!data.userpic
 						&& !data.info.unique
 						&& data.info.requirePremium)
-					? tr::lng_gift_stars_premium(tr::now)
+					? ((yourLeft.isEmpty() || !_delegate->amPremium())
+						? tr::lng_gift_stars_premium(tr::now)
+						: yourLeft)
 					: (!data.userpic && !data.info.unique)
-					? tr::lng_gift_stars_limited(tr::now)
+					? (yourLeft.isEmpty()
+						? tr::lng_gift_stars_limited(tr::now)
+						: yourLeft)
 					: (count == 1)
 					? tr::lng_gift_limited_of_one(tr::now)
 					: tr::lng_gift_limited_of_count(
@@ -942,6 +954,10 @@ QImage Delegate::cachedBadge(const GiftBadge &badge) {
 		image = ValidateRotatedBadge(badge, padding);
 	}
 	return image;
+}
+
+bool Delegate::amPremium() {
+	return _session->premium();
 }
 
 DocumentData *LookupGiftSticker(

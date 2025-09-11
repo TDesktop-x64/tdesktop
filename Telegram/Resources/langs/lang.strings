@@ -3589,6 +3589,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_gift_premium_by_stars" = "or {amount}";
 "lng_gift_stars_subtitle" = "Gift Stars";
 "lng_gift_stars_about" = "Give {name} gifts that can be kept on your profile or converted to Stars. {link}";
+"lng_gift_stars_about_collectibles" = "Collectible gifts are unique digital items you can exchange or sell. {link}";
 "lng_gift_stars_link" = "What are Stars >";
 "lng_gift_stars_limited" = "limited";
 "lng_gift_stars_sold_out" = "sold out";
@@ -3600,9 +3601,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_gift_stars_your_finished" = "none left";
 "lng_gift_stars_tabs_all" = "All Gifts";
 "lng_gift_stars_tabs_my" = "My Gifts";
-"lng_gift_stars_tabs_limited" = "Limited";
-"lng_gift_stars_tabs_in_stock" = "In Stock";
-"lng_gift_stars_tabs_resale" = "Resale";
+"lng_gift_stars_tabs_collectibles" = "Collectibles";
 "lng_gift_send_title" = "Send a Gift";
 "lng_gift_send_message" = "Enter Message";
 "lng_gift_send_anonymous" = "Hide My Name";

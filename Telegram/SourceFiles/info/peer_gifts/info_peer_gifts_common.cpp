@@ -950,7 +950,8 @@ QImage Delegate::cachedBadge(const GiftBadge &badge) {
 	auto &image = _badges[badge];
 	if (image.isNull()) {
 		const auto &extend = buttonExtend();
-		const auto padding = QMargins(extend.top(), 0, extend.top(), 0);
+		const auto line = st::lineWidth;
+		const auto padding = QMargins(extend.top(), 0, extend.top(), line);
 		image = ValidateRotatedBadge(badge, padding);
 	}
 	return image;

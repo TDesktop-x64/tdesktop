@@ -16,21 +16,18 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 class Image;
 
+namespace ChatHelpers {
+class Show;
+} // namespace ChatHelpers
+
 namespace Data {
 class PhotoMedia;
 class GroupCall;
 } // namespace Data
 
-namespace Main {
-class SessionShow;
-} // namespace Main
-
 namespace Ui {
 class Show;
 class BoxContent;
-class LayerWidget;
-enum class LayerOption;
-using LayerOptions = base::flags<LayerOption>;
 class AbstractButton;
 class ImportantTooltip;
 class DropdownMenu;
@@ -73,6 +70,7 @@ class Viewport;
 enum class PanelMode;
 enum class StickedTooltip;
 class MicLevelTester;
+class MessageField;
 
 class Panel final
 	: public base::has_weak_ptr
@@ -97,9 +95,8 @@ public:
 	void showAndActivate();
 	void closeBeforeDestroy();
 
-	[[nodiscard]] std::shared_ptr<Main::SessionShow> sessionShow();
-	[[nodiscard]] std::shared_ptr<Ui::Show> uiShow();
-
+	[[nodiscard]] std::shared_ptr<ChatHelpers::Show> uiShow();
+	[[nodiscard]] not_null<Window*> callWindow() const;
 	[[nodiscard]] not_null<Ui::RpWindow*> window() const;
 
 	rpl::lifetime &lifetime();
@@ -171,6 +168,7 @@ private:
 	void updateWideControlsVisibility();
 	[[nodiscard]] bool videoButtonInNarrowMode() const;
 	[[nodiscard]] Fn<void()> shareConferenceLinkCallback();
+	void toggleMessageTyping();
 
 	void endCall();
 
@@ -257,6 +255,9 @@ private:
 	QPointer<Ui::RpWidget> _niceTooltipControl;
 	StickedTooltips _stickedTooltipsShown;
 	Fn<void()> _callShareLinkCallback;
+
+	std::shared_ptr<ChatHelpers::Show> _cachedShow;
+	std::unique_ptr<MessageField> _messageField;
 
 	const std::unique_ptr<Toasts> _toasts;
 

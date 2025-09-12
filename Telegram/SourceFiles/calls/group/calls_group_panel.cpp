@@ -571,12 +571,12 @@ void Panel::refreshLeftButton() {
 void Panel::refreshVideoButtons(std::optional<bool> overrideWideMode) {
 	const auto create = overrideWideMode.value_or(mode() == PanelMode::Wide)
 		|| (!_call->scheduleDate() && _call->videoIsWorking());
-	const auto created = _video && _screenShare;
+	const auto created = _video != nullptr/*&& _screenShare*/;
 	if (created == create) {
 		return;
 	} else if (created) {
 		_video.destroy();
-		_screenShare.destroy();
+		//_screenShare.destroy();
 		if (!overrideWideMode) {
 			updateButtonsGeometry();
 		}
@@ -617,25 +617,34 @@ void Panel::refreshVideoButtons(std::optional<bool> overrideWideMode) {
 			_video->setProgress(sharing ? 1. : 0.);
 		}, _video->lifetime());
 	}
-	if (!_screenShare) {
-		_screenShare.create(widget(), st::groupCallScreenShareSmall);
-		_screenShare->show();
-		_screenShare->setClickedCallback([=] {
-			chooseShareScreenSource();
-		});
-		_screenShare->setColorOverrides(
-			toggleableOverrides(_call->isSharingScreenValue()));
-		_call->isSharingScreenValue(
-		) | rpl::start_with_next([=](bool sharing) {
-			_screenShare->setProgress(sharing ? 1. : 0.);
-		}, _screenShare->lifetime());
-	}
+	//if (!_screenShare) {
+	//	_screenShare.create(widget(), st::groupCallScreenShareSmall);
+	//	_screenShare->show();
+	//	_screenShare->setClickedCallback([=] {
+	//		chooseShareScreenSource();
+	//	});
+	//	_screenShare->setColorOverrides(
+	//		toggleableOverrides(_call->isSharingScreenValue()));
+	//	_call->isSharingScreenValue(
+	//	) | rpl::start_with_next([=](bool sharing) {
+	//		_screenShare->setProgress(sharing ? 1. : 0.);
+	//	}, _screenShare->lifetime());
+	//}
 	if (!_wideMenu) {
 		_wideMenu.create(widget(), st::groupCallMenuToggleSmall);
 		_wideMenu->show();
 		_wideMenu->setClickedCallback([=] { showMainMenu(); });
 		_wideMenu->setColorOverrides(
 			toggleableOverrides(_wideMenuShown.value()));
+	}
+	if (!_message) {
+		_message.create(
+			widget(),
+			st::groupCallMessageSmall,
+			&st::groupCallMessageActiveSmall);
+		_message->show();
+		_message->setColorOverrides(
+			toggleableOverrides(_messageTyping.value()));
 	}
 	updateButtonsStyles();
 	updateButtonsGeometry();
@@ -985,9 +994,10 @@ void Panel::raiseControls() {
 	const auto buttons = {
 		&_settings,
 		&_callShare,
-		&_screenShare,
+		//&_screenShare,
 		&_wideMenu,
 		&_video,
+		&_message,
 		&_hangup
 	};
 	for (const auto button : buttons) {
@@ -1690,6 +1700,16 @@ void Panel::updateButtonsStyles() {
 			? rpl::single(QString())
 			: tr::lng_group_call_video());
 	}
+	if (_message) {
+		_message->setStyle(
+			wide ? st::groupCallMessageSmall : st::groupCallMessage,
+			(wide
+				? &st::groupCallMessageActiveSmall
+				: &st::groupCallMessageActive));
+		_message->setText(wide
+			? rpl::single(QString())
+			: tr::lng_group_call_message());
+	}
 	if (_settings) {
 		_settings->setText(wide
 			? rpl::single(QString())
@@ -2002,12 +2022,12 @@ void Panel::showNiceTooltip(
 		not_null<Ui::RpWidget*> control,
 		NiceTooltipType type) {
 	auto text = [&]() -> rpl::producer<QString> {
-		if (control == _screenShare.data()) {
+		/*if (control == _screenShare.data()) {
 			if (_call->mutedByAdmin()) {
 				return nullptr;
 			}
-			return tr::lng_group_call_tooltip_screen();
-		} else if (control == _video.data()) {
+			return tr::lng_group_call_tooltip_screen(); #TODO remove lang key
+		} else */if (control == _video.data()) {
 			if (_call->mutedByAdmin()) {
 				return nullptr;
 			}
@@ -2023,6 +2043,8 @@ void Panel::showNiceTooltip(
 			return MuteButtonTooltip(_call);
 		} else if (control == _hangup.data()) {
 			return tr::lng_group_call_leave();
+		} else if (control == _message.data()) {
+			return tr::lng_group_call_message();
 		}
 		return rpl::producer<QString>();
 	}();
@@ -2159,7 +2181,8 @@ void Panel::trackControls(bool track, bool force) {
 	};
 	trackOne(_mute->outer());
 	trackOne(_video);
-	trackOne(_screenShare);
+	trackOne(_message);
+	//trackOne(_screenShare);
 	trackOne(_wideMenu);
 	trackOne(_settings);
 	trackOne(_hangup);
@@ -2218,7 +2241,8 @@ void Panel::updateButtonsGeometry() {
 	};
 	if (mode() == PanelMode::Wide) {
 		Assert(_video != nullptr);
-		Assert(_screenShare != nullptr);
+		Assert(_message != nullptr);
+		//Assert(_screenShare != nullptr);
 		Assert(_wideMenu != nullptr);
 		Assert(_settings != nullptr);
 		Assert(_callShare == nullptr);
@@ -2240,31 +2264,37 @@ void Panel::updateButtonsGeometry() {
 		const auto muteSize = _mute->innerSize().width() + 2 * addSkip;
 		const auto skip = st::groupCallButtonSkipSmall;
 		const auto fullWidth = (rtmp ? 0 : (_video->width() + skip))
-			+ (rtmp ? 0 : (_screenShare->width() + skip))
+			+ (rtmp ? 0 : (_message->width() + skip))
 			+ (muteSize + skip)
 			+ (_settings->width() + skip)
 			+ _hangup->width();
 		const auto membersSkip = st::groupCallNarrowSkip;
-		const auto membersWidth = _call->rtmp()
+		const auto membersWidth = rtmp
 			? membersSkip
 			: (st::groupCallNarrowMembersWidth + 2 * membersSkip);
 		auto left = membersSkip + (widget()->width()
 			- membersWidth
 			- membersSkip
 			- fullWidth) / 2;
-		toggle(_screenShare, !hidden && !rtmp);
-		if (!rtmp) {
-			_screenShare->moveToLeft(left, buttonsTop);
-			left += _screenShare->width() + skip;
-		}
+		//toggle(_screenShare, !hidden && !rtmp);
+		toggle(_message, !hidden && !rtmp);
+		//if (!rtmp) {
+		//	_screenShare->moveToLeft(left, buttonsTop);
+		//	left += _screenShare->width() + skip;
+		//}
+
+		_wideMenu->moveToLeft(left, buttonsTop);
+		_settings->moveToLeft(left, buttonsTop);
+		left += _settings->width() + skip;
+
 		toggle(_video, !hidden && !rtmp);
 		if (!rtmp) {
 			_video->moveToLeft(left, buttonsTop);
 			left += _video->width() + skip;
-		} else {
-			_wideMenu->moveToLeft(left, buttonsTop);
-			_settings->moveToLeft(left, buttonsTop);
-			left += _settings->width() + skip;
+		//} else {
+		//	_wideMenu->moveToLeft(left, buttonsTop);
+		//	_settings->moveToLeft(left, buttonsTop);
+		//	left += _settings->width() + skip;
 		}
 		toggle(_mute, !hidden);
 		_mute->moveInner({ left + addSkip, buttonsTop + addSkip });
@@ -2274,9 +2304,11 @@ void Panel::updateButtonsGeometry() {
 		toggle(_settings, !hidden && !wideMenuShown);
 		toggle(_wideMenu, !hidden && wideMenuShown);
 		if (!rtmp) {
-			_wideMenu->moveToLeft(left, buttonsTop);
-			_settings->moveToLeft(left, buttonsTop);
-			left += _settings->width() + skip;
+			//_wideMenu->moveToLeft(left, buttonsTop);
+			//_settings->moveToLeft(left, buttonsTop);
+			//left += _settings->width() + skip;
+			_message->moveToLeft(left, buttonsTop);
+			left += _message->width() + skip;
 		}
 		toggle(_hangup, !hidden);
 		_hangup->moveToLeft(left, buttonsTop);
@@ -2299,13 +2331,16 @@ void Panel::updateButtonsGeometry() {
 		const auto buttonsTop = widget()->height()
 			- st::groupCallButtonBottomSkip;
 		const auto muteSize = _mute->innerSize().width();
-		const auto fullWidth = muteSize
-			+ 2 * (_settings ? _settings : _callShare)->width()
-			+ 2 * st::groupCallButtonSkip;
+		const auto single = (_settings ? _settings : _callShare)->width();
+		const auto five = !_callShare && _message;
+		const auto fullWidth = five
+			? st::groupCallWidth
+			: (muteSize + 2 * (single + st::groupCallButtonSkip));
 		toggle(_mute, true);
 		_mute->moveInner({ (widget()->width() - muteSize) / 2, muteTop });
 		const auto leftButtonLeft = (widget()->width() - fullWidth) / 2;
-		toggle(_screenShare, false);
+		const auto nextButtonLeft = leftButtonLeft + (five ? single : 0);
+		//toggle(_screenShare, false);
 		toggle(_wideMenu, false);
 		toggle(_callShare, true);
 		if (_callShare) {
@@ -2317,10 +2352,15 @@ void Panel::updateButtonsGeometry() {
 			_video->setStyle(st::groupCallVideo, &st::groupCallVideoActive);
 			_video->moveToLeft(leftButtonLeft, buttonsTop);
 		}
-		toggle(_settings, !_callShare && !showVideoButton);
+		toggle(_settings, !_callShare && (five || !showVideoButton));
 		if (_settings) {
-			_settings->moveToLeft(leftButtonLeft, buttonsTop);
+			_settings->moveToLeft(nextButtonLeft, buttonsTop);
 		}
+		toggle(_message, !_callShare);
+		if (_message) {
+			_message->moveToRight(nextButtonLeft, buttonsTop);
+		}
+
 		toggle(_hangup, true);
 		_hangup->moveToRight(leftButtonLeft, buttonsTop);
 	}

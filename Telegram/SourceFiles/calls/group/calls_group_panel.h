@@ -222,6 +222,7 @@ private:
 	object_ptr<Ui::IconButton> _pinOnTop = { nullptr };
 	object_ptr<Ui::DropdownMenu> _menu = { nullptr };
 	rpl::variable<bool> _wideMenuShown = false;
+	rpl::variable<bool> _messageTyping = false;
 	object_ptr<Ui::AbstractButton> _joinAsToggle = { nullptr };
 	object_ptr<Members> _members = { nullptr };
 	std::unique_ptr<Viewport> _viewport;
@@ -247,7 +248,8 @@ private:
 	object_ptr<Ui::CallButton> _wideMenu = { nullptr };
 	object_ptr<Ui::CallButton> _callShare = { nullptr };
 	object_ptr<Ui::CallButton> _video = { nullptr };
-	object_ptr<Ui::CallButton> _screenShare = { nullptr };
+	//object_ptr<Ui::CallButton> _screenShare = { nullptr };
+	object_ptr<Ui::CallButton> _message = { nullptr };
 	std::unique_ptr<Ui::CallMuteButton> _mute;
 	object_ptr<Ui::CallButton> _hangup;
 	object_ptr<Ui::ImportantTooltip> _niceTooltip = { nullptr };

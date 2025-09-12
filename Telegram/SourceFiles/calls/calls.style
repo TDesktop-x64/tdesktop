@@ -928,6 +928,10 @@ groupCallHangupInner: IconButton(callButton) {
 		color: groupCallLeaveBgRipple;
 	}
 }
+groupCallMessageInner: IconButton(groupCallSettingsInner) {
+	icon: icon {{ "calls/call_message", groupCallIconFg }};
+	iconPosition: point(-1px, 16px);
+}
 groupCallSettings: CallButton(callMicrophoneMute) {
 	button: groupCallSettingsInner;
 }
@@ -942,6 +946,15 @@ groupCallVideoInnerActive: IconButton(groupCallVideoInner) {
 }
 groupCallVideoActive: CallButton(groupCallVideo) {
 	button: groupCallVideoInnerActive;
+}
+groupCallMessage: CallButton(groupCallSettings) {
+	button: groupCallMessageInner;
+}
+groupCallMessageInnerActive: IconButton(groupCallMessageInner) {
+	icon: icon {{ "calls/call_message", groupCallIconFg }};
+}
+groupCallMessageActive: CallButton(groupCallMessage) {
+	button: groupCallMessageInnerActive;
 }
 groupCallHangup: CallButton(callHangup) {
 	button: groupCallHangupInner;
@@ -973,6 +986,20 @@ groupCallVideoSmall: CallButton(groupCallSettingsSmall) {
 }
 groupCallVideoActiveSmall: CallButton(groupCallVideoSmall) {
 	button: IconButton(groupCallVideoInnerActive) {
+		width: 60px;
+		height: 68px;
+		rippleAreaPosition: point(8px, 12px);
+	}
+}
+groupCallMessageSmall: CallButton(groupCallSettingsSmall) {
+	button: IconButton(groupCallMessageInner) {
+		width: 60px;
+		height: 68px;
+		rippleAreaPosition: point(8px, 12px);
+	}
+}
+groupCallMessageActiveSmall: CallButton(groupCallMessageSmall) {
+	button: IconButton(groupCallMessageInnerActive) {
 		width: 60px;
 		height: 68px;
 		rippleAreaPosition: point(8px, 12px);

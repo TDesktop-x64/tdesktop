@@ -7,21 +7,24 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "platform/mac/notifications_manager_mac.h"
 
-#include "core/application.h"
-#include "core/core_settings.h"
 #include "base/platform/base_platform_info.h"
-#include "platform/platform_specific.h"
 #include "base/platform/mac/base_utilities_mac.h"
 #include "base/random.h"
-#include "lang/lang_keys.h"
+#include "base/unixtime.h"
+#include "core/application.h"
+#include "core/core_settings.h"
 #include "data/data_forum_topic.h"
-#include "data/data_saved_sublist.h"
 #include "data/data_peer.h"
-#include "history/history.h"
+#include "data/data_saved_sublist.h"
 #include "history/history_item.h"
-#include "ui/empty_userpic.h"
+#include "history/history.h"
+#include "lang/lang_cloud_manager.h"
+#include "lang/lang_instance.h"
+#include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "mainwindow.h"
+#include "platform/platform_specific.h"
+#include "ui/empty_userpic.h"
 #include "window/notifications_utilities.h"
 #include "styles/style_window.h"
 
@@ -31,6 +34,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace {
 
 constexpr auto kQuerySettingsEachMs = crl::time(1000);
+constexpr auto kCacheExpirationWeeks = 5;
+constexpr auto kCacheExpirationSeconds = kCacheExpirationWeeks * 7 * 24 * 60 * 60;
+
+NSString *const kTelegramMarkAsReadText = @"TelegramMarkAsReadText";
+NSString *const kTelegramMarkAsReadTimestamp = @"TelegramMarkAsReadTimestamp";
+NSString *const kTelegramMarkAsReadLanguageCode = @"TelegramMarkAsReadLanguageCode";
 
 crl::time LastSettingsQueryMs/* = 0*/;
 bool DoNotDisturbEnabled/* = false*/;
@@ -246,6 +255,7 @@ private:
 	void putClearTask(Task task);
 
 	void clearingThreadLoop();
+	void initCachedMarkAsReadText();
 
 	const uint64 _managerId = 0;
 	QString _managerIdString;
@@ -286,6 +296,7 @@ private:
 	std::vector<ClearTask> _clearingTasks;
 
 	Media::Audio::LocalDiskCache _sounds;
+	NSString *_cachedMarkAsReadText = nil;
 
 	rpl::lifetime _lifetime;
 
@@ -324,6 +335,8 @@ Manager::Private::Private(Manager *manager)
 			updateDelegate();
 		});
 	}, _lifetime);
+
+	initCachedMarkAsReadText();
 }
 
 void Manager::Private::showNotification(
@@ -379,8 +392,7 @@ void Manager::Private::showNotification(
 		[notification setAdditionalActions:@[
 			[NSUserNotificationAction
 				actionWithIdentifier:@"markAsRead"
-				title:Platform::Q2NSString(
-					tr::lng_context_mark_read(tr::now))]
+				title:_cachedMarkAsReadText]
 		]];
 	} else if (!info.options.hideReplyButton
 		&& [notification respondsToSelector:@selector(setHasReplyButton:)]) {
@@ -389,8 +401,7 @@ void Manager::Private::showNotification(
 		&& [notification respondsToSelector:@selector(setHasActionButton:)]) {
 		[notification setHasActionButton:YES];
 		[notification
-			setActionButtonTitle:Platform::Q2NSString(
-				tr::lng_context_mark_read(tr::now))];
+			setActionButtonTitle:_cachedMarkAsReadText];
 
 		AddActionIdToNotification(notification, @"markAsRead");
 	}
@@ -567,6 +578,65 @@ void Manager::Private::updateDelegate() {
 	[center setDelegate:_delegate];
 }
 
+void Manager::Private::initCachedMarkAsReadText() {
+	const auto langId = Lang::GetInstance().id();
+
+	const auto preferredLang = [[NSLocale preferredLanguages] firstObject];
+	const auto languageCode
+		= [[NSLocale localeWithLocaleIdentifier:preferredLang] languageCode];
+
+	const auto defaults = [NSUserDefaults standardUserDefaults];
+	const auto cachedText = static_cast<NSString*>([defaults
+		stringForKey:kTelegramMarkAsReadText]);
+	const auto cachedTimestamp = static_cast<NSNumber*>([defaults
+		objectForKey:kTelegramMarkAsReadTimestamp]);
+	const auto cachedLanguageCode = static_cast<NSString*>([defaults
+		stringForKey:kTelegramMarkAsReadLanguageCode]);
+
+	const auto now = base::unixtime::now();
+	const auto shouldRefresh = !cachedTimestamp
+		|| (now - [cachedTimestamp longLongValue]) > kCacheExpirationSeconds
+		|| ![cachedLanguageCode isEqualToString:languageCode];
+
+	if (cachedText && !shouldRefresh) {
+		_cachedMarkAsReadText = [cachedText retain];
+	} else {
+		_cachedMarkAsReadText
+			= [Q2NSString(tr::lng_context_mark_read(tr::now)) retain];
+	}
+
+	if (langId == NS2QString(languageCode)) {
+		[defaults
+			setObject:Q2NSString(tr::lng_context_mark_read(tr::now))
+			forKey:kTelegramMarkAsReadText];
+		[defaults
+			setObject:@(base::unixtime::now())
+			forKey:kTelegramMarkAsReadTimestamp];
+		[defaults
+			setObject:languageCode
+			forKey:kTelegramMarkAsReadLanguageCode];
+	} else if (shouldRefresh) {
+		Lang::CurrentCloudManager().getValueForLang(
+			u"lng_context_mark_read"_q,
+			NS2QString(languageCode),
+			[=](const QString &r) {
+				if (r != NS2QString(_cachedMarkAsReadText)) {
+					[_cachedMarkAsReadText release];
+					_cachedMarkAsReadText = [Q2NSString(r) retain];
+				}
+				[defaults
+					setObject:Q2NSString(r)
+					forKey:kTelegramMarkAsReadText];
+				[defaults
+					setObject:@(base::unixtime::now())
+					forKey:kTelegramMarkAsReadTimestamp];
+				[defaults
+					setObject:languageCode
+					forKey:kTelegramMarkAsReadLanguageCode];
+			});
+	}
+}
+
 Manager::Private::~Private() {
 	if (_clearingThread.joinable()) {
 		putClearTask(ClearFinish());
@@ -575,6 +645,7 @@ Manager::Private::~Private() {
 	NSUserNotificationCenter *center = [NSUserNotificationCenter defaultUserNotificationCenter];
 	[center setDelegate:nil];
 	[_delegate release];
+	[_cachedMarkAsReadText release];
 }
 
 Manager::Manager(Window::Notifications::System *system) : NativeManager(system)

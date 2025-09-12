@@ -90,6 +90,8 @@ namespace Window::Notifications {
 extern const char kOptionGNotification[];
 extern base::options::toggle OptionGNotification;
 
+extern const char kOptionHideReplyButton[];
+
 class Manager;
 
 struct ActivateOptions {

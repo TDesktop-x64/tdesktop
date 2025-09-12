@@ -620,6 +620,62 @@ void CloudManager::changeIdAndReInitConnection(const Language &data) {
 	}
 }
 
+void CloudManager::getValueForLang(
+		const QString &key,
+		const QString &langId,
+		Fn<void(const QString &)> callback) {
+	const auto requestKey = langId + ':' + key;
+	auto &request = _getValueForLangRequests[requestKey];
+	request.callback = std::move(callback);
+	if (!_api) {
+		request.requestId = -1;
+		return;
+	}
+	_api->request(base::take(request.requestId)).cancel();
+	request.requestId = _api->request(
+		MTPlangpack_GetStrings(
+			MTP_string(Lang::CloudLangPackName()),
+			MTP_string(langId),
+			MTP_vector<MTPstring>(1, MTP_string(key))
+	)).done([=](const MTPVector<MTPLangPackString> &result) {
+		const auto it = _getValueForLangRequests.find(requestKey);
+		if (it != _getValueForLangRequests.end()) {
+			const auto onstack = it->second.callback;
+			_getValueForLangRequests.erase(it);
+			const auto values = Instance::ParseStrings(result);
+			for (const auto &[k, v] : values) {
+				onstack(v);
+				return;
+			}
+			onstack(QString());
+		}
+	}).fail([=] {
+		const auto it = _getValueForLangRequests.find(requestKey);
+		if (it != _getValueForLangRequests.end()) {
+			const auto onstack = it->second.callback;
+			_getValueForLangRequests.erase(it);
+			onstack(QString());
+		}
+	}).send();
+}
+
+void CloudManager::resendPendingValueRequests() {
+	if (!_api) {
+		return;
+	}
+	for (const auto &[requestKey, request] : _getValueForLangRequests) {
+		if (request.requestId == -1) {
+			const auto colonPos = requestKey.indexOf(':');
+			if (colonPos > 0) {
+				getValueForLang(
+					requestKey.mid(colonPos + 1),
+					requestKey.left(colonPos),
+					request.callback);
+			}
+		}
+	}
+}
+
 void CloudManager::resendRequests() {
 	if (packRequestId(Pack::Base)) {
 		requestLangPackDifference(Pack::Base);
@@ -633,6 +689,7 @@ void CloudManager::resendRequests() {
 	if (_switchingToLanguageRequest) {
 		sendSwitchingToLanguageRequest();
 	}
+	resendPendingValueRequests();
 }
 
 CloudManager &CurrentCloudManager() {

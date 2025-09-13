@@ -337,10 +337,18 @@ void SubsectionTabs::startFillingSlider(
 		auto updated = Cache();
 		auto sections = std::vector<Ui::SubsectionTab>();
 		auto activeIndex = -1;
+		auto fixedCount = 1; // 1 is the first button.
+		auto pinnedCount = 0;
 		for (const auto &item : _slice) {
 			const auto index = int(sections.size());
 			if (item.thread == _active) {
 				activeIndex = index;
+			}
+			if (item.thread->fixedOnTopIndex()) {
+				++fixedCount;
+			}
+			if (item.thread->isPinnedDialog(FilterId())) {
+				++pinnedCount;
 			}
 			const auto textFg = [=] {
 				return anim::color(
@@ -463,6 +471,8 @@ void SubsectionTabs::startFillingSlider(
 			.context = Core::TextContext({
 				.session = &session(),
 			}),
+			.fixed = fixedCount,
+			.pinned = pinnedCount,
 		}, paused);
 
 		const auto ignoreActiveScroll = (scrollSavingIndex >= 0);

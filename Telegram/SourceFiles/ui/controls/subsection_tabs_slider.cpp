@@ -23,6 +23,28 @@ namespace Ui {
 namespace {
 
 constexpr auto kMaxNameLines = 3;
+constexpr auto kVerticalScale = 0.6;
+constexpr auto kHorizontalScale = 0.5;
+
+void PaintPinnedIcon(
+		QPainter &p,
+		int width,
+		int backgroundMargin,
+		float64 scale = kVerticalScale,
+		bool isHorizontal = false) {
+	constexpr auto kOffset = 5;
+	p.scale(scale, scale);
+	if (isHorizontal) {
+		p.translate(
+			st::lineWidth * kOffset,
+			st::lineWidth * kOffset + backgroundMargin);
+	} else {
+		p.translate(
+			st::lineWidth * kOffset + backgroundMargin,
+			st::lineWidth * kOffset);
+	}
+	st::dialogsPinnedIcon.icon.paint(p, 0, 0, width);
+}
 
 class VerticalButton final : public SubsectionButton {
 public:
@@ -163,6 +185,9 @@ void VerticalButton::paintEvent(QPaintEvent *e) {
 			: st::dialogsUnreadReaction.icon).paintInCenter(p, badge);
 		right -= badge.width() + st.padding + st::dialogsUnreadPadding;
 	}
+	if (isPinned() && isFirstPinned()) {
+		PaintPinnedIcon(p, width(), _backgroundMargin);
+	}
 }
 
 HorizontalButton::HorizontalButton(
@@ -279,6 +304,15 @@ void HorizontalButton::paintEvent(QPaintEvent *e) {
 			? st::dialogsUnreadMention.icon
 			: st::dialogsUnreadReaction.icon).paintInCenter(p, badge);
 		right -= badge.width() + st.padding + st::dialogsUnreadPadding;
+	}
+
+	if (isPinned() && isFirstPinned()) {
+		PaintPinnedIcon(
+			p,
+			width(),
+			_backgroundMargin,
+			kHorizontalScale,
+			true);
 	}
 }
 

@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat.h"
 #include "styles/style_dialogs.h"
 #include "styles/style_filter_icons.h"
+#include "styles/style_layers.h"
 
 namespace Ui {
 namespace {
@@ -92,6 +93,26 @@ void VerticalButton::paintEvent(QPaintEvent *e) {
 		_st.rippleBgActive,
 		active);
 	paintRipple(p, QPoint(0, 0), &color);
+
+	if (isPinned()) {
+		const auto bgRect = rect()
+			- QMargins(_backgroundMargin, 0, _backgroundMargin, 0);
+		if (isFirstPinned() && isLastPinned()) {
+			RoundRect(st::boxRadius, st::windowBgOver).paint(p, bgRect);
+		} else if (isFirstPinned()) {
+			RoundRect(st::boxRadius, st::windowBgOver).paintSomeRounded(
+				p,
+				bgRect,
+				RectPart::TopLeft | RectPart::TopRight);
+		} else if (isLastPinned()) {
+			RoundRect(st::boxRadius, st::windowBgOver).paintSomeRounded(
+				p,
+				bgRect,
+				RectPart::BottomLeft | RectPart::BottomRight);
+		} else {
+			p.fillRect(bgRect, st::windowBgOver);
+		}
+	}
 
 	if (!_subscribed) {
 		_subscribed = true;
@@ -201,6 +222,26 @@ void HorizontalButton::paintEvent(QPaintEvent *e) {
 		active);
 	paintRipple(p, QPoint(0, 0), &color);
 
+	if (isPinned()) {
+		const auto bgRect = rect()
+			- QMargins(0, _backgroundMargin, 0, _backgroundMargin);
+		if (isFirstPinned() && isLastPinned()) {
+			RoundRect(st::boxRadius, st::windowBgOver).paint(p, bgRect);
+		} else if (isFirstPinned()) {
+			RoundRect(st::boxRadius, st::windowBgOver).paintSomeRounded(
+				p,
+				bgRect,
+				RectPart::TopLeft | RectPart::BottomLeft);
+		} else if (isLastPinned()) {
+			RoundRect(st::boxRadius, st::windowBgOver).paintSomeRounded(
+				p,
+				bgRect,
+				RectPart::TopRight | RectPart::BottomRight);
+		} else {
+			p.fillRect(bgRect, st::windowBgOver);
+		}
+	}
+
 	p.setPen(anim::pen(_st.labelFg, _st.labelFgActive, active));
 	_text.draw(p, {
 		.position = QPoint(_st.strictSkip / 2, _st.labelTop),
@@ -269,6 +310,37 @@ void SubsectionButton::setActiveShown(float64 activeShown) {
 		_activeShown = activeShown;
 		update();
 	}
+}
+
+void SubsectionButton::setIsPinned(bool pinned) {
+	if (_isPinned != pinned) {
+		_isPinned = pinned;
+		update();
+	}
+}
+
+bool SubsectionButton::isPinned() const {
+	return _isPinned;
+}
+
+void SubsectionButton::setPinnedPosition(bool isFirst, bool isLast) {
+	if (_isFirstPinned != isFirst || _isLastPinned != isLast) {
+		_isFirstPinned = isFirst;
+		_isLastPinned = isLast;
+		update();
+	}
+}
+
+bool SubsectionButton::isFirstPinned() const {
+	return _isFirstPinned;
+}
+
+bool SubsectionButton::isLastPinned() const {
+	return _isLastPinned;
+}
+
+void SubsectionButton::setBackgroundMargin(int margin) {
+	_backgroundMargin = margin;
 }
 
 void SubsectionButton::contextMenuEvent(QContextMenuEvent *e) {
@@ -350,13 +422,32 @@ void SubsectionSlider::setSections(
 			_tabs.push_back(makeButton(std::move(data)));
 			_tabs.back()->show();
 		}
+		_tabs.back()->setBackgroundMargin(_barSt.radius);
 		_tabs.back()->move(_vertical ? 0 : size, _vertical ? size : 0);
 
 		const auto index = int(_tabs.size()) - 1;
+		const auto isPinned = (index >= _fixedCount)
+			&& (index < _fixedCount + _pinnedCount);
+		_tabs.back()->setIsPinned(isPinned);
+		if (isPinned) {
+			const auto isFirst = (index == _fixedCount);
+			const auto isLast = (index == _fixedCount + _pinnedCount - 1);
+			_tabs.back()->setPinnedPosition(isFirst, isLast);
+		}
 		_tabs.back()->setClickedCallback([=] {
 			activate(index);
 		});
 		size += _vertical ? _tabs.back()->height() : _tabs.back()->width();
+	}
+
+	for (auto i = 0; i < int(_tabs.size()); ++i) {
+		const auto isPinned = (i >= _fixedCount)
+			&& (i < _fixedCount + _pinnedCount);
+		if (isPinned) {
+			const auto isFirst = (i == _fixedCount);
+			const auto isLast = (i == _fixedCount + _pinnedCount - 1);
+			_tabs[i]->setPinnedPosition(isFirst, isLast);
+		}
 	}
 
 	if (!_tabs.empty()) {

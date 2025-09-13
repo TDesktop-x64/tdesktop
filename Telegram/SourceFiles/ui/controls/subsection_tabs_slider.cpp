@@ -57,12 +57,21 @@ private:
 	void paintEvent(QPaintEvent *e) override;
 
 	void dataUpdatedHook() override;
+	void invalidateCache() override;
+	QImage prepareRippleMask() const override final {
+		return isPinned()
+			? _rippleMask
+			: Ui::RippleButton::prepareRippleMask();
+	}
 
 	void updateSize();
+	void paintPinnedBackground(QPainter &p, const QRect &bgRect);
 
 	const style::ChatTabsVertical &_st;
 	Text::String _text;
 	bool _subscribed = false;
+	RoundRect _roundRect;
+	QImage _rippleMask;
 
 };
 
@@ -78,10 +87,19 @@ private:
 	void paintEvent(QPaintEvent *e) override;
 
 	void dataUpdatedHook() override;
+	void invalidateCache() override;
+	QImage prepareRippleMask() const override final {
+		return isPinned()
+			? _rippleMask
+			: Ui::RippleButton::prepareRippleMask();
+	}
 	void updateSize();
+	void paintPinnedBackground(QPainter &p, const QRect &bgRect);
 
 	const style::SettingsSlider &_st;
 	Text::String _text;
+	RoundRect _roundRect;
+	QImage _rippleMask;
 
 };
 
@@ -91,7 +109,8 @@ VerticalButton::VerticalButton(
 	SubsectionTab &&data)
 : SubsectionButton(parent, delegate, std::move(data))
 , _st(st::chatTabsVertical)
-, _text(_st.nameStyle, _data.text, kDefaultTextOptions, _st.nameWidth) {
+, _text(_st.nameStyle, _data.text, kDefaultTextOptions, _st.nameWidth)
+, _roundRect(st::boxRadius, st::windowBgOver) {
 	updateSize();
 }
 
@@ -100,10 +119,49 @@ void VerticalButton::dataUpdatedHook() {
 	updateSize();
 }
 
+void VerticalButton::invalidateCache() {
+	_roundRect.setColor(st::white);
+	if (isPinned()) {
+		const auto bgRect = rect()
+			- QMargins(_backgroundMargin, 0, _backgroundMargin, 0);
+		const auto ratio = style::DevicePixelRatio();
+		_rippleMask = QImage(
+			bgRect.size() * ratio,
+			QImage::Format_ARGB32_Premultiplied);
+		_rippleMask.setDevicePixelRatio(ratio);
+		_rippleMask.fill(Qt::transparent);
+		{
+			auto p = QPainter(&_rippleMask);
+			paintPinnedBackground(p, QRect(QPoint(), bgRect.size()));
+		}
+	} else {
+		_rippleMask = QImage();
+	}
+	_roundRect.setColor(st::shadowFg);
+}
+
 void VerticalButton::updateSize() {
 	resize(_st.width, _st.baseHeight + std::min(
 		_st.nameStyle.font->height * kMaxNameLines,
 		_text.countHeight(_st.nameWidth, true)));
+}
+
+void VerticalButton::paintPinnedBackground(QPainter &p, const QRect &bgRect) {
+	if (isFirstPinned() && isLastPinned()) {
+		_roundRect.paint(p, bgRect);
+	} else if (isFirstPinned()) {
+		_roundRect.paintSomeRounded(
+			p,
+			bgRect,
+			RectPart::TopLeft | RectPart::TopRight);
+	} else if (isLastPinned()) {
+		_roundRect.paintSomeRounded(
+			p,
+			bgRect,
+			RectPart::BottomLeft | RectPart::BottomRight);
+	} else {
+		_roundRect.paintSomeRounded(p, bgRect, 0);
+	}
 }
 
 void VerticalButton::paintEvent(QPaintEvent *e) {
@@ -114,26 +172,14 @@ void VerticalButton::paintEvent(QPaintEvent *e) {
 		_st.rippleBg,
 		_st.rippleBgActive,
 		active);
-	paintRipple(p, QPoint(0, 0), &color);
 
 	if (isPinned()) {
 		const auto bgRect = rect()
 			- QMargins(_backgroundMargin, 0, _backgroundMargin, 0);
-		if (isFirstPinned() && isLastPinned()) {
-			RoundRect(st::boxRadius, st::windowBgOver).paint(p, bgRect);
-		} else if (isFirstPinned()) {
-			RoundRect(st::boxRadius, st::windowBgOver).paintSomeRounded(
-				p,
-				bgRect,
-				RectPart::TopLeft | RectPart::TopRight);
-		} else if (isLastPinned()) {
-			RoundRect(st::boxRadius, st::windowBgOver).paintSomeRounded(
-				p,
-				bgRect,
-				RectPart::BottomLeft | RectPart::BottomRight);
-		} else {
-			p.fillRect(bgRect, st::windowBgOver);
-		}
+		paintPinnedBackground(p, bgRect);
+		paintRipple(p, QPoint(_backgroundMargin, 0), &color);
+	} else {
+		paintRipple(p, QPoint(0, 0), &color);
 	}
 
 	if (!_subscribed) {
@@ -196,7 +242,8 @@ HorizontalButton::HorizontalButton(
 	not_null<SubsectionButtonDelegate*> delegate,
 	SubsectionTab &&data)
 : SubsectionButton(parent, delegate, std::move(data))
-, _st(st) {
+, _st(st)
+, _roundRect(st::boxRadius, st::windowBgOver) {
 	dataUpdatedHook();
 }
 
@@ -226,6 +273,26 @@ void HorizontalButton::updateSize() {
 	resize(width, _st.height);
 }
 
+void HorizontalButton::paintPinnedBackground(
+		QPainter &p,
+		const QRect &bgRect) {
+	if (isFirstPinned() && isLastPinned()) {
+		_roundRect.paint(p, bgRect);
+	} else if (isFirstPinned()) {
+		_roundRect.paintSomeRounded(
+			p,
+			bgRect,
+			RectPart::TopLeft | RectPart::BottomLeft);
+	} else if (isLastPinned()) {
+		_roundRect.paintSomeRounded(
+			p,
+			bgRect,
+			RectPart::TopRight | RectPart::BottomRight);
+	} else {
+		_roundRect.paintSomeRounded(p, bgRect, 0);
+	}
+}
+
 void HorizontalButton::dataUpdatedHook() {
 	auto context = _delegate->buttonContext();
 	context.repaint = [=] { update(); };
@@ -237,6 +304,27 @@ void HorizontalButton::dataUpdatedHook() {
 	updateSize();
 }
 
+void HorizontalButton::invalidateCache() {
+	_roundRect.setColor(st::white);
+	if (isPinned()) {
+		const auto bgRect = rect()
+			- QMargins(0, _backgroundMargin, 0, _backgroundMargin);
+		const auto ratio = style::DevicePixelRatio();
+		_rippleMask = QImage(
+			bgRect.size() * ratio,
+			QImage::Format_ARGB32_Premultiplied);
+		_rippleMask.setDevicePixelRatio(ratio);
+		_rippleMask.fill(Qt::transparent);
+		{
+			auto p = QPainter(&_rippleMask);
+			paintPinnedBackground(p, QRect(QPoint(), bgRect.size()));
+		}
+	} else {
+		_rippleMask = QImage();
+	}
+	_roundRect.setColor(st::shadowFg);
+}
+
 void HorizontalButton::paintEvent(QPaintEvent *e) {
 	auto p = QPainter(this);
 	const auto active = _delegate->buttonActive(this);
@@ -245,26 +333,14 @@ void HorizontalButton::paintEvent(QPaintEvent *e) {
 		_st.rippleBg,
 		_st.rippleBgActive,
 		active);
-	paintRipple(p, QPoint(0, 0), &color);
 
 	if (isPinned()) {
 		const auto bgRect = rect()
 			- QMargins(0, _backgroundMargin, 0, _backgroundMargin);
-		if (isFirstPinned() && isLastPinned()) {
-			RoundRect(st::boxRadius, st::windowBgOver).paint(p, bgRect);
-		} else if (isFirstPinned()) {
-			RoundRect(st::boxRadius, st::windowBgOver).paintSomeRounded(
-				p,
-				bgRect,
-				RectPart::TopLeft | RectPart::BottomLeft);
-		} else if (isLastPinned()) {
-			RoundRect(st::boxRadius, st::windowBgOver).paintSomeRounded(
-				p,
-				bgRect,
-				RectPart::TopRight | RectPart::BottomRight);
-		} else {
-			p.fillRect(bgRect, st::windowBgOver);
-		}
+		paintPinnedBackground(p, bgRect);
+		paintRipple(p, QPoint(0, _backgroundMargin), &color);
+	} else {
+		paintRipple(p, QPoint(0, 0), &color);
 	}
 
 	p.setPen(anim::pen(_st.labelFg, _st.labelFgActive, active));
@@ -349,6 +425,7 @@ void SubsectionButton::setActiveShown(float64 activeShown) {
 void SubsectionButton::setIsPinned(bool pinned) {
 	if (_isPinned != pinned) {
 		_isPinned = pinned;
+		invalidateCache();
 		update();
 	}
 }
@@ -361,6 +438,7 @@ void SubsectionButton::setPinnedPosition(bool isFirst, bool isLast) {
 	if (_isFirstPinned != isFirst || _isLastPinned != isLast) {
 		_isFirstPinned = isFirst;
 		_isLastPinned = isLast;
+		invalidateCache();
 		update();
 	}
 }
@@ -375,6 +453,7 @@ bool SubsectionButton::isLastPinned() const {
 
 void SubsectionButton::setBackgroundMargin(int margin) {
 	_backgroundMargin = margin;
+	invalidateCache();
 }
 
 void SubsectionButton::contextMenuEvent(QContextMenuEvent *e) {

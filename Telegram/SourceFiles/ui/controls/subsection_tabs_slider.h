@@ -69,6 +69,7 @@ public:
 
 protected:
 	virtual void dataUpdatedHook() = 0;
+	virtual void invalidateCache() = 0;
 
 	void contextMenuEvent(QContextMenuEvent *e) override;
 

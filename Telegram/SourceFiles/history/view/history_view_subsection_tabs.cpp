@@ -9,33 +9,35 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/qt/qt_key_modifiers.h"
 #include "core/ui_integration.h"
-#include "data/stickers/data_custom_emoji.h"
 #include "data/data_changes.h"
 #include "data/data_channel.h"
-#include "data/data_forum.h"
 #include "data/data_forum_topic.h"
+#include "data/data_forum.h"
 #include "data/data_saved_messages.h"
 #include "data/data_saved_sublist.h"
 #include "data/data_session.h"
 #include "data/data_thread.h"
 #include "data/data_user.h"
+#include "data/stickers/data_custom_emoji.h"
 #include "dialogs/dialogs_main_list.h"
 #include "history/history.h"
 #include "lang/lang_keys.h"
-#include "main/main_session.h"
 #include "main/main_session_settings.h"
+#include "main/main_session.h"
+#include "ui/controls/subsection_tabs_slider_reorder.h"
 #include "ui/controls/subsection_tabs_slider.h"
+#include "ui/dynamic_image.h"
+#include "ui/dynamic_thumbnails.h"
 #include "ui/effects/ripple_animation.h"
-#include "ui/widgets/menu/menu_add_action_callback_factory.h"
-#include "ui/widgets/menu/menu_add_action_callback.h"
 #include "ui/text/text_utilities.h"
+#include "ui/ui_utility.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/discrete_sliders.h"
+#include "ui/widgets/menu/menu_add_action_callback_factory.h"
+#include "ui/widgets/menu/menu_add_action_callback.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/scroll_area.h"
 #include "ui/widgets/shadow.h"
-#include "ui/dynamic_image.h"
-#include "ui/dynamic_thumbnails.h"
 #include "window/window_peer_menu.h"
 #include "window/window_separate_id.h"
 #include "window/window_session_controller.h"
@@ -113,6 +115,7 @@ void SubsectionTabs::setupHorizontal(not_null<QWidget*> parent) {
 	const auto shadow = Ui::CreateChild<Ui::PlainShadow>(_horizontal);
 	const auto slider = scroll->setOwnedWidget(
 		object_ptr<Ui::HorizontalSlider>(scroll));
+	_reorder = std::make_unique<Ui::SubsectionSliderReorder>(slider);
 	setupSlider(scroll, slider, false);
 
 	shadow->showOn(rpl::single(
@@ -185,6 +188,7 @@ void SubsectionTabs::setupVertical(not_null<QWidget*> parent) {
 	const auto shadow = Ui::CreateChild<Ui::PlainShadow>(_vertical);
 	const auto slider = scroll->setOwnedWidget(
 		object_ptr<Ui::VerticalSlider>(scroll));
+	_reorder = std::make_unique<Ui::SubsectionSliderReorder>(slider);
 	setupSlider(scroll, slider, true);
 
 	shadow->showOn(rpl::single(
@@ -220,6 +224,9 @@ void SubsectionTabs::setupSlider(
 		not_null<Ui::SubsectionSlider*> slider,
 		bool vertical) {
 	slider->sectionActivated() | rpl::start_with_next([=](int active) {
+		if (_reordering) {
+			return;
+		}
 		const auto newWindow = base::IsCtrlPressed();
 		if (active >= 0
 			&& active < _slice.size()
@@ -235,7 +242,27 @@ void SubsectionTabs::setupSlider(
 				_controller->showThread(thread, ShowAtUnreadMsgId, params);
 			}
 		}
+		_reorder->finishReordering();
 	}, slider->lifetime());
+
+	_reorder->updates(
+	) | rpl::start_with_next([=](Ui::SubsectionSliderReorder::Single data) {
+		using State = Ui::SubsectionSliderReorder::State;
+		if (data.state == State::Started) {
+			++_reordering;
+		} else {
+			Ui::PostponeCall(slider, [=] {
+				--_reordering;
+			});
+			if (data.state == State::Applied) {
+				applyReorder(data.widget, data.oldPosition, data.newPosition);
+			}
+		}
+	}, slider->lifetime());
+
+	slider->setIsReorderingCallback([=] {
+		return _reordering > 0;
+	});
 
 	slider->sectionContextMenu() | rpl::start_with_next([=](int index) {
 		if (index >= 0 && index < _slice.size()) {
@@ -474,12 +501,22 @@ void SubsectionTabs::startFillingSlider(
 			.fixed = fixedCount,
 			.pinned = pinnedCount,
 		}, paused);
+		_reorder->clearPinnedIntervals();
+		_reorder->addPinnedInterval(0, 1);
+		if (pinnedCount > 1) {
+			const auto from = 1 + pinnedCount;
+			_reorder->addPinnedInterval(from, slider->sectionsCount() - from);
+		}
 
 		const auto ignoreActiveScroll = (scrollSavingIndex >= 0);
 		slider->setActiveSectionFast(activeIndex, ignoreActiveScroll);
 
 		_sectionsSlice = _slice;
 		Assert(slider->sectionsCount() == _slice.size());
+
+		_reorder->cancel();
+		_reorder->start();
+
 		if (ignoreActiveScroll) {
 			Assert(scrollSavingIndex < slider->sectionsCount());
 			const auto position = scrollSavingShift
@@ -868,6 +905,22 @@ bool SubsectionTabs::UsedFor(not_null<Data::Thread*> thread) {
 	const auto history = thread->owningHistory();
 	return history->amMonoforumAdmin()
 		|| history->peer->useSubsectionTabs();
+}
+
+void SubsectionTabs::applyReorder(
+		not_null<Ui::RpWidget*> widget,
+		int oldPosition,
+		int newPosition) {
+	if (newPosition == oldPosition) {
+		return;
+	}
+
+	Assert(oldPosition >= 0 && oldPosition < _slice.size());
+	Assert(newPosition >= 0 && newPosition < _slice.size());
+
+	base::reorder(_slice, oldPosition, newPosition);
+
+	// TODO: Api.
 }
 
 } // namespace HistoryView

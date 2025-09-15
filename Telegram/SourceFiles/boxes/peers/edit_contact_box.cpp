@@ -53,7 +53,8 @@ void SendRequest(
 		user->inputUser,
 		MTP_string(first),
 		MTP_string(last),
-		MTP_string(phone)
+		MTP_string(phone),
+		MTPTextWithEntities() // note
 	)).done([=](const MTPUpdates &result) {
 		user->setName(
 			first,

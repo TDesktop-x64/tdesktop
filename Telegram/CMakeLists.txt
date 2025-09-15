@@ -363,10 +363,12 @@ PRIVATE
     calls/group/calls_group_members_row.h
     calls/group/calls_group_menu.cpp
     calls/group/calls_group_menu.h
-    calls/group/calls_group_messages.cpp
-    calls/group/calls_group_messages.h
     calls/group/calls_group_message_field.cpp
     calls/group/calls_group_message_field.h
+    calls/group/calls_group_messages.cpp
+    calls/group/calls_group_messages.h
+    calls/group/calls_group_messages_ui.cpp
+    calls/group/calls_group_messages_ui.h
     calls/group/calls_group_panel.cpp
     calls/group/calls_group_panel.h
     calls/group/calls_group_rtmp.cpp

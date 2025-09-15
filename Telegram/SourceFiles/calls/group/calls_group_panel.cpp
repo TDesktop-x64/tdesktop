@@ -12,6 +12,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "calls/group/calls_group_members.h"
 #include "calls/group/calls_group_menu.h"
 #include "calls/group/calls_group_message_field.h"
+#include "calls/group/calls_group_messages.h"
+#include "calls/group/calls_group_messages_ui.h"
 #include "calls/group/calls_group_settings.h"
 #include "calls/group/calls_group_toasts.h"
 #include "calls/group/calls_group_viewport.h"
@@ -236,6 +238,10 @@ Panel::Panel(not_null<GroupCall*> call, ConferencePanelMigration info)
 , _hangup(widget(), st::groupCallHangup)
 , _stickedTooltipsShown(Core::App().settings().hiddenGroupCallTooltips()
 	& ~StickedTooltip::Microphone) // Always show tooltip about mic.
+, _messages(std::make_unique<MessagesUi>(
+	widget(),
+	uiShow(),
+	_call->messages()->listValue()))
 , _toasts(std::make_unique<Toasts>(this))
 , _controlsBackgroundColor([] {
 	auto result = st::groupCallBg->c;
@@ -1155,6 +1161,7 @@ void Panel::raiseControls() {
 	if (_pinOnTop) {
 		_pinOnTop->raise();
 	}
+	_messages->raise();
 	if (_messageField) {
 		_messageField->raise();
 	}
@@ -2410,26 +2417,40 @@ void Panel::updateButtonsGeometry() {
 			- membersSkip
 			- fullWidth) / 2;
 
+		const auto forMessagesLeft = left
+			- st::groupCallControlsBackMargin.left();
+		const auto forMessagesWidth = fullWidth
+			+ st::groupCallControlsBackMargin.left()
+			+ st::groupCallControlsBackMargin.right();
+		const auto existingBottomSkip = st::groupCallButtonBottomSkipWide
+			- _hangup->height()
+			- st::groupCallControlsBackMargin.bottom();
 		if (_messageField) {
-			const auto paddedWidth = fullWidth
-				+ st::groupCallControlsBackMargin.left()
-				+ st::groupCallControlsBackMargin.right();
-			_messageField->resizeToWidth(paddedWidth);
+			_messageField->resizeToWidth(forMessagesWidth);
 			messagesBottomSkip += _messageField->height();
 
-			const auto existing = st::groupCallButtonBottomSkipWide
-				- _hangup->height()
-				- st::groupCallControlsBackMargin.bottom();
-			const auto x = left - st::groupCallControlsBackMargin.left();
 			const auto y = widget()->height()
 				- messagesBottomSkip
-				- (existing / 2);
-			_messageField->move(x, y);
+				- (existingBottomSkip / 2);
+			_messageField->move(forMessagesLeft, y);
 		}
 
 		const auto buttonsTop = widget()->height()
 			- messagesBottomSkip
 			- anim::interpolate(0, st::groupCallButtonBottomSkipWide, shown);
+		const auto muteTop = buttonsTop + addSkip;
+
+		const auto forMessagesBottom = buttonsTop
+			- st::groupCallControlsBackMargin.top()
+			- (existingBottomSkip / 2);
+		const auto forMessagesHeight = forMessagesBottom
+			- (st::groupCallWideVideoTop * 1.5);
+
+		_messages->move(
+			forMessagesLeft,
+			forMessagesBottom,
+			forMessagesWidth,
+			forMessagesHeight);
 
 		//toggle(_screenShare, !hidden && !rtmp);
 		toggle(_message, !hidden && !rtmp);
@@ -2452,7 +2473,7 @@ void Panel::updateButtonsGeometry() {
 		//	left += _settings->width() + skip;
 		}
 		toggle(_mute, !hidden);
-		_mute->moveInner({ left + addSkip, buttonsTop + addSkip });
+		_mute->moveInner({ left + addSkip, muteTop });
 		left += muteSize + skip;
 		const auto wideMenuShown = _call->canManage()
 			|| _call->showChooseJoinAs();
@@ -2487,24 +2508,39 @@ void Panel::updateButtonsGeometry() {
 		const auto fullWidth = five
 			? st::groupCallWidth
 			: (muteSize + 2 * (single + st::groupCallButtonSkip));
+		const auto forMessagesWidth = st::groupCallWidth
+			- st::groupCallMembersMargin.left()
+			- st::groupCallMembersMargin.right();
+		const auto forMessagesLeft = (widget()->width() - forMessagesWidth)
+			/ 2;
+		const auto existingBottomSkip = st::groupCallButtonBottomSkip
+			- _mute->innerSize().height();
 		if (_messageField) {
-			const auto paddedWidth = st::groupCallWidth
-				- st::groupCallMembersMargin.left()
-				- st::groupCallMembersMargin.right();
-			_messageField->resizeToWidth(paddedWidth);
+			_messageField->resizeToWidth(forMessagesWidth);
 
-			const auto existing = st::groupCallButtonBottomSkip
-				- _mute->innerSize().height();
 			const auto height = _messageField->height();
-			messagesBottomSkip += height + std::min(height, existing / 3);
+			messagesBottomSkip += height
+				+ std::min(height, existingBottomSkip / 3);
 
-			const auto x = (widget()->width() - paddedWidth) / 2;
 			const auto y = widget()->height() - messagesBottomSkip;
-			_messageField->move(x, y);
+			_messageField->move(forMessagesLeft, y);
 		}
+
 		const auto muteTop = widget()->height()
 			- messagesBottomSkip
 			- st::groupCallMuteBottomSkip;
+		const auto forMessagesBottom = muteTop
+			- (existingBottomSkip / 3);
+		const auto forMessagesHeight = forMessagesBottom
+			- st::groupCallMembersTop
+			- (st::normalFont->height / 2);
+
+		_messages->move(
+			forMessagesLeft,
+			forMessagesBottom,
+			forMessagesWidth,
+			forMessagesHeight);
+
 		const auto buttonsTop = widget()->height()
 			- messagesBottomSkip
 			- st::groupCallButtonBottomSkip;

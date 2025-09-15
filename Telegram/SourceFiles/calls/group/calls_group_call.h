@@ -245,6 +245,9 @@ public:
 	[[nodiscard]] rpl::producer<not_null<PeerData*>> joinAsValue() const {
 		return _joinAs.value();
 	}
+	[[nodiscard]] not_null<Group::Messages*> messages() const {
+		return _messages.get();
+	}
 	[[nodiscard]] bool showChooseJoinAs() const;
 	[[nodiscard]] TimeId scheduleDate() const {
 		return _scheduleDate;

@@ -22,6 +22,14 @@ struct Response;
 
 namespace Calls::Group {
 
+struct Message {
+	int id = 0;
+	TimeId date = 0;
+	not_null<PeerData*> peer;
+	TextWithEntities text;
+	bool failed = false;
+};
+
 class Messages final {
 public:
 	Messages(not_null<GroupCall*> call, not_null<MTP::Sender*> api);
@@ -31,17 +39,12 @@ public:
 	void received(const MTPDupdateGroupCallMessage &data);
 	void received(const MTPDupdateGroupCallEncryptedMessage &data);
 
-private:
-	struct Message {
-		int id = 0;
-		TimeId date = 0;
-		not_null<PeerData*> peer;
-		TextWithEntities text;
-		bool failed = false;
-	};
+	[[nodiscard]] rpl::producer<std::vector<Message>> listValue() const;
 
+private:
 	[[nodiscard]] bool ready() const;
 	void sendPending();
+	void pushChanges();
 
 	void received(const MTPPeer &from, const MTPTextWithEntities &message);
 	void sent(int id, const MTP::Response &response);
@@ -55,6 +58,7 @@ private:
 	std::vector<TextWithTags> _pending;
 
 	std::vector<Message> _messages;
+	rpl::event_stream<std::vector<Message>> _changes;
 
 	int _autoincrementId = 0;
 

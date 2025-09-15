@@ -557,10 +557,15 @@ void Set(
 	};
 	if (peer->isSelf()) {
 		using Flag = MTPaccount_UpdateColor::Flag;
+		using ColorFlag = MTPDpeerColor::Flag;
 		send(MTPaccount_UpdateColor(
-			MTP_flags(Flag::f_color | Flag::f_background_emoji_id),
-			MTP_int(values.colorIndex),
-			MTP_long(values.backgroundEmojiId)));
+			MTP_flags(Flag::f_color),
+			MTP_peerColor(
+				MTP_flags(ColorFlag()
+					| ColorFlag::f_color
+					| ColorFlag::f_background_emoji_id),
+				MTP_int(values.colorIndex),
+				MTP_long(values.backgroundEmojiId))));
 	} else if (const auto channel = peer->asChannel()) {
 		if (peer->isBroadcast()) {
 			using Flag = MTPchannels_UpdateColor::Flag;

@@ -98,6 +98,7 @@ void Messages::send(TextWithTags text) {
 			failed(id);
 		}).send();
 	}
+	pushChanges();
 }
 
 void Messages::received(const MTPDupdateGroupCallMessage &data) {
@@ -105,6 +106,7 @@ void Messages::received(const MTPDupdateGroupCallMessage &data) {
 		return;
 	}
 	received(data.vfrom_id(), data.vmessage());
+	pushChanges();
 }
 
 void Messages::received(const MTPDupdateGroupCallEncryptedMessage &data) {
@@ -132,19 +134,28 @@ void Messages::received(const MTPDupdateGroupCallEncryptedMessage &data) {
 		return;
 	}
 	received(fromId, text);
+	pushChanges();
 }
 
 void Messages::received(
 		const MTPPeer &from,
 		const MTPTextWithEntities &message) {
-	const auto id = ++_autoincrementId;
 	const auto peer = _call->peer();
+	if (peerFromMTP(from) == peer->session().userPeerId()) {
+		// Our own we add only locally.
+		return;
+	}
+	const auto id = ++_autoincrementId;
 	_messages.push_back({
 		.id = id,
 		.date = base::unixtime::now(),
 		.peer = peer->owner().peer(peerFromMTP(from)),
 		.text = Api::ParseTextWithEntities(&peer->session(), message),
 	});
+}
+
+rpl::producer<std::vector<Message>> Messages::listValue() const {
+	return _changes.events_starting_with_copy(_messages);
 }
 
 void Messages::sendPending() {
@@ -155,10 +166,15 @@ void Messages::sendPending() {
 	}
 }
 
+void Messages::pushChanges() {
+	_changes.fire_copy(_messages);
+}
+
 void Messages::sent(int id, const MTP::Response &response) {
 	const auto i = ranges::find(_messages, id, &Message::id);
 	if (i != end(_messages)) {
 		i->date = Api::UnixtimeFromMsgId(response.outerMsgId);
+		pushChanges();
 	}
 }
 
@@ -166,6 +182,7 @@ void Messages::failed(int id) {
 	const auto i = ranges::find(_messages, id, &Message::id);
 	if (i != end(_messages)) {
 		i->failed = true;
+		pushChanges();
 	}
 }
 

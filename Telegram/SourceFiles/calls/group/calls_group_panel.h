@@ -71,6 +71,7 @@ enum class PanelMode;
 enum class StickedTooltip;
 class MicLevelTester;
 class MessageField;
+class MessagesUi;
 
 class Panel final
 	: public base::has_weak_ptr
@@ -258,6 +259,7 @@ private:
 
 	std::shared_ptr<ChatHelpers::Show> _cachedShow;
 	std::unique_ptr<MessageField> _messageField;
+	std::unique_ptr<MessagesUi> _messages;
 
 	const std::unique_ptr<Toasts> _toasts;
 

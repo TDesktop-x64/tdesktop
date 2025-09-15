@@ -60,6 +60,7 @@ struct RejoinEvent;
 struct RtmpInfo;
 enum class VideoQuality;
 enum class Error;
+class Messages;
 } // namespace Group
 
 struct InviteRequest;
@@ -278,6 +279,9 @@ public:
 	void handlePossibleCreateOrJoinResponse(const MTPDupdateGroupCall &data);
 	void handlePossibleCreateOrJoinResponse(
 		const MTPDupdateGroupCallConnection &data);
+	void handleIncomingMessage(const MTPDupdateGroupCallMessage &data);
+	void handleIncomingMessage(
+		const MTPDupdateGroupCallEncryptedMessage &data);
 	void changeTitle(const QString &title);
 	void toggleRecording(
 		bool enabled,
@@ -445,6 +449,13 @@ public:
 
 	void pushToTalk(bool pressed, crl::time delay);
 	void setNotRequireARGB32();
+
+	[[nodiscard]] std::function<std::vector<uint8_t>(
+		std::vector<uint8_t> const &,
+		int64_t, bool,
+		int32_t)> e2eEncryptDecrypt() const;
+	void sendMessage(TextWithTags message);
+	[[nodiscard]] MTPInputGroupCall inputCall() const;
 
 	[[nodiscard]] rpl::lifetime &lifetime() {
 		return _lifetime;
@@ -647,7 +658,6 @@ private:
 
 	[[nodiscard]] int activeVideoSendersCount() const;
 
-	[[nodiscard]] MTPInputGroupCall inputCall() const;
 	[[nodiscard]] MTPInputGroupCall inputCallSafe() const;
 
 	const not_null<Delegate*> _delegate;
@@ -667,6 +677,7 @@ private:
 	base::flat_set<uint32> _unresolvedSsrcs;
 	rpl::event_stream<Error> _errors;
 	std::vector<Fn<void()>> _rejoinedCallbacks;
+	std::unique_ptr<Group::Messages> _messages;
 	bool _recordingStoppedByMe = false;
 	bool _requestedVideoChannelsUpdateScheduled = false;
 

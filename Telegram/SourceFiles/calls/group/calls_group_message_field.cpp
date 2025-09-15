@@ -7,8 +7,17 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "calls/group/calls_group_message_field.h"
 
+#include "boxes/premium_preview_box.h"
 #include "chat_helpers/compose/compose_show.h"
+#include "chat_helpers/emoji_suggestions_widget.h"
+#include "chat_helpers/message_field.h"
+#include "chat_helpers/tabbed_panel.h"
+#include "chat_helpers/tabbed_selector.h"
+#include "data/stickers/data_custom_emoji.h"
+#include "data/stickers/data_stickers.h"
+#include "data/data_document.h"
 #include "lang/lang_keys.h"
+#include "main/main_session.h"
 #include "ui/controls/emoji_button.h"
 #include "ui/controls/send_button.h"
 #include "ui/widgets/fields/input_field.h"
@@ -22,14 +31,15 @@ namespace Calls::Group {
 
 MessageField::MessageField(
 	not_null<QWidget*> parent,
-	std::shared_ptr<ChatHelpers::Show> show)
+	std::shared_ptr<ChatHelpers::Show> show,
+	PeerData *peer)
 : _parent(parent)
 , _show(std::move(show))
 , _wrap(std::make_unique<Ui::RpWidget>(_parent)) {
-	createControls();
+	createControls(peer);
 }
 
-void MessageField::createControls() {
+void MessageField::createControls(PeerData *peer) {
 	setupBackground();
 
 	const auto &st = st::storiesComposeControls;
@@ -44,9 +54,82 @@ void MessageField::createControls() {
 	_field->setDocumentMargin(4.);
 	_field->setAdditionalMargin(style::ConvertScale(4) - 4);
 
+	const auto show = _show;
+	const auto allow = [=](not_null<DocumentData*> emoji) {
+		return peer
+			? Data::AllowEmojiWithoutPremium(peer, emoji)
+			: show->session().premium();
+	};
+	InitMessageFieldHandlers({
+		.session = &show->session(),
+		.show = show,
+		.field = _field,
+		.customEmojiPaused = [=] {
+			return show->paused(ChatHelpers::PauseReason::Layer);
+		},
+		.allowPremiumEmoji = allow,
+		.fieldStyle = &st.files.caption,
+	});
+	Ui::Emoji::SuggestionsController::Init(
+		_parent,
+		_field,
+		&_show->session(),
+		{
+			.suggestCustomEmoji = true,
+			.allowCustomWithoutPremium = allow,
+			.st = &st.suggestions,
+		});
+
 	_send = Ui::CreateChild<Ui::SendButton>(_wrap.get(), st.send);
 
+	using Selector = ChatHelpers::TabbedSelector;
+	using Descriptor = ChatHelpers::TabbedPanelDescriptor;
+	_emojiPanel = Ui::CreateChild<ChatHelpers::TabbedPanel>(
+		_parent,
+		ChatHelpers::TabbedPanelDescriptor{
+			.ownedSelector = object_ptr<Selector>(
+				nullptr,
+				ChatHelpers::TabbedSelectorDescriptor{
+					.show = _show,
+					.st = st.tabbed,
+					.level = ChatHelpers::PauseReason::Layer,
+					.mode = ChatHelpers::TabbedSelector::Mode::EmojiOnly,
+					.features = {
+						.stickersSettings = false,
+						.openStickerSets = false,
+					},
+				}),
+		});
+	_emojiPanel->setDesiredHeightValues(
+		1.,
+		st::emojiPanMinHeight / 2,
+		st::emojiPanMinHeight);
+	_emojiPanel->hide();
+	_emojiPanel->selector()->setCurrentPeer(peer);
+	_emojiPanel->selector()->emojiChosen(
+	) | rpl::start_with_next([=](ChatHelpers::EmojiChosen data) {
+		Ui::InsertEmojiAtCursor(_field->textCursor(), data.emoji);
+	}, lifetime());
+	_emojiPanel->selector()->customEmojiChosen(
+	) | rpl::start_with_next([=](ChatHelpers::FileChosen data) {
+		const auto info = data.document->sticker();
+		if (info
+			&& info->setType == Data::StickersType::Emoji
+			&& !_show->session().premium()) {
+			ShowPremiumPreviewBox(
+				_show,
+				PremiumFeature::AnimatedEmoji);
+		} else {
+			Data::InsertCustomEmoji(_field, data.document);
+		}
+	}, lifetime());
+
 	_emojiToggle = Ui::CreateChild<Ui::EmojiButton>(_wrap.get(), st.emoji);
+
+	_emojiToggle->installEventFilter(_emojiPanel);
+	_emojiToggle->addClickHandler([=] {
+		_emojiPanel->toggleAnimated();
+	});
 
 	_width.value(
 	) | rpl::filter(
@@ -79,6 +162,15 @@ void MessageField::createControls() {
 	}, _lifetime);
 }
 
+void MessageField::updateEmojiPanelGeometry() {
+	const auto parent = _emojiPanel->parentWidget();
+	const auto global = _emojiToggle->mapToGlobal({ 0, 0 });
+	const auto local = parent->mapFromGlobal(global);
+	_emojiPanel->moveBottomRight(
+		local.y(),
+		local.x() + _emojiToggle->width() * 3);
+}
+
 void MessageField::setupBackground() {
 	_wrap->paintRequest() | rpl::start_with_next([=] {
 		const auto radius = st::historySendSize.height() / 2.;
@@ -96,6 +188,7 @@ void MessageField::resizeToWidth(int newWidth) {
 	if (_wrap->isHidden()) {
 		Ui::SendPendingMoveResizeEvents(_wrap.get());
 	}
+	updateEmojiPanelGeometry();
 }
 
 void MessageField::move(int x, int y) {

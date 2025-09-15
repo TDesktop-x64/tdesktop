@@ -107,10 +107,6 @@ using PhotoFileLocationId = Data::PhotoFileLocationId;
 using DocumentFileLocationId = Data::DocumentFileLocationId;
 using UpdatedFileReferences = Data::UpdatedFileReferences;
 
-[[nodiscard]] TimeId UnixtimeFromMsgId(mtpMsgId msgId) {
-	return TimeId(msgId >> 32);
-}
-
 [[nodiscard]] std::shared_ptr<ChatHelpers::Show> ShowForPeer(
 		not_null<PeerData*> peer) {
 	if (const auto window = Core::App().windowFor(peer)) {
@@ -154,6 +150,14 @@ void ShowChannelsLimitBox(not_null<PeerData*> peer) {
 }
 
 } // namespace
+
+namespace Api {
+
+TimeId UnixtimeFromMsgId(mtpMsgId msgId) {
+	return TimeId(msgId >> 32);
+}
+
+} // namespace Api
 
 ApiWrap::ApiWrap(not_null<Main::Session*> session)
 : MTP::Sender(&session->account().mtp())
@@ -2182,7 +2186,7 @@ void ApiWrap::saveDraftsToCloud() {
 			history->finishSavingCloudDraft(
 				topicRootId,
 				monoforumPeerId,
-				UnixtimeFromMsgId(response.outerMsgId));
+				Api::UnixtimeFromMsgId(response.outerMsgId));
 			const auto cloudDraft = history->cloudDraft(
 				topicRootId,
 				monoforumPeerId);
@@ -2203,7 +2207,7 @@ void ApiWrap::saveDraftsToCloud() {
 			history->finishSavingCloudDraft(
 				topicRootId,
 				monoforumPeerId,
-				UnixtimeFromMsgId(response.outerMsgId));
+				Api::UnixtimeFromMsgId(response.outerMsgId));
 			const auto cloudDraft = history->cloudDraft(
 				topicRootId,
 				monoforumPeerId);
@@ -4059,7 +4063,7 @@ void ApiWrap::sendMessage(MessageToSend &&message) {
 				history->finishSavingCloudDraft(
 					draftTopicRootId,
 					draftMonoforumPeerId,
-					UnixtimeFromMsgId(response.outerMsgId));
+					Api::UnixtimeFromMsgId(response.outerMsgId));
 			}
 		};
 		const auto fail = [=](
@@ -4074,7 +4078,7 @@ void ApiWrap::sendMessage(MessageToSend &&message) {
 				history->finishSavingCloudDraft(
 					draftTopicRootId,
 					draftMonoforumPeerId,
-					UnixtimeFromMsgId(response.outerMsgId));
+					Api::UnixtimeFromMsgId(response.outerMsgId));
 			}
 		};
 		const auto mtpShortcut = Data::ShortcutIdToMTP(
@@ -4270,7 +4274,7 @@ void ApiWrap::sendInlineResult(
 		history->finishSavingCloudDraft(
 			topicRootId,
 			monoforumPeerId,
-			UnixtimeFromMsgId(response.outerMsgId));
+			Api::UnixtimeFromMsgId(response.outerMsgId));
 		if (done) {
 			done(true);
 		}
@@ -4279,7 +4283,7 @@ void ApiWrap::sendInlineResult(
 		history->finishSavingCloudDraft(
 			topicRootId,
 			monoforumPeerId,
-			UnixtimeFromMsgId(response.outerMsgId));
+			Api::UnixtimeFromMsgId(response.outerMsgId));
 		if (done) {
 			done(false);
 		}

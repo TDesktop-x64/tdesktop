@@ -2128,7 +2128,9 @@ void Updates::feedUpdate(const MTPUpdate &update) {
 	case mtpc_updateGroupCallParticipants:
 	case mtpc_updateGroupCallChainBlocks:
 	case mtpc_updateGroupCallConnection:
-	case mtpc_updateGroupCall: {
+	case mtpc_updateGroupCall:
+	case mtpc_updateGroupCallMessage:
+	case mtpc_updateGroupCallEncryptedMessage: {
 		Core::App().calls().handleUpdate(&session(), update);
 	} break;
 

@@ -13,6 +13,7 @@ struct TextWithTags;
 
 namespace ChatHelpers {
 class Show;
+class TabbedPanel;
 } // namespace ChatHelpers
 
 namespace Ui {
@@ -28,7 +29,8 @@ class MessageField final {
 public:
 	MessageField(
 		not_null<QWidget*> parent,
-		std::shared_ptr<ChatHelpers::Show> show);
+		std::shared_ptr<ChatHelpers::Show> show,
+		PeerData *peer);
 
 	void resizeToWidth(int newWidth);
 	void move(int x, int y);
@@ -44,9 +46,10 @@ public:
 	[[nodiscard]] rpl::lifetime &lifetime();
 
 private:
-	void createControls();
+	void createControls(PeerData *peer);
 	void setupBackground();
 	void shownAnimationCallback();
+	void updateEmojiPanelGeometry();
 
 	const not_null<QWidget*> _parent;
 	const std::shared_ptr<ChatHelpers::Show> _show;
@@ -55,6 +58,7 @@ private:
 	Ui::InputField *_field = nullptr;
 	Ui::SendButton *_send = nullptr;
 	Ui::EmojiButton *_emojiToggle = nullptr;
+	ChatHelpers::TabbedPanel *_emojiPanel = nullptr;
 
 	rpl::variable<int> _width;
 

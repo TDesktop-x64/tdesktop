@@ -129,6 +129,8 @@ QString RequestKey(Types &&...values) {
 	return result;
 }
 
+[[nodiscard]] TimeId UnixtimeFromMsgId(mtpMsgId msgId);
+
 } // namespace Api
 
 class ApiWrap final : public MTP::Sender {

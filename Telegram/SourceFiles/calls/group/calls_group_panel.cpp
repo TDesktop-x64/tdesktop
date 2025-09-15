@@ -486,14 +486,18 @@ void Panel::toggleMessageTyping() {
 	if (_messageField) {
 		_messageField->toggle(typing);
 	} else if (typing) {
-		_messageField = std::make_unique<MessageField>(widget(), uiShow());
+		_messageField = std::make_unique<MessageField>(
+			widget(),
+			uiShow(),
+			_call->conference() ? nullptr : _call->peer().get());
 
 		updateButtonsGeometry();
 		_messageField->toggle(true);
 
 		_messageField->submitted(
 		) | rpl::start_with_next([=](TextWithTags text) {
-			//_call->sendMessage(text);
+			_call->sendMessage(std::move(text));
+
 			_messageField->toggle(false);
 			_messageTyping = false;
 			updateWideControlsVisibility();

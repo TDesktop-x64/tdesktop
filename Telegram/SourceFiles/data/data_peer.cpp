@@ -1015,11 +1015,10 @@ bool PeerData::changeBackgroundEmojiId(
 bool PeerData::changeColor(
 		const tl::conditional<MTPPeerColor> &cloudColor) {
 	const auto changed1 = cloudColor
-		? changeColorIndex(cloudColor->data().vcolor())
+		? changeColorIndex(Data::ColorIndexFromColor(cloudColor))
 		: clearColorIndex();
-	const auto changed2 = changeBackgroundEmojiId(cloudColor
-		? cloudColor->data().vbackground_emoji_id().value_or_empty()
-		: DocumentId());
+	const auto changed2 = changeBackgroundEmojiId(
+		Data::BackgroundEmojiIdFromColor(cloudColor));
 	return changed1 || changed2;
 }
 
@@ -2015,6 +2014,32 @@ FullMsgId ResolveMinPinnedId(
 	} else {
 		return FullMsgId();
 	}
+}
+
+uint64 BackgroundEmojiIdFromColor(const MTPPeerColor *color) {
+	if (!color) {
+		return 0;
+	}
+	return color->match([](const MTPDpeerColor &data) -> uint64 {
+		return data.vbackground_emoji_id().value_or_empty();
+	}, [](const MTPDpeerColorCollectible &data) -> uint64 {
+		return data.vbackground_emoji_id().v;
+	}, [](const MTPDinputPeerColorCollectible &data) -> uint64 {
+		return 0;
+	});
+}
+
+uint8 ColorIndexFromColor(const MTPPeerColor *color) {
+	if (!color) {
+		return 0;
+	}
+	return color->match([](const MTPDpeerColor &data) -> uint8 {
+		return data.vcolor().value_or_empty();
+	}, [](const MTPDpeerColorCollectible &data) -> uint8 {
+		return 0; // themes
+	}, [](const MTPDinputPeerColorCollectible &) -> uint8 {
+		return 0;
+	});
 }
 
 } // namespace Data

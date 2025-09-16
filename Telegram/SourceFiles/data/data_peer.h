@@ -639,4 +639,7 @@ void SetTopPinnedMessageId(
 	PeerId monoforumPeerId,
 	PeerData *migrated = nullptr);
 
+[[nodiscard]] uint64 BackgroundEmojiIdFromColor(const MTPPeerColor *color);
+[[nodiscard]] uint8 ColorIndexFromColor(const MTPPeerColor *color);
+
 } // namespace Data

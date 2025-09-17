@@ -61,9 +61,11 @@ private:
 	ChatHelpers::TabbedPanel *_emojiPanel = nullptr;
 
 	rpl::variable<int> _width;
+	rpl::variable<int> _height;
 
 	bool _shown = false;
 	Ui::Animations::Simple _shownAnimation;
+	std::unique_ptr<Ui::RpWidget> _cache;
 
 	rpl::event_stream<TextWithTags> _submitted;
 	rpl::event_stream<> _closed;

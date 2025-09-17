@@ -199,6 +199,9 @@ void MessageField::resizeToWidth(int newWidth) {
 
 void MessageField::move(int x, int y) {
 	_wrap->move(x, y);
+	if (_cache) {
+		_cache->move(x, y);
+	}
 }
 
 void MessageField::toggle(bool shown) {
@@ -209,36 +212,70 @@ void MessageField::toggle(bool shown) {
 		Ui::SendPendingMoveResizeEvents(_wrap.get());
 	}
 	_shown = shown;
+	if (!anim::Disabled()) {
+		if (!_cache) {
+			auto image = Ui::GrabWidgetToImage(_wrap.get());
+			_cache = std::make_unique<Ui::RpWidget>(_parent);
+			const auto raw = _cache.get();
+			raw->paintRequest() | rpl::start_with_next([=] {
+				auto p = QPainter(raw);
+				auto hq = PainterHighQualityEnabler(p);
+				const auto scale = raw->height() / float64(_wrap->height());
+				const auto target = _wrap->rect();
+				const auto center = target.center();
+				p.translate(center);
+				p.scale(scale, scale);
+				p.translate(-center);
+				p.drawImage(target, image);
+			}, raw->lifetime());
+			raw->show();
+			raw->move(_wrap->pos());
+			raw->resize(_wrap->width(), 0);
+
+			_wrap->hide();
+		}
+		_shownAnimation.start(
+			[=] { shownAnimationCallback(); },
+			shown ? 0. : 1.,
+			shown ? 1. : 0.,
+			st::slideWrapDuration,
+			anim::easeOutCirc);
+	}
 	shownAnimationCallback();
-	//_shownAnimation.start(
-	//	[=] { shownAnimationCallback(); },
-	//	shown ? 0. : 1.,
-	//	shown ? 1. : 0.,
-	//	st::slideWrapDuration,
-	//	anim::easeOutCirc);
 }
 
 void MessageField::raise() {
 	_wrap->raise();
+	if (_cache) {
+		_cache->raise();
+	}
 }
 
 void MessageField::shownAnimationCallback() {
 	if (_shownAnimation.animating()) {
-		_wrap->update();
+		Assert(_cache != nullptr);
+		const auto height = int(base::SafeRound(
+			_shownAnimation.value(_shown ? 1. : 0.) * _wrap->height()));
+		_cache->resize(_cache->width(), height);
+		_cache->update();
+		_height = height;
 	} else if (_shown) {
+		_cache = nullptr;
 		_wrap->show();
+		_height = _wrap->height();
 		_field->setFocusFast();
 	} else {
+		_height = 0;
 		_closed.fire({});
 	}
 }
 
 int MessageField::height() const {
-	return _shownAnimation.value(_shown ? 1. : 0.) * _wrap->height();
+	return _height.current();
 }
 
 rpl::producer<int> MessageField::heightValue() const {
-	return _wrap->heightValue();
+	return _height.value();
 }
 
 rpl::producer<TextWithTags> MessageField::submitted() const {

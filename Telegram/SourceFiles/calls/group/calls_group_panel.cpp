@@ -2442,7 +2442,7 @@ void Panel::updateButtonsGeometry() {
 
 		const auto forMessagesBottom = buttonsTop
 			- st::groupCallControlsBackMargin.top()
-			- (existingBottomSkip / 2);
+			- (existingBottomSkip / 6);
 		const auto forMessagesHeight = forMessagesBottom
 			- (st::groupCallWideVideoTop * 1.5);
 

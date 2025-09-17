@@ -37,6 +37,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat.h"
 #include "styles/style_media_view.h"
 
+#include <QtGui/QGuiApplication>
+#include <QtGui/QWindow>
+
 namespace Calls::Group {
 namespace {
 
@@ -47,6 +50,51 @@ constexpr auto kMessageBgOpacity = 0.8;
 		+ st::messageTextStyle.font->height
 		+ st::groupCallMessagePadding.bottom();
 	return minHeight / 2;
+}
+
+void ReceiveOnlyWheelEvents(not_null<Ui::ScrollArea*> scroll) {
+	class EventFilter final : public QObject {
+	public:
+		explicit EventFilter(not_null<Ui::ScrollArea*> scroll)
+		: QObject(scroll) {
+		}
+
+		bool eventFilter(QObject *watched, QEvent *event) {
+			if (event->type() != QEvent::Wheel) {
+				return false;
+			}
+			const auto e = static_cast<QWheelEvent*>(event);
+			Assert(parent()->isWidgetType());
+			const auto scroll = static_cast<Ui::ScrollArea*>(parent());
+			if (watched != scroll->window()->windowHandle()
+				|| !scroll->scrollTopMax()) {
+				return false;
+			}
+			const auto global = e->globalPos();
+			const auto viewport = scroll->viewport();
+			const auto local = viewport->mapFromGlobal(global);
+			if (!viewport->rect().contains(local)) {
+				return false;
+			}
+			auto ev = QWheelEvent(
+				local,
+				global,
+				e->pixelDelta(),
+				e->angleDelta(),
+				e->delta(),
+				e->orientation(),
+				e->buttons(),
+				e->modifiers(),
+				e->phase(),
+				e->source());
+			ev.setTimestamp(crl::now());
+			QGuiApplication::sendEvent(viewport, &ev);
+			return true;
+		}
+	};
+
+	scroll->setAttribute(Qt::WA_TransparentForMouseEvents);
+	qApp->installEventFilter(new EventFilter(scroll));
 }
 
 } // namespace
@@ -289,8 +337,11 @@ void MessagesUi::appendMessage(const Message &data) {
 
 void MessagesUi::setupMessagesWidget() {
 	_scroll = std::make_unique<Ui::ScrollArea>(_parent);
-	_messages = _scroll->setOwnedWidget(
-		object_ptr<Ui::RpWidget>(_scroll.get()));
+	const auto scroll = _scroll.get();
+
+	ReceiveOnlyWheelEvents(scroll);
+
+	_messages = scroll->setOwnedWidget(object_ptr<Ui::RpWidget>(scroll));
 
 	_messages->paintRequest() | rpl::start_with_next([=](QRect clip) {
 		auto p = Painter(_messages);
@@ -371,8 +422,7 @@ void MessagesUi::setupMessagesWidget() {
 		}
 	}, _lifetime);
 
-	//_scroll->setAttribute(Qt::WA_TransparentForMouseEvents);
-	_scroll->show();
+	scroll->show();
 	applyWidth();
 }
 

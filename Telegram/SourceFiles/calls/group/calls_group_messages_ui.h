@@ -18,7 +18,7 @@ class TabbedPanel;
 } // namespace ChatHelpers
 
 namespace Ui {
-class ScrollArea;
+class ElasticScroll;
 class EmojiButton;
 class InputField;
 class SendButton;
@@ -61,7 +61,7 @@ private:
 
 	const not_null<QWidget*> _parent;
 	const std::shared_ptr<ChatHelpers::Show> _show;
-	std::unique_ptr<Ui::ScrollArea> _scroll;
+	std::unique_ptr<Ui::ElasticScroll> _scroll;
 	Ui::RpWidget *_messages = nullptr;
 
 	std::vector<MessageView> _views;

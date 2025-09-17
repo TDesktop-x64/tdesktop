@@ -28,7 +28,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/effects/radial_animation.h"
 #include "ui/text/text_utilities.h"
 #include "ui/widgets/fields/input_field.h"
-#include "ui/widgets/scroll_area.h"
+#include "ui/widgets/elastic_scroll.h"
 #include "ui/painter.h"
 #include "ui/ui_utility.h"
 #include "ui/userpic_view.h"
@@ -52,10 +52,10 @@ constexpr auto kMessageBgOpacity = 0.8;
 	return minHeight / 2;
 }
 
-void ReceiveOnlyWheelEvents(not_null<Ui::ScrollArea*> scroll) {
+void ReceiveOnlyWheelEvents(not_null<Ui::ElasticScroll*> scroll) {
 	class EventFilter final : public QObject {
 	public:
-		explicit EventFilter(not_null<Ui::ScrollArea*> scroll)
+		explicit EventFilter(not_null<Ui::ElasticScroll*> scroll)
 		: QObject(scroll) {
 		}
 
@@ -65,15 +65,14 @@ void ReceiveOnlyWheelEvents(not_null<Ui::ScrollArea*> scroll) {
 			}
 			const auto e = static_cast<QWheelEvent*>(event);
 			Assert(parent()->isWidgetType());
-			const auto scroll = static_cast<Ui::ScrollArea*>(parent());
+			const auto scroll = static_cast<Ui::ElasticScroll*>(parent());
 			if (watched != scroll->window()->windowHandle()
 				|| !scroll->scrollTopMax()) {
 				return false;
 			}
 			const auto global = e->globalPos();
-			const auto viewport = scroll->viewport();
-			const auto local = viewport->mapFromGlobal(global);
-			if (!viewport->rect().contains(local)) {
+			const auto local = scroll->mapFromGlobal(global);
+			if (!scroll->rect().contains(local)) {
 				return false;
 			}
 			auto ev = QWheelEvent(
@@ -88,7 +87,7 @@ void ReceiveOnlyWheelEvents(not_null<Ui::ScrollArea*> scroll) {
 				e->phase(),
 				e->source());
 			ev.setTimestamp(crl::now());
-			QGuiApplication::sendEvent(viewport, &ev);
+			QGuiApplication::sendEvent(scroll, &ev);
 			return true;
 		}
 	};
@@ -336,7 +335,7 @@ void MessagesUi::appendMessage(const Message &data) {
 }
 
 void MessagesUi::setupMessagesWidget() {
-	_scroll = std::make_unique<Ui::ScrollArea>(
+	_scroll = std::make_unique<Ui::ElasticScroll>(
 		_parent,
 		st::groupCallMessagesScroll);
 	const auto scroll = _scroll.get();

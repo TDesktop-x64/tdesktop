@@ -336,7 +336,9 @@ void MessagesUi::appendMessage(const Message &data) {
 }
 
 void MessagesUi::setupMessagesWidget() {
-	_scroll = std::make_unique<Ui::ScrollArea>(_parent);
+	_scroll = std::make_unique<Ui::ScrollArea>(
+		_parent,
+		st::groupCallMessagesScroll);
 	const auto scroll = _scroll.get();
 
 	ReceiveOnlyWheelEvents(scroll);

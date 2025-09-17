@@ -1685,6 +1685,9 @@ groupCallInviteLink: SettingsButton(createCallInviteLink) {
 }
 groupCallInviteLinkIcon: icon {{ "info/edit/group_manage_links", mediaviewTextLinkFg }};
 
+groupCallMessagesScroll: ScrollArea(defaultScrollArea) {
+	barHidden: true;
+}
 groupCallMessagePadding: margins(8px, 2px, 8px, 2px);
 groupCallMessageSkip: 8px;
 groupCallUserpic: 20px;

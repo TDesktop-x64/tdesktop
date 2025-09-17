@@ -25,6 +25,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/controls/emoji_button.h"
 #include "ui/controls/send_button.h"
 #include "ui/effects/animations.h"
+#include "ui/effects/radial_animation.h"
 #include "ui/text/text_utilities.h"
 #include "ui/widgets/fields/input_field.h"
 #include "ui/widgets/scroll_area.h"
@@ -55,7 +56,7 @@ struct MessagesUi::MessageView {
 	PeerData *from = nullptr;
 	Ui::Animations::Simple toggleAnimation;
 	Ui::Animations::Simple sentAnimation;
-	Ui::Animations::Basic sendingAnimation;
+	std::unique_ptr<Ui::InfiniteRadialAnimation> sendingAnimation;
 	Ui::PeerUserpicView view;
 	Ui::Text::String text;
 	int top = 0;
@@ -97,8 +98,10 @@ void MessagesUi::setupList(rpl::producer<std::vector<Message>> messages) {
 				const auto i = ranges::find(from, till, id, &Message::id);
 				if (i == till) {
 					toggleMessage(entry, false);
+					continue;
 				} else if (entry.failed != i->failed) {
 					setContentFailed(entry);
+					updateMessageSize(entry);
 					repaintMessage(entry.id);
 				} else if (entry.sending != (i->date == 0)) {
 					animateMessageSent(entry);
@@ -121,33 +124,56 @@ void MessagesUi::animateMessageSent(MessageView &entry) {
 	entry.sending = false;
 	entry.sentAnimation.start([=] {
 		repaintMessage(id);
-	}, 0., 1, st::slideWrapDuration, anim::easeOutCirc);
+	}, 0., 1, st::slideDuration, anim::easeOutCirc);
+	repaintMessage(id);
 }
 
 void MessagesUi::updateMessageSize(MessageView &entry) {
 	const auto &padding = st::groupCallMessagePadding;
 
-	const auto widthSkip = padding.left() + padding.right();
+	const auto hasUserpic = !entry.failed;
+	const auto userpicPadding = st::groupCallUserpicPadding;
+	const auto userpicSize = st::groupCallUserpic;
+	const auto leftSkip = hasUserpic
+		? (userpicPadding.left() + userpicSize + userpicPadding.right())
+		: padding.left();
+	const auto widthSkip = leftSkip + padding.right();
 	const auto inner = _width - widthSkip;
-	entry.width = std::min(inner, entry.text.maxWidth()) + widthSkip;
+
+	const auto size = Ui::Text::CountOptimalTextSize(
+		entry.text,
+		std::min(st::groupCallWidth / 2, inner),
+		inner);
+
+	const auto textHeight = size.height();
+	entry.width = size.width() + widthSkip;
 	entry.left = (_width - entry.width) / 2;
 
+	const auto contentHeight = padding.top() + textHeight + padding.bottom();
+	const auto userpicHeight = hasUserpic
+		? (userpicPadding.top() + userpicSize + userpicPadding.bottom())
+		: 0;
+
 	const auto skip = st::groupCallMessageSkip;
-	const auto textHeight = entry.text.countHeight(entry.width);
-	entry.realHeight = skip
-		+ padding.top()
-		+ textHeight
-		+ padding.bottom();
-	entry.height = entry.toggleAnimation.animating()
+	entry.realHeight = skip + std::max(contentHeight, userpicHeight);
+}
+
+bool MessagesUi::updateMessageHeight(MessageView &entry) {
+	const auto height = entry.toggleAnimation.animating()
 		? anim::interpolate(
 			0,
 			entry.realHeight,
 			entry.toggleAnimation.value(entry.removed ? 0. : 1.))
 		: entry.realHeight;
+	if (entry.height == height) {
+		return false;
+	}
+	entry.height = height;
+	return true;
 }
 
 void MessagesUi::setContentFailed(MessageView &entry) {
-	const auto manager = &entry.from->owner().customEmojiManager();
+	entry.failed = true;
 	entry.text = Ui::Text::String(
 		st::messageTextStyle,
 		TextWithEntities().append(
@@ -155,7 +181,21 @@ void MessagesUi::setContentFailed(MessageView &entry) {
 		).append(' ').append(
 			Ui::Text::Italic(u"Failed to send the message."_q)),
 		kMarkupTextOptions,
-		st::groupCallWidth / 2);
+		st::groupCallWidth / 4);
+}
+
+void MessagesUi::setContent(
+		MessageView &entry,
+		const TextWithEntities &text) {
+	entry.text = Ui::Text::String(
+		st::messageTextStyle,
+		text,
+		kMarkupTextOptions,
+		st::groupCallWidth / 4,
+		Core::TextContext({
+			.session = &_show->session(),
+			.repaint = [this, id = entry.id] { repaintMessage(id); },
+		}));
 }
 
 void MessagesUi::toggleMessage(MessageView &entry, bool shown) {
@@ -166,7 +206,8 @@ void MessagesUi::toggleMessage(MessageView &entry, bool shown) {
 		shown ? 0. : 1.,
 		shown ? 1. : 0.,
 		st::slideWrapDuration,
-		anim::easeOutCirc);
+		shown ? anim::easeOutCirc : anim::easeInCirc);
+	repaintMessage(id);
 }
 
 void MessagesUi::repaintMessage(int id) {
@@ -180,13 +221,10 @@ void MessagesUi::repaintMessage(int id) {
 		return;
 	}
 	if (!i->sending && !i->sentAnimation.animating()) {
-		i->sendingAnimation.stop();
+		i->sendingAnimation = nullptr;
 	}
 	if (i->toggleAnimation.animating() || i->height != i->realHeight) {
-		const auto shown = i->toggleAnimation.value(i->removed ? 0. : 1.);
-		const auto height = anim::interpolate(0, i->realHeight, shown);
-		if (i->height != height) {
-			i->height = height;
+		if (updateMessageHeight(*i)) {
 			recountHeights(i, i->top);
 			return;
 		}
@@ -227,30 +265,23 @@ void MessagesUi::appendMessage(const Message &data) {
 	};
 	entry.from = data.peer;
 	entry.sending = !data.date;
-	entry.failed = data.failed;
-	if (entry.failed) {
+	if (data.failed) {
 		setContentFailed(entry);
 	} else {
-		const auto manager = &entry.from->owner().customEmojiManager();
-		entry.text = Ui::Text::String(
-			st::messageTextStyle,
-			Ui::Text::SingleCustomEmoji(
-				manager->peerUserpicEmojiData(entry.from),
-				u"@"_q).append(' ').append(
-					Ui::Text::Bold(data.peer->shortName())
-				).append(' ').append(data.text),
-			kMarkupTextOptions,
-			st::groupCallWidth / 2,
-			Core::TextContext({
-				.session = &_show->session(),
-				.repaint = repaint,
-			}));
+		setContent(
+			entry,
+			Ui::Text::Bold(
+				data.peer->shortName()).append(' ').append(data.text));
 	}
 	entry.top = top;
 	updateMessageSize(entry);
 	if (entry.sending) {
-		entry.sendingAnimation.init(repaint);
-		entry.sendingAnimation.start();
+		using namespace Ui;
+		const auto &st = st::defaultInfiniteRadialAnimation;
+		entry.sendingAnimation = std::make_unique<InfiniteRadialAnimation>(
+			repaint,
+			st);
+		entry.sendingAnimation->start(0);
 	}
 	entry.height = 0;
 	toggleMessage(entry, true);
@@ -262,8 +293,7 @@ void MessagesUi::setupMessagesWidget() {
 		object_ptr<Ui::RpWidget>(_scroll.get()));
 
 	_messages->paintRequest() | rpl::start_with_next([=](QRect clip) {
-		auto p = QPainter(_messages);
-		auto hq = PainterHighQualityEnabler(p);
+		auto p = Painter(_messages);
 		const auto skip = st::groupCallMessageSkip;
 		const auto padding = st::groupCallMessagePadding;
 		const auto widthSkip = padding.left() + padding.right();
@@ -289,10 +319,49 @@ void MessagesUi::setupMessagesWidget() {
 			}
 			_messageBgRect.paint(p, { entry.left, entry.top, width, use });
 
+			auto leftSkip = padding.left();
+			const auto hasUserpic = !entry.failed;
+			if (hasUserpic) {
+				const auto userpicSize = st::groupCallUserpic;
+				const auto userpicPadding = st::groupCallUserpicPadding;
+				const auto position = QPoint(
+					entry.left + userpicPadding.left(),
+					entry.top + userpicPadding.top());
+				const auto rect = QRect(
+					position,
+					QSize(userpicSize, userpicSize));
+				entry.from->paintUserpic(p, entry.view, {
+					.position = position,
+					.size = userpicSize,
+					.shape = Ui::PeerUserpicShape::Circle,
+				});
+				if (const auto animation = entry.sendingAnimation.get()) {
+					auto hq = PainterHighQualityEnabler(p);
+					auto pen = st::groupCallBg->p;
+					const auto shift = userpicPadding.left();
+					pen.setWidthF(shift);
+					p.setPen(pen);
+					p.setBrush(Qt::NoBrush);
+					const auto state = animation->computeState();
+					const auto sent = entry.sending
+						? 0.
+						: entry.sentAnimation.value(1.);
+					p.setOpacity(state.shown * (1. - sent));
+					p.drawArc(
+						rect.marginsRemoved({ shift, shift, shift, shift }),
+						state.arcFrom,
+						state.arcLength);
+					p.setOpacity(1.);
+				}
+				leftSkip = userpicPadding.left()
+					+ userpicSize
+					+ userpicPadding.right();
+			}
+
 			p.setPen(st::radialFg);
 			entry.text.draw(p, {
 				.position = {
-					entry.left + padding.left(),
+					entry.left + leftSkip,
 					entry.top + padding.top()
 				},
 				.availableWidth = entry.width - widthSkip,
@@ -313,8 +382,11 @@ void MessagesUi::applyWidth() {
 	}
 	auto top = 0;
 	for (auto &entry : _views) {
-		updateMessageSize(entry);
 		entry.top = top;
+
+		updateMessageSize(entry);
+		updateMessageHeight(entry);
+
 		top += entry.height;
 	}
 	updateGeometries();

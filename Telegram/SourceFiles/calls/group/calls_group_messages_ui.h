@@ -48,7 +48,9 @@ private:
 	void setupList(rpl::producer<std::vector<Message>> messages);
 	void toggleMessage(MessageView &entry, bool shown);
 	void setContentFailed(MessageView &entry);
+	void setContent(MessageView &entry, const TextWithEntities &text);
 	void updateMessageSize(MessageView &entry);
+	bool updateMessageHeight(MessageView &entry);
 	void animateMessageSent(MessageView &entry);
 	void repaintMessage(int id);
 	void recountHeights(std::vector<MessageView>::iterator i, int top);

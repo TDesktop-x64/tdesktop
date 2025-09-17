@@ -20,10 +20,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/ui_utility.h"
 
 namespace Calls::Group {
+namespace {
+
+constexpr auto kMessageLifetime = TimeId(20);
+
+} // namespace
 
 Messages::Messages(not_null<GroupCall*> call, not_null<MTP::Sender*> api)
 : _call(call)
-, _api(api) {
+, _api(api)
+, _destroyTimer([=] { checkDestroying(); }) {
 	Ui::PostponeCall(_call, [=] {
 		_call->real(
 		) | rpl::start_with_next([=](not_null<Data::GroupCall*> call) {
@@ -71,9 +77,13 @@ void Messages::send(TextWithTags text) {
 			_call->inputCall(),
 			serialized
 		)).done([=](const MTPBool &, const MTP::Response &response) {
+			if (rand() % 256 < 64) {
+				AssertIsDebug();
+				failed(id, response);
+			} else
 			sent(id, response);
-		}).fail([=] {
-			failed(id);
+		}).fail([=](const MTP::Error &, const MTP::Response &response) {
+			failed(id, response);
 		}).send();
 	} else {
 		auto counter = ::tl::details::LengthCounter();
@@ -94,11 +104,11 @@ void Messages::send(TextWithTags text) {
 			MTP_bytes(bytes::make_span(encrypted))
 		)).done([=](const MTPBool &, const MTP::Response &response) {
 			sent(id, response);
-		}).fail([=] {
-			failed(id);
+		}).fail([=](const MTP::Error &, const MTP::Response &response) {
+			failed(id, response);
 		}).send();
 	}
-	pushChanges();
+	checkDestroying(true);
 }
 
 void Messages::received(const MTPDupdateGroupCallMessage &data) {
@@ -152,6 +162,39 @@ void Messages::received(
 		.peer = peer->owner().peer(peerFromMTP(from)),
 		.text = Api::ParseTextWithEntities(&peer->session(), message),
 	});
+	checkDestroying(true);
+}
+
+void Messages::checkDestroying(bool afterChanges) {
+	auto next = TimeId();
+	const auto now = base::unixtime::now();
+	const auto destroyTime = now - kMessageLifetime;
+	const auto initial = _messages.size();
+	for (auto i = begin(_messages); i != end(_messages);) {
+		const auto date = i->date;
+		if (!date) {
+			++i;
+		} else if (date <= destroyTime) {
+			i = _messages.erase(i);
+		} else if (!next) {
+			next = date + kMessageLifetime - now;
+			++i;
+		} else {
+			++i;
+		}
+	}
+	if (!next) {
+		_destroyTimer.cancel();
+	} else {
+		const auto delay = next * crl::time(1000);
+		if (!_destroyTimer.isActive()
+			|| (_destroyTimer.remainingTime() > delay)) {
+			_destroyTimer.callOnce(delay);
+		}
+	}
+	if (afterChanges || (_messages.size() < initial)) {
+		pushChanges();
+	}
 }
 
 rpl::producer<std::vector<Message>> Messages::listValue() const {
@@ -174,15 +217,16 @@ void Messages::sent(int id, const MTP::Response &response) {
 	const auto i = ranges::find(_messages, id, &Message::id);
 	if (i != end(_messages)) {
 		i->date = Api::UnixtimeFromMsgId(response.outerMsgId);
-		pushChanges();
+		checkDestroying(true);
 	}
 }
 
-void Messages::failed(int id) {
+void Messages::failed(int id, const MTP::Response &response) {
 	const auto i = ranges::find(_messages, id, &Message::id);
 	if (i != end(_messages)) {
+		i->date = Api::UnixtimeFromMsgId(response.outerMsgId);
 		i->failed = true;
-		pushChanges();
+		checkDestroying(true);
 	}
 }
 

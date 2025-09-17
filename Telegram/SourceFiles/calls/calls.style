@@ -1687,6 +1687,8 @@ groupCallInviteLinkIcon: icon {{ "info/edit/group_manage_links", mediaviewTextLi
 
 groupCallMessagePadding: margins(8px, 2px, 8px, 2px);
 groupCallMessageSkip: 8px;
+groupCallUserpic: 20px;
+groupCallUserpicPadding: margins(2px, 2px, 4px, 2px);
 
 confcallLinkMenu: IconButton(boxTitleClose) {
 	icon: icon {{ "title_menu_dots", boxTitleCloseFg }};

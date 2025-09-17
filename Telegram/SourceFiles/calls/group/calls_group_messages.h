@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "base/timer.h"
+
 namespace Calls {
 class GroupCall;
 } // namespace Calls
@@ -45,10 +47,11 @@ private:
 	[[nodiscard]] bool ready() const;
 	void sendPending();
 	void pushChanges();
+	void checkDestroying(bool afterChanges = false);
 
 	void received(const MTPPeer &from, const MTPTextWithEntities &message);
 	void sent(int id, const MTP::Response &response);
-	void failed(int id);
+	void failed(int id, const MTP::Response &response);
 
 	const not_null<GroupCall*> _call;
 	const not_null<MTP::Sender*> _api;
@@ -57,6 +60,7 @@ private:
 
 	std::vector<TextWithTags> _pending;
 
+	base::Timer _destroyTimer;
 	std::vector<Message> _messages;
 	rpl::event_stream<std::vector<Message>> _changes;
 

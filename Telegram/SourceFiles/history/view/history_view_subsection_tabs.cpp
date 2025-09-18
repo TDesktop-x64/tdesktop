@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/history_view_subsection_tabs.h"
 
+#include "apiwrap.h"
 #include "base/qt/qt_key_modifiers.h"
 #include "core/ui_integration.h"
 #include "data/data_changes.h"
@@ -920,7 +921,18 @@ void SubsectionTabs::applyReorder(
 
 	base::reorder(_slice, oldPosition, newPosition);
 
-	// TODO: Api.
+	if (const auto forum = _history->asForum()) {
+		auto topicIds = QVector<MTPint>();
+		for (const auto &item : _slice) {
+			if (item.thread->isPinnedDialog(FilterId())) {
+				if (const auto topic = item.thread->asTopic()) {
+					topicIds.push_back(MTP_int(topic->rootId()));
+				}
+			}
+		}
+		forum->topicsList()->pinned()->applyList(forum, topicIds);
+		session().api().savePinnedOrder(forum);
+	}
 }
 
 } // namespace HistoryView

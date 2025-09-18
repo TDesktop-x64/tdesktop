@@ -66,12 +66,17 @@ private:
 
 	void updateSize();
 	void paintPinnedBackground(QPainter &p, const QRect &bgRect);
+	QPainterPath createClipPath(const QRect &rect) const;
+	[[nodiscard]] const QPainterPath &cachedClipPath(const QRect &rect);
 
 	const style::ChatTabsVertical &_st;
 	Text::String _text;
 	bool _subscribed = false;
 	RoundRect _roundRect;
 	QImage _rippleMask;
+	QPainterPath _clipPathCache;
+	QRect _clipPathRect;
+	bool _clipPathValid = false;
 
 };
 
@@ -95,11 +100,16 @@ private:
 	}
 	void updateSize();
 	void paintPinnedBackground(QPainter &p, const QRect &bgRect);
+	QPainterPath createClipPath(const QRect &rect) const;
+	[[nodiscard]] const QPainterPath &cachedClipPath(const QRect &rect);
 
 	const style::SettingsSlider &_st;
 	Text::String _text;
 	RoundRect _roundRect;
 	QImage _rippleMask;
+	QPainterPath _clipPathCache;
+	QRect _clipPathRect;
+	bool _clipPathValid = false;
 
 };
 
@@ -132,18 +142,20 @@ void VerticalButton::invalidateCache() {
 		_rippleMask.fill(Qt::transparent);
 		{
 			auto p = QPainter(&_rippleMask);
-			paintPinnedBackground(p, QRect(QPoint(), bgRect.size()));
+			_roundRect.paintSomeRounded(p, QRect(QPoint(), bgRect.size()), 0);
 		}
 	} else {
 		_rippleMask = QImage();
 	}
 	_roundRect.setColor(st::shadowFg);
+	_clipPathValid = false;
 }
 
 void VerticalButton::updateSize() {
 	resize(_st.width, _st.baseHeight + std::min(
 		_st.nameStyle.font->height * kMaxNameLines,
 		_text.countHeight(_st.nameWidth, true)));
+	_clipPathValid = false;
 }
 
 void VerticalButton::paintPinnedBackground(QPainter &p, const QRect &bgRect) {
@@ -164,6 +176,31 @@ void VerticalButton::paintPinnedBackground(QPainter &p, const QRect &bgRect) {
 	}
 }
 
+QPainterPath VerticalButton::createClipPath(const QRect &rect) const {
+	QPainterPath path;
+	path.setFillRule(Qt::WindingFill);
+	const auto radius = st::boxRadius;
+	if (isFirstPinned() && isLastPinned()) {
+		path.addRoundedRect(rect, radius, radius);
+	} else if (isFirstPinned()) {
+		path.addRoundedRect(rect, radius, radius);
+		path.addRect(rect.adjusted(0, rect.height() / 2, 0, 0));
+	} else if (isLastPinned()) {
+		path.addRoundedRect(rect, radius, radius);
+		path.addRect(rect.adjusted(0, 0, 0, -rect.height() / 2));
+	}
+	return path;
+}
+
+const QPainterPath &VerticalButton::cachedClipPath(const QRect &rect) {
+	if (!_clipPathValid || _clipPathRect != rect) {
+		_clipPathCache = createClipPath(rect);
+		_clipPathRect = rect;
+		_clipPathValid = true;
+	}
+	return _clipPathCache;
+}
+
 void VerticalButton::paintEvent(QPaintEvent *e) {
 	auto p = QPainter(this);
 
@@ -176,6 +213,9 @@ void VerticalButton::paintEvent(QPaintEvent *e) {
 	if (isPinned()) {
 		const auto bgRect = rect()
 			- QMargins(_backgroundMargin, 0, _backgroundMargin, 0);
+		if (isFirstPinned() || isLastPinned()) {
+			p.setClipPath(cachedClipPath(bgRect));
+		}
 		paintPinnedBackground(p, bgRect);
 		paintRipple(p, QPoint(_backgroundMargin, 0), &color);
 	} else {
@@ -271,6 +311,7 @@ void HorizontalButton::updateSize() {
 		width += badge.width() + st.padding + st::dialogsUnreadPadding;
 	}
 	resize(width, _st.height);
+	_clipPathValid = false;
 }
 
 void HorizontalButton::paintPinnedBackground(
@@ -291,6 +332,31 @@ void HorizontalButton::paintPinnedBackground(
 	} else {
 		_roundRect.paintSomeRounded(p, bgRect, 0);
 	}
+}
+
+QPainterPath HorizontalButton::createClipPath(const QRect &rect) const {
+	QPainterPath path;
+	path.setFillRule(Qt::WindingFill);
+	const auto radius = st::boxRadius;
+	if (isFirstPinned() && isLastPinned()) {
+		path.addRoundedRect(rect, radius, radius);
+	} else if (isFirstPinned()) {
+		path.addRoundedRect(rect, radius, radius);
+		path.addRect(rect.adjusted(rect.width() / 2, 0, 0, 0));
+	} else if (isLastPinned()) {
+		path.addRoundedRect(rect, radius, radius);
+		path.addRect(rect.adjusted(0, 0, -rect.width() / 2, 0));
+	}
+	return path;
+}
+
+const QPainterPath &HorizontalButton::cachedClipPath(const QRect &rect) {
+	if (!_clipPathValid || _clipPathRect != rect) {
+		_clipPathCache = createClipPath(rect);
+		_clipPathRect = rect;
+		_clipPathValid = true;
+	}
+	return _clipPathCache;
 }
 
 void HorizontalButton::dataUpdatedHook() {
@@ -317,12 +383,13 @@ void HorizontalButton::invalidateCache() {
 		_rippleMask.fill(Qt::transparent);
 		{
 			auto p = QPainter(&_rippleMask);
-			paintPinnedBackground(p, QRect(QPoint(), bgRect.size()));
+			_roundRect.paintSomeRounded(p, QRect(QPoint(), bgRect.size()), 0);
 		}
 	} else {
 		_rippleMask = QImage();
 	}
 	_roundRect.setColor(st::shadowFg);
+	_clipPathValid = false;
 }
 
 void HorizontalButton::paintEvent(QPaintEvent *e) {
@@ -337,6 +404,9 @@ void HorizontalButton::paintEvent(QPaintEvent *e) {
 	if (isPinned()) {
 		const auto bgRect = rect()
 			- QMargins(0, _backgroundMargin, 0, _backgroundMargin);
+		if (isFirstPinned() || isLastPinned()) {
+			p.setClipPath(cachedClipPath(bgRect));
+		}
 		paintPinnedBackground(p, bgRect);
 		paintRipple(p, QPoint(0, _backgroundMargin), &color);
 	} else {
@@ -744,6 +814,7 @@ void SubsectionSlider::setButtonShift(int index, int shift) {
 	_tabs[index]->move(
 		_vertical ? 0 : targetPos,
 		_vertical ? targetPos : 0);
+	recalculatePinnedPositionsByUI();
 }
 
 void SubsectionSlider::reorderButtons(int from, int to) {
@@ -760,6 +831,49 @@ void SubsectionSlider::reorderButtons(int from, int to) {
 	for (auto i = 0; i < int(_tabs.size()); ++i) {
 		_tabs[i]->move(_vertical ? 0 : position, _vertical ? position : 0);
 		position += _vertical ? _tabs[i]->height() : _tabs[i]->width();
+	}
+}
+
+void SubsectionSlider::recalculatePinnedPositions() {
+	for (auto i = 0; i < int(_tabs.size()); ++i) {
+		const auto isPinned = (i >= _fixedCount)
+			&& (i < _fixedCount + _pinnedCount);
+		_tabs[i]->setIsPinned(isPinned);
+		if (isPinned) {
+			const auto isFirst = (i == _fixedCount);
+			const auto isLast = (i == _fixedCount + _pinnedCount - 1);
+			_tabs[i]->setPinnedPosition(isFirst, isLast);
+		}
+	}
+}
+
+void SubsectionSlider::recalculatePinnedPositionsByUI() {
+	if (_pinnedCount == 0) {
+		return;
+	}
+
+	auto pinnedIndices = std::vector<int>();
+	for (auto i = 0; i < int(_tabs.size()); ++i) {
+		if (_tabs[i]->isPinned()) {
+			pinnedIndices.push_back(i);
+		}
+	}
+
+	if (pinnedIndices.empty()) {
+		return;
+	}
+
+	ranges::sort(pinnedIndices, [&](int a, int b) {
+		const auto posA = _vertical ? _tabs[a]->y() : _tabs[a]->x();
+		const auto posB = _vertical ? _tabs[b]->y() : _tabs[b]->x();
+		return posA < posB;
+	});
+
+	for (auto i = 0; i < int(pinnedIndices.size()); ++i) {
+		const auto index = pinnedIndices[i];
+		const auto isFirst = (i == 0);
+		const auto isLast = (i == int(pinnedIndices.size()) - 1);
+		_tabs[index]->setPinnedPosition(isFirst, isLast);
 	}
 }
 

@@ -110,6 +110,8 @@ public:
 	[[nodiscard]] not_null<SubsectionButton*> buttonAt(int index);
 	void setButtonShift(int index, int shift);
 	void reorderButtons(int from, int to);
+	void recalculatePinnedPositions();
+	void recalculatePinnedPositionsByUI();
 
 	[[nodiscard]] rpl::producer<ScrollToRequest> requestShown() const;
 

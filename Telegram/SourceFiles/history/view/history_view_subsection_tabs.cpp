@@ -257,6 +257,7 @@ void SubsectionTabs::setupSlider(
 			});
 			if (data.state == State::Applied) {
 				applyReorder(data.widget, data.oldPosition, data.newPosition);
+				slider->recalculatePinnedPositions();
 			}
 		}
 	}, slider->lifetime());

@@ -34,6 +34,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_media_view.h"
 
 namespace Calls::Group {
+namespace {
+
+constexpr auto kWarnLimit = 24;
+constexpr auto kErrorLimit = 99;
+
+} // namespace
 
 MessageField::MessageField(
 	not_null<QWidget*> parent,
@@ -41,7 +47,8 @@ MessageField::MessageField(
 	PeerData *peer)
 : _parent(parent)
 , _show(std::move(show))
-, _wrap(std::make_unique<Ui::RpWidget>(_parent)) {
+, _wrap(std::make_unique<Ui::RpWidget>(_parent))
+, _limit(128) {
 	createControls(peer);
 }
 
@@ -54,6 +61,7 @@ void MessageField::createControls(PeerData *peer) {
 		st.field,
 		Ui::InputField::Mode::MultiLine,
 		tr::lng_message_ph());
+	_field->setMaxLength(_limit + kErrorLimit);
 	_field->setMinHeight(
 		st::historySendSize.height() - 2 * st::historySendPadding);
 	_field->setMaxHeight(st::historyComposeFieldMaxHeight);
@@ -75,6 +83,13 @@ void MessageField::createControls(PeerData *peer) {
 		},
 		.allowPremiumEmoji = allow,
 		.fieldStyle = &st.files.caption,
+		.allowMarkdownTags = {
+			Ui::InputField::kTagBold,
+			Ui::InputField::kTagItalic,
+			Ui::InputField::kTagUnderline,
+			Ui::InputField::kTagStrikeOut,
+			Ui::InputField::kTagSpoiler,
+		},
 	});
 	Ui::Emoji::SuggestionsController::Init(
 		_parent,
@@ -152,12 +167,20 @@ void MessageField::createControls(PeerData *peer) {
 			st::historySendPadding,
 			st::historySendPadding,
 			newWidth);
-		_send->moveToRight(0, 0, newWidth);
-		_emojiToggle->moveToRight(_send->width(), 0, newWidth);
 		updateWrapSize(newWidth);
 	}, _lifetime);
 
-	_field->heightValue() | rpl::start_with_next([=](int height) {
+	rpl::combine(
+		_width.value(),
+		_field->heightValue()
+	) | rpl::start_with_next([=](int width, int height) {
+		if (width <= 0) {
+			return;
+		}
+		const auto minHeight = st::historySendSize.height()
+			- 2 * st::historySendPadding;
+		_send->moveToRight(0, height - minHeight, width);
+		_emojiToggle->moveToRight(_send->width(), height - minHeight, width);
 		updateWrapSize();
 	}, _lifetime);
 
@@ -165,11 +188,23 @@ void MessageField::createControls(PeerData *peer) {
 		_closeRequests.fire({});
 	}, _lifetime);
 
+	const auto updateLimitPosition = [=](QSize parent, QSize label) {
+		const auto skip = st::historySendPadding;
+		return QPoint(parent.width() - label.width() - skip, skip);
+	};
+	Ui::AddLengthLimitLabel(_field, _limit, {
+		.customParent = _wrap.get(),
+		.customUpdatePosition = updateLimitPosition,
+	});
+
 	rpl::merge(
 		_field->submits() | rpl::to_empty,
 		_send->clicks() | rpl::to_empty
 	) | rpl::start_with_next([=] {
-		_submitted.fire(_field->getTextWithAppliedMarkdown());
+		auto text = _field->getTextWithTags();
+		if (text.text.size() <= _limit) {
+			_submitted.fire(std::move(text));
+		}
 	}, _lifetime);
 }
 

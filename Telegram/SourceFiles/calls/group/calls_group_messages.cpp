@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_user.h"
 #include "main/main_session.h"
 #include "mtproto/sender.h"
+#include "ui/text/text_utilities.h"
 #include "ui/ui_utility.h"
 
 namespace Calls::Group {
@@ -160,7 +161,18 @@ void Messages::received(
 		.id = id,
 		.date = base::unixtime::now(),
 		.peer = peer->owner().peer(peerFromMTP(from)),
-		.text = Api::ParseTextWithEntities(&peer->session(), message),
+		.text = Ui::Text::Filtered(
+			Api::ParseTextWithEntities(&peer->session(), message),
+			{
+				EntityType::Code,
+				EntityType::Bold,
+				EntityType::Semibold,
+				EntityType::Spoiler,
+				EntityType::StrikeOut,
+				EntityType::Underline,
+				EntityType::Italic,
+				EntityType::CustomEmoji,
+			}),
 	});
 	checkDestroying(true);
 }

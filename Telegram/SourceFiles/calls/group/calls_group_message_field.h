@@ -58,6 +58,7 @@ private:
 	const std::shared_ptr<ChatHelpers::Show> _show;
 	const std::unique_ptr<Ui::RpWidget> _wrap;
 
+	int _limit = 0;
 	Ui::InputField *_field = nullptr;
 	Ui::SendButton *_send = nullptr;
 	Ui::EmojiButton *_emojiToggle = nullptr;

@@ -1835,6 +1835,14 @@ ServiceAction ParseServiceAction(
 			? State::Hangup
 			: State::Invitation;
 		result.content = content;
+	}, [&](const MTPDmessageActionSuggestBirthday &data) {
+		auto content = ActionSuggestBirthday();
+		const auto &fields = data.vbirthday().data();
+		content.birthday = Birthday(
+			fields.vday().v,
+			fields.vmonth().v,
+			fields.vyear().value_or_empty());
+		result.content = content;
 	}, [](const MTPDmessageActionEmpty &data) {});
 	return result;
 }

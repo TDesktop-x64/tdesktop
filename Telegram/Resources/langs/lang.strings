@@ -2263,6 +2263,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_action_suggested_video_me" = "You suggested this photo for {user}'s Telegram profile.";
 "lng_action_suggested_video" = "{user} suggests this photo for your Telegram profile.";
 "lng_action_suggested_video_button" = "View Photo";
+"lng_action_suggested_birthday_me" = "You suggest {user} add a date of birth:";
+"lng_action_suggested_birthday" = "{user} suggests you add your date of birth:";
+"lng_action_suggested_birtday_button" = "View";
 "lng_action_attach_menu_bot_allowed" = "You allowed this bot to message you when you added it to your attachment menu.";
 "lng_action_webapp_bot_allowed" = "You allowed this bot to message you in its web-app.";
 "lng_action_set_wallpaper_me" = "You set a new wallpaper for this chat";

@@ -6310,6 +6310,30 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 		Unexpected("PhoneCall type in setServiceMessageFromMtp.");
 	};
 
+	auto prepareSuggestBirthday = [this](const MTPDmessageActionSuggestBirthday &action) {
+		auto result = PreparedServiceText{};
+		const auto &data = action.vbirthday().data();
+		const auto birthday = Data::Birthday(
+			data.vday().v,
+			data.vmonth().v,
+			data.vyear().value_or_empty());
+		const auto isSelf = (_from->id == _from->session().userPeerId());
+		const auto peer = isSelf ? history()->peer : _from;
+		const auto user = peer->asUser();
+		const auto name = (user && !user->firstName.isEmpty())
+			? user->firstName
+			: peer->name();
+		result.links.push_back(peer->createOpenLink());
+		result.text = (isSelf
+			? tr::lng_action_suggested_birthday_me
+			: tr::lng_action_suggested_birthday)(
+				tr::now,
+				lt_user,
+				Ui::Text::Link(name, 1), // Link 1.
+				Ui::Text::WithEntities);
+		return result;
+	};
+
 	setServiceText(action.match(
 		prepareChatAddUserText,
 		prepareChatJoinedByLink,
@@ -6366,6 +6390,7 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 		prepareSuggestedPostApproval,
 		prepareSuggestedPostSuccess,
 		prepareSuggestedPostRefund,
+		prepareSuggestBirthday,
 		PrepareEmptyText<MTPDmessageActionRequestedPeerSentMe>,
 		PrepareErrorText<MTPDmessageActionEmpty>));
 

@@ -147,6 +147,7 @@ protected:
 	RoundRect _barRect;
 
 	std::vector<std::unique_ptr<SubsectionButton>> _tabs;
+	bool _tabsReorderedOnce = false;
 	int _active = -1;
 	int _pressed = -1;
 	Animations::Simple _activeFrom;

@@ -621,8 +621,18 @@ void SubsectionSlider::setSections(
 			const auto isLast = (index == _fixedCount + _pinnedCount - 1);
 			_tabs.back()->setPinnedPosition(isFirst, isLast);
 		}
-		_tabs.back()->setClickedCallback([=] {
-			activate(index);
+		_tabs.back()->setClickedCallback([=, raw = _tabs.back().get()] {
+			if (_tabsReorderedOnce) {
+				const auto i = ranges::find(
+					_tabs,
+					raw,
+					&std::unique_ptr<SubsectionButton>::get);
+				if (i != end(_tabs)) {
+					activate(int(i - begin(_tabs)));
+				}
+			} else {
+				activate(index);
+			}
 		});
 		size += _vertical ? _tabs.back()->height() : _tabs.back()->width();
 	}
@@ -832,6 +842,7 @@ void SubsectionSlider::reorderButtons(int from, int to) {
 		_tabs[i]->move(_vertical ? 0 : position, _vertical ? position : 0);
 		position += _vertical ? _tabs[i]->height() : _tabs[i]->width();
 	}
+	_tabsReorderedOnce = true;
 }
 
 void SubsectionSlider::recalculatePinnedPositions() {

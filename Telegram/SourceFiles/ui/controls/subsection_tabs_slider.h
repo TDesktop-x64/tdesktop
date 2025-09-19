@@ -66,6 +66,7 @@ public:
 	[[nodiscard]] bool isFirstPinned() const;
 	[[nodiscard]] bool isLastPinned() const;
 	virtual void setBackgroundMargin(int margin);
+	void setShift(int shift);
 
 protected:
 	virtual void dataUpdatedHook() = 0;
@@ -80,6 +81,7 @@ protected:
 	bool _isFirstPinned = false;
 	bool _isLastPinned = false;
 	int _backgroundMargin = 0;
+	int _shift = 0;
 
 };
 
@@ -106,8 +108,16 @@ public:
 		not_null<QContextMenuEvent*> e) override;
 	Text::MarkedContext buttonContext() override;
 	[[nodiscard]] not_null<SubsectionButton*> buttonAt(int index);
+	void setButtonShift(int index, int shift);
+	void reorderButtons(int from, int to);
 
 	[[nodiscard]] rpl::producer<ScrollToRequest> requestShown() const;
+
+	void setIsReorderingCallback(Fn<bool()> callback);
+
+	[[nodiscard]] bool isVertical() const {
+		return _vertical;
+	}
 
 protected:
 	struct Range {
@@ -152,6 +162,8 @@ protected:
 	Fn<bool()> _paused;
 
 	rpl::event_stream<ScrollToRequest> _requestShown;
+
+	Fn<bool()> _isReorderingCallback;
 
 };
 

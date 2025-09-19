@@ -456,6 +456,10 @@ void SubsectionButton::setBackgroundMargin(int margin) {
 	invalidateCache();
 }
 
+void SubsectionButton::setShift(int shift) {
+	_shift = shift;
+}
+
 void SubsectionButton::contextMenuEvent(QContextMenuEvent *e) {
 	_delegate->buttonContextMenu(this, e);
 }
@@ -576,6 +580,9 @@ void SubsectionSlider::activate(int index) {
 	if (_active == index) {
 		return;
 	}
+	if (_isReorderingCallback && _isReorderingCallback()) {
+		return;
+	}
 	const auto old = _active;
 	const auto was = getFinalActiveRange();
 	_active = index;
@@ -616,6 +623,10 @@ void SubsectionSlider::setActiveSectionFast(int active, bool ignoreScroll) {
 
 rpl::producer<ScrollToRequest> SubsectionSlider::requestShown() const {
 	return _requestShown.events();
+}
+
+void SubsectionSlider::setIsReorderingCallback(Fn<bool()> callback) {
+	_isReorderingCallback = std::move(callback);
 }
 
 int SubsectionSlider::sectionsCount() const {
@@ -716,6 +727,40 @@ not_null<SubsectionButton*> SubsectionSlider::buttonAt(int index) {
 	Expects(index >= 0 && index < _tabs.size());
 
 	return _tabs[index].get();
+}
+
+void SubsectionSlider::setButtonShift(int index, int shift) {
+	Expects(index >= 0 && index < _tabs.size());
+
+	auto position = 0;
+	for (auto i = 0; i < index; ++i) {
+		position += _vertical ? _tabs[i]->height() : _tabs[i]->width();
+	}
+
+	const auto currentPos = _vertical ? _tabs[index]->y() : _tabs[index]->x();
+	const auto targetPos = position + shift;
+	const auto delta = targetPos - currentPos;
+
+	_tabs[index]->move(
+		_vertical ? 0 : targetPos,
+		_vertical ? targetPos : 0);
+}
+
+void SubsectionSlider::reorderButtons(int from, int to) {
+	Expects(from >= 0 && from < _tabs.size());
+	Expects(to >= 0 && to < _tabs.size());
+	if (from == to) {
+		return;
+	}
+
+	_active = base::reorder_index(_active, from, to);
+	base::reorder(_tabs, from, to);
+
+	auto position = 0;
+	for (auto i = 0; i < int(_tabs.size()); ++i) {
+		_tabs[i]->move(_vertical ? 0 : position, _vertical ? position : 0);
+		position += _vertical ? _tabs[i]->height() : _tabs[i]->width();
+	}
 }
 
 VerticalSlider::VerticalSlider(not_null<QWidget*> parent)

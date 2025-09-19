@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_text_entities.h"
 #include "base/unixtime.h"
 #include "calls/group/calls_group_call.h"
+#include "calls/group/calls_group_message_encryption.h"
 #include "data/data_group_call.h"
 #include "data/data_peer.h"
 #include "data/data_session.h"
@@ -87,14 +88,9 @@ void Messages::send(TextWithTags text) {
 			failed(id, response);
 		}).send();
 	} else {
-		auto counter = ::tl::details::LengthCounter();
-		serialized.write(counter);
-		auto buffer = mtpBuffer();
-		buffer.reserve(counter.length);
-		serialized.write(buffer);
-		const auto view = bytes::make_span(buffer);
-		auto v = std::vector<std::uint8_t>(view.size());
-		bytes::copy(bytes::make_span(v), view);
+		const auto bytes = SerializeMessage(serialized);
+		auto v = std::vector<std::uint8_t>(bytes.size());
+		bytes::copy(bytes::make_span(v), bytes::make_span(bytes));
 
 		const auto userId = peerToUser(from->id).bare;
 		const auto encrypt = _call->e2eEncryptDecrypt();
@@ -132,19 +128,15 @@ void Messages::received(const MTPDupdateGroupCallEncryptedMessage &data) {
 	const auto userId = peerToUser(peerFromMTP(fromId)).bare;
 	const auto decrypt = _call->e2eEncryptDecrypt();
 	const auto decrypted = decrypt(v, int64_t(userId), false, 0);
-	if (decrypted.empty() || decrypted.size() % 4 != 0) {
-		LOG(("API Error: Wrong decrypted message size: %1"
-			).arg(decrypted.size()));
-		return;
-	}
-	auto info = reinterpret_cast<const mtpPrime*>(decrypted.data());
 
-	auto text = MTPTextWithEntities();
-	if (!text.read(info, info + (decrypted.size() / 4))) {
+	const auto deserialized = DeserializeMessage(QByteArray::fromRawData(
+		reinterpret_cast<const char*>(decrypted.data()),
+		decrypted.size()));
+	if (!deserialized) {
 		LOG(("API Error: Can't parse decrypted message"));
 		return;
 	}
-	received(fromId, text);
+	received(fromId, *deserialized);
 	pushChanges();
 }
 

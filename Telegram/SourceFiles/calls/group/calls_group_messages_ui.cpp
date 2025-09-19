@@ -159,10 +159,21 @@ void MessagesUi::setupList(rpl::producer<std::vector<Message>> messages) {
 				}
 			}
 		}
+		auto addedSendingToBottom = false;
 		for (auto i = from; i != till; ++i) {
 			if (!ranges::contains(_views, i->id, &MessageView::id)) {
+				if (i + 1 == till && !i->date) {
+					addedSendingToBottom = true;
+				}
 				appendMessage(*i);
 			}
+		}
+		if (addedSendingToBottom) {
+			const auto from = _scroll->scrollTop();
+			const auto till = _scroll->scrollTopMax();
+			_scrollToBottomAnimation.start([=] {
+				_scroll->scrollToY(_scrollToBottomAnimation.value(till));
+			}, from, till, st::slideDuration, anim::easeOutCirc);
 		}
 	}, _lifetime);
 }

@@ -64,6 +64,7 @@ private:
 	const not_null<QWidget*> _parent;
 	const std::shared_ptr<ChatHelpers::Show> _show;
 	std::unique_ptr<Ui::ElasticScroll> _scroll;
+	Ui::Animations::Simple _scrollToBottomAnimation;
 	Ui::RpWidget *_messages = nullptr;
 	QImage _canvas;
 

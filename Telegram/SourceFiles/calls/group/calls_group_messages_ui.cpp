@@ -415,6 +415,7 @@ void MessagesUi::setupMessagesWidget() {
 		p.fillRect(QRect(QPoint(), scroll->size()), QColor(0, 0, 0, 0));
 
 		p.setCompositionMode(QPainter::CompositionMode_SourceOver);
+		const auto now = crl::now();
 		const auto skip = st::groupCallMessageSkip;
 		const auto padding = st::groupCallMessagePadding;
 		const auto widthSkip = padding.left() + padding.right();
@@ -489,6 +490,9 @@ void MessagesUi::setupMessagesWidget() {
 					entry.top + padding.top()
 				},
 				.availableWidth = entry.width - widthSkip,
+				.spoiler = Ui::Text::DefaultSpoilerCache(),
+				.now = now,
+				.paused = !_messages->window()->isActiveWindow(),
 			});
 
 			p.restore();

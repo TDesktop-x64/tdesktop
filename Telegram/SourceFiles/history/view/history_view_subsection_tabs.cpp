@@ -116,7 +116,7 @@ void SubsectionTabs::setupHorizontal(not_null<QWidget*> parent) {
 	const auto shadow = Ui::CreateChild<Ui::PlainShadow>(_horizontal);
 	const auto slider = scroll->setOwnedWidget(
 		object_ptr<Ui::HorizontalSlider>(scroll));
-	_reorder = std::make_unique<Ui::SubsectionSliderReorder>(slider);
+	_reorder = std::make_unique<Ui::SubsectionSliderReorder>(slider, scroll);
 	setupSlider(scroll, slider, false);
 
 	shadow->showOn(rpl::single(
@@ -189,7 +189,7 @@ void SubsectionTabs::setupVertical(not_null<QWidget*> parent) {
 	const auto shadow = Ui::CreateChild<Ui::PlainShadow>(_vertical);
 	const auto slider = scroll->setOwnedWidget(
 		object_ptr<Ui::VerticalSlider>(scroll));
-	_reorder = std::make_unique<Ui::SubsectionSliderReorder>(slider);
+	_reorder = std::make_unique<Ui::SubsectionSliderReorder>(slider, scroll);
 	setupSlider(scroll, slider, true);
 
 	shadow->showOn(rpl::single(

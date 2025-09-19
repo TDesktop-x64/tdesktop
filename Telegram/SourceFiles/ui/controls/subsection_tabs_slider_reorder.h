@@ -12,6 +12,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Ui {
 
 class RpWidget;
+class ScrollArea;
 class SubsectionButton;
 class SubsectionSlider;
 
@@ -30,6 +31,9 @@ public:
 		State state = State::Started;
 	};
 
+	SubsectionSliderReorder(
+		not_null<SubsectionSlider*> slider,
+		not_null<ScrollArea*> scroll);
 	SubsectionSliderReorder(not_null<SubsectionSlider*> slider);
 	~SubsectionSliderReorder();
 
@@ -72,9 +76,17 @@ private:
 	void moveToShift(int index, int shift);
 	void updateShift(not_null<SubsectionButton*> button, int indexHint);
 
+	void updateScrollCallback();
+	void checkForScrollAnimation();
+	[[nodiscard]] int deltaFromEdge();
+
 	[[nodiscard]] bool isIndexPinned(int index) const;
 
 	const not_null<Ui::SubsectionSlider*> _slider;
+	Ui::ScrollArea *_scroll = nullptr;
+
+	Ui::Animations::Basic _scrollAnimation;
+
 	std::vector<Interval> _pinnedIntervals;
 
 	ProxyCallback _proxyButtonCallback = nullptr;

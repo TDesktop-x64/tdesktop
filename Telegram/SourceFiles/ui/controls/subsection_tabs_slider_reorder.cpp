@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/controls/subsection_tabs_slider_reorder.h"
 
 #include "ui/controls/subsection_tabs_slider.h"
+#include "ui/widgets/scroll_area.h"
 #include "ui/controls/subsection_tabs_slider.h"
 #include "styles/style_basic.h"
 
@@ -20,6 +21,14 @@ namespace {
 constexpr auto kScrollFactor = 0.05;
 
 } // namespace
+
+SubsectionSliderReorder::SubsectionSliderReorder(
+	not_null<SubsectionSlider*> slider,
+	not_null<ScrollArea*> scroll)
+: _slider(slider)
+, _scroll(scroll)
+, _scrollAnimation([=] { updateScrollCallback(); }) {
+}
 
 SubsectionSliderReorder::SubsectionSliderReorder(
 	not_null<SubsectionSlider*> slider)
@@ -103,6 +112,8 @@ void SubsectionSliderReorder::mouseMove(
 		checkForStart(position);
 	} else {
 		updateOrder(indexOf(_currentButton), position);
+
+		checkForScrollAnimation();
 	}
 }
 
@@ -228,6 +239,9 @@ void SubsectionSliderReorder::cancelCurrent(int index) {
 }
 
 void SubsectionSliderReorder::finishReordering() {
+	if (_scroll) {
+		_scrollAnimation.stop();
+	}
 	finishCurrent();
 }
 
@@ -326,6 +340,61 @@ int SubsectionSliderReorder::indexOf(
 	const auto i = ranges::find(_entries, button, &Entry::button);
 	Assert(i != end(_entries));
 	return i - begin(_entries);
+}
+
+void SubsectionSliderReorder::updateScrollCallback() {
+	if (!_scroll) {
+		return;
+	}
+	const auto delta = deltaFromEdge();
+	if (_slider->isVertical()) {
+		const auto oldTop = _scroll->scrollTop();
+		_scroll->scrollToY(oldTop + delta);
+		const auto newTop = _scroll->scrollTop();
+		_currentStart += oldTop - newTop;
+		if (newTop == 0 || newTop == _scroll->scrollTopMax()) {
+			_scrollAnimation.stop();
+		}
+	} else {
+		const auto oldLeft = _scroll->scrollLeft();
+		_scroll->scrollToX(oldLeft + delta);
+		const auto newLeft = _scroll->scrollLeft();
+		_currentStart += oldLeft - newLeft;
+		if (newLeft == 0 || newLeft == _scroll->scrollLeftMax()) {
+			_scrollAnimation.stop();
+		}
+	}
+}
+
+void SubsectionSliderReorder::checkForScrollAnimation() {
+	if (!_scroll || !deltaFromEdge() || _scrollAnimation.animating()) {
+		return;
+	}
+	_scrollAnimation.start();
+}
+
+int SubsectionSliderReorder::deltaFromEdge() {
+	Expects(_currentButton != nullptr);
+	Expects(_scroll);
+
+	const auto globalPosition = _currentButton->mapToGlobal(QPoint(0, 0));
+	const auto localPos = _scroll->mapFromGlobal(globalPosition);
+	const auto localTop = _slider->isVertical() ? localPos.y() : localPos.x();
+	const auto buttonSize = _slider->isVertical()
+		? _currentButton->height()
+		: _currentButton->width();
+	const auto scrollSize = _slider->isVertical()
+		? _scroll->height()
+		: _scroll->width();
+	const auto localBottom = localTop + buttonSize - scrollSize;
+
+	const auto isTopEdge = (localTop < 0);
+	const auto isBottomEdge = (localBottom > 0);
+	if (!isTopEdge && !isBottomEdge) {
+		_scrollAnimation.stop();
+		return 0;
+	}
+	return int((isBottomEdge ? localBottom : localTop) * kScrollFactor);
 }
 
 } // namespace Ui

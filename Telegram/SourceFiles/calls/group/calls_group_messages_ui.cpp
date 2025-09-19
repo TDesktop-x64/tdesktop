@@ -127,7 +127,8 @@ MessagesUi::MessagesUi(
 	result.setAlphaF(kMessageBgOpacity);
 	return result;
 })
-, _messageBgRect(CountMessageRadius(), _messageBg.color()) {
+, _messageBgRect(CountMessageRadius(), _messageBg.color())
+, _fadeHeight(st::normalFont->height) {
 	setupList(std::move(messages));
 }
 
@@ -334,6 +335,39 @@ void MessagesUi::appendMessage(const Message &data) {
 	toggleMessage(entry, true);
 }
 
+void MessagesUi::updateTopFade() {
+	const auto topFadeShown = (_scroll->scrollTop() > 0);
+	if (_topFadeShown != topFadeShown) {
+		_topFadeShown = topFadeShown;
+		//const auto from = topFadeShown ? 0. : 1.;
+		//const auto till = topFadeShown ? 1. : 0.;
+		//_topFadeAnimation.start([=] {
+			_messages->update(
+				0,
+				_scroll->scrollTop(),
+				_messages->width(),
+				_fadeHeight);
+		//}, from, till, st::slideWrapDuration);
+	}
+}
+
+void MessagesUi::updateBottomFade() {
+	const auto max = _scroll->scrollTopMax();
+	const auto bottomFadeShown = (_scroll->scrollTop() < max);
+	if (_bottomFadeShown != bottomFadeShown) {
+		_bottomFadeShown = bottomFadeShown;
+		//const auto from = bottomFadeShown ? 0. : 1.;
+		//const auto till = bottomFadeShown ? 1. : 0.;
+		//_bottomFadeAnimation.start([=] {
+			_messages->update(
+				0,
+				_scroll->scrollTop() + _scroll->height() - _fadeHeight,
+				_messages->width(),
+				_fadeHeight);
+		//}, from, till, st::slideWrapDuration);
+	}
+}
+
 void MessagesUi::setupMessagesWidget() {
 	_scroll = std::make_unique<Ui::ElasticScroll>(
 		_parent,
@@ -343,6 +377,14 @@ void MessagesUi::setupMessagesWidget() {
 	ReceiveOnlyWheelEvents(scroll);
 
 	_messages = scroll->setOwnedWidget(object_ptr<Ui::RpWidget>(scroll));
+	rpl::combine(
+		scroll->scrollTopValue(),
+		scroll->heightValue(),
+		_messages->heightValue()
+	) | rpl::start_with_next([=] {
+		updateTopFade();
+		updateBottomFade();
+	}, scroll->lifetime());
 
 	_messages->paintRequest() | rpl::start_with_next([=](QRect clip) {
 		const auto start = scroll->scrollTop();
@@ -442,27 +484,35 @@ void MessagesUi::setupMessagesWidget() {
 		}
 		p.translate(0, start);
 
-		const auto fadeHeight = st::normalFont->height;
 		p.setCompositionMode(QPainter::CompositionMode_DestinationIn);
 		p.setPen(Qt::NoPen);
 
-		auto gradientTop = QLinearGradient(0, 0, 0, fadeHeight);
-		gradientTop.setStops({
-			{ 0., QColor(255, 255, 255, 0) },
-			{ 1., QColor(255, 255, 255, 255) },
-		});
-		p.setBrush(gradientTop);
-		p.drawRect(0, 0, scroll->width(), fadeHeight);
-
-		const auto till = scroll->height();
-		auto gradientBottom = QLinearGradient(0, till - fadeHeight, 0, till);
-		gradientBottom.setStops({
-			{ 0., QColor(255, 255, 255, 255) },
-			{ 1., QColor(255, 255, 255, 0) },
-		});
-		p.setBrush(gradientBottom);
-		p.drawRect(0, till - fadeHeight, scroll->width(), fadeHeight);
-
+		const auto topFade = _topFadeAnimation.value(
+			_topFadeShown ? 1. : 0.);
+		if (topFade) {
+			auto gradientTop = QLinearGradient(0, 0, 0, _fadeHeight);
+			gradientTop.setStops({
+				{ 0., QColor(255, 255, 255, 0) },
+				{ 1., QColor(255, 255, 255, 255) },
+			});
+			p.setOpacity(topFade);
+			p.setBrush(gradientTop);
+			p.drawRect(0, 0, scroll->width(), _fadeHeight);
+			p.setOpacity(1.);
+		}
+		const auto bottomFade = _bottomFadeAnimation.value(
+			_bottomFadeShown ? 1. : 0.);
+		if (bottomFade) {
+			const auto till = scroll->height();
+			const auto from = till - _fadeHeight;
+			auto gradientBottom = QLinearGradient(0, from, 0, till);
+			gradientBottom.setStops({
+				{ 0., QColor(255, 255, 255, 255) },
+				{ 1., QColor(255, 255, 255, 0) },
+			});
+			p.setBrush(gradientBottom);
+			p.drawRect(0, from, scroll->width(), _fadeHeight);
+		}
 		QPainter(_messages).drawImage(
 			QRect(QPoint(0, start), scroll->size()),
 			_canvas,

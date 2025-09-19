@@ -87,6 +87,7 @@ void MessageField::createControls(PeerData *peer) {
 		});
 
 	_send = Ui::CreateChild<Ui::SendButton>(_wrap.get(), st.send);
+	_send->show();
 
 	using Selector = ChatHelpers::TabbedSelector;
 	using Descriptor = ChatHelpers::TabbedPanelDescriptor;
@@ -131,6 +132,7 @@ void MessageField::createControls(PeerData *peer) {
 	}, lifetime());
 
 	_emojiToggle = Ui::CreateChild<Ui::EmojiButton>(_wrap.get(), st.emoji);
+	_emojiToggle->show();
 
 	_emojiToggle->installEventFilter(_emojiPanel);
 	_emojiToggle->addClickHandler([=] {
@@ -141,8 +143,6 @@ void MessageField::createControls(PeerData *peer) {
 	) | rpl::filter(
 		rpl::mappers::_1 > 0
 	) | rpl::start_with_next([=](int newWidth) {
-		_wrap->resizeToWidth(newWidth);
-
 		const auto fieldWidth = newWidth
 			- st::historySendPadding
 			- _emojiToggle->width()
@@ -152,12 +152,17 @@ void MessageField::createControls(PeerData *peer) {
 			st::historySendPadding,
 			st::historySendPadding,
 			newWidth);
-		_send->moveToRight(0, 0);
-		_emojiToggle->moveToRight(_send->width(), 0);
+		_send->moveToRight(0, 0, newWidth);
+		_emojiToggle->moveToRight(_send->width(), 0, newWidth);
+		updateWrapSize(newWidth);
 	}, _lifetime);
 
 	_field->heightValue() | rpl::start_with_next([=](int height) {
-		_wrap->resize(_wrap->width(), height + 2 * st::historySendPadding);
+		updateWrapSize();
+	}, _lifetime);
+
+	_field->cancelled() | rpl::start_with_next([=] {
+		_closeRequests.fire({});
 	}, _lifetime);
 
 	rpl::merge(
@@ -251,21 +256,29 @@ void MessageField::raise() {
 	}
 }
 
+void MessageField::updateWrapSize(int widthOverride) {
+	const auto width = widthOverride ? widthOverride : _wrap->width();
+	const auto height = _field->height() + 2 * st::historySendPadding;
+	_wrap->resize(width, height);
+	updateHeight();
+}
+
+void MessageField::updateHeight() {
+	_height = int(base::SafeRound(
+		_shownAnimation.value(_shown ? 1. : 0.) * _wrap->height()));
+}
+
 void MessageField::shownAnimationCallback() {
+	updateHeight();
 	if (_shownAnimation.animating()) {
 		Assert(_cache != nullptr);
-		const auto height = int(base::SafeRound(
-			_shownAnimation.value(_shown ? 1. : 0.) * _wrap->height()));
-		_cache->resize(_cache->width(), height);
+		_cache->resize(_cache->width(), _height.current());
 		_cache->update();
-		_height = height;
 	} else if (_shown) {
 		_cache = nullptr;
 		_wrap->show();
-		_height = _wrap->height();
 		_field->setFocusFast();
 	} else {
-		_height = 0;
 		_closed.fire({});
 	}
 }
@@ -280,6 +293,10 @@ rpl::producer<int> MessageField::heightValue() const {
 
 rpl::producer<TextWithTags> MessageField::submitted() const {
 	return _submitted.events();
+}
+
+rpl::producer<> MessageField::closeRequests() const {
+	return _closeRequests.events();
 }
 
 rpl::producer<> MessageField::closed() const {

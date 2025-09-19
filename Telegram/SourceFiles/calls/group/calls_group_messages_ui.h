@@ -58,6 +58,8 @@ private:
 	void setupMessagesWidget();
 	void applyWidth();
 	void updateGeometries();
+	void updateTopFade();
+	void updateBottomFade();
 
 	const not_null<QWidget*> _parent;
 	const std::shared_ptr<ChatHelpers::Show> _show;
@@ -68,6 +70,12 @@ private:
 	std::vector<MessageView> _views;
 	style::complex_color _messageBg;
 	Ui::RoundRect _messageBgRect;
+
+	Ui::Animations::Simple _topFadeAnimation;
+	Ui::Animations::Simple _bottomFadeAnimation;
+	int _fadeHeight = 0;
+	bool _topFadeShown = false;
+	bool _bottomFadeShown = false;
 
 	int _left = 0;
 	int _bottom = 0;

@@ -513,6 +513,12 @@ void Panel::toggleMessageTyping() {
 			updateButtonsGeometry();
 		}, _messageField->lifetime());
 
+		_messageField->closeRequests() | rpl::start_with_next([=] {
+			if (_messageTyping.current()) {
+				toggleMessageTyping();
+			}
+		}, _messageField->lifetime());
+
 		_messageField->closed() | rpl::start_with_next([=] {
 			_messageField = nullptr;
 			updateButtonsGeometry();

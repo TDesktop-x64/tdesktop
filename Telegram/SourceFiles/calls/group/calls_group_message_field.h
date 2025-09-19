@@ -41,6 +41,7 @@ public:
 	[[nodiscard]] rpl::producer<int> heightValue() const;
 
 	[[nodiscard]] rpl::producer<TextWithTags> submitted() const;
+	[[nodiscard]] rpl::producer<> closeRequests() const;
 	[[nodiscard]] rpl::producer<> closed() const;
 
 	[[nodiscard]] rpl::lifetime &lifetime();
@@ -50,6 +51,8 @@ private:
 	void setupBackground();
 	void shownAnimationCallback();
 	void updateEmojiPanelGeometry();
+	void updateWrapSize(int widthOverride = 0);
+	void updateHeight();
 
 	const not_null<QWidget*> _parent;
 	const std::shared_ptr<ChatHelpers::Show> _show;
@@ -68,6 +71,7 @@ private:
 	std::unique_ptr<Ui::RpWidget> _cache;
 
 	rpl::event_stream<TextWithTags> _submitted;
+	rpl::event_stream<> _closeRequests;
 	rpl::event_stream<> _closed;
 
 	rpl::lifetime _lifetime;

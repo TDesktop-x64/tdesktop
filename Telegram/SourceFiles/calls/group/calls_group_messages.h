@@ -49,7 +49,10 @@ private:
 	void pushChanges();
 	void checkDestroying(bool afterChanges = false);
 
-	void received(const MTPPeer &from, const MTPTextWithEntities &message);
+	void received(
+		const MTPPeer &from,
+		const MTPTextWithEntities &message,
+		bool checkCustomEmoji = false);
 	void sent(int id, const MTP::Response &response);
 	void failed(int id, const MTP::Response &response);
 

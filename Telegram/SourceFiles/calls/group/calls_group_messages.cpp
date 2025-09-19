@@ -136,17 +136,31 @@ void Messages::received(const MTPDupdateGroupCallEncryptedMessage &data) {
 		LOG(("API Error: Can't parse decrypted message"));
 		return;
 	}
-	received(fromId, *deserialized);
+	received(fromId, *deserialized, true);
 	pushChanges();
 }
 
 void Messages::received(
 		const MTPPeer &from,
-		const MTPTextWithEntities &message) {
+		const MTPTextWithEntities &message,
+		bool checkCustomEmoji) {
 	const auto peer = _call->peer();
 	if (peerFromMTP(from) == peer->session().userPeerId()) {
 		// Our own we add only locally.
 		return;
+	}
+	auto allowedEntityTypes = std::vector<EntityType>{
+		EntityType::Code,
+		EntityType::Bold,
+		EntityType::Semibold,
+		EntityType::Spoiler,
+		EntityType::StrikeOut,
+		EntityType::Underline,
+		EntityType::Italic,
+		EntityType::CustomEmoji,
+	};
+	if (checkCustomEmoji && !peer->isSelf() && !peer->isPremium()) {
+		allowedEntityTypes.pop_back();
 	}
 	const auto id = ++_autoincrementId;
 	_messages.push_back({
@@ -155,16 +169,7 @@ void Messages::received(
 		.peer = peer->owner().peer(peerFromMTP(from)),
 		.text = Ui::Text::Filtered(
 			Api::ParseTextWithEntities(&peer->session(), message),
-			{
-				EntityType::Code,
-				EntityType::Bold,
-				EntityType::Semibold,
-				EntityType::Spoiler,
-				EntityType::StrikeOut,
-				EntityType::Underline,
-				EntityType::Italic,
-				EntityType::CustomEmoji,
-			}),
+			allowedEntityTypes),
 	});
 	checkDestroying(true);
 }

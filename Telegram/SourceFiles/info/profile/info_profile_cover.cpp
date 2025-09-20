@@ -613,8 +613,9 @@ Cover::Cover(
 , _emojiStatusPanel(peer->isSelf()
 	? std::make_unique<EmojiStatusPanel>()
 	: nullptr)
-, _botVerify(
-	std::make_unique<Badge>(
+, _botVerify(role == Role::EditContact
+	? nullptr
+	: std::make_unique<Badge>(
 		this,
 		st::infoBotVerifyBadge,
 		&peer->session(),
@@ -660,6 +661,7 @@ Cover::Cover(
 		_st.photo,
 		_peer->userpicShape()))
 , _changePersonal((role == Role::Info
+	|| role == Role::EditContact
 	|| topic
 	|| !_peer->isUser()
 	|| _peer->isSelf()
@@ -670,7 +672,7 @@ Cover::Cover(
 	? object_ptr<TopicIconButton>(this, controller, topic)
 	: nullptr)
 , _name(this, _st.name)
-, _starsRating(_peer->isUser()
+, _starsRating(_peer->isUser() && _role != Role::EditContact
 	? std::make_unique<Ui::StarsRating>(
 		this,
 		_controller->uiShow(),
@@ -711,18 +713,24 @@ Cover::Cover(
 			::Settings::ShowEmojiStatusPremium(_controller, _peer);
 		}
 	});
-	rpl::merge(
-		_botVerify->updated(),
+	auto badgeUpdates = rpl::merge(
 		_badge->updated(),
-		_verified->updated()
-	) | rpl::start_with_next([=] {
+		_verified->updated());
+	if (_botVerify) {
+		badgeUpdates = rpl::merge(
+			std::move(badgeUpdates),
+			_botVerify->updated());
+	}
+	std::move(badgeUpdates) | rpl::start_with_next([=] {
 		refreshNameGeometry(width());
 	}, _name->lifetime());
 
 	initViewers(std::move(title));
 	setupChildGeometry();
 	setupUniqueBadgeTooltip();
-	setupSavedMusic();
+	if (_role != Role::EditContact) {
+		setupSavedMusic();
+	}
 
 	if (_userpic) {
 	} else if (topic->canEdit()) {
@@ -1116,12 +1124,14 @@ void Cover::refreshNameGeometry(int newWidth) {
 	const auto badgeBottom = _st.nameTop + _name->height();
 	const auto margins = LargeCustomEmojiMargins();
 
-	_botVerify->move(nameLeft - margins.left(), badgeTop, badgeBottom);
-	if (const auto widget = _botVerify->widget()) {
-		const auto skip = widget->width()
-			+ st::infoVerifiedCheckPosition.x();
-		nameLeft += skip;
-		nameWidth -= skip;
+	if (_botVerify) {
+		_botVerify->move(nameLeft - margins.left(), badgeTop, badgeBottom);
+		if (const auto widget = _botVerify->widget()) {
+			const auto skip = widget->width()
+				+ st::infoVerifiedCheckPosition.x();
+			nameLeft += skip;
+			nameWidth -= skip;
+		}
 	}
 	_name->resizeToNaturalWidth(nameWidth);
 	_name->moveToLeft(nameLeft, _st.nameTop, newWidth);

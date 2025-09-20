@@ -26,17 +26,22 @@ namespace HistoryView::Controls {
 CharactersLimitLabel::CharactersLimitLabel(
 	not_null<Ui::RpWidget*> parent,
 	not_null<Ui::RpWidget*> widgetToAlign,
-	style::align align)
+	style::align align,
+	QMargins margins)
 : Ui::FlatLabel(parent, st::historyCharsLimitationLabel)
 , _widgetToAlign(widgetToAlign)
 , _position((align == style::al_top)
 	? Fn<void(int, const QRect &)>([=](int height, const QRect &g) {
 		const auto w = textMaxWidth();
-		move(g.x() + (g.width() - w) / 2, rect::bottom(g));
+		move(
+			g.x() + (g.width() - w) / 2 + margins.left(),
+			rect::bottom(g) + margins.top());
 	})
 	: Fn<void(int, const QRect &)>([=](int height, const QRect &g) {
 		const auto w = textMaxWidth();
-		move(g.x() + (g.width() - w) / 2, g.y() - height);
+		move(
+			g.x() + (g.width() - w) / 2 + margins.left(),
+			g.y() - height - margins.bottom());
 	})) {
 	Expects((align == style::al_top) || align == style::al_bottom);
 	rpl::combine(

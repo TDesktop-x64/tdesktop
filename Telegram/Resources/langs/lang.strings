@@ -1640,6 +1640,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_profile_suggest_photo_from_clipboard" = "Suggest From Clipboard";
 "lng_profile_set_photo_for" = "Set Profile Photo";
 "lng_profile_set_photo_for_from_clipboard" = "Set From Clipboard";
+"lng_profile_set_photo_for_about" = "You can replace {user}'s photo with another photo that only you will see.";
 "lng_profile_photo_reset" = "Reset to Original";
 "lng_profile_photo_from_clipboard" = "From clipboard";
 "lng_profile_suggest_sure" = "You can suggest {user} to set this photo for their Telegram profile.";
@@ -4795,6 +4796,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_contact_phone_after" = "Phone number will be visible once {user} adds you as a contact.";
 "lng_contact_share_phone" = "Share my phone number";
 "lng_contact_phone_will_be_shared" = "You can make your phone visible to {user}.";
+"lng_contact_add_notes" = "Note";
+"lng_contact_add_notes_about" = "Notes are only visible to you.";
 "lng_edit_contact_title" = "Edit contact";
 "lng_edit_channel_title" = "Edit channel";
 "lng_edit_bot_title" = "Edit bot";

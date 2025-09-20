@@ -7,25 +7,39 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "boxes/peers/edit_contact_box.h"
 
-#include "data/data_user.h"
-#include "data/data_session.h"
+#include "api/api_peer_photo.h"
+#include "apiwrap.h"
 #include "boxes/peers/edit_peer_common.h"
-#include "ui/wrap/vertical_layout.h"
-#include "ui/widgets/labels.h"
-#include "ui/widgets/checkbox.h"
-#include "ui/widgets/fields/input_field.h"
-#include "ui/text/format_values.h" // Ui::FormatPhone
-#include "ui/text/text_utilities.h"
+#include "boxes/premium_preview_box.h"
+#include "chat_helpers/tabbed_panel.h"
+#include "chat_helpers/tabbed_selector.h"
+#include "core/ui_integration.h"
+#include "data/data_document.h"
+#include "data/data_premium_limits.h"
+#include "data/data_session.h"
+#include "data/data_user.h"
+#include "data/stickers/data_custom_emoji.h"
+#include "data/stickers/data_stickers.h"
+#include "history/view/controls/history_view_characters_limit.h"
 #include "info/profile/info_profile_cover.h"
 #include "lang/lang_keys.h"
-#include "window/window_controller.h"
-#include "ui/toast/toast.h"
 #include "main/main_session.h"
-#include "apiwrap.h"
-#include "api/api_peer_photo.h"
-#include "styles/style_layers.h"
+#include "ui/controls/emoji_button_factory.h"
+#include "ui/controls/emoji_button.h"
+#include "ui/text/format_values.h" // Ui::FormatPhone
+#include "ui/text/text_utilities.h"
+#include "ui/toast/toast.h"
+#include "ui/vertical_list.h"
+#include "ui/widgets/checkbox.h"
+#include "ui/widgets/fields/input_field.h"
+#include "ui/widgets/labels.h"
+#include "ui/wrap/vertical_layout.h"
+#include "window/window_controller.h"
+#include "window/window_session_controller.h"
 #include "styles/style_boxes.h"
+#include "styles/style_chat_helpers.h"
 #include "styles/style_info.h"
+#include "styles/style_layers.h"
 
 namespace {
 
@@ -92,6 +106,7 @@ private:
 	void setupContent();
 	void setupCover();
 	void setupNameFields();
+	void setupNotesField();
 	void setupWarning();
 	void setupSharePhoneNumber();
 	void initNameFields(
@@ -103,6 +118,8 @@ private:
 	not_null<Window::SessionController*> _window;
 	not_null<UserData*> _user;
 	Ui::Checkbox *_sharePhone = nullptr;
+	Ui::InputField *_notesField = nullptr;
+	base::unique_qptr<ChatHelpers::TabbedPanel> _emojiPanel;
 	QString _phone;
 	Fn<void()> _focus;
 	Fn<void()> _save;
@@ -135,6 +152,7 @@ void Controller::prepare() {
 void Controller::setupContent() {
 	setupCover();
 	setupNameFields();
+	setupNotesField();
 	setupWarning();
 	setupSharePhoneNumber();
 }
@@ -258,6 +276,122 @@ void Controller::setupWarning() {
 		st::addContactWarningMargin);
 }
 
+void Controller::setupNotesField() {
+	Ui::AddSkip(_box->verticalLayout());
+	Ui::AddDivider(_box->verticalLayout());
+	Ui::AddSkip(_box->verticalLayout());
+	_notesField = _box->addRow(
+		object_ptr<Ui::InputField>(
+			_box,
+			st::notesFieldWithEmoji,
+			Ui::InputField::Mode::MultiLine,
+			tr::lng_contact_add_notes(),
+			QString()),
+		st::addContactFieldMargin);
+	_notesField->setCustomTextContext(Core::TextContext({
+		.session = &_user->session()
+	}));
+	_notesField->setTextWithTags({
+		_user->note().text,
+		TextUtilities::ConvertEntitiesToTextTags(_user->note().entities)
+	});
+
+	_notesField->setMarkdownReplacesEnabled(rpl::single(
+		Ui::MarkdownEnabledState{
+			Ui::MarkdownEnabled{
+				{
+					Ui::InputField::kTagBold,
+					Ui::InputField::kTagItalic,
+					Ui::InputField::kTagUnderline,
+					Ui::InputField::kTagStrikeOut,
+					Ui::InputField::kTagSpoiler
+				}
+			}
+		}
+	));
+
+	const auto container = _box->getDelegate()->outerContainer();
+	using Selector = ChatHelpers::TabbedSelector;
+	_emojiPanel = base::make_unique_q<ChatHelpers::TabbedPanel>(
+		container,
+		_window,
+		object_ptr<Selector>(
+			nullptr,
+			_window->uiShow(),
+			Window::GifPauseReason::Layer,
+			Selector::Mode::EmojiOnly));
+	_emojiPanel->setDesiredHeightValues(
+		1.,
+		st::emojiPanMinHeight / 2,
+		st::emojiPanMinHeight);
+	_emojiPanel->hide();
+	_emojiPanel->selector()->setCurrentPeer(_window->session().user());
+	_emojiPanel->selector()->emojiChosen(
+	) | rpl::start_with_next([=](ChatHelpers::EmojiChosen data) {
+		Ui::InsertEmojiAtCursor(_notesField->textCursor(), data.emoji);
+	}, _notesField->lifetime());
+	_emojiPanel->selector()->customEmojiChosen(
+	) | rpl::start_with_next([=](ChatHelpers::FileChosen data) {
+		const auto info = data.document->sticker();
+		if (info
+			&& info->setType == Data::StickersType::Emoji
+			&& !_window->session().premium()) {
+			ShowPremiumPreviewBox(
+				_window,
+				PremiumFeature::AnimatedEmoji);
+		} else {
+			Data::InsertCustomEmoji(_notesField, data.document);
+		}
+	}, _notesField->lifetime());
+
+	const auto emojiButton = Ui::AddEmojiToggleToField(
+		_notesField,
+		_box,
+		_window,
+		_emojiPanel.get(),
+		st::sendGifWithCaptionEmojiPosition);
+	emojiButton->show();
+
+	using Limit = HistoryView::Controls::CharactersLimitLabel;
+	struct LimitState {
+		base::unique_qptr<Limit> charsLimitation;
+	};
+	const auto limitState = _notesField->lifetime().make_state<LimitState>();
+
+	const auto checkCharsLimitation = [=] {
+		const auto limit = Data::PremiumLimits(
+			&_user->session()).contactNoteLengthCurrent();
+		const auto remove = Ui::ComputeFieldCharacterCount(_notesField)
+			- limit;
+		if (!limitState->charsLimitation) {
+			limitState->charsLimitation = base::make_unique_q<Limit>(
+				_box->verticalLayout(),
+				emojiButton,
+				style::al_top,
+				QMargins{ 0, -st::lineWidth, 0, 0 });
+			_notesField->heightValue(
+			) | rpl::start_with_next([=](int height) {
+				const auto &st = _notesField->st();
+				const auto hasMultipleLines = height >
+					(st.textMargins.top()
+						+ st.style.font->height
+						+ st.textMargins.bottom() * 2);
+				limitState->charsLimitation->setVisible(hasMultipleLines);
+				limitState->charsLimitation->raise();
+			}, limitState->charsLimitation->lifetime());
+		}
+		limitState->charsLimitation->setLeft(remove);
+	};
+
+	_notesField->changes() | rpl::start_with_next([=] {
+		checkCharsLimitation();
+	}, _notesField->lifetime());
+
+	Ui::AddDividerText(
+		_box->verticalLayout(),
+		tr::lng_contact_add_notes_about());
+}
+
 void Controller::setupSharePhoneNumber() {
 	const auto settings = _user->barSettings();
 	if (!settings
@@ -286,5 +420,6 @@ void EditContactBox(
 		not_null<Ui::GenericBox*> box,
 		not_null<Window::SessionController*> window,
 		not_null<UserData*> user) {
+	box->setWidth(st::boxWideWidth);
 	box->lifetime().make_state<Controller>(box, window, user)->prepare();
 }

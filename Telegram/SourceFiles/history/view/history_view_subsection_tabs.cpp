@@ -65,6 +65,10 @@ SubsectionTabs::SubsectionTabs(
 	refreshSlice();
 	setup(parent);
 
+	session().data().pinnedDialogsOrderUpdated() | rpl::start_with_next([=] {
+		_refreshed.fire({});
+	}, _lifetime);
+
 	dataChanged() | rpl::start_with_next([=] {
 		if (_loading) {
 			_loading = false;
@@ -530,7 +534,7 @@ void SubsectionTabs::startFillingSlider(
 		Assert(slider->sectionsCount() == _slice.size());
 
 		_reorder->cancel();
-		if (_history->peer->canManageTopics()) {
+		if ((pinnedCount > 1) && _history->peer->canManageTopics()) {
 			_reorder->start();
 		}
 

@@ -341,6 +341,19 @@ void SubsectionTabs::startScrollChecking(
 			refreshAroundMiddle(scroll, slider);
 		}
 	}, scroll->lifetime());
+
+	session().changes().peerUpdates(
+		Data::PeerUpdate::Flag::Rights
+	) | rpl::filter([=](const Data::PeerUpdate &update) {
+		return (update.peer == _history->peer);
+	}) | rpl::start_with_next([=] {
+		if (_reorder) {
+			_reorder->cancel();
+			if (_history->peer->canManageTopics()) {
+				_reorder->start();
+			}
+		}
+	}, _lifetime);
 }
 
 void SubsectionTabs::startFillingSlider(
@@ -517,7 +530,9 @@ void SubsectionTabs::startFillingSlider(
 		Assert(slider->sectionsCount() == _slice.size());
 
 		_reorder->cancel();
-		_reorder->start();
+		if (_history->peer->canManageTopics()) {
+			_reorder->start();
+		}
 
 		if (ignoreActiveScroll) {
 			Assert(scrollSavingIndex < slider->sectionsCount());

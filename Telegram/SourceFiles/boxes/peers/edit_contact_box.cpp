@@ -288,6 +288,7 @@ void Controller::setupNotesField() {
 			tr::lng_contact_add_notes(),
 			QString()),
 		st::addContactFieldMargin);
+	_notesField->setMarkdownSet(Ui::MarkdownSet::Notes);
 	_notesField->setCustomTextContext(Core::TextContext({
 		.session = &_user->session()
 	}));

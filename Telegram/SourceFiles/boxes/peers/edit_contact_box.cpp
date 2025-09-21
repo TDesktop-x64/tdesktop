@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/peers/edit_contact_box.h"
 
 #include "api/api_peer_photo.h"
+#include "api/api_text_entities.h"
 #include "apiwrap.h"
 #include "boxes/peers/edit_peer_common.h"
 #include "boxes/premium_preview_box.h"
@@ -35,6 +36,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/controls/userpic_button.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/text/format_values.h" // Ui::FormatPhone
+#include "ui/text/text_entity.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
 #include "ui/vertical_list.h"
@@ -71,18 +73,22 @@ void SendRequest(
 		const QString &first,
 		const QString &last,
 		const QString &phone,
+		const TextWithEntities &note,
 		Fn<void()> done) {
 	const auto wasContact = user->isContact();
 	using Flag = MTPcontacts_AddContact::Flag;
 	user->session().api().request(MTPcontacts_AddContact(
-		MTP_flags(sharePhone
-			? Flag::f_add_phone_privacy_exception
-			: Flag(0)),
+		MTP_flags(Flag::f_note
+			| (sharePhone ? Flag::f_add_phone_privacy_exception : Flag(0))),
 		user->inputUser,
 		MTP_string(first),
 		MTP_string(last),
 		MTP_string(phone),
-		MTPTextWithEntities() // note
+		note.text.isEmpty()
+			? MTPTextWithEntities()
+			: MTP_textWithEntities(
+				MTP_string(note.text),
+				Api::EntitiesToMTP(&user->session(), note.entities))
 	)).done([=](const MTPUpdates &result) {
 		user->setName(
 			first,
@@ -262,6 +268,16 @@ void Controller::initNameFields(
 				}
 			}
 		};
+		const auto noteValue = _notesField
+			? [&] {
+				auto textWithTags = _notesField->getTextWithAppliedMarkdown();
+				return TextWithEntities{
+					base::take(textWithTags.text),
+					TextUtilities::ConvertTextTagsToEntities(
+						base::take(textWithTags.tags)),
+				};
+			}()
+			: TextWithEntities();
 		SendRequest(
 			base::make_weak(_box),
 			user,
@@ -269,6 +285,7 @@ void Controller::initNameFields(
 			firstValue,
 			lastValue,
 			_phone,
+			noteValue,
 			done);
 	};
 	const auto submit = [=] {

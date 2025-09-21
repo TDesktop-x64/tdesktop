@@ -128,6 +128,7 @@ private:
 	void setupNameFields();
 	void setupNotesField();
 	void setupPhotoButtons();
+	void setupDeleteContactButton();
 	void setupWarning();
 	void setupSharePhoneNumber();
 	void initNameFields(
@@ -183,6 +184,7 @@ void Controller::setupContent() {
 	setupNameFields();
 	setupNotesField();
 	setupPhotoButtons();
+	setupDeleteContactButton();
 	setupWarning();
 	setupSharePhoneNumber();
 }
@@ -518,6 +520,41 @@ void Controller::setupPhotoButtons() {
 	Ui::AddDividerText(
 		inner,
 		tr::lng_contact_photo_replace_info(lt_user, std::move(nameValue)));
+	Ui::AddSkip(inner);
+}
+
+void Controller::setupDeleteContactButton() {
+	if (!_user->isContact()) {
+		return;
+	}
+	const auto inner = _box->verticalLayout();
+	const auto deleteButton = Settings::AddButtonWithIcon(
+		inner,
+		tr::lng_info_delete_contact(),
+		st::settingsAttentionButton,
+		{ nullptr });
+	deleteButton->setClickedCallback([=] {
+		const auto text = tr::lng_sure_delete_contact(
+			tr::now,
+			lt_contact,
+			_user->name());
+		const auto deleteSure = [=](Fn<void()> &&close) {
+			close();
+			_user->session().api().request(MTPcontacts_DeleteContacts(
+				MTP_vector<MTPInputUser>(1, _user->inputUser)
+			)).done([=](const MTPUpdates &result) {
+				_user->session().api().applyUpdates(result);
+				_box->closeBox();
+			}).send();
+		};
+		_window->show(Ui::MakeConfirmBox({
+			.text = text,
+			.confirmed = deleteSure,
+			.confirmText = tr::lng_box_delete(),
+			.confirmStyle = &st::attentionBoxButton,
+		}));
+	});
+	Ui::AddSkip(inner);
 }
 
 void Controller::setupSharePhoneNumber() {

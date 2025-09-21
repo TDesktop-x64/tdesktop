@@ -704,6 +704,73 @@ base::options::toggle ShowChannelJoinedBelowAbout({
 	return result;
 }
 
+[[nodiscard]] object_ptr<Ui::SlideWrap<>> CreateNotes(
+		not_null<QWidget*> parent,
+		not_null<UserData*> user) {
+	auto notesText = user->session().changes().peerFlagsValue(
+		user,
+		Data::PeerUpdate::Flag::FullInfo
+	) | rpl::map([=] {
+		return user->note();
+	}) | rpl::filter([](const TextWithEntities &note) {
+		return !note.text.isEmpty();
+	});
+
+	auto result = object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+		parent,
+		object_ptr<Ui::VerticalLayout>(parent));
+	result->toggleOn(rpl::duplicate(
+		notesText
+	) | rpl::map([](const TextWithEntities &note) {
+		return !note.text.isEmpty();
+	}));
+	result->finishAnimating();
+
+	const auto notesContainer = result->entity();
+
+	const auto context = Ui::Text::MarkedContext{
+		.customEmojiFactory = user->owner().customEmojiManager().factory(
+			Data::CustomEmojiManager::SizeTag::Normal)
+	};
+
+	auto notesLine = CreateTextWithLabel(
+		notesContainer,
+		tr::lng_info_notes_label(TextWithEntities::Simple),
+		rpl::duplicate(notesText),
+		st::infoLabel,
+		st::infoLabeled,
+		st::infoProfileLabeledPadding);
+
+	std::move(
+		notesText
+	) | rpl::start_with_next([=, raw = notesLine.text](
+			const TextWithEntities &note) {
+		raw->setMarkedText(note, context);
+	}, notesLine.text->lifetime());
+
+	const auto subtextLabel = Ui::CreateChild<Ui::FlatLabel>(
+		notesLine.subtext->parentWidget(),
+		tr::lng_info_notes_private(tr::now),
+		st::infoLabel);
+	subtextLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
+
+	rpl::combine(
+		notesLine.subtext->geometryValue(),
+		notesContainer->widthValue()
+	) | rpl::start_with_next([=, skip = st::lineWidth * 5](
+			const QRect &subtextGeometry,
+			int parentWidth) {
+		subtextLabel->moveToRight(
+			subtextLabel->width(),
+			subtextGeometry.y() + skip,
+			parentWidth);
+	}, subtextLabel->lifetime());
+
+	notesContainer->add(std::move(notesLine.wrap));
+
+	return result;
+}
+
 [[nodiscard]] object_ptr<Ui::SlideWrap<>> CreateBirthday(
 		not_null<QWidget*> parent,
 		not_null<Window::SessionController*> controller,
@@ -1498,6 +1565,9 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 				style::al_justify));
 			tracker.track(result->add(
 				CreateWorkingHours(result, user), {}, style::al_justify));
+
+			tracker.track(result->add(
+				CreateNotes(result, user), {}, style::al_justify));
 
 			auto locationText = user->session().changes().peerFlagsValue(
 				user,

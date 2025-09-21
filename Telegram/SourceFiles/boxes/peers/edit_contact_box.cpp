@@ -14,6 +14,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/premium_preview_box.h"
 #include "chat_helpers/tabbed_panel.h"
 #include "chat_helpers/tabbed_selector.h"
+#include "core/application.h"
+#include "core/click_handler_types.h"
 #include "core/ui_integration.h"
 #include "data/data_changes.h"
 #include "data/data_document.h"
@@ -449,6 +451,20 @@ void Controller::setupPhotoButtons() {
 		: rpl::single(_user->shortName());
 	const auto inner = _box->verticalLayout();
 	Ui::AddSkip(inner);
+
+	const auto suggestBirthdayButton = Settings::AddButtonWithIcon(
+		inner,
+		tr::lng_suggest_birthday(),
+		st::settingsButtonLightNoIcon);
+	suggestBirthdayButton->setClickedCallback([=] {
+		Core::App().openInternalUrl(
+			u"internal:edit_birthday:suggest:%1"_q.arg(
+				peerToUser(_user->id).bare),
+			QVariant::fromValue(ClickHandlerContext{
+				.sessionWindow = base::make_weak(_window),
+			}));
+	});
+	suggestBirthdayButton->setVisible(!_user->birthday().valid());
 
 	const auto suggestButton = Settings::AddButtonWithIcon(
 		inner,

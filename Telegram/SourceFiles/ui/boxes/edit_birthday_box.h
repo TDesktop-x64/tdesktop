@@ -18,6 +18,7 @@ class GenericBox;
 void EditBirthdayBox(
 	not_null<Ui::GenericBox*> box,
 	Data::Birthday current,
-	Fn<void(Data::Birthday)> save);
+	Fn<void(Data::Birthday)> save,
+	bool useConfirmText = false);
 
 } // namespace Ui

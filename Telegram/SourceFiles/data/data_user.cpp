@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_global_privacy.h"
 #include "api/api_sensitive_content.h"
 #include "api/api_statistics.h"
+#include "api/api_text_entities.h"
 #include "base/timer_rpl.h"
 #include "core/application.h"
 #include "storage/localstorage.h"
@@ -764,6 +765,14 @@ void UserData::setDisallowedGiftTypes(Api::DisallowedGiftTypes types) {
 	}
 }
 
+const TextWithEntities &UserData::note() const {
+	return _note;
+}
+
+void UserData::setNote(const TextWithEntities &note) {
+	_note = note;
+}
+
 namespace Data {
 
 void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
@@ -976,6 +985,17 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 
 	user->owner().stories().apply(user, update.vstories());
 	user->owner().savedMusic().apply(user, update.vsaved_music());
+
+	if (const auto note = update.vnote()) {
+		user->setNote(TextWithEntities{
+			qs(note->data().vtext()),
+			Api::EntitiesFromMTP(
+				&user->session(),
+				note->data().ventities().v)
+		});
+	} else {
+		user->setNote(TextWithEntities());
+	}
 
 	user->fullUpdated();
 }

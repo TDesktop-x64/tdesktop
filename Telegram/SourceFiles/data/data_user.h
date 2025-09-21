@@ -297,6 +297,9 @@ public:
 	}
 	void setDisallowedGiftTypes(Api::DisallowedGiftTypes types);
 
+	[[nodiscard]] const TextWithEntities &note() const;
+	void setNote(const TextWithEntities &note);
+
 private:
 	auto unavailableReasons() const
 		-> const std::vector<Data::UnavailableReason> & override;
@@ -330,6 +333,7 @@ private:
 		= 0xFFFFFFFFFFFFFFFFULL;
 
 	Api::DisallowedGiftTypes _disallowedGiftTypes;
+	TextWithEntities _note;
 
 };
 

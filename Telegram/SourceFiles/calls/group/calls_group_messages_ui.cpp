@@ -70,21 +70,20 @@ void ReceiveOnlyWheelEvents(not_null<Ui::ElasticScroll*> scroll) {
 				|| !scroll->scrollTopMax()) {
 				return false;
 			}
-			const auto global = e->globalPos();
+			const auto global = e->globalPosition().toPoint();
 			const auto local = scroll->mapFromGlobal(global);
 			if (!scroll->rect().contains(local)) {
 				return false;
 			}
 			auto ev = QWheelEvent(
-				local,
-				global,
+				e->position(),
+				e->globalPosition(),
 				e->pixelDelta(),
 				e->angleDelta(),
-				e->delta(),
-				e->orientation(),
 				e->buttons(),
 				e->modifiers(),
 				e->phase(),
+				e->inverted(),
 				e->source());
 			ev.setTimestamp(crl::now());
 			QGuiApplication::sendEvent(scroll, &ev);

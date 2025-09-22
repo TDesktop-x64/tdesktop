@@ -817,9 +817,7 @@ void SubsectionSlider::setButtonShift(int index, int shift) {
 		position += _vertical ? _tabs[i]->height() : _tabs[i]->width();
 	}
 
-	const auto currentPos = _vertical ? _tabs[index]->y() : _tabs[index]->x();
 	const auto targetPos = position + shift;
-	const auto delta = targetPos - currentPos;
 
 	_tabs[index]->move(
 		_vertical ? 0 : targetPos,

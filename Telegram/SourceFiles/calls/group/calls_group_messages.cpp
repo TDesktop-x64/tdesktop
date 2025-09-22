@@ -79,10 +79,6 @@ void Messages::send(TextWithTags text) {
 			_call->inputCall(),
 			serialized
 		)).done([=](const MTPBool &, const MTP::Response &response) {
-			if (rand() % 256 < 64) {
-				AssertIsDebug();
-				failed(id, response);
-			} else
 			sent(id, response);
 		}).fail([=](const MTP::Error &, const MTP::Response &response) {
 			failed(id, response);

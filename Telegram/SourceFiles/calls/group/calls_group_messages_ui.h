@@ -82,7 +82,6 @@ private:
 	style::complex_color _messageBg;
 	Ui::RoundRect _messageBgRect;
 
-
 	rpl::lifetime _effectsLifetime;
 
 	Ui::Animations::Simple _topFadeAnimation;

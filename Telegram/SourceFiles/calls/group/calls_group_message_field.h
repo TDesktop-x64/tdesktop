@@ -25,6 +25,8 @@ class RpWidget;
 
 namespace Calls::Group {
 
+class ReactionPanel;
+
 class MessageField final {
 public:
 	MessageField(
@@ -64,6 +66,9 @@ private:
 	Ui::SendButton *_send = nullptr;
 	Ui::EmojiButton *_emojiToggle = nullptr;
 	std::unique_ptr<ChatHelpers::TabbedPanel> _emojiPanel;
+	std::unique_ptr<ReactionPanel> _reactionPanel;
+	rpl::variable<bool> _fieldFocused;
+	rpl::variable<bool> _fieldEmpty = true;
 
 	rpl::variable<int> _width;
 	rpl::variable<int> _height;

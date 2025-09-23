@@ -23,6 +23,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/reactions/history_view_reactions_selector.h"
 #include "history/view/reactions/history_view_reactions_strip.h"
 #include "lang/lang_keys.h"
+#include "main/main_app_config.h"
 #include "main/main_session.h"
 #include "ui/controls/emoji_button.h"
 #include "ui/controls/send_button.h"
@@ -40,7 +41,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Calls::Group {
 namespace {
 
-constexpr auto kWarnLimit = 24;
 constexpr auto kErrorLimit = 99;
 
 using Chosen = HistoryView::Reactions::ChosenReaction;
@@ -316,7 +316,7 @@ MessageField::MessageField(
 : _parent(parent)
 , _show(std::move(show))
 , _wrap(std::make_unique<Ui::RpWidget>(_parent))
-, _limit(128) {
+, _limit(_show->session().appConfig().groupCallMessageLengthLimit()) {
 	createControls(peer);
 }
 

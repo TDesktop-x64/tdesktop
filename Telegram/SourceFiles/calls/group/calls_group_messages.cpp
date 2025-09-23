@@ -16,22 +16,19 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_peer.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
+#include "main/main_app_config.h"
 #include "main/main_session.h"
 #include "mtproto/sender.h"
 #include "ui/text/text_utilities.h"
 #include "ui/ui_utility.h"
 
 namespace Calls::Group {
-namespace {
-
-constexpr auto kMessageLifetime = TimeId(20);
-
-} // namespace
 
 Messages::Messages(not_null<GroupCall*> call, not_null<MTP::Sender*> api)
 : _call(call)
 , _api(api)
-, _destroyTimer([=] { checkDestroying(); }) {
+, _destroyTimer([=] { checkDestroying(); })
+, _ttl(_call->peer()->session().appConfig().groupCallMessageTTL()) {
 	Ui::PostponeCall(_call, [=] {
 		_call->real(
 		) | rpl::start_with_next([=](not_null<Data::GroupCall*> call) {
@@ -173,7 +170,7 @@ void Messages::received(
 void Messages::checkDestroying(bool afterChanges) {
 	auto next = TimeId();
 	const auto now = base::unixtime::now();
-	const auto destroyTime = now - kMessageLifetime;
+	const auto destroyTime = now - _ttl;
 	const auto initial = _messages.size();
 	for (auto i = begin(_messages); i != end(_messages);) {
 		const auto date = i->date;
@@ -182,7 +179,7 @@ void Messages::checkDestroying(bool afterChanges) {
 		} else if (date <= destroyTime) {
 			i = _messages.erase(i);
 		} else if (!next) {
-			next = date + kMessageLifetime - now;
+			next = date + _ttl - now;
 			++i;
 		} else {
 			++i;

@@ -68,6 +68,7 @@ private:
 	rpl::event_stream<std::vector<Message>> _changes;
 
 	int _autoincrementId = 0;
+	TimeId _ttl = 0;
 
 	rpl::lifetime _lifetime;
 

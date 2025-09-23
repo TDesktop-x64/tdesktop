@@ -52,6 +52,8 @@ MessageField::MessageField(
 	createControls(peer);
 }
 
+MessageField::~MessageField() = default;
+
 void MessageField::createControls(PeerData *peer) {
 	setupBackground();
 
@@ -106,7 +108,7 @@ void MessageField::createControls(PeerData *peer) {
 
 	using Selector = ChatHelpers::TabbedSelector;
 	using Descriptor = ChatHelpers::TabbedPanelDescriptor;
-	_emojiPanel = Ui::CreateChild<ChatHelpers::TabbedPanel>(
+	_emojiPanel = std::make_unique<ChatHelpers::TabbedPanel>(
 		_parent,
 		ChatHelpers::TabbedPanelDescriptor{
 			.ownedSelector = object_ptr<Selector>(
@@ -122,17 +124,18 @@ void MessageField::createControls(PeerData *peer) {
 					},
 				}),
 		});
-	_emojiPanel->setDesiredHeightValues(
+	const auto panel = _emojiPanel.get();
+	panel->setDesiredHeightValues(
 		1.,
 		st::emojiPanMinHeight / 2,
 		st::emojiPanMinHeight);
-	_emojiPanel->hide();
-	_emojiPanel->selector()->setCurrentPeer(peer);
-	_emojiPanel->selector()->emojiChosen(
+	panel->hide();
+	panel->selector()->setCurrentPeer(peer);
+	panel->selector()->emojiChosen(
 	) | rpl::start_with_next([=](ChatHelpers::EmojiChosen data) {
 		Ui::InsertEmojiAtCursor(_field->textCursor(), data.emoji);
 	}, lifetime());
-	_emojiPanel->selector()->customEmojiChosen(
+	panel->selector()->customEmojiChosen(
 	) | rpl::start_with_next([=](ChatHelpers::FileChosen data) {
 		const auto info = data.document->sticker();
 		if (info
@@ -149,9 +152,9 @@ void MessageField::createControls(PeerData *peer) {
 	_emojiToggle = Ui::CreateChild<Ui::EmojiButton>(_wrap.get(), st.emoji);
 	_emojiToggle->show();
 
-	_emojiToggle->installEventFilter(_emojiPanel);
+	_emojiToggle->installEventFilter(panel);
 	_emojiToggle->addClickHandler([=] {
-		_emojiPanel->toggleAnimated();
+		panel->toggleAnimated();
 	});
 
 	_width.value(
@@ -209,9 +212,8 @@ void MessageField::createControls(PeerData *peer) {
 }
 
 void MessageField::updateEmojiPanelGeometry() {
-	const auto parent = _emojiPanel->parentWidget();
 	const auto global = _emojiToggle->mapToGlobal({ 0, 0 });
-	const auto local = parent->mapFromGlobal(global);
+	const auto local = _parent->mapFromGlobal(global);
 	_emojiPanel->moveBottomRight(
 		local.y(),
 		local.x() + _emojiToggle->width() * 3);
@@ -288,6 +290,9 @@ void MessageField::raise() {
 	_wrap->raise();
 	if (_cache) {
 		_cache->raise();
+	}
+	if (_emojiPanel) {
+		_emojiPanel->raise();
 	}
 }
 

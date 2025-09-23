@@ -641,7 +641,6 @@ public:
 		Data::ReactionId,
 		std::unique_ptr<Ui::ReactionFlyAnimation>>;
 
-	virtual void animateEffect(Ui::ReactionFlyAnimationArgs &&args);
 	void animateUnreadEffect();
 	[[nodiscard]] virtual auto takeEffectAnimation()
 	-> std::unique_ptr<Ui::ReactionFlyAnimation>;

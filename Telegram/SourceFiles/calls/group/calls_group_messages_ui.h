@@ -17,6 +17,10 @@ class Show;
 class TabbedPanel;
 } // namespace ChatHelpers
 
+namespace Data {
+struct ReactionId;
+} // namespace Data
+
 namespace Ui {
 class ElasticScroll;
 class EmojiButton;
@@ -55,6 +59,12 @@ private:
 	void repaintMessage(int id);
 	void recountHeights(std::vector<MessageView>::iterator i, int top);
 	void appendMessage(const Message &data);
+	void checkReactionContent(
+		MessageView &entry,
+		const TextWithEntities &text);
+	void startReactionAnimation(MessageView &entry);
+	void updateReactionPosition(MessageView &entry);
+	void removeReaction(not_null<Ui::RpWidget*> widget);
 	void setupMessagesWidget();
 	void applyWidth();
 	void updateGeometries();
@@ -71,6 +81,9 @@ private:
 	std::vector<MessageView> _views;
 	style::complex_color _messageBg;
 	Ui::RoundRect _messageBgRect;
+
+
+	rpl::lifetime _effectsLifetime;
 
 	Ui::Animations::Simple _topFadeAnimation;
 	Ui::Animations::Simple _bottomFadeAnimation;

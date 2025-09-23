@@ -31,6 +31,7 @@ public:
 		not_null<QWidget*> parent,
 		std::shared_ptr<ChatHelpers::Show> show,
 		PeerData *peer);
+	~MessageField();
 
 	void resizeToWidth(int newWidth);
 	void move(int x, int y);
@@ -62,7 +63,7 @@ private:
 	Ui::InputField *_field = nullptr;
 	Ui::SendButton *_send = nullptr;
 	Ui::EmojiButton *_emojiToggle = nullptr;
-	ChatHelpers::TabbedPanel *_emojiPanel = nullptr;
+	std::unique_ptr<ChatHelpers::TabbedPanel> _emojiPanel;
 
 	rpl::variable<int> _width;
 	rpl::variable<int> _height;

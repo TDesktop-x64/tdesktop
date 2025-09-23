@@ -2375,9 +2375,6 @@ auto Element::takeReactionAnimations()
 	return {};
 }
 
-void Element::animateEffect(Ui::ReactionFlyAnimationArgs &&args) {
-}
-
 void Element::animateUnreadEffect() {
 }
 

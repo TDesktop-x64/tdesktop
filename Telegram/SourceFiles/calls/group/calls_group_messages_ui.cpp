@@ -553,7 +553,6 @@ void MessagesUi::setupMessagesWidget() {
 		const auto now = crl::now();
 		const auto skip = st::groupCallMessageSkip;
 		const auto padding = st::groupCallMessagePadding;
-		const auto widthSkip = padding.left() + padding.right();
 		p.translate(0, -start);
 		for (auto &entry : _views) {
 			if (entry.height <= skip || entry.top + entry.height <= start) {
@@ -624,7 +623,7 @@ void MessagesUi::setupMessagesWidget() {
 					entry.left + leftSkip,
 					entry.top + padding.top()
 				},
-				.availableWidth = entry.width - widthSkip,
+				.availableWidth = entry.width - leftSkip - padding.right(),
 				.spoiler = Ui::Text::DefaultSpoilerCache(),
 				.now = now,
 				.paused = !_messages->window()->isActiveWindow(),

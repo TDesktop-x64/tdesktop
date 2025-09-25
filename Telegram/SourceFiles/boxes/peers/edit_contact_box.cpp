@@ -47,6 +47,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/labels.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/wrap/vertical_layout.h"
+#include "ui/wrap/slide_wrap.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
 #include "styles/style_boxes.h"
@@ -452,10 +453,16 @@ void Controller::setupPhotoButtons() {
 	const auto inner = _box->verticalLayout();
 	Ui::AddSkip(inner);
 
+	const auto suggestBirthdayWrap = inner->add(
+		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+			inner,
+			object_ptr<Ui::VerticalLayout>(inner)));
+
 	const auto suggestBirthdayButton = Settings::AddButtonWithIcon(
-		inner,
+		suggestBirthdayWrap->entity(),
 		tr::lng_suggest_birthday(),
-		st::settingsButtonLightNoIcon);
+		st::settingsButtonLight,
+		{ &st::menuBlueIconGiftPremium });
 	suggestBirthdayButton->setClickedCallback([=] {
 		Core::App().openInternalUrl(
 			u"internal:edit_birthday:suggest:%1"_q.arg(
@@ -464,7 +471,7 @@ void Controller::setupPhotoButtons() {
 				.sessionWindow = base::make_weak(_window),
 			}));
 	});
-	suggestBirthdayButton->setVisible(!_user->birthday().valid());
+	suggestBirthdayWrap->toggleOn(rpl::single(!_user->birthday().valid()));
 
 	const auto suggestButton = Settings::AddButtonWithIcon(
 		inner,
@@ -484,8 +491,13 @@ void Controller::setupPhotoButtons() {
 		showPhotoMenu(false);
 	});
 
+	const auto resetButtonWrap = inner->add(
+		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+			inner,
+			object_ptr<Ui::VerticalLayout>(inner)));
+
 	const auto resetButton = Settings::AddButtonWithIcon(
-		inner,
+		resetButtonWrap->entity(),
 		tr::lng_profile_photo_reset(),
 		st::settingsButtonLight,
 		{ nullptr });
@@ -505,18 +517,13 @@ void Controller::setupPhotoButtons() {
 			st::settingsButtonLight.iconLeft,
 			(size.height() - userpicButton->height()) / 2);
 	}, userpicButton->lifetime());
-
-	_user->session().changes().peerFlagsValue(
-		_user,
-		Data::PeerUpdate::Flag::FullInfo
-	) | rpl::map([=] {
-		return _user->hasPersonalPhoto();
-	}) | rpl::distinct_until_changed(
-	) | rpl::start_with_next([=](bool hasPersonal) {
-		resetButton->setVisible(hasPersonal);
-	}, resetButton->lifetime());
-
-	resetButton->setVisible(_user->hasPersonalPhoto());
+	resetButtonWrap->toggleOn(
+		_user->session().changes().peerFlagsValue(
+			_user,
+			Data::PeerUpdate::Flag::FullInfo
+		) | rpl::map([=] {
+			return _user->hasPersonalPhoto();
+		}) | rpl::distinct_until_changed());
 
 	resetButton->setClickedCallback([=] {
 		_window->show(Ui::MakeConfirmBox({

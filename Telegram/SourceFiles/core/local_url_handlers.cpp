@@ -954,6 +954,7 @@ bool ShowEditBirthday(
 					MTP_int(result.month()),
 					MTP_int(result.year()))
 			)).done(crl::guard(controller, [=] {
+				controller->showPeerHistory(targetUser);
 				controller->showToast(
 					tr::lng_settings_birthday_suggested(
 						tr::now,

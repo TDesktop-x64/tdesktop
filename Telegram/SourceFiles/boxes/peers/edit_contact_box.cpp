@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_peer_photo.h"
 #include "api/api_text_entities.h"
 #include "apiwrap.h"
+#include "base/call_delayed.h"
 #include "boxes/peers/edit_peer_common.h"
 #include "boxes/premium_preview_box.h"
 #include "chat_helpers/tabbed_panel.h"
@@ -31,8 +32,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/userpic/info_userpic_emoji_builder_common.h"
 #include "info/userpic/info_userpic_emoji_builder_menu_item.h"
 #include "lang/lang_keys.h"
+#include "lottie/lottie_common.h"
+#include "lottie/lottie_frame_generator.h"
 #include "main/main_session.h"
 #include "settings/settings_common.h"
+#include "ui/animated_icon.h"
 #include "ui/controls/emoji_button_factory.h"
 #include "ui/controls/emoji_button.h"
 #include "ui/controls/userpic_button.h"
@@ -48,6 +52,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/popup_menu.h"
 #include "ui/wrap/vertical_layout.h"
 #include "ui/wrap/slide_wrap.h"
+#include "ui/painter.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
 #include "styles/style_boxes.h"
@@ -56,11 +61,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
+#include "styles/style_widgets.h"
 
 #include <QtGui/QClipboard>
 #include <QtGui/QGuiApplication>
 
 namespace {
+
+constexpr auto kAnimationStartFrame = 0;
+constexpr auto kAnimationEndFrame = 21;
 
 QString UserPhone(not_null<UserData*> user) {
 	const auto phone = user->phone();
@@ -144,6 +153,11 @@ private:
 	void processChosenPhotoWithMarkup(
 		UserpicBuilder::Result &&data,
 		bool suggest);
+	void executeWithDelay(
+		Fn<void()> callback,
+		bool suggest,
+		bool startAnimation = true);
+	void finishIconAnimation(bool suggest);
 
 	not_null<Ui::GenericBox*> _box;
 	not_null<Window::SessionController*> _window;
@@ -153,6 +167,10 @@ private:
 	Ui::InputField *_firstNameField = nullptr;
 	base::unique_qptr<ChatHelpers::TabbedPanel> _emojiPanel;
 	base::unique_qptr<Ui::PopupMenu> _photoMenu;
+	std::unique_ptr<Ui::AnimatedIcon> _suggestIcon;
+	std::unique_ptr<Ui::AnimatedIcon> _cameraIcon;
+	Ui::RpWidget *_suggestIconWidget = nullptr;
+	Ui::RpWidget *_cameraIconWidget = nullptr;
 	QString _phone;
 	Fn<void()> _focus;
 	Fn<void()> _save;
@@ -457,6 +475,7 @@ void Controller::setupNotesField() {
 }
 
 void Controller::setupPhotoButtons() {
+	const auto iconSize = st::restoreUserpicIcon.size;
 	auto nameValue = _firstNameField
 		? rpl::merge(
 			rpl::single(_firstNameField->getLastText().trimmed()),
@@ -489,12 +508,58 @@ void Controller::setupPhotoButtons() {
 	});
 	suggestBirthdayWrap->toggleOn(rpl::single(!_user->birthday().valid()));
 
+	_suggestIcon = Ui::MakeAnimatedIcon({
+		.generator = [] {
+			return std::make_unique<Lottie::FrameGenerator>(
+				Lottie::ReadContent(
+					QByteArray(),
+					u":/animations/photo_suggest_icon.tgs"_q));
+		},
+		.sizeOverride = iconSize * style::DevicePixelRatio(),
+		.colorized = true,
+	});
+
+	_cameraIcon = Ui::MakeAnimatedIcon({
+		.generator = [] {
+			return std::make_unique<Lottie::FrameGenerator>(
+				Lottie::ReadContent(
+					QByteArray(),
+					u":/animations/camera_outline.tgs"_q));
+		},
+		.sizeOverride = iconSize * style::DevicePixelRatio(),
+		.colorized = true,
+	});
+
 	const auto suggestButton = Settings::AddButtonWithIcon(
 		inner,
 		tr::lng_suggest_photo_for(lt_user, rpl::duplicate(nameValue)),
 		st::settingsButtonLight,
-		{ &st::menuBlueIconPhotoSuggest });
+		{ nullptr });
+
+	_suggestIconWidget = Ui::CreateChild<Ui::RpWidget>(suggestButton);
+	_suggestIconWidget->resize(iconSize * style::DevicePixelRatio());
+	_suggestIconWidget->paintRequest() | rpl::start_with_next([=] {
+		if (_suggestIcon && _suggestIcon->valid()) {
+			auto p = QPainter(_suggestIconWidget);
+			const auto frame = _suggestIcon->frame(st::lightButtonFg->c);
+			const auto rect = _suggestIconWidget->rect();
+			p.drawImage(rect, frame);
+		}
+	}, _suggestIconWidget->lifetime());
+
+	suggestButton->sizeValue() | rpl::start_with_next([=](QSize size) {
+		_suggestIconWidget->move(
+			st::settingsButtonLight.iconLeft - iconSize.width() / 2,
+			(size.height() - _suggestIconWidget->height()) / 2);
+	}, _suggestIconWidget->lifetime());
+
 	suggestButton->setClickedCallback([=] {
+		if (_suggestIcon && _suggestIcon->valid()) {
+			_suggestIcon->setCustomStartFrame(kAnimationStartFrame);
+			_suggestIcon->setCustomEndFrame(kAnimationEndFrame);
+			_suggestIcon->jumpToStart([=] { _suggestIconWidget->update(); });
+			_suggestIcon->animate([=] { _suggestIconWidget->update(); });
+		}
 		showPhotoMenu(true);
 	});
 
@@ -502,8 +567,32 @@ void Controller::setupPhotoButtons() {
 		inner,
 		tr::lng_set_photo_for_user(lt_user, rpl::duplicate(nameValue)),
 		st::settingsButtonLight,
-		{ &st::menuBlueIconPhotoSet });
+		{ nullptr });
+
+	_cameraIconWidget = Ui::CreateChild<Ui::RpWidget>(setButton);
+	_cameraIconWidget->resize(iconSize * style::DevicePixelRatio());
+	_cameraIconWidget->paintRequest() | rpl::start_with_next([=] {
+		if (_cameraIcon && _cameraIcon->valid()) {
+			auto p = QPainter(_cameraIconWidget);
+			const auto frame = _cameraIcon->frame(st::lightButtonFg->c);
+			const auto rect = _cameraIconWidget->rect();
+			p.drawImage(rect, frame);
+		}
+	}, _cameraIconWidget->lifetime());
+
+	setButton->sizeValue() | rpl::start_with_next([=](QSize size) {
+		_cameraIconWidget->move(
+			st::settingsButtonLight.iconLeft - iconSize.width() / 2,
+			(size.height() - _cameraIconWidget->height()) / 2);
+	}, _cameraIconWidget->lifetime());
+
 	setButton->setClickedCallback([=] {
+		if (_cameraIcon && _cameraIcon->valid()) {
+			_cameraIcon->setCustomStartFrame(kAnimationStartFrame);
+			_cameraIcon->setCustomEndFrame(kAnimationEndFrame);
+			_cameraIcon->jumpToStart([=] { _cameraIconWidget->update(); });
+			_cameraIcon->animate([=] { _cameraIconWidget->update(); });
+		}
 		showPhotoMenu(false);
 	});
 
@@ -623,9 +712,13 @@ void Controller::showPhotoMenu(bool suggest) {
 		_box,
 		st::popupMenuWithIcons);
 
+	QObject::connect(_photoMenu.get(), &QObject::destroyed, [=] {
+		finishIconAnimation(suggest);
+	});
+
 	_photoMenu->addAction(
 		tr::lng_attach_photo(tr::now),
-		[=] { choosePhotoFile(suggest); },
+		[=] { executeWithDelay([=] { choosePhotoFile(suggest); }, suggest); },
 		&st::menuIconPhoto);
 
 	if (const auto data = QGuiApplication::clipboard()->mimeData()) {
@@ -659,7 +752,7 @@ void Controller::showPhotoMenu(bool suggest) {
 			};
 			_photoMenu->addAction(
 				tr::lng_profile_photo_from_clipboard(tr::now),
-				std::move(callback),
+				[=] { executeWithDelay(callback, suggest); },
 				&st::menuIconPhoto);
 		}
 	}
@@ -708,6 +801,11 @@ void Controller::processChosenPhoto(QImage &&image, bool suggest) {
 	Api::PeerPhoto::UserPhoto photo{
 		.image = base::duplicate(image),
 	};
+	if (suggest && _suggestIcon && _suggestIcon->valid()) {
+		_suggestIcon->animate([=] { _suggestIconWidget->update(); });
+	} else if (!suggest && _cameraIcon && _cameraIcon->valid()) {
+		_cameraIcon->animate([=] { _cameraIconWidget->update(); });
+	}
 	if (suggest) {
 		_window->session().api().peerPhoto().suggest(_user, std::move(photo));
 		_window->showPeerHistory(_user->id);
@@ -724,11 +822,48 @@ void Controller::processChosenPhotoWithMarkup(
 		.markupDocumentId = data.id,
 		.markupColors = std::move(data.colors),
 	};
+	if (suggest && _suggestIcon && _suggestIcon->valid()) {
+		_suggestIcon->animate([=] { _suggestIconWidget->update(); });
+	} else if (!suggest && _cameraIcon && _cameraIcon->valid()) {
+		_cameraIcon->animate([=] { _cameraIconWidget->update(); });
+	}
 	if (suggest) {
 		_window->session().api().peerPhoto().suggest(_user, std::move(photo));
 		_window->showPeerHistory(_user->id);
 	} else {
 		_window->session().api().peerPhoto().upload(_user, std::move(photo));
+	}
+}
+
+void Controller::finishIconAnimation(bool suggest) {
+	const auto icon = suggest ? _suggestIcon.get() : _cameraIcon.get();
+	const auto widget = suggest ? _suggestIconWidget : _cameraIconWidget;
+	if (icon && icon->valid()) {
+		icon->setCustomStartFrame(icon->frameIndex());
+		icon->setCustomEndFrame(-1);
+		icon->animate([=] { widget->update(); });
+	}
+}
+
+void Controller::executeWithDelay(
+		Fn<void()> callback,
+		bool suggest,
+		bool startAnimation) {
+	const auto icon = suggest ? _suggestIcon.get() : _cameraIcon.get();
+	const auto widget = suggest ? _suggestIconWidget : _cameraIconWidget;
+
+	if (startAnimation && icon && icon->valid()) {
+		icon->setCustomStartFrame(icon->frameIndex());
+		icon->setCustomEndFrame(-1);
+		icon->animate([=] { widget->update(); });
+	}
+
+	if (icon && icon->valid() && icon->animating()) {
+		base::call_delayed(50, [=] {
+			executeWithDelay(callback, suggest, false);
+		});
+	} else {
+		callback();
 	}
 }
 

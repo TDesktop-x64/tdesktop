@@ -258,6 +258,22 @@ void Controller::initNameFields(
 			(inverted ? last : first)->showError();
 			return;
 		}
+
+		if (_notesField) {
+			const auto limit = Data::PremiumLimits(
+				&_user->session()).contactNoteLengthCurrent();
+			const auto remove = Ui::ComputeFieldCharacterCount(_notesField)
+				- limit;
+			if (remove > 0) {
+				_box->showToast(tr::lng_contact_notes_limit_reached(
+					tr::now,
+					lt_count,
+					remove));
+				_notesField->setFocus();
+				return;
+			}
+		}
+
 		const auto user = _user;
 		const auto personal = _updatedPersonalPhoto
 			? _updatedPersonalPhoto()

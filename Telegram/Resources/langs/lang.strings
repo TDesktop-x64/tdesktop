@@ -4802,6 +4802,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_contact_phone_will_be_shared" = "You can make your phone visible to {user}.";
 "lng_contact_add_notes" = "Note";
 "lng_contact_add_notes_about" = "Notes are only visible to you.";
+"lng_contact_notes_limit_reached#one" = "You've reached the contact note limit. Please make the note shorter by {count} character.";
+"lng_contact_notes_limit_reached#other" = "You've reached the contact note limit. Please make the note shorter by {count} characters.";
 "lng_suggest_photo_for" = "Suggest Photo for {user}";
 "lng_suggest_birthday" = "Suggest Date of Birth";
 "lng_suggest_birthday_box_title" = "{user}'s Date of Birth";

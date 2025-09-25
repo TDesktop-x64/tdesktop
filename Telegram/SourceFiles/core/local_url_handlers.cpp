@@ -971,7 +971,11 @@ bool ShowEditBirthday(
 			box->setTitle(tr::lng_suggest_birthday_box_title(
 				lt_user,
 				Info::Profile::NameValue(targetUser)));
-			Ui::EditBirthdayBox(box, Data::Birthday(), save, true);
+			Ui::EditBirthdayBox(
+				box,
+				Data::Birthday(),
+				save,
+				Ui::EditBirthdayType::Suggest);
 		}));
 		return true;
 	}
@@ -998,8 +1002,20 @@ bool ShowEditBirthday(
 				: (u"Error: "_q + error.type()));
 		})).handleFloodErrors().send();
 	};
-	if (captured.isEmpty()) {
-		controller->show(Box(Ui::EditBirthdayBox, user->birthday(), save, 0));
+	if (captured.startsWith(u":suggestion_"_q)) {
+		const auto suggested = Data::Birthday::FromSerialized(
+			captured.mid(u":suggestion_"_q.size()).toInt());
+		controller->show(Box(
+			Ui::EditBirthdayBox,
+			suggested,
+			save,
+			Ui::EditBirthdayType::ConfirmSuggestion));
+	} else if (captured.isEmpty()) {
+		controller->show(Box(
+			Ui::EditBirthdayBox,
+			user->birthday(),
+			save,
+			Ui::EditBirthdayType::Edit));
 	} else {
 		controller->show(Box([=](not_null<Ui::GenericBox*> box) {
 			Ui::EditBirthdayBox(box, user->birthday(), save);

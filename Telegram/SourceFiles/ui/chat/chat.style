@@ -1464,3 +1464,11 @@ saveMusicInfoMenu: Menu(defaultMenu) {
 
 newBotThreadDown: icon {{ "history_down_arrow", msgServiceFg }};
 newBotThreadTopSkip: 24px;
+
+birthdaySuggestStickerWidth: 236px;
+birthdaySuggestStickerSize: 96px;
+birthdaySuggestStickerPadding: margins(10px, 16px, 10px, 4px);
+birthdaySuggestTextPadding: margins(10px, 4px, 10px, 8px);
+birthdaySuggestTablePadding: margins(2px, 4px, 2px, 12px);
+birthdaySuggestTableLastPadding: margins(2px, 4px, 2px, 24px);
+birthdaySuggestTableSkip: 2px;

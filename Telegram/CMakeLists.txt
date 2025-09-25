@@ -783,6 +783,8 @@ PRIVATE
     history/view/controls/history_view_voice_record_bar.h
     history/view/controls/history_view_webpage_processor.cpp
     history/view/controls/history_view_webpage_processor.h
+    history/view/media/history_view_birthday_suggestion.cpp
+    history/view/media/history_view_birthday_suggestion.h
     history/view/media/history_view_call.cpp
     history/view/media/history_view_call.h
     history/view/media/history_view_contact.cpp

@@ -26,7 +26,7 @@ void EditBirthdayBox(
 		not_null<Ui::GenericBox*> box,
 		Data::Birthday current,
 		Fn<void(Data::Birthday)> save,
-		bool useSuggestText) {
+		EditBirthdayType type) {
 	box->setWidth(st::boxWideWidth);
 	const auto content = box->addRow(object_ptr<Ui::FixedHeightWidget>(
 		box,
@@ -210,7 +210,7 @@ void EditBirthdayBox(
 		return base::EventFilterResult::Continue;
 	});
 
-	auto confirmText = useSuggestText
+	auto confirmText = (type == EditBirthdayType::Suggest)
 		? tr::lng_suggest_birthday_box_confirm()
 		: tr::lng_settings_save();
 	box->addButton(std::move(confirmText), [=] {
@@ -226,7 +226,7 @@ void EditBirthdayBox(
 	box->addButton(tr::lng_cancel(), [=] {
 		box->closeBox();
 	});
-	if (current) {
+	if (current && type == EditBirthdayType::Edit) {
 		box->addLeftButton(tr::lng_settings_birthday_reset(), [=] {
 			box->closeBox();
 			save(Data::Birthday());

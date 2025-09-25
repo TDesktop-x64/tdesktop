@@ -6312,11 +6312,6 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 
 	auto prepareSuggestBirthday = [this](const MTPDmessageActionSuggestBirthday &action) {
 		auto result = PreparedServiceText{};
-		const auto &data = action.vbirthday().data();
-		const auto birthday = Data::Birthday(
-			data.vday().v,
-			data.vmonth().v,
-			data.vyear().value_or_empty());
 		const auto isSelf = (_from->id == _from->session().userPeerId());
 		const auto peer = isSelf ? history()->peer : _from;
 		const auto user = peer->asUser();
@@ -6631,6 +6626,18 @@ void HistoryItem::applyAction(const MTPMessageAction &action) {
 			this,
 			_from,
 			std::move(fields));
+	}, [&](const MTPDmessageActionSuggestBirthday &data) {
+		const auto &fields = data.vbirthday().data();
+		_media = std::make_unique<Data::MediaGiftBox>(
+			this,
+			_from,
+			Data::GiftCode{
+				.count = Data::Birthday(
+					fields.vday().v,
+					fields.vmonth().v,
+					fields.vyear().value_or_empty()).serialize(),
+				.type = Data::GiftType::BirthdaySuggest,
+			});
 	}, [](const auto &) {
 	});
 }

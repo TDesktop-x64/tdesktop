@@ -296,7 +296,10 @@ Tasks::Task::Task(
 		tr::lng_todo_create_list_add()))
 , _limit(session->appConfig().todoListItemTextLimit()) {
 	InitField(outer, _field, session);
-	_field->setMaxLength(_limit + kErrorLimit);
+
+	// Don't limit max length, because user can paste long list of items.
+	//_field->setMaxLength(_limit + kErrorLimit);
+
 	_field->show();
 	if (locked) {
 		_field->setDisabled(true);

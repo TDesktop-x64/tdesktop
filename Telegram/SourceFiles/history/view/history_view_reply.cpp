@@ -699,14 +699,24 @@ void Reply::paint(
 	const auto colorIndexPlusOne = _colorPeer
 		? (_colorPeer->colorIndex() + 1)
 		: _hiddenSenderColorIndexPlusOne;
+	const auto &colorCollectible = _colorPeer
+		? _colorPeer->colorCollectible()
+		: nullptr;
+	const auto useColorCollectible = colorCollectible && !context.outbg;
 	const auto useColorIndex = colorIndexPlusOne && !context.outbg;
-	const auto colorPattern = colorIndexPlusOne
+	const auto colorPattern = colorCollectible
+		? 2
+		: colorIndexPlusOne
 		? st->colorPatternIndex(colorIndexPlusOne - 1)
 		: 0;
 	const auto cache = !inBubble
 		? (_hasQuoteIcon
 			? st->serviceQuoteCache(colorPattern)
 			: st->serviceReplyCache(colorPattern)).get()
+		: useColorCollectible
+		? (_hasQuoteIcon
+			? st->collectibleQuoteCache(selected, colorCollectible)
+			: st->collectibleReplyCache(selected, colorCollectible)).get()
 		: useColorIndex
 		? (_hasQuoteIcon
 			? st->coloredQuoteCache(selected, colorIndexPlusOne - 1)
@@ -832,6 +842,8 @@ void Reply::paint(
 			if (namew > 0) {
 				p.setPen(!inBubble
 					? st->msgImgReplyBarColor()->c
+					: useColorCollectible
+					? cache->icon
 					: useColorIndex
 					? FromNameFg(context, colorIndexPlusOne - 1)
 					: stm->msgServiceFg->c);
@@ -849,6 +861,8 @@ void Reply::paint(
 				view->prepareCustomEmojiPaint(p, context, _text);
 				auto replyToTextPalette = &(!inBubble
 					? st->imgReplyTextPalette()
+					: useColorCollectible
+					? st->collectibleTextPalette(selected, colorCollectible)
 					: useColorIndex
 					? st->coloredTextPalette(selected, colorIndexPlusOne - 1)
 					: stm->replyTextPalette);

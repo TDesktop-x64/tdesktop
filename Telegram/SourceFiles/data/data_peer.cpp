@@ -88,6 +88,28 @@ using UpdateFlag = Data::PeerUpdate::Flag;
 	return (month > 0 && month <= 12) ? month : 0;
 }
 
+[[nodiscard]] Ui::ColorCollectible ParseColorCollectible(
+		const MTPDpeerColorCollectible &data) {
+	return {
+		.giftEmojiId = data.vgift_emoji_id().v,
+		.accentColor = Ui::ColorFromSerialized(data.vaccent_color()),
+		.strip = ranges::views::all(
+			data.vcolors().v
+		) | ranges::views::transform(
+			&Ui::ColorFromSerialized
+		) | ranges::to_vector,
+		.darkAccentColor = Ui::MaybeColorFromSerialized(
+			data.vdark_accent_color()).value_or(QColor(0, 0, 0, 0)),
+		.darkStrip = (data.vdark_colors()
+			? ranges::views::all(
+				data.vdark_colors()->v
+			) | ranges::views::transform(
+				&Ui::ColorFromSerialized
+			) | ranges::to_vector
+			: std::vector<QColor>()),
+	};
+}
+
 } // namespace
 
 namespace Data {
@@ -998,18 +1020,41 @@ TimeId PeerData::photoChangeDate() const {
 	return _barDetails ? _barDetails->photoChangeDate : 0;
 }
 
-bool PeerData::changeColorIndex(
-		const tl::conditional<MTPint> &cloudColorIndex) {
-	return cloudColorIndex
-		? changeColorIndex(cloudColorIndex->v)
-		: clearColorIndex();
-}
-
 bool PeerData::changeBackgroundEmojiId(
 		const tl::conditional<MTPlong> &cloudBackgroundEmoji) {
 	return changeBackgroundEmojiId(cloudBackgroundEmoji
 		? cloudBackgroundEmoji->v
 		: DocumentId());
+}
+
+bool PeerData::changeColorCollectible(
+		const tl::conditional<MTPPeerColor> &cloudColor) {
+	const auto clear = [&] {
+		if (_colorCollectible) {
+			_colorCollectible = nullptr;
+			return true;
+		}
+		return false;
+	};
+	if (!cloudColor) {
+		return clear();
+	}
+	return cloudColor->match([&](const MTPDpeerColorCollectible &data) {
+		auto parsed = ParseColorCollectible(data);
+		if (!_colorCollectible) {
+			_colorCollectible = std::make_shared<Ui::ColorCollectible>(
+				std::move(parsed));
+			return true;
+		} else if (*_colorCollectible != parsed) {
+			*_colorCollectible = std::move(parsed);
+			return true;
+		}
+		return false;
+	}, [&](const MTPDpeerColor &) {
+		return clear();
+	}, [&](const MTPDinputPeerColorCollectible &) {
+		return clear();
+	});
 }
 
 bool PeerData::changeColor(
@@ -1019,7 +1064,8 @@ bool PeerData::changeColor(
 		: clearColorIndex();
 	const auto changed2 = changeBackgroundEmojiId(
 		Data::BackgroundEmojiIdFromColor(cloudColor));
-	return changed1 || changed2;
+	const auto changed3 = changeColorCollectible(cloudColor);
+	return changed1 || changed2 || changed3;
 }
 
 void PeerData::fillNames() {
@@ -1344,6 +1390,7 @@ bool PeerData::clearColorIndex() {
 	}
 	_colorIndexCloud = 0;
 	_colorIndex = Data::DecideColorIndex(id);
+	_colorCollectible = nullptr;
 	return true;
 }
 
@@ -2036,7 +2083,7 @@ uint8 ColorIndexFromColor(const MTPPeerColor *color) {
 	return color->match([](const MTPDpeerColor &data) -> uint8 {
 		return data.vcolor().value_or_empty();
 	}, [](const MTPDpeerColorCollectible &data) -> uint8 {
-		return 0; // themes
+		return 0;
 	}, [](const MTPDinputPeerColorCollectible &) -> uint8 {
 		return 0;
 	});

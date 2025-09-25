@@ -25,6 +25,7 @@ enum class ChatRestriction;
 namespace Ui {
 class EmptyUserpic;
 struct BotVerifyDetails;
+struct ColorCollectible;
 } // namespace Ui
 
 namespace Main {
@@ -213,6 +214,10 @@ public:
 
 	[[nodiscard]] uint8 colorIndex() const {
 		return _colorIndex;
+	}
+	[[nodiscard]] auto colorCollectible() const
+	-> const std::shared_ptr<Ui::ColorCollectible> & {
+		return _colorCollectible;
 	}
 	bool changeColorIndex(uint8 index);
 	bool clearColorIndex();
@@ -489,9 +494,10 @@ public:
 	void saveTranslationDisabled(bool disabled);
 
 	void setBarSettings(const MTPPeerSettings &data);
-	bool changeColorIndex(const tl::conditional<MTPint> &cloudColorIndex);
 	bool changeBackgroundEmojiId(
 		const tl::conditional<MTPlong> &cloudBackgroundEmoji);
+	bool changeColorCollectible(
+		const tl::conditional<MTPPeerColor> &cloudColor);
 	bool changeColor(const tl::conditional<MTPPeerColor> &cloudColor);
 
 	enum class BlockStatus : char {
@@ -609,6 +615,7 @@ private:
 
 	BarSettings _barSettings = PeerBarSettings(PeerBarSetting::Unknown);
 	std::unique_ptr<PeerBarDetails> _barDetails;
+	std::shared_ptr<Ui::ColorCollectible> _colorCollectible;
 
 	BlockStatus _blockStatus = BlockStatus::Unknown;
 	LoadedStatus _loadedStatus = LoadedStatus::Not;

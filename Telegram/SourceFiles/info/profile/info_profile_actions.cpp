@@ -776,6 +776,13 @@ void DeleteContactNote(
 		const auto addAction = Ui::Menu::CreateAddActionCallback(
 			request.menu);
 		addAction({
+			.text = tr::lng_edit_note(tr::now),
+			.handler = [=] {
+				controller->window().show(
+					Box(EditContactNoteBox, controller, user));
+			},
+		});
+		addAction({
 			.text = tr::lng_delete_note(tr::now),
 			.handler = [=] {
 				DeleteContactNote(user, [=](const QString &error) {

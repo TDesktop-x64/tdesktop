@@ -130,7 +130,8 @@ public:
 	Controller(
 		not_null<Ui::GenericBox*> box,
 		not_null<Window::SessionController*> window,
-		not_null<UserData*> user);
+		not_null<UserData*> user,
+		bool focusOnNotes = false);
 
 	void prepare();
 
@@ -162,6 +163,7 @@ private:
 	not_null<Ui::GenericBox*> _box;
 	not_null<Window::SessionController*> _window;
 	not_null<UserData*> _user;
+	bool _focusOnNotes = false;
 	Ui::Checkbox *_sharePhone = nullptr;
 	Ui::InputField *_notesField = nullptr;
 	Ui::InputField *_firstNameField = nullptr;
@@ -181,10 +183,12 @@ private:
 Controller::Controller(
 	not_null<Ui::GenericBox*> box,
 	not_null<Window::SessionController*> window,
-	not_null<UserData*> user)
+	not_null<UserData*> user,
+	bool focusOnNotes)
 : _box(box)
 , _window(window)
 , _user(user)
+, _focusOnNotes(focusOnNotes)
 , _phone(UserPhone(user)) {
 }
 
@@ -261,6 +265,11 @@ void Controller::initNameFields(
 		_box->setTabOrder(last, first);
 	}
 	_focus = [=] {
+		if (_focusOnNotes && _notesField) {
+			_notesField->setFocusFast();
+			_notesField->setCursorPosition(_notesField->getLastText().size());
+			return;
+		}
 		const auto firstValue = getValue(first);
 		const auto lastValue = getValue(last);
 		const auto empty = firstValue.isEmpty() && lastValue.isEmpty();
@@ -875,4 +884,16 @@ void EditContactBox(
 		not_null<UserData*> user) {
 	box->setWidth(st::boxWideWidth);
 	box->lifetime().make_state<Controller>(box, window, user)->prepare();
+}
+
+void EditContactNoteBox(
+		not_null<Ui::GenericBox*> box,
+		not_null<Window::SessionController*> window,
+		not_null<UserData*> user) {
+	box->setWidth(st::boxWideWidth);
+	box->lifetime().make_state<Controller>(
+		box,
+		window,
+		user,
+		true)->prepare();
 }

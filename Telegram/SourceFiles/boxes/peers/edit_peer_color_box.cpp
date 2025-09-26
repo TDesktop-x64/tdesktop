@@ -15,6 +15,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/background_box.h"
 #include "boxes/star_gift_box.h"
 #include "boxes/stickers_box.h"
+#include "boxes/transfer_gift_box.h"
 #include "chat_helpers/compose/compose_show.h"
 #include "core/ui_integration.h"
 #include "data/stickers/data_custom_emoji.h"
@@ -25,6 +26,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_emoji_statuses.h"
 #include "data/data_file_origin.h"
 #include "data/data_peer.h"
+#include "data/data_peer_values.h"
 #include "data/data_premium_limits.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
@@ -46,6 +48,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/boxes/boost_box.h"
 #include "ui/chat/chat_style.h"
 #include "ui/chat/chat_theme.h"
+#include "ui/controls/button_labels.h"
 #include "ui/controls/sub_tabs.h"
 #include "ui/effects/path_shift_gradient.h"
 #include "ui/effects/premium_graphics.h"
@@ -631,29 +634,35 @@ void Set(
 	}
 }
 
+bool ShowPremiumToast(
+		std::shared_ptr<ChatHelpers::Show> show,
+		not_null<PeerData*> peer) {
+	if (!peer->isSelf() || show->session().premium()) {
+		return false;
+	}
+	Settings::ShowPremiumPromoToast(
+		show,
+		tr::lng_settings_color_subscribe(
+			tr::now,
+			lt_link,
+			Ui::Text::Link(
+				Ui::Text::Bold(
+					tr::lng_send_as_premium_required_link(tr::now))),
+			Ui::Text::WithEntities),
+		u"name_color"_q);
+	return true;
+}
+
 void Apply(
 		std::shared_ptr<ChatHelpers::Show> show,
 		not_null<PeerData*> peer,
 		SetValues values,
 		Fn<void()> close,
 		Fn<void()> cancel) {
-	const auto session = &peer->session();
 	if (peer->colorIndex() == values.colorIndex
 		&& peer->backgroundEmojiId() == values.backgroundEmojiId
 		&& !values.statusChanged) {
 		close();
-	} else if (peer->isSelf() && !session->premium()) {
-		Settings::ShowPremiumPromoToast(
-			show,
-			tr::lng_settings_color_subscribe(
-				tr::now,
-				lt_link,
-				Ui::Text::Link(
-					Ui::Text::Bold(
-						tr::lng_send_as_premium_required_link(tr::now))),
-				Ui::Text::WithEntities),
-			u"name_color"_q);
-		cancel();
 	} else if (peer->isSelf()) {
 		Set(show, peer, values);
 		close();
@@ -1546,6 +1555,10 @@ void EditPeerColorBox(
 		? tr::lng_settings_color_title()
 		: tr::lng_edit_channel_color());
 	box->setWidth(st::boxWideWidth);
+	box->setStyle(st::giftBox);
+	box->addTopButton(st::boxTitleClose, [=] {
+		box->closeBox();
+	});
 
 	struct State {
 		rpl::variable<uint8> index;
@@ -1553,6 +1566,7 @@ void EditPeerColorBox(
 		rpl::variable<EmojiStatusId> statusId;
 		rpl::variable<std::optional<Ui::ColorCollectible>> collectible;
 		rpl::variable<uint64> showingGiftId;
+		std::shared_ptr<Data::UniqueGift> buyCollectible;
 		TimeId statusUntil = 0;
 		bool statusChanged = false;
 		bool changing = false;
@@ -1596,6 +1610,7 @@ void EditPeerColorBox(
 				state->index.value(),
 				[=](uint8 index) {
 					if (state->collectible.current()) {
+						state->buyCollectible = nullptr;
 						state->collectible = std::nullopt;
 						state->emojiId = 0;
 					}
@@ -1739,33 +1754,93 @@ void EditPeerColorBox(
 			state->emojiId = selected->peerColor
 				? selected->peerColor->backgroundEmojiId
 				: 0;
+			state->buyCollectible = (selected->peerColor
+				&& (selected->ownerId != session->userPeerId())
+				&& selected->starsForResale > 0)
+				? selected
+				: nullptr;
 			state->collectible = selected->peerColor
 				? *selected->peerColor
 				: std::optional<Ui::ColorCollectible>();
 		}, state->collectible.value());
 	}
 
-	box->addButton(tr::lng_settings_apply(), [=] {
+	const auto button = box->addButton(tr::lng_settings_color_apply(), [=] {
 		if (state->applying) {
 			return;
+		} else if (ShowPremiumToast(show, peer)) {
+			return;
 		}
-		state->applying = true;
-		Apply(show, peer, {
+		const auto values = SetValues{
 			state->index.current(),
 			state->emojiId.current(),
 			state->collectible.current(),
 			state->statusId.current(),
 			state->statusUntil,
 			state->statusChanged,
-		}, crl::guard(box, [=] {
+		};
+		if (const auto buy = state->buyCollectible) {
+			const auto done = [=, weak = base::make_weak(box)](bool ok) {
+				if (ok) {
+					if (const auto strong = weak.get()) {
+						strong->closeBox();
+					}
+					Apply(show, peer, values, [] {}, [] {});
+				}
+			};
+			const auto to = peer->session().user();
+			ShowBuyResaleGiftBox(show, buy, false, to, done);
+			return;
+		}
+		state->applying = true;
+		Apply(show, peer, values, crl::guard(box, [=] {
 			box->closeBox();
 		}), crl::guard(box, [=] {
 			state->applying = false;
 		}));
 	});
-	box->addButton(tr::lng_cancel(), [=] {
-		box->closeBox();
-	});
+	state->collectible.value(
+	) | rpl::start_with_next([=] {
+		const auto buy = state->buyCollectible.get();
+		while (!button->children().isEmpty()) {
+			delete button->children().first();
+		}
+		if (!buy) {
+			button->setText(rpl::combine(
+				tr::lng_settings_color_apply(),
+				Data::AmPremiumValue(&peer->session())
+			) | rpl::map([=](const QString &text, bool premium) {
+				auto result = TextWithEntities();
+				if (!premium && peer->isSelf()) {
+					result.append(Ui::Text::IconEmoji(&st::giftBoxLock));
+				}
+				result.append(text);
+				return result;
+			}));
+		} else if (buy->onlyAcceptTon) {
+			button->setText(rpl::single(QString()));
+			Ui::SetButtonTwoLabels(
+				button,
+				tr::lng_gift_buy_resale_button(
+					lt_cost,
+					rpl::single(Data::FormatGiftResaleTon(*buy)),
+					Ui::Text::WithEntities),
+				tr::lng_gift_buy_resale_equals(
+					lt_cost,
+					rpl::single(Ui::Text::IconEmoji(
+						&st::starIconEmojiSmall
+					).append(Lang::FormatCountDecimal(buy->starsForResale))),
+					Ui::Text::WithEntities),
+				st::resaleButtonTitle,
+				st::resaleButtonSubtitle);
+		} else {
+			button->setText(tr::lng_gift_buy_resale_button(
+				lt_cost,
+				rpl::single(Ui::Text::IconEmoji(&st::starIconEmoji).append(
+					Lang::FormatCountDecimal(buy->starsForResale))),
+				Ui::Text::WithEntities));
+		}
+	}, button->lifetime());
 }
 
 void SetupPeerColorSample(

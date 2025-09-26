@@ -954,7 +954,9 @@ const style::TextPalette &ChatStyle::collectibleTextPalette(
 }
 
 not_null<BackgroundEmojiData*> ChatStyle::backgroundEmojiData(
-		uint64 id) const {
+		uint64 emojiId,
+		const std::shared_ptr<ColorCollectible> &collectible) const {
+	const auto id = collectible ? collectible->collectibleId : emojiId;
 	return &_backgroundEmojis[id];
 }
 

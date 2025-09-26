@@ -2212,7 +2212,7 @@ void GenericCreditsEntryBox(
 				e.uniqueGift,
 				e.giftResaleForceTon,
 				to,
-				crl::guard(box, [=] { box->closeBox(); }));
+				crl::guard(box, [=](bool) { box->closeBox(); }));
 		} else if (canUpgrade || canGiftUpgrade) {
 			upgrade();
 		} else if (canToggle && !e.savedToProfile) {

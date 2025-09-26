@@ -779,14 +779,14 @@ void Reply::paint(
 	const auto &quoteSt = _hasQuoteIcon
 		? st::messageTextStyle.blockquote
 		: st::messageQuoteStyle;
-	const auto backgroundEmoji = backgroundEmojiId
-		? st->backgroundEmojiData(backgroundEmojiId).get()
+	const auto backgroundEmojiData = backgroundEmojiId
+		? st->backgroundEmojiData(backgroundEmojiId, colorCollectible).get()
 		: nullptr;
-	const auto backgroundEmojiCache = !backgroundEmoji
+	const auto backgroundEmojiCache = !backgroundEmojiData
 		? nullptr
 		: useColorCollectible
-		? &backgroundEmoji->collectibleCaches[colorCollectible]
-		: &backgroundEmoji->caches[Ui::BackgroundEmojiData::CacheIndex(
+		? &backgroundEmojiData->collectibleCaches[colorCollectible]
+		: &backgroundEmojiData->caches[Ui::BackgroundEmojiData::CacheIndex(
 			selected,
 			context.outbg,
 			inBubble,
@@ -797,11 +797,11 @@ void Reply::paint(
 	}
 	Ui::Text::ValidateQuotePaintCache(*cache, quoteSt);
 	Ui::Text::FillQuotePaint(p, rect, *cache, quoteSt);
-	if (backgroundEmoji) {
+	if (backgroundEmojiData) {
 		ValidateBackgroundEmoji(
 			backgroundEmojiId,
 			colorCollectible,
-			backgroundEmoji,
+			backgroundEmojiData,
 			backgroundEmojiCache,
 			cache,
 			view);
@@ -811,7 +811,7 @@ void Reply::paint(
 				rect,
 				_hasQuoteIcon,
 				*backgroundEmojiCache,
-				backgroundEmoji->firstGiftFrame);
+				backgroundEmojiData->firstGiftFrame);
 		}
 	}
 	if (!inBubble) {

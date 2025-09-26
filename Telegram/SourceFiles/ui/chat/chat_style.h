@@ -379,7 +379,8 @@ public:
 		const std::shared_ptr<ColorCollectible> &collectible) const;
 
 	[[nodiscard]] not_null<BackgroundEmojiData*> backgroundEmojiData(
-		uint64 id) const;
+		uint64 emojiId,
+		const std::shared_ptr<ColorCollectible> &collectible) const;
 
 	[[nodiscard]] const CornersPixmaps &msgBotKbOverBgAddCornersSmall() const;
 	[[nodiscard]] const CornersPixmaps &msgBotKbOverBgAddCornersLarge() const;

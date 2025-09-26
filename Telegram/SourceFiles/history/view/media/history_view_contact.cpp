@@ -376,25 +376,25 @@ void Contact::draw(Painter &p, const PaintContext &context) const {
 	const auto backgroundEmojiId = _contact
 		? _contact->backgroundEmojiId()
 		: DocumentId();
-	const auto backgroundEmoji = backgroundEmojiId
-		? st->backgroundEmojiData(backgroundEmojiId).get()
+	const auto backgroundEmojiData = backgroundEmojiId
+		? st->backgroundEmojiData(backgroundEmojiId, colorCollectible).get()
 		: nullptr;
-	const auto backgroundEmojiCache = !backgroundEmoji
+	const auto backgroundEmojiCache = !backgroundEmojiData
 		? nullptr
 		: useColorCollectible
-		? &backgroundEmoji->collectibleCaches[colorCollectible]
-		: &backgroundEmoji->caches[Ui::BackgroundEmojiData::CacheIndex(
+		? &backgroundEmojiData->collectibleCaches[colorCollectible]
+		: &backgroundEmojiData->caches[Ui::BackgroundEmojiData::CacheIndex(
 			selected,
 			context.outbg,
 			true,
 			useColorIndex ? (colorIndex + 1) : 0)];
 	Ui::Text::ValidateQuotePaintCache(*cache, _st);
 	Ui::Text::FillQuotePaint(p, outer, *cache, _st);
-	if (backgroundEmoji) {
+	if (backgroundEmojiData) {
 		ValidateBackgroundEmoji(
 			backgroundEmojiId,
 			colorCollectible,
-			backgroundEmoji,
+			backgroundEmojiData,
 			backgroundEmojiCache,
 			cache,
 			view);
@@ -407,7 +407,7 @@ void Contact::draw(Painter &p, const PaintContext &context) const {
 				r,
 				false,
 				*backgroundEmojiCache,
-				backgroundEmoji->firstGiftFrame);
+				backgroundEmojiData->firstGiftFrame);
 		}
 	}
 

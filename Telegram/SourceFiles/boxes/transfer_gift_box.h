@@ -41,7 +41,7 @@ void ShowBuyResaleGiftBox(
 	std::shared_ptr<Data::UniqueGift> gift,
 	bool forceTon,
 	not_null<PeerData*> to,
-	Fn<void()> closeParentBox);
+	Fn<void(bool ok)> closeParentBox);
 
 bool ShowResaleGiftLater(
 	std::shared_ptr<ChatHelpers::Show> show,

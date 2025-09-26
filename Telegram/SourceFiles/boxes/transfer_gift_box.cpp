@@ -790,7 +790,7 @@ void ShowBuyResaleGiftBox(
 		std::shared_ptr<Data::UniqueGift> gift,
 		bool forceTon,
 		not_null<PeerData*> to,
-		Fn<void()> closeParentBox) {
+		Fn<void(bool ok)> closeParentBox) {
 	show->show(Box([=](not_null<Ui::GenericBox*> box) {
 		struct State {
 			rpl::variable<bool> ton;
@@ -856,12 +856,12 @@ void ShowBuyResaleGiftBox(
 			const auto weak = base::make_weak(box);
 			const auto done = [=](Payments::CheckoutResult result) {
 				if (result == Payments::CheckoutResult::Cancelled) {
-					closeParentBox();
+					closeParentBox(false);
 					close();
 				} else if (result != Payments::CheckoutResult::Paid) {
 					state->sent = false;
 				} else {
-					closeParentBox();
+					closeParentBox(true);
 					close();
 				}
 			};

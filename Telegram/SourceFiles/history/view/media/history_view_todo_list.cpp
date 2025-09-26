@@ -506,7 +506,7 @@ void TodoList::paintBottom(
 		const PaintContext &context) const {
 	const auto stringtop = top
 		+ st::msgPadding.bottom()
-		+ st::historyPollBottomButtonTop;
+		+ st::historyChecklistBottomTop;
 	const auto stm = context.messageStyle();
 
 	p.setPen(stm->msgDateFg);

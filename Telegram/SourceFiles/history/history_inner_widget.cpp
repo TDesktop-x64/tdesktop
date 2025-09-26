@@ -2979,7 +2979,9 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 							const auto out = item->out();
 							const auto outgoingGift = isGift
 								&& (starGiftUpgrade ? !out : out);
-							if (outgoingGift) {
+							if (outgoingGift
+								&& gift->type
+									!= Data::GiftType::BirthdaySuggest) {
 								_menu->addAction(
 									tr::lng_context_gift_send(tr::now),
 									[=] {

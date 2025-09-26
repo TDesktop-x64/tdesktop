@@ -502,6 +502,8 @@ PRIVATE
     ui/vertical_list.h
     ui/unread_badge_paint.cpp
     ui/unread_badge_paint.h
+    ui/unread_counter_format.cpp
+    ui/unread_counter_format.h
     ui/userpic_view.cpp
     ui/userpic_view.h
     ui/webview_helpers.cpp

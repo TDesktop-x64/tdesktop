@@ -167,6 +167,8 @@ struct BackgroundEmojiData {
 		std::weak_ptr<ColorCollectible>,
 		BackgroundEmojiCache,
 		ColorCollectiblePtrCompare> collectibleCaches;
+	std::unique_ptr<Text::CustomEmoji> gift;
+	QImage firstGiftFrame;
 
 	[[nodiscard]] static int CacheIndex(
 		bool selected,
@@ -634,12 +636,20 @@ private:
 [[nodiscard]] QColor FromNameFg(
 	not_null<const ChatStyle*> st,
 	bool selected,
-	uint8 colorIndex);
+	uint8 colorIndex,
+	const std::shared_ptr<Ui::ColorCollectible> &colorCollectible);
 
 [[nodiscard]] inline QColor FromNameFg(
 		const ChatPaintContext &context,
-		uint8 colorIndex) {
-	return FromNameFg(context.st, context.selected(), colorIndex);
+		uint8 colorIndex,
+		const std::shared_ptr<Ui::ColorCollectible> &colorCollectible) {
+	return context.outbg
+		? context.messageStyle()->msgServiceFg->c
+		: FromNameFg(
+			context.st,
+			context.selected(),
+			colorIndex,
+			colorCollectible);
 }
 
 void FillComplexOverlayRect(

@@ -222,13 +222,8 @@ void Game::draw(Painter &p, const PaintContext &context) const {
 	auto tshift = inner.top();
 	auto paintw = inner.width();
 	const auto selected = context.selected();
-	const auto from = parent()->data()->contentColorsFrom();
-	const auto colorIndex = from
-		? from->colorIndex()
-		: parent()->colorIndex();
-	const auto &colorCollectible = from
-		? from->colorCollectible()
-		: nullptr;
+	const auto colorIndex = parent()->contentColorIndex();
+	const auto &colorCollectible = parent()->contentColorCollectible();
 	const auto colorPattern = colorCollectible
 		? st->collectiblePatternIndex(colorCollectible)
 		: st->colorPatternIndex(colorIndex);

@@ -895,21 +895,16 @@ void WebPage::draw(Painter &p, const PaintContext &context) const {
 
 	const auto selected = context.selected();
 	const auto view = parent();
-	const auto from = view->data()->contentColorsFrom();
 	const auto colorIndex = factcheck
 		? 0 // red
 		: (sponsored && sponsored->colorIndex)
 		? sponsored->colorIndex
-		: from
-		? from->colorIndex()
-		: view->colorIndex();
+		: view->contentColorIndex();
 	const auto &colorCollectible = factcheck
 		? nullptr
 		: (sponsored && sponsored->colorIndex)
 		? nullptr
-		: from
-		? from->colorCollectible()
-		: nullptr;
+		: view->contentColorCollectible();
 	const auto colorPattern = colorCollectible
 		? st->collectiblePatternIndex(colorCollectible)
 		: st->colorPatternIndex(colorIndex);
@@ -924,9 +919,7 @@ void WebPage::draw(Painter &p, const PaintContext &context) const {
 		? DocumentId()
 		: (sponsored && sponsored->backgroundEmojiId)
 		? sponsored->backgroundEmojiId
-		: from
-		? from->backgroundEmojiId()
-		: DocumentId();
+		: view->contentBackgroundEmojiId();
 	const auto backgroundEmoji = backgroundEmojiId
 		? st->backgroundEmojiData(backgroundEmojiId).get()
 		: nullptr;
@@ -944,12 +937,18 @@ void WebPage::draw(Painter &p, const PaintContext &context) const {
 	if (backgroundEmoji) {
 		ValidateBackgroundEmoji(
 			backgroundEmojiId,
+			colorCollectible,
 			backgroundEmoji,
 			backgroundEmojiCache,
 			cache,
 			view);
 		if (!backgroundEmojiCache->frames[0].isNull()) {
-			FillBackgroundEmoji(p, outer, false, *backgroundEmojiCache);
+			FillBackgroundEmoji(
+				p,
+				outer,
+				false,
+				*backgroundEmojiCache,
+				backgroundEmoji->firstGiftFrame);
 		}
 	} else if (factcheck && factcheck->expandable) {
 		const auto &icon = factcheck->expanded ? _st.collapse : _st.expand;

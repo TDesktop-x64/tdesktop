@@ -1472,3 +1472,5 @@ birthdaySuggestTextPadding: margins(10px, 4px, 10px, 8px);
 birthdaySuggestTablePadding: margins(2px, 4px, 2px, 12px);
 birthdaySuggestTableLastPadding: margins(2px, 4px, 2px, 24px);
 birthdaySuggestTableSkip: 2px;
+
+messageGiftIconSkip: 30px;

@@ -393,6 +393,7 @@ void Contact::draw(Painter &p, const PaintContext &context) const {
 	if (backgroundEmoji) {
 		ValidateBackgroundEmoji(
 			backgroundEmojiId,
+			colorCollectible,
 			backgroundEmoji,
 			backgroundEmojiCache,
 			cache,
@@ -401,7 +402,12 @@ void Contact::draw(Painter &p, const PaintContext &context) const {
 			const auto end = rect::bottom(inner) + _st.padding.bottom();
 			const auto r = outer
 				- QMargins(0, 0, 0, rect::bottom(outer) - end);
-			FillBackgroundEmoji(p, r, false, *backgroundEmojiCache);
+			FillBackgroundEmoji(
+				p,
+				r,
+				false,
+				*backgroundEmojiCache,
+				backgroundEmoji->firstGiftFrame);
 		}
 	}
 

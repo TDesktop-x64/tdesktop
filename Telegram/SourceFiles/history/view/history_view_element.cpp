@@ -827,8 +827,22 @@ uint8 Element::colorIndex() const {
 	return data()->colorIndex();
 }
 
+auto Element::colorCollectible() const
+-> const std::shared_ptr<Ui::ColorCollectible> & {
+	return data()->colorCollectible();
+}
+
 uint8 Element::contentColorIndex() const {
 	return data()->contentColorIndex();
+}
+
+DocumentId Element::contentBackgroundEmojiId() const {
+	return data()->contentBackgroundEmojiId();
+}
+
+auto Element::contentColorCollectible() const
+-> const std::shared_ptr<Ui::ColorCollectible> & {
+	return data()->contentColorCollectible();
 }
 
 QDateTime Element::dateTime() const {

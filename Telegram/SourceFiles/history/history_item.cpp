@@ -1381,6 +1381,22 @@ uint8 HistoryItem::colorIndex() const {
 	Unexpected("No displayFrom and no displayHiddenSenderInfo.");
 }
 
+DocumentId HistoryItem::backgroundEmojiId() const {
+	if (const auto from = displayFrom()) {
+		return from->backgroundEmojiId();
+	}
+	return DocumentId();
+}
+
+auto HistoryItem::colorCollectible() const
+-> const std::shared_ptr<Ui::ColorCollectible> & {
+	if (const auto from = displayFrom()) {
+		return from->colorCollectible();
+	}
+	static const auto dummy = std::shared_ptr<Ui::ColorCollectible>();
+	return dummy;
+}
+
 PeerData *HistoryItem::contentColorsFrom() const {
 	if (const auto forwarded = Get<HistoryMessageForwarded>()) {
 		return forwarded->originalSender;
@@ -1395,6 +1411,27 @@ uint8 HistoryItem::contentColorIndex() const {
 			: forwarded->originalHiddenSenderInfo->colorIndex;
 	}
 	return colorIndex();
+}
+
+DocumentId HistoryItem::contentBackgroundEmojiId() const {
+	if (const auto forwarded = Get<HistoryMessageForwarded>()) {
+		return forwarded->originalSender
+			? forwarded->originalSender->backgroundEmojiId()
+			: DocumentId();
+	}
+	return backgroundEmojiId();
+}
+
+auto HistoryItem::contentColorCollectible() const
+-> const std::shared_ptr<Ui::ColorCollectible> & {
+	if (const auto forwarded = Get<HistoryMessageForwarded>()) {
+		if (forwarded->originalSender) {
+			return forwarded->originalSender->colorCollectible();
+		}
+		static const auto dummy = std::shared_ptr<Ui::ColorCollectible>();
+		return dummy;
+	}
+	return colorCollectible();
 }
 
 std::unique_ptr<HistoryView::Element> HistoryItem::createView(

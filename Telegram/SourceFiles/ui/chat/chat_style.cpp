@@ -1183,8 +1183,13 @@ uint8 ColorIndexToPaletteIndex(uint8 colorIndex) {
 QColor FromNameFg(
 		not_null<const ChatStyle*> st,
 		bool selected,
-		uint8 colorIndex) {
-	return st->coloredValues(selected, colorIndex).name;
+		uint8 colorIndex,
+		const std::shared_ptr<Ui::ColorCollectible> &colorCollectible) {
+	return !colorCollectible
+		? st->coloredValues(selected, colorIndex).name
+		: (st->dark() && (colorCollectible->darkAccentColor.alpha() > 0))
+		? colorCollectible->darkAccentColor
+		: colorCollectible->accentColor;
 }
 
 void FillComplexOverlayRect(

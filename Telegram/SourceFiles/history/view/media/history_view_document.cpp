@@ -956,11 +956,6 @@ void Document::draw(
 		p.setPen(stm->historyTextFg);
 		_parent->prepareCustomEmojiPaint(p, context, captioned->caption);
 
-		const auto colorsFrom = _parent->data()->contentColorsFrom();
-		const auto &colorCollectible = colorsFrom
-			? colorsFrom->colorCollectible()
-			: nullptr;
-
 		auto highlightRequest = context.computeHighlightCache();
 		captioned->caption.draw(p, {
 			.position = { st::msgPadding.left(), captiontop },
@@ -968,7 +963,7 @@ void Document::draw(
 			.palette = &stm->textPalette,
 			.pre = stm->preCache.get(),
 			.blockquote = context.quoteCache(
-				colorCollectible,
+				parent()->contentColorCollectible(),
 				parent()->contentColorIndex()),
 			.colors = context.st->highlightColors(),
 			.spoiler = Ui::Text::DefaultSpoilerCache(),

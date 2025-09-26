@@ -1795,9 +1795,10 @@ void Message::paintFromName(
 	const auto from = item->displayFrom();
 	const auto info = from ? nullptr : item->displayHiddenSenderInfo();
 	Assert(from || info);
-	const auto nameFg = !context.outbg
-		? FromNameFg(context, colorIndex())
-		: stm->msgServiceFg->c;
+	const auto nameFg = FromNameFg(
+		context,
+		colorIndex(),
+		colorCollectible());
 	const auto nameText = [&] {
 		if (from) {
 			validateFromNameText(from);
@@ -1884,9 +1885,10 @@ void Message::paintFromName(
 			const auto shift = QPoint(trect.width() - rightWidth, 0);
 			const auto pen = !_rightBadgeHasBoosts
 				? QPen()
-				: !context.outbg
-				? QPen(FromNameFg(context, colorIndex()))
-				: stm->msgServiceFg->p;
+				: QPen(FromNameFg(
+					context,
+					colorIndex(),
+					colorCollectible()));
 			auto colored = std::array<Ui::Text::SpecialColor, 1>{
 				{ { &pen, &pen } },
 			};
@@ -2081,19 +2083,13 @@ void Message::paintText(
 		trect.setY(trect.y() + botTop->height);
 	}
 	auto highlightRequest = context.computeHighlightCache();
-
-	const auto colorsFrom = data()->contentColorsFrom();
-	const auto &colorCollectible = colorsFrom
-		? colorsFrom->colorCollectible()
-		: nullptr;
-
 	text().draw(p, {
 		.position = trect.topLeft(),
 		.availableWidth = trect.width(),
 		.palette = &stm->textPalette,
 		.pre = stm->preCache.get(),
 		.blockquote = context.quoteCache(
-			colorCollectible,
+			contentColorCollectible(),
 			contentColorIndex()),
 		.colors = context.st->highlightColors(),
 		.spoiler = Ui::Text::DefaultSpoilerCache(),

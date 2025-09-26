@@ -109,7 +109,6 @@ struct MessagesUi::MessageView {
 	std::unique_ptr<Ui::InfiniteRadialAnimation> sendingAnimation;
 	std::unique_ptr<Ui::ReactionFlyAnimation> reactionAnimation;
 	std::unique_ptr<Ui::RpWidget> reactionWidget;
-	QPoint reactionBase;
 	QPoint reactionShift;
 	Ui::PeerUserpicView view;
 	Ui::Text::String text;
@@ -405,11 +404,9 @@ void MessagesUi::startReactionAnimation(MessageView &entry) {
 			_scroll->scrollTopValue(),
 			_scroll->RpWidget::positionValue()
 		) | rpl::start_with_next([=](int yshift, QPoint point) {
+			_reactionBasePosition = point - QPoint(0, yshift);
 			for (auto &view : _views) {
-				if (const auto widget = view.reactionWidget.get()) {
-					view.reactionBase = point - QPoint(0, yshift);
-					updateReactionPosition(view);
-				}
+				updateReactionPosition(view);
 			}
 		}, _effectsLifetime);
 	}
@@ -422,7 +419,6 @@ void MessagesUi::startReactionAnimation(MessageView &entry) {
 		},
 		[=] { raw->update(); },
 		st::reactionInlineImage);
-	entry.reactionBase = _scroll->pos() + QPoint(0, _scroll->scrollTop());
 	updateReactionPosition(entry);
 
 	const auto effectSize = st::reactionInlineImage * 2;
@@ -481,7 +477,7 @@ void MessagesUi::updateReactionPosition(MessageView &entry) {
 				padding.top())
 			+ QPoint(eleft + (esize / 2), etop + (esize / 2))
 			- QPoint(effectSize / 2, effectSize / 2);
-		widget->move(entry.reactionBase + entry.reactionShift);
+		widget->move(_reactionBasePosition + entry.reactionShift);
 	}
 }
 

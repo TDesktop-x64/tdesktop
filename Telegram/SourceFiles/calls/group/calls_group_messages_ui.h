@@ -82,6 +82,7 @@ private:
 	style::complex_color _messageBg;
 	Ui::RoundRect _messageBgRect;
 
+	QPoint _reactionBasePosition;
 	rpl::lifetime _effectsLifetime;
 
 	Ui::Animations::Simple _topFadeAnimation;

@@ -415,7 +415,6 @@ void MessageField::createControls(PeerData *peer) {
 	_send->show();
 
 	using Selector = ChatHelpers::TabbedSelector;
-	using Descriptor = ChatHelpers::TabbedPanelDescriptor;
 	_emojiPanel = std::make_unique<ChatHelpers::TabbedPanel>(
 		_parent,
 		ChatHelpers::TabbedPanelDescriptor{

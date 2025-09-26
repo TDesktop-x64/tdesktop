@@ -2366,7 +2366,7 @@ TodoListData *MediaTodoList::todolist() const {
 
 TextWithEntities MediaTodoList::notificationText() const {
 	return TextWithEntities()
-		.append(QChar(0x2611))
+		.append(QChar(0x2705))
 		.append(QChar(' '))
 		.append(Ui::Text::Colorized(_todolist->title));
 }

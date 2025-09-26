@@ -6176,6 +6176,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 "lng_todo_title" = "Checklist";
 "lng_todo_title_group" = "Group Checklist";
+"lng_todo_title_user" = "Checklist";
 "lng_todo_completed#one" = "{count} of {total} completed";
 "lng_todo_completed#other" = "{count} of {total} completed";
 "lng_todo_completed_none" = "None of {total} completed";

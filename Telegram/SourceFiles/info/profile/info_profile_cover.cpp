@@ -626,8 +626,9 @@ Cover::Cover(
 				Window::GifPauseReason::Layer);
 		}))
 , _badgeContent(BadgeContentForPeer(peer))
-, _badge(
-	std::make_unique<Badge>(
+, _badge(role == Role::EditContact
+	? nullptr
+	: std::make_unique<Badge>(
 		this,
 		st::infoPeerBadge,
 		&peer->session(),
@@ -637,8 +638,9 @@ Cover::Cover(
 			return controller->isGifPausedAtLeastFor(
 				Window::GifPauseReason::Layer);
 		}))
-, _verified(
-	std::make_unique<Badge>(
+, _verified(role == Role::EditContact
+	? nullptr
+	: std::make_unique<Badge>(
 		this,
 		st::infoPeerBadge,
 		&peer->session(),
@@ -706,16 +708,26 @@ Cover::Cover(
 
 	setupShowLastSeen();
 
-	_badge->setPremiumClickCallback([=] {
-		if (const auto panel = _emojiStatusPanel.get()) {
-			panel->show(_controller, _badge->widget(), _badge->sizeTag());
-		} else {
-			::Settings::ShowEmojiStatusPremium(_controller, _peer);
-		}
-	});
-	auto badgeUpdates = rpl::merge(
-		_badge->updated(),
-		_verified->updated());
+	if (_badge) {
+		_badge->setPremiumClickCallback([=] {
+			if (const auto panel = _emojiStatusPanel.get()) {
+				panel->show(_controller, _badge->widget(), _badge->sizeTag());
+			} else {
+				::Settings::ShowEmojiStatusPremium(_controller, _peer);
+			}
+		});
+	}
+	auto badgeUpdates = rpl::producer<rpl::empty_value>();
+	if (_badge) {
+		badgeUpdates = rpl::merge(
+			std::move(badgeUpdates),
+			_badge->updated());
+	}
+	if (_verified) {
+		badgeUpdates = rpl::merge(
+			std::move(badgeUpdates),
+			_verified->updated());
+	}
 	if (_botVerify) {
 		badgeUpdates = rpl::merge(
 			std::move(badgeUpdates),
@@ -1108,8 +1120,8 @@ Cover::~Cover() {
 
 void Cover::refreshNameGeometry(int newWidth) {
 	auto nameWidth = newWidth - _st.nameLeft - _st.rightSkip;
-	const auto verifiedWidget = _verified->widget();
-	const auto badgeWidget = _badge->widget();
+	const auto verifiedWidget = _verified ? _verified->widget() : nullptr;
+	const auto badgeWidget = _badge ? _badge->widget() : nullptr;
 	if (verifiedWidget) {
 		nameWidth -= verifiedWidget->width();
 	}
@@ -1136,11 +1148,15 @@ void Cover::refreshNameGeometry(int newWidth) {
 	_name->resizeToNaturalWidth(nameWidth);
 	_name->moveToLeft(nameLeft, _st.nameTop, newWidth);
 	const auto badgeLeft = nameLeft + _name->width();
-	_badge->move(badgeLeft, badgeTop, badgeBottom);
-	_verified->move(
-		badgeLeft + (badgeWidget ? badgeWidget->width() : 0),
-		badgeTop,
-		badgeBottom);
+	if (_badge) {
+		_badge->move(badgeLeft, badgeTop, badgeBottom);
+	}
+	if (_verified) {
+		_verified->move(
+			badgeLeft + (badgeWidget ? badgeWidget->width() : 0),
+			badgeTop,
+			badgeBottom);
+	}
 }
 
 void Cover::refreshStatusGeometry(int newWidth) {
@@ -1181,6 +1197,9 @@ void Cover::hideBadgeTooltip() {
 }
 
 void Cover::setupUniqueBadgeTooltip() {
+	if (!_badge) {
+		return;
+	}
 	base::timer_once(kWaitBeforeGiftBadge) | rpl::then(
 		_badge->updated()
 	) | rpl::start_with_next([=] {

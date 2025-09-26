@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "apiwrap.h"
 #include "api/api_text_entities.h"
+#include "base/random.h"
 #include "base/unixtime.h"
 #include "calls/group/calls_group_call.h"
 #include "calls/group/calls_group_message_encryption.h"
@@ -63,10 +64,10 @@ void Messages::send(TextWithTags text) {
 			prepared.entities,
 			Api::ConvertOption::SkipLocal)));
 
-	const auto id = ++_autoincrementId;
+	const auto randomId = base::RandomValue<uint64>();
 	const auto from = _call->peer()->session().user();
 	_messages.push_back({
-		.id = id,
+		.randomId = randomId,
 		.peer = from,
 		.text = std::move(prepared),
 	});
@@ -74,14 +75,15 @@ void Messages::send(TextWithTags text) {
 	if (!_call->conference()) {
 		_api->request(MTPphone_SendGroupCallMessage(
 			_call->inputCall(),
+			MTP_long(randomId),
 			serialized
 		)).done([=](const MTPBool &, const MTP::Response &response) {
-			sent(id, response);
+			sent(randomId, response);
 		}).fail([=](const MTP::Error &, const MTP::Response &response) {
-			failed(id, response);
+			failed(randomId, response);
 		}).send();
 	} else {
-		const auto bytes = SerializeMessage(serialized);
+		const auto bytes = SerializeMessage({ randomId, serialized });
 		auto v = std::vector<std::uint8_t>(bytes.size());
 		bytes::copy(bytes::make_span(v), bytes::make_span(bytes));
 
@@ -93,9 +95,9 @@ void Messages::send(TextWithTags text) {
 			_call->inputCall(),
 			MTP_bytes(bytes::make_span(encrypted))
 		)).done([=](const MTPBool &, const MTP::Response &response) {
-			sent(id, response);
+			sent(randomId, response);
 		}).fail([=](const MTP::Error &, const MTP::Response &response) {
-			failed(id, response);
+			failed(randomId, response);
 		}).send();
 	}
 	checkDestroying(true);
@@ -105,7 +107,7 @@ void Messages::received(const MTPDupdateGroupCallMessage &data) {
 	if (!ready()) {
 		return;
 	}
-	received(data.vfrom_id(), data.vmessage());
+	received(data.vrandom_id().v, data.vfrom_id(), data.vmessage());
 	pushChanges();
 }
 
@@ -129,17 +131,22 @@ void Messages::received(const MTPDupdateGroupCallEncryptedMessage &data) {
 		LOG(("API Error: Can't parse decrypted message"));
 		return;
 	}
-	received(fromId, *deserialized, true);
+	received(deserialized->randomId, fromId, deserialized->message, true);
 	pushChanges();
 }
 
 void Messages::received(
+		uint64 randomId,
 		const MTPPeer &from,
 		const MTPTextWithEntities &message,
 		bool checkCustomEmoji) {
 	const auto peer = _call->peer();
-	if (peerFromMTP(from) == peer->session().userPeerId()) {
-		// Our own we add only locally.
+	const auto i = ranges::find(_messages, randomId, &Message::randomId);
+	if (i != end(_messages)) {
+		if (peerFromMTP(from) == peer->session().userPeerId() && !i->date) {
+			i->date = base::unixtime::now();
+			checkDestroying(true);
+		}
 		return;
 	}
 	auto allowedEntityTypes = std::vector<EntityType>{
@@ -155,9 +162,8 @@ void Messages::received(
 	if (checkCustomEmoji && !peer->isSelf() && !peer->isPremium()) {
 		allowedEntityTypes.pop_back();
 	}
-	const auto id = ++_autoincrementId;
 	_messages.push_back({
-		.id = id,
+		.randomId = randomId,
 		.date = base::unixtime::now(),
 		.peer = peer->owner().peer(peerFromMTP(from)),
 		.text = Ui::Text::Filtered(
@@ -215,17 +221,17 @@ void Messages::pushChanges() {
 	_changes.fire_copy(_messages);
 }
 
-void Messages::sent(int id, const MTP::Response &response) {
-	const auto i = ranges::find(_messages, id, &Message::id);
-	if (i != end(_messages)) {
+void Messages::sent(uint64 randomId, const MTP::Response &response) {
+	const auto i = ranges::find(_messages, randomId, &Message::randomId);
+	if (i != end(_messages) && !i->date) {
 		i->date = Api::UnixtimeFromMsgId(response.outerMsgId);
 		checkDestroying(true);
 	}
 }
 
-void Messages::failed(int id, const MTP::Response &response) {
-	const auto i = ranges::find(_messages, id, &Message::id);
-	if (i != end(_messages)) {
+void Messages::failed(uint64 randomId, const MTP::Response &response) {
+	const auto i = ranges::find(_messages, randomId, &Message::randomId);
+	if (i != end(_messages) && !i->date) {
 		i->date = Api::UnixtimeFromMsgId(response.outerMsgId);
 		i->failed = true;
 		checkDestroying(true);

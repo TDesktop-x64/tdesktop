@@ -101,7 +101,7 @@ void ReceiveOnlyWheelEvents(not_null<Ui::ElasticScroll*> scroll) {
 } // namespace
 
 struct MessagesUi::MessageView {
-	int id = 0;
+	uint64 id = 0;
 	PeerData *from = nullptr;
 	Ui::Animations::Simple toggleAnimation;
 	Ui::Animations::Simple sentAnimation;
@@ -150,7 +150,11 @@ void MessagesUi::setupList(rpl::producer<std::vector<Message>> messages) {
 		for (auto &entry : _views) {
 			if (!entry.removed) {
 				const auto id = entry.id;
-				const auto i = ranges::find(from, till, id, &Message::id);
+				const auto i = ranges::find(
+					from,
+					till,
+					id,
+					&Message::randomId);
 				if (i == till) {
 					toggleMessage(entry, false);
 					continue;
@@ -168,7 +172,7 @@ void MessagesUi::setupList(rpl::producer<std::vector<Message>> messages) {
 		}
 		auto addedSendingToBottom = false;
 		for (auto i = from; i != till; ++i) {
-			if (!ranges::contains(_views, i->id, &MessageView::id)) {
+			if (!ranges::contains(_views, i->randomId, &MessageView::id)) {
 				if (i + 1 == till && !i->date) {
 					addedSendingToBottom = true;
 				}
@@ -277,7 +281,7 @@ void MessagesUi::toggleMessage(MessageView &entry, bool shown) {
 	repaintMessage(id);
 }
 
-void MessagesUi::repaintMessage(int id) {
+void MessagesUi::repaintMessage(uint64 id) {
 	auto i = ranges::find(_views, id, &MessageView::id);
 	if (i == end(_views)) {
 		return;
@@ -327,7 +331,7 @@ void MessagesUi::appendMessage(const Message &data) {
 	}
 
 	auto &entry = _views.emplace_back();
-	const auto id = entry.id = data.id;
+	const auto id = entry.id = data.randomId;
 	const auto repaint = [=] {
 		repaintMessage(id);
 	};

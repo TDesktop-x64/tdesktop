@@ -56,7 +56,7 @@ private:
 	void updateMessageSize(MessageView &entry);
 	bool updateMessageHeight(MessageView &entry);
 	void animateMessageSent(MessageView &entry);
-	void repaintMessage(int id);
+	void repaintMessage(uint64 id);
 	void recountHeights(std::vector<MessageView>::iterator i, int top);
 	void appendMessage(const Message &data);
 	void checkReactionContent(

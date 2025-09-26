@@ -309,20 +309,23 @@ template <typename MTPD>
 
 } // namespace
 
-QByteArray SerializeMessage(const MTPTextWithEntities &text) {
+QByteArray SerializeMessage(const PreparedMessage &data) {
 	return Serialize(Object("groupCallMessage", {
+		Value(
+			"random_id",
+			String(QByteArray::number(int64(data.randomId)))),
 		Value(
 			"message",
 			Object("textWithEntities", {
-				Value("text", String(text.data().vtext().v)),
+				Value("text", String(data.message.data().vtext().v)),
 				Value(
 					"entities",
-					Array(Entities(text.data().ventities().v))),
+					Array(Entities(data.message.data().ventities().v))),
 			})),
 	}));
 }
 
-std::optional<MTPTextWithEntities> DeserializeMessage(
+std::optional<PreparedMessage> DeserializeMessage(
 		const QByteArray &data) {
 	auto error = QJsonParseError();
 	auto document = QJsonDocument::fromJson(data, &error);
@@ -333,6 +336,10 @@ std::optional<MTPTextWithEntities> DeserializeMessage(
 	}
 	const auto groupCallMessage = document.object();
 	if (Unsupported(groupCallMessage, "groupCallMessage")) {
+		return {};
+	}
+	const auto randomId = GetLong(groupCallMessage, "random_id").value_or(0);
+	if (!randomId) {
 		return {};
 	}
 	const auto message = groupCallMessage["message"].toObject();
@@ -349,9 +356,12 @@ std::optional<MTPTextWithEntities> DeserializeMessage(
 		return {};
 	}
 	const auto entities = GetEntities(text, maybeEntities->toArray());
-	return MTP_textWithEntities(
-		MTP_string(text),
-		MTP_vector<MTPMessageEntity>(entities));
+	return PreparedMessage{
+		.randomId = randomId,
+		.message = MTP_textWithEntities(
+			MTP_string(text),
+			MTP_vector<MTPMessageEntity>(entities)),
+	};
 }
 
 } // namespace Calls::Group

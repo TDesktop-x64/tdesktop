@@ -9,8 +9,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace Calls::Group {
 
-[[nodiscard]] QByteArray SerializeMessage(const MTPTextWithEntities &text);
-[[nodiscard]] std::optional<MTPTextWithEntities> DeserializeMessage(
+struct PreparedMessage {
+	uint64 randomId = 0;
+	MTPTextWithEntities message;
+};
+
+[[nodiscard]] QByteArray SerializeMessage(const PreparedMessage &data);
+[[nodiscard]] std::optional<PreparedMessage> DeserializeMessage(
 	const QByteArray &data);
 
 } // namespace Calls::Group

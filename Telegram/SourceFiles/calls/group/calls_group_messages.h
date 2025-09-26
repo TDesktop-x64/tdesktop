@@ -25,7 +25,7 @@ struct Response;
 namespace Calls::Group {
 
 struct Message {
-	int id = 0;
+	uint64 randomId = 0;
 	TimeId date = 0;
 	not_null<PeerData*> peer;
 	TextWithEntities text;
@@ -50,11 +50,12 @@ private:
 	void checkDestroying(bool afterChanges = false);
 
 	void received(
+		uint64 randomId,
 		const MTPPeer &from,
 		const MTPTextWithEntities &message,
 		bool checkCustomEmoji = false);
-	void sent(int id, const MTP::Response &response);
-	void failed(int id, const MTP::Response &response);
+	void sent(uint64 randomId, const MTP::Response &response);
+	void failed(uint64 randomId, const MTP::Response &response);
 
 	const not_null<GroupCall*> _call;
 	const not_null<MTP::Sender*> _api;
@@ -67,7 +68,6 @@ private:
 	std::vector<Message> _messages;
 	rpl::event_stream<std::vector<Message>> _changes;
 
-	int _autoincrementId = 0;
 	TimeId _ttl = 0;
 
 	rpl::lifetime _lifetime;

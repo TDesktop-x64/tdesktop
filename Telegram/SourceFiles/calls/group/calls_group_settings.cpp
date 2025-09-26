@@ -84,7 +84,8 @@ void SaveCallJoinMuted(
 	peer->session().api().request(MTPphone_ToggleGroupCallSettings(
 		MTP_flags(MTPphone_ToggleGroupCallSettings::Flag::f_join_muted),
 		call->input(),
-		MTP_bool(joinMuted)
+		MTP_bool(joinMuted),
+		MTPBool() // messages_enabled
 	)).send();
 }
 

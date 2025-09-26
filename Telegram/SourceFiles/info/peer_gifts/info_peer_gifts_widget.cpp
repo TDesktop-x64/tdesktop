@@ -752,9 +752,12 @@ void InnerWidget::validateButtons() {
 		view.index = index;
 		view.manageId = manageId;
 		view.giftId = giftId;
-		view.button->toggleSelected(
-			_addingToCollectionId && _inCollection.contains(manageId),
-			anim::type::instant);
+		if (_addingToCollectionId) {
+			view.button->toggleSelected(
+				_inCollection.contains(manageId),
+				GiftSelectionMode::Check,
+				anim::type::instant);
+		}
 		view.button->setDescriptor(descriptor, _mode);
 		view.button->setClickedCallback(callback);
 		return true;
@@ -937,7 +940,9 @@ void InnerWidget::showGift(int index) {
 
 		const auto view = ranges::find(_views, index, &View::index);
 		if (view != end(_views)) {
-			view->button->toggleSelected(!selected);
+			view->button->toggleSelected(
+				!selected,
+				GiftSelectionMode::Check);
 		}
 		return;
 	}

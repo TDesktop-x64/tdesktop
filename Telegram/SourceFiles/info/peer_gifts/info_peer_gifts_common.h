@@ -133,6 +133,12 @@ enum class GiftButtonMode : uint8 {
 	Selection,
 };
 
+enum class GiftSelectionMode : uint8 {
+	Border,
+	Inset,
+	Check,
+};
+
 class GiftButtonDelegate {
 public:
 	[[nodiscard]] virtual TextWithEntities star() = 0;
@@ -165,6 +171,7 @@ public:
 
 	void toggleSelected(
 		bool selected,
+		GiftSelectionMode selectionMode = GiftSelectionMode::Border,
 		anim::type animated = anim::type::normal);
 
 	[[nodiscard]] rpl::producer<QPoint> contextMenuRequests() const {
@@ -207,10 +214,11 @@ private:
 	std::unique_ptr<Overview::Layout::Checkbox> _check;
 	int _resalePrice = 0;
 	GiftButtonMode _mode = GiftButtonMode::Full;
-	bool _subscribed = false;
-	bool _patterned = false;
-	bool _selected = false;
-	bool _locked = false;
+	GiftSelectionMode _selectionMode = GiftSelectionMode::Border;
+	bool _subscribed : 1 = false;
+	bool _patterned : 1 = false;
+	bool _selected : 1 = false;
+	bool _locked : 1 = false;
 
 	base::Timer _lockedTimer;
 	TimeId _lockedUntilDate = 0;

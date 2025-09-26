@@ -178,21 +178,14 @@ void GiftButton::onStateChanged(State was, StateChangeSource source) {
 }
 
 void GiftButton::unsubscribe() {
-	if (base::take(_subscribed)) {
+	if (_subscribed) {
+		_subscribed = false;
 		_userpic->subscribeToUpdates(nullptr);
 	}
 }
 
 void GiftButton::setDescriptor(const GiftDescriptor &descriptor, Mode mode) {
 	_mode = mode;
-
-	if (_mode != GiftButtonMode::Selection) {
-		_check = nullptr;
-	} else if (!_check) {
-		_check = std::make_unique<Overview::Layout::Checkbox>(
-			[=] { update(); },
-			st::overviewSmallCheck);
-	}
 
 	const auto unique = v::is<GiftTypeStars>(descriptor)
 		? v::get<GiftTypeStars>(descriptor).info.unique.get()
@@ -423,9 +416,9 @@ void GiftButton::setGeometry(QRect inner, QMargins extend) {
 }
 
 QMargins GiftButton::currentExtend() const {
-	const auto progress = (_mode == Mode::Selection)
-		? 0.
-		: _selectedAnimation.value(_selected ? 1. : 0.);
+	const auto progress = (_selectionMode == GiftSelectionMode::Border)
+		? _selectedAnimation.value(_selected ? 1. : 0.)
+		: 0.;
 	const auto added = anim::interpolate(0, st::giftBoxSelectSkip, progress);
 	return _extend + QMargins(added, added, added, added);
 }
@@ -434,13 +427,25 @@ bool GiftButton::small() const {
 	return _mode != GiftButtonMode::Full;
 }
 
-void GiftButton::toggleSelected(bool selected, anim::type animated) {
+void GiftButton::toggleSelected(
+		bool selected,
+		GiftSelectionMode selectionMode,
+		anim::type animated) {
+	_selectionMode = selectionMode;
+	if (_selectionMode != GiftSelectionMode::Check) {
+		_check = nullptr;
+	} else if (!_check) {
+		_check = std::make_unique<Overview::Layout::Checkbox>(
+			[=] { update(); },
+			st::overviewSmallCheck);
+	}
 	if (_selected == selected) {
 		if (animated == anim::type::instant) {
 			_selectedAnimation.stop();
 		}
 		return;
 	}
+
 	const auto duration = st::defaultRoundCheckbox.duration;
 	_selected = selected;
 	if (animated == anim::type::instant) {
@@ -498,9 +503,9 @@ void GiftButton::paintBackground(QPainter &p, const QImage &background) {
 	}
 
 	auto hq = PainterHighQualityEnabler(p);
-	const auto progress = (_mode == Mode::Selection)
-		? 0.
-		: _selectedAnimation.value(_selected ? 1. : 0.);
+	const auto progress = (_selectionMode == GiftSelectionMode::Border)
+		? _selectedAnimation.value(_selected ? 1. : 0.)
+		: 0.;
 	if (progress < 0.01) {
 		return;
 	}
@@ -614,6 +619,27 @@ void GiftButton::paintEvent(QPaintEvent *e) {
 		const auto extend = currentExtend();
 		const auto radius = st::giftBoxGiftRadius;
 		p.drawRoundedRect(outer.marginsRemoved(extend), radius, radius);
+	}
+	auto inset = 0;
+	if (_selectionMode == GiftSelectionMode::Inset) {
+		const auto progress = _selectedAnimation.value(_selected ? 1. : 0.);
+		if (progress > 0) {
+			auto hq = PainterHighQualityEnabler(p);
+			auto pen = st::boxBg->p;
+			const auto thickness = style::ConvertScaleExact(2.);
+			pen.setWidthF(progress * thickness);
+			p.setPen(pen);
+			p.setBrush(Qt::NoBrush);
+			const auto height = background.height() / dpr;
+			const auto outer = QRectF(0, 0, width, height);
+			const auto shift = progress * thickness * 2;
+			const auto extend = QMarginsF(currentExtend())
+				+ QMarginsF(shift, shift, shift, shift);
+			const auto radius = st::giftBoxGiftRadius - shift;
+			p.drawRoundedRect(outer.marginsRemoved(extend), radius, radius);
+			inset = int(std::ceil(
+				progress * (thickness * 2 + st::giftBoxUserpicSkip)));
+		}
 	}
 	if (_locked) {
 		st::giftBoxLockIcon.paint(
@@ -798,7 +824,7 @@ void GiftButton::paintEvent(QPaintEvent *e) {
 	v::match(_descriptor, [](const GiftTypePremium &) {
 	}, [&](const GiftTypeStars &data) {
 		if (!unique) {
-		} else if (data.pinned) {
+		} else if (data.pinned && _mode != GiftButtonMode::Selection) {
 			auto hq = PainterHighQualityEnabler(p);
 			const auto &icon = st::giftBoxPinIcon;
 			const auto skip = st::giftBoxUserpicSkip;
@@ -818,7 +844,7 @@ void GiftButton::paintEvent(QPaintEvent *e) {
 					QColor(255, 255, 255));
 			}
 			const auto size = _tonIcon.size() / _tonIcon.devicePixelRatio();
-			const auto skip = st::giftBoxUserpicSkip;
+			const auto skip = st::giftBoxUserpicSkip + inset;
 			const auto add = (st::giftBoxUserpicSize - size.width()) / 2;
 			p.setPen(Qt::NoPen);
 			p.setBrush(unique->backdrop.patternColor);

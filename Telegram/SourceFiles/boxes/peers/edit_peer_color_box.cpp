@@ -661,6 +661,9 @@ void Apply(
 		Fn<void()> cancel) {
 	if (peer->colorIndex() == values.colorIndex
 		&& peer->backgroundEmojiId() == values.backgroundEmojiId
+		&& (!peer->colorCollectible() == !values.colorCollectible)
+		&& (!peer->colorCollectible()
+			|| (*peer->colorCollectible() == *values.colorCollectible))
 		&& !values.statusChanged) {
 		close();
 	} else if (peer->isSelf()) {
@@ -771,7 +774,7 @@ void ColorSelector::fillFrom(std::vector<uint8> indices) {
 	for (const auto index : indices) {
 		add(index);
 	}
-	if (!ranges::contains(indices, initial)) {
+	if (initial != kUnsetColorIndex && !ranges::contains(indices, initial)) {
 		add(initial);
 	}
 	_samples = std::move(samples);
@@ -1410,6 +1413,7 @@ void AddGiftSelector(
 			raw->setGeometry(QRect(QPoint(x, y), single), extend);
 			raw->toggleSelected(
 				gift.info.unique->id == selectedId,
+				GiftSelectionMode::Inset,
 				anim::type::instant);
 		};
 		y += rowFrom * singleh;
@@ -1460,10 +1464,10 @@ void AddGiftSelector(
 				return nullptr;
 			};
 			if (const auto button = find(wasId)) {
-				button->toggleSelected(false);
+				button->toggleSelected(false, GiftSelectionMode::Inset);
 			}
 			if (const auto button = find(nowId)) {
-				button->toggleSelected(true);
+				button->toggleSelected(true, GiftSelectionMode::Inset);
 			}
 		}, raw->lifetime());
 
@@ -1573,7 +1577,9 @@ void EditPeerColorBox(
 		bool applying = false;
 	};
 	const auto state = box->lifetime().make_state<State>();
-	state->index = peer->colorIndex();
+	state->index = peer->colorCollectible()
+		? kUnsetColorIndex
+		: peer->colorIndex();
 	state->emojiId = peer->backgroundEmojiId();
 	state->statusId = peer->emojiStatusId();
 	state->collectible = peer->colorCollectible()

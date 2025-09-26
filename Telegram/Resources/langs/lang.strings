@@ -1605,6 +1605,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_info_birthday_today" = "{emoji} {date}";
 "lng_info_notes_label" = "Notes";
 "lng_info_notes_private" = "only visible to you";
+"lng_delete_note" = "Delete Note";
 "lng_info_bio_label" = "Bio";
 "lng_info_link_label" = "Link";
 "lng_info_location_label" = "Location";

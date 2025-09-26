@@ -85,6 +85,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/labels.h"
+#include "ui/widgets/menu/menu_add_action_callback.h"
+#include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/shadow.h"
 #include "ui/wrap/padding_wrap.h"
@@ -704,15 +706,35 @@ base::options::toggle ShowChannelJoinedBelowAbout({
 	return result;
 }
 
+void DeleteContactNote(
+		not_null<UserData*> user,
+		Fn<void(const QString &)> showError = nullptr) {
+	user->session().api().request(MTPcontacts_UpdateContactNote(
+		user->inputUser,
+		MTP_textWithEntities(MTP_string(), MTP_vector<MTPMessageEntity>())
+	)).done([=] {
+		user->setNote(TextWithEntities());
+	}).fail([=](const MTP::Error &error) {
+		if (showError) {
+			showError(error.description());
+		}
+	}).send();
+}
+
 [[nodiscard]] object_ptr<Ui::SlideWrap<>> CreateNotes(
 		not_null<QWidget*> parent,
+		not_null<Window::SessionController*> controller,
 		not_null<UserData*> user) {
-	auto notesText = user->session().changes().peerFlagsValue(
+	auto allNotesText = user->session().changes().peerFlagsValue(
 		user,
 		Data::PeerUpdate::Flag::FullInfo
 	) | rpl::map([=] {
 		return user->note();
-	}) | rpl::filter([](const TextWithEntities &note) {
+	});
+
+	auto notesText = rpl::duplicate(
+		allNotesText
+	) | rpl::filter([](const TextWithEntities &note) {
 		return !note.text.isEmpty();
 	});
 
@@ -720,7 +742,7 @@ base::options::toggle ShowChannelJoinedBelowAbout({
 		parent,
 		object_ptr<Ui::VerticalLayout>(parent));
 	result->toggleOn(rpl::duplicate(
-		notesText
+		allNotesText
 	) | rpl::map([](const TextWithEntities &note) {
 		return !note.text.isEmpty();
 	}));
@@ -747,6 +769,37 @@ base::options::toggle ShowChannelJoinedBelowAbout({
 			const TextWithEntities &note) {
 		raw->setMarkedText(note, context);
 	}, notesLine.text->lifetime());
+
+	notesLine.text->setContextMenuHook([=, raw = notesLine.text](
+			Ui::FlatLabel::ContextMenuRequest request) {
+		raw->fillContextMenu(request);
+		const auto addAction = Ui::Menu::CreateAddActionCallback(
+			request.menu);
+		addAction({
+			.text = tr::lng_delete_note(tr::now),
+			.handler = [=] {
+				DeleteContactNote(user, [=](const QString &error) {
+					controller->showToast(error);
+				});
+			},
+			.isAttention = true,
+		});
+	});
+
+	rpl::merge(
+		notesLine.wrap->events(),
+		notesLine.subtext->events()
+	) | rpl::start_with_next([=, raw = notesLine.text](not_null<QEvent*> e) {
+		if (e->type() == QEvent::ContextMenu) {
+			const auto ce = static_cast<QContextMenuEvent*>(e.get());
+			QCoreApplication::postEvent(
+				raw,
+				new QContextMenuEvent(
+					ce->reason(),
+					ce->pos(),
+					ce->globalPos()));
+		}
+	}, notesLine.wrap->lifetime());
 
 	const auto subtextLabel = Ui::CreateChild<Ui::FlatLabel>(
 		notesLine.subtext->parentWidget(),
@@ -1567,7 +1620,7 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 				CreateWorkingHours(result, user), {}, style::al_justify));
 
 			tracker.track(result->add(
-				CreateNotes(result, user), {}, style::al_justify));
+				CreateNotes(result, controller, user), {}, style::al_justify));
 
 			auto locationText = user->session().changes().peerFlagsValue(
 				user,

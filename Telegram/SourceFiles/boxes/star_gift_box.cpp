@@ -4982,17 +4982,20 @@ void UpgradeBox(
 	});
 	if (!preview) {
 		auto costText = [=] {
-			auto costValue = state->cost->costValue(
+			return state->cost->costValue(
 			) | rpl::map([](int cost) {
-				return Ui::Text::IconEmoji(
-					&st::starIconEmoji
-				).append(Lang::FormatCreditsAmountDecimal(
-					CreditsAmount{ cost }));
-			});
-			return tr::lng_gift_upgrade_button(
-				lt_price,
-				std::move(costValue),
-				Ui::Text::WithEntities);
+				if (!cost) {
+					return tr::lng_gift_upgrade_confirm(
+						Ui::Text::WithEntities);
+				}
+				return tr::lng_gift_upgrade_button(
+					lt_price,
+					rpl::single(Ui::Text::IconEmoji(
+						&st::starIconEmoji
+					).append(Lang::FormatCreditsAmountDecimal(
+						CreditsAmount{ cost }))),
+					Ui::Text::WithEntities);
+			}) | rpl::flatten_latest();
 		};
 		auto tillNext = state->cost->tillNextValue(
 		) | rpl::map([](TimeId left) {

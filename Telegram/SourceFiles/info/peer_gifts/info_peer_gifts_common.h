@@ -93,6 +93,10 @@ struct GiftTypeStars {
 		const GiftTypeStars&) = default;
 };
 
+[[nodiscard]] rpl::producer<std::vector<GiftTypeStars>> GiftsStars(
+	not_null<Main::Session*> session,
+	not_null<PeerData*> peer);
+
 struct GiftDescriptor : std::variant<GiftTypePremium, GiftTypeStars> {
 	using variant::variant;
 

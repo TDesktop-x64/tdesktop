@@ -40,6 +40,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_boxes.h" // peerListSingleRow.
 #include "styles/style_credits.h" // starIconEmoji.
 #include "styles/style_dialogs.h" // recentPeersSpecialName.
+#include "styles/style_info.h" // defaultSubTabs.
 #include "styles/style_layers.h" // boxLabel.
 
 namespace {
@@ -810,6 +811,7 @@ void ShowBuyResaleGiftBox(
 			const auto tabs = box->addRow(
 				object_ptr<Ui::SubTabs>(
 					box,
+					st::defaultSubTabs,
 					Ui::SubTabsOptions{
 						.selected = (state->ton.current()
 							? u"ton"_q

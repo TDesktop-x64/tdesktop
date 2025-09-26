@@ -12,6 +12,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_basic.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_credits.h"
+#include "Styles/style_info.h"
 
 #include <QApplication>
 
@@ -19,10 +20,12 @@ namespace Ui {
 
 SubTabs::SubTabs(
 	QWidget *parent,
+	const style::SubTabs &st,
 	Options options,
 	std::vector<Tab> tabs,
 	Text::MarkedContext context)
 : RpWidget(parent)
+, _st(st)
 , _centered(options.centered) {
 	setMouseTracking(true);
 	setTabs(std::move(tabs), context);
@@ -273,7 +276,7 @@ void SubTabs::paintEvent(QPaintEvent *e) {
 	if (_fullWidth > width()) {
 		const auto &icon = st::defaultEmojiSuggestions;
 		const auto w = icon.fadeRight.width();
-		const auto &c = st::boxDividerBg->c;
+		const auto &c = _st.bg->c;
 		const auto r = QRect(0, 0, w, height());
 		const auto s = std::abs(float64(shift.x()));
 		constexpr auto kF = 0.5;

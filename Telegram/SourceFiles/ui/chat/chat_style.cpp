@@ -76,11 +76,15 @@ not_null<const MessageImageStyle*> ChatPaintContext::imageStyle() const {
 }
 
 not_null<Text::QuotePaintCache*> ChatPaintContext::quoteCache(
+		const std::shared_ptr<ColorCollectible> &colorCollectible,
 		uint8 colorIndex) const {
-	return !outbg
-		? st->coloredQuoteCache(selected(), colorIndex).get()
-		: messageStyle()->quoteCache[
-			st->colorPatternIndex(colorIndex)].get();
+	return outbg
+		? messageStyle()->quoteCache[colorCollectible
+			? 2
+			: st->colorPatternIndex(colorIndex)].get()
+		: colorCollectible
+		? st->collectibleQuoteCache(selected(), colorCollectible).get()
+		: st->coloredQuoteCache(selected(), colorIndex).get();
 }
 
 int HistoryServiceMsgRadius() {
@@ -156,6 +160,27 @@ int ColorPatternIndex(
 	auto &data = (*indices.colors)[colorIndex];
 	auto &colors = dark ? data.dark : data.light;
 	return colors[2] ? 2 : colors[1] ? 1 : 0;
+}
+
+ChatStyle::ColoredPalette::ColoredPalette() = default;
+ChatStyle::ColoredPalette::ColoredPalette(const ColoredPalette &other)
+: linkFg(other.linkFg)
+, data(other.data) {
+	if (linkFg) {
+		data.linkFg = linkFg->color();
+		data.selectLinkFg = data.linkFg;
+	}
+}
+
+ChatStyle::ColoredPalette &ChatStyle::ColoredPalette::operator=(
+		const ColoredPalette &other) {
+	linkFg = other.linkFg;
+	data = other.data;
+	if (linkFg) {
+		data.linkFg = linkFg->color();
+		data.selectLinkFg = data.linkFg;
+	}
+	return *this;
 }
 
 ChatStyle::ChatStyle(rpl::producer<ColorIndicesCompressed> colorIndices) {
@@ -576,7 +601,11 @@ void ChatStyle::updateDarkValue() {
 	const auto withBg = [&](const QColor &color) {
 		return CountContrast(windowBg()->c, color);
 	};
-	_dark = (withBg({ 0, 0, 0 }) < withBg({ 255, 255, 255 }));
+	const auto dark = (withBg({ 0, 0, 0 }) < withBg({ 255, 255, 255 }));
+	if (_dark != dark) {
+		_dark = dark;
+		_collectibleCaches.clear();
+	}
 }
 
 void ChatStyle::applyCustomPalette(const style::palette *palette) {
@@ -776,6 +805,14 @@ int ChatStyle::colorPatternIndex(uint8 colorIndex) const {
 	auto &data = (*_colorIndices.colors)[colorIndex];
 	auto &colors = _dark ? data.dark : data.light;
 	return colors[2] ? 2 : colors[1] ? 1 : 0;
+}
+
+int ChatStyle::collectiblePatternIndex(
+		const std::shared_ptr<ColorCollectible> &collectible) const {
+	const auto &strip = (_dark && !collectible->darkStrip.empty())
+		? collectible->darkStrip
+		: collectible->strip;
+	return std::clamp(int(strip.size()), 1, 3) - 1;
 }
 
 ColorIndexValues ChatStyle::computeColorIndexValues(

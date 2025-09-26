@@ -7,6 +7,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+namespace Main {
+class Session;
+} // namespace Main
+
+namespace Ui {
+struct ColorCollectible;
+} // namespace Ui
+
 namespace Data {
 
 struct UniqueGiftAttribute {
@@ -77,6 +85,7 @@ struct UniqueGift {
 	UniqueGiftBackdrop backdrop;
 	UniqueGiftOriginalDetails originalDetails;
 	std::shared_ptr<UniqueGiftValue> value;
+	std::shared_ptr<Ui::ColorCollectible> peerColor;
 };
 
 [[nodiscard]] QString UniqueGiftName(const UniqueGift &gift);
@@ -109,6 +118,7 @@ struct StarGift {
 	TimeId lockedUntilDate = 0;
 	bool resellTonOnly : 1 = false;
 	bool requirePremium : 1 = false;
+	bool peerColorAvailable : 1 = false;
 	bool upgradable : 1 = false;
 	bool birthday : 1 = false;
 	bool soldOut : 1 = false;
@@ -194,5 +204,86 @@ struct GiftCollection {
 	DocumentData *icon = nullptr;
 	uint64 hash = 0;
 };
+
+struct UniqueGiftModelCount {
+	UniqueGiftModel model;
+	int count = 0;
+};
+
+struct UniqueGiftBackdropCount {
+	UniqueGiftBackdrop backdrop;
+	int count = 0;
+};
+
+struct UniqueGiftPatternCount {
+	UniqueGiftPattern pattern;
+	int count = 0;
+};
+
+enum class ResaleGiftsSort {
+	Date,
+	Price,
+	Number,
+};
+
+enum class GiftAttributeIdType {
+	Model,
+	Pattern,
+	Backdrop,
+};
+
+struct GiftAttributeId {
+	uint64 value = 0;
+	GiftAttributeIdType type = GiftAttributeIdType::Model;
+
+	friend inline auto operator<=>(
+		GiftAttributeId,
+		GiftAttributeId) = default;
+	friend inline bool operator==(
+		GiftAttributeId,
+		GiftAttributeId) = default;
+};
+
+[[nodiscard]] GiftAttributeId IdFor(const UniqueGiftBackdrop &value);
+[[nodiscard]] GiftAttributeId IdFor(const UniqueGiftModel &value);
+[[nodiscard]] GiftAttributeId IdFor(const UniqueGiftPattern &value);
+
+struct MyGiftsDescriptor {
+	std::vector<SavedStarGift> list;
+	QString offset;
+};
+
+[[nodiscard]] rpl::producer<MyGiftsDescriptor> MyUniqueGiftsSlice(
+	not_null<Main::Session*> session,
+	QString offset = QString());
+
+struct ResaleGiftsDescriptor {
+	uint64 giftId = 0;
+	QString title;
+	QString offset;
+	std::vector<StarGift> list;
+	std::vector<UniqueGiftModelCount> models;
+	std::vector<UniqueGiftBackdropCount> backdrops;
+	std::vector<UniqueGiftPatternCount> patterns;
+	uint64 attributesHash = 0;
+	int count = 0;
+	ResaleGiftsSort sort = ResaleGiftsSort::Date;
+};
+
+struct ResaleGiftsFilter {
+	uint64 attributesHash = 0;
+	base::flat_set<GiftAttributeId> attributes;
+	ResaleGiftsSort sort = ResaleGiftsSort::Price;
+
+	friend inline bool operator==(
+		const ResaleGiftsFilter &,
+		const ResaleGiftsFilter &) = default;
+};
+
+[[nodiscard]] rpl::producer<ResaleGiftsDescriptor> ResaleGiftsSlice(
+	not_null<Main::Session*> session,
+	uint64 giftId,
+	ResaleGiftsFilter filter = {},
+	QString offset = QString());
 
 } // namespace Data

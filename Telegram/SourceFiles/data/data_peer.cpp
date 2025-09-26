@@ -88,28 +88,6 @@ using UpdateFlag = Data::PeerUpdate::Flag;
 	return (month > 0 && month <= 12) ? month : 0;
 }
 
-[[nodiscard]] Ui::ColorCollectible ParseColorCollectible(
-		const MTPDpeerColorCollectible &data) {
-	return {
-		.giftEmojiId = data.vgift_emoji_id().v,
-		.accentColor = Ui::ColorFromSerialized(data.vaccent_color()),
-		.strip = ranges::views::all(
-			data.vcolors().v
-		) | ranges::views::transform(
-			&Ui::ColorFromSerialized
-		) | ranges::to_vector,
-		.darkAccentColor = Ui::MaybeColorFromSerialized(
-			data.vdark_accent_color()).value_or(QColor(0, 0, 0, 0)),
-		.darkStrip = (data.vdark_colors()
-			? ranges::views::all(
-				data.vdark_colors()->v
-			) | ranges::views::transform(
-				&Ui::ColorFromSerialized
-			) | ranges::to_vector
-			: std::vector<QColor>()),
-	};
-}
-
 } // namespace
 
 namespace Data {
@@ -266,6 +244,30 @@ UserData *UserFromInputMTP(
 	}, [](const auto &data) {
 		return (UserData*)nullptr;
 	});
+}
+
+Ui::ColorCollectible ParseColorCollectible(
+		const MTPDpeerColorCollectible &data) {
+	return {
+		.collectibleId = data.vcollectible_id().v,
+		.giftEmojiId = data.vgift_emoji_id().v,
+		.backgroundEmojiId = data.vbackground_emoji_id().v,
+		.accentColor = Ui::ColorFromSerialized(data.vaccent_color()),
+		.strip = ranges::views::all(
+			data.vcolors().v
+		) | ranges::views::transform(
+			&Ui::ColorFromSerialized
+		) | ranges::to_vector,
+		.darkAccentColor = Ui::MaybeColorFromSerialized(
+			data.vdark_accent_color()).value_or(QColor(0, 0, 0, 0)),
+		.darkStrip = (data.vdark_colors()
+			? ranges::views::all(
+				data.vdark_colors()->v
+			) | ranges::views::transform(
+				&Ui::ColorFromSerialized
+			) | ranges::to_vector
+			: std::vector<QColor>()),
+	};
 }
 
 } // namespace Data
@@ -1029,31 +1031,15 @@ bool PeerData::changeBackgroundEmojiId(
 
 bool PeerData::changeColorCollectible(
 		const tl::conditional<MTPPeerColor> &cloudColor) {
-	const auto clear = [&] {
-		if (_colorCollectible) {
-			_colorCollectible = nullptr;
-			return true;
-		}
-		return false;
-	};
 	if (!cloudColor) {
-		return clear();
+		return clearColorCollectible();
 	}
 	return cloudColor->match([&](const MTPDpeerColorCollectible &data) {
-		auto parsed = ParseColorCollectible(data);
-		if (!_colorCollectible) {
-			_colorCollectible = std::make_shared<Ui::ColorCollectible>(
-				std::move(parsed));
-			return true;
-		} else if (*_colorCollectible != parsed) {
-			*_colorCollectible = std::move(parsed);
-			return true;
-		}
-		return false;
+		return changeColorCollectible(Data::ParseColorCollectible(data));
 	}, [&](const MTPDpeerColor &) {
-		return clear();
+		return clearColorCollectible();
 	}, [&](const MTPDinputPeerColorCollectible &) {
-		return clear();
+		return clearColorCollectible();
 	});
 }
 
@@ -1374,6 +1360,25 @@ bool PeerData::isUsernameEditable(QString username) const {
 	return false;
 }
 
+bool PeerData::changeColorCollectible(Ui::ColorCollectible data) {
+	if (!_colorCollectible || (*_colorCollectible != data)) {
+		// We don't reuse allocated object because in ChatStyle we
+		// cache colors using std::weak_ptr as a key.
+		_colorCollectible = std::make_shared<Ui::ColorCollectible>(
+			std::move(data));
+		return true;
+	}
+	return false;
+}
+
+bool PeerData::clearColorCollectible() {
+	if (!_colorCollectible) {
+		return false;
+	}
+	_colorCollectible = nullptr;
+	return true;
+}
+
 bool PeerData::changeColorIndex(uint8 index) {
 	index %= Ui::kColorIndexCount;
 	if (_colorIndexCloud && _colorIndex == index) {
@@ -1390,7 +1395,6 @@ bool PeerData::clearColorIndex() {
 	}
 	_colorIndexCloud = 0;
 	_colorIndex = Data::DecideColorIndex(id);
-	_colorCollectible = nullptr;
 	return true;
 }
 

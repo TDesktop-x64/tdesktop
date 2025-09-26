@@ -126,6 +126,28 @@ struct MessageImageStyle {
 	style::icon historyPageEnlarge = { Qt::Uninitialized };
 };
 
+struct ColorCollectible {
+	uint64 collectibleId = 0;
+	uint64 giftEmojiId = 0;
+	uint64 backgroundEmojiId = 0;
+	QColor accentColor;
+	std::vector<QColor> strip;
+	QColor darkAccentColor;
+	std::vector<QColor> darkStrip;
+
+	friend inline bool operator==(
+		const ColorCollectible &,
+		const ColorCollectible &) = default;
+};
+
+struct ColorCollectiblePtrCompare {
+	bool operator()(
+			const std::weak_ptr<ColorCollectible> &a,
+			const std::weak_ptr<ColorCollectible> &b) const {
+		return a.owner_before(b);
+	}
+};
+
 struct ReactionPaintInfo {
 	QPoint position;
 	QPoint effectOffset;
@@ -140,7 +162,11 @@ struct BackgroundEmojiCache {
 struct BackgroundEmojiData {
 	std::unique_ptr<Text::CustomEmoji> emoji;
 	QImage firstFrameMask;
-	std::array<BackgroundEmojiCache, 2 * (3 + kColorIndexCount)> caches;
+	base::flat_map<int, BackgroundEmojiCache> caches;
+	base::flat_map<
+		std::weak_ptr<ColorCollectible>,
+		BackgroundEmojiCache,
+		ColorCollectiblePtrCompare> collectibleCaches;
 
 	[[nodiscard]] static int CacheIndex(
 		bool selected,
@@ -184,6 +210,7 @@ struct ChatPaintContext {
 	[[nodiscard]] not_null<const MessageStyle*> messageStyle() const;
 	[[nodiscard]] not_null<const MessageImageStyle*> imageStyle() const;
 	[[nodiscard]] not_null<Text::QuotePaintCache*> quoteCache(
+		const std::shared_ptr<ColorCollectible> &colorCollectible,
 		uint8 colorIndex) const;
 
 	[[nodiscard]] ChatPaintContext translated(int x, int y) const {
@@ -267,26 +294,6 @@ struct ColorIndexValues {
 	QColor color,
 	int patternIndex);
 
-struct ColorCollectible {
-	uint64 giftEmojiId = 0;
-	QColor accentColor;
-	std::vector<QColor> strip;
-	QColor darkAccentColor;
-	std::vector<QColor> darkStrip;
-
-	friend inline bool operator==(
-		const ColorCollectible &,
-		const ColorCollectible &) = default;
-};
-
-struct ColorCollectiblePtrCompare {
-	bool operator()(
-			const std::weak_ptr<ColorCollectible> &a,
-			const std::weak_ptr<ColorCollectible> &b) const {
-		return a.owner_before(b);
-	}
-};
-
 class ChatStyle final : public style::palette {
 public:
 	explicit ChatStyle(rpl::producer<ColorIndicesCompressed> colorIndices);
@@ -334,6 +341,8 @@ public:
 	[[nodiscard]] const MessageImageStyle &imageStyle(bool selected) const;
 
 	[[nodiscard]] int colorPatternIndex(uint8 colorIndex) const;
+	[[nodiscard]] int collectiblePatternIndex(
+		const std::shared_ptr<ColorCollectible> &collectible) const;
 	[[nodiscard]] ColorIndexValues computeColorIndexValues(
 		bool selected,
 		uint8 colorIndex) const;
@@ -475,6 +484,10 @@ private:
 		kColorIndexCount * 2>;
 
 	struct ColoredPalette {
+		ColoredPalette();
+		ColoredPalette(const ColoredPalette &other);
+		ColoredPalette &operator=(const ColoredPalette &other);
+
 		std::optional<style::owned_color> linkFg;
 		style::TextPalette data;
 	};

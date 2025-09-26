@@ -9,6 +9,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "ui/rp_widget.h"
 
+namespace style {
+struct SubTabs;
+} // namespace style
+
 namespace Ui {
 
 struct SubTabsOptions {
@@ -32,6 +36,7 @@ public:
 
 	explicit SubTabs(
 		QWidget *parent,
+		const style::SubTabs &st,
 		Options options = {},
 		std::vector<Tab> tabs = {},
 		Text::MarkedContext context = {});
@@ -66,6 +71,7 @@ private:
 	void setActive(int index);
 	[[nodiscard]] QPoint scroll() const;
 
+	const style::SubTabs &_st;
 	std::vector<Button> _buttons;
 	rpl::event_stream<QString> _activated;
 	rpl::event_stream<QString> _contextMenuRequests;

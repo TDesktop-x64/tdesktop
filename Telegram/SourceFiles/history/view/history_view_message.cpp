@@ -2081,12 +2081,20 @@ void Message::paintText(
 		trect.setY(trect.y() + botTop->height);
 	}
 	auto highlightRequest = context.computeHighlightCache();
+
+	const auto colorsFrom = data()->contentColorsFrom();
+	const auto &colorCollectible = colorsFrom
+		? colorsFrom->colorCollectible()
+		: nullptr;
+
 	text().draw(p, {
 		.position = trect.topLeft(),
 		.availableWidth = trect.width(),
 		.palette = &stm->textPalette,
 		.pre = stm->preCache.get(),
-		.blockquote = context.quoteCache(contentColorIndex()),
+		.blockquote = context.quoteCache(
+			colorCollectible,
+			contentColorIndex()),
 		.colors = context.st->highlightColors(),
 		.spoiler = Ui::Text::DefaultSpoilerCache(),
 		.now = context.now,

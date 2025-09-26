@@ -681,6 +681,7 @@ void InnerWidget::refreshAlbumsTabs() {
 	if (!_albumsTabs) {
 		_albumsTabs = std::make_unique<Ui::SubTabs>(
 			_albumsWrap,
+			st::collectionSubTabs,
 			Ui::SubTabs::Options{
 				.selected = selected,
 				.centered = true,

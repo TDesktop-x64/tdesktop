@@ -23,6 +23,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_app_config.h"
 #include "main/main_session.h"
 #include "payments/payments_form.h"
+#include "ui/chat/chat_style.h" // ColorCollectible
 #include "ui/text/format_values.h"
 
 namespace Api {
@@ -865,6 +866,7 @@ std::optional<Data::StarGift> FromTL(
 			.lastSaleDate = data.vlast_sale_date().value_or_empty(),
 			.lockedUntilDate = data.vlocked_until_date().value_or_empty(),
 			.requirePremium = data.is_require_premium(),
+			.peerColorAvailable = data.is_peer_color_available(),
 			.upgradable = data.vupgrade_stars().has_value(),
 			.birthday = data.is_birthday(),
 			.soldOut = data.is_sold_out(),
@@ -900,6 +902,12 @@ std::optional<Data::StarGift> FromTL(
 		const auto themeUser = themeUserId
 			? session->data().peer(themeUserId).get()
 			: nullptr;
+		const auto colorCollectible = (data.vpeer_color()
+			&& data.vpeer_color()->type() == mtpc_peerColorCollectible)
+			? std::make_shared<Ui::ColorCollectible>(
+				Data::ParseColorCollectible(
+					data.vpeer_color()->c_peerColorCollectible()))
+			: nullptr;
 		auto result = Data::StarGift{
 			.id = data.vid().v,
 			.unique = std::make_shared<Data::UniqueGift>(Data::UniqueGift{
@@ -930,6 +938,7 @@ std::optional<Data::StarGift> FromTL(
 								data.vvalue_amount().value_or_empty()),
 						})
 					: nullptr),
+				.peerColor = colorCollectible,
 			}),
 			.document = model->document,
 			.releasedBy = releasedBy,

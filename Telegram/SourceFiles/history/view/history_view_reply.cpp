@@ -705,7 +705,7 @@ void Reply::paint(
 	const auto useColorCollectible = colorCollectible && !context.outbg;
 	const auto useColorIndex = colorIndexPlusOne && !context.outbg;
 	const auto colorPattern = colorCollectible
-		? 2
+		? st->collectiblePatternIndex(colorCollectible)
 		: colorIndexPlusOne
 		? st->colorPatternIndex(colorIndexPlusOne - 1)
 		: 0;
@@ -730,13 +730,15 @@ void Reply::paint(
 	const auto backgroundEmoji = backgroundEmojiId
 		? st->backgroundEmojiData(backgroundEmojiId).get()
 		: nullptr;
-	const auto backgroundEmojiCache = backgroundEmoji
-		? &backgroundEmoji->caches[Ui::BackgroundEmojiData::CacheIndex(
+	const auto backgroundEmojiCache = !backgroundEmoji
+		? nullptr
+		: useColorCollectible
+		? &backgroundEmoji->collectibleCaches[colorCollectible]
+		: &backgroundEmoji->caches[Ui::BackgroundEmojiData::CacheIndex(
 			selected,
 			context.outbg,
 			inBubble,
-			colorIndexPlusOne)]
-		: nullptr;
+			useColorIndex ? colorIndexPlusOne : 0)];
 	const auto rippleColor = cache->bg;
 	if (!inBubble) {
 		cache->bg = QColor(0, 0, 0, 0);

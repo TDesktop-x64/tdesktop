@@ -126,19 +126,24 @@ namespace {
 constexpr auto kPriceTabAll = 0;
 constexpr auto kPriceTabMy = -1;
 constexpr auto kPriceTabCollectibles = -2;
-constexpr auto kMyGiftsPerPage = 50;
 constexpr auto kGiftMessageLimit = 255;
 constexpr auto kSentToastDuration = 3 * crl::time(1000);
 constexpr auto kSwitchUpgradeCoverInterval = 3 * crl::time(1000);
 constexpr auto kCrossfadeDuration = crl::time(400);
 constexpr auto kUpgradeDoneToastDuration = 4 * crl::time(1000);
 constexpr auto kGiftsPreloadTimeout = 3 * crl::time(1000);
-constexpr auto kResaleGiftsPerPage = 50;
 constexpr auto kFiltersCount = 4;
 constexpr auto kResellPriceCacheLifetime = 60 * crl::time(1000);
 
 using namespace HistoryView;
 using namespace Info::PeerGifts;
+
+using Data::GiftAttributeId;
+using Data::GiftAttributeIdType;
+using Data::ResaleGiftsSort;
+using Data::ResaleGiftsFilter;
+using Data::ResaleGiftsDescriptor;
+using Data::MyGiftsDescriptor;
 
 enum class PickType {
 	Activate,
@@ -147,72 +152,9 @@ enum class PickType {
 };
 using PickCallback = Fn<void(not_null<PeerData*>, PickType)>;
 
-enum class AttributeIdType {
-	Model,
-	Pattern,
-	Backdrop,
-};
-
-struct AttributeId {
-	uint64 value = 0;
-	AttributeIdType type = AttributeIdType::Model;
-
-	friend inline auto operator<=>(AttributeId, AttributeId) = default;
-	friend inline bool operator==(AttributeId, AttributeId) = default;
-};
-
 struct PremiumGiftsDescriptor {
 	std::vector<GiftTypePremium> list;
 	std::shared_ptr<Api::PremiumGiftCodeOptions> api;
-};
-
-struct MyGiftsDescriptor {
-	std::vector<Data::SavedStarGift> list;
-	QString offset;
-};
-
-struct ModelCount {
-	Data::UniqueGiftModel model;
-	int count = 0;
-};
-
-struct BackdropCount {
-	Data::UniqueGiftBackdrop backdrop;
-	int count = 0;
-};
-
-struct PatternCount {
-	Data::UniqueGiftPattern pattern;
-	int count = 0;
-};
-
-enum class ResaleSort {
-	Date,
-	Price,
-	Number,
-};
-
-struct ResaleGiftsDescriptor {
-	uint64 giftId = 0;
-	QString title;
-	QString offset;
-	std::vector<Data::StarGift> list;
-	std::vector<ModelCount> models;
-	std::vector<BackdropCount> backdrops;
-	std::vector<PatternCount> patterns;
-	uint64 attributesHash = 0;
-	int count = 0;
-	ResaleSort sort = ResaleSort::Date;
-};
-
-struct ResaleFilter {
-	uint64 attributesHash = 0;
-	base::flat_set<AttributeId> attributes;
-	ResaleSort sort = ResaleSort::Price;
-
-	friend inline bool operator==(
-		const ResaleFilter &,
-		const ResaleFilter &) = default;
 };
 
 struct GiftsDescriptor {
@@ -434,53 +376,6 @@ int TextBubblePart::elisionLines() const {
 	return 1;
 }
 
-[[nodiscard]] AttributeId FromTL(const MTPStarGiftAttributeId &id) {
-	return id.match([&](const MTPDstarGiftAttributeIdBackdrop &data) {
-		return AttributeId{
-			.value = uint64(uint32(data.vbackdrop_id().v)),
-			.type = AttributeIdType::Backdrop,
-		};
-	}, [&](const MTPDstarGiftAttributeIdModel &data) {
-		return AttributeId{
-			.value = data.vdocument_id().v,
-			.type = AttributeIdType::Model,
-		};
-	}, [&](const MTPDstarGiftAttributeIdPattern &data) {
-		return AttributeId{
-			.value = data.vdocument_id().v,
-			.type = AttributeIdType::Pattern,
-		};
-	});
-}
-
-[[nodiscard]] MTPStarGiftAttributeId AttributeToTL(AttributeId id) {
-	switch (id.type) {
-	case AttributeIdType::Backdrop:
-		return MTP_starGiftAttributeIdBackdrop(
-			MTP_int(int32(uint32(id.value))));
-	case AttributeIdType::Model:
-		return MTP_starGiftAttributeIdModel(MTP_long(id.value));
-	case AttributeIdType::Pattern:
-		return MTP_starGiftAttributeIdPattern(MTP_long(id.value));
-	}
-	Unexpected("Invalid attribute id type");
-}
-
-[[nodiscard]] AttributeId IdFor(const Data::UniqueGiftBackdrop &value) {
-	return {
-		.value = uint64(uint32(value.id)),
-		.type = AttributeIdType::Backdrop,
-	};
-}
-
-[[nodiscard]] AttributeId IdFor(const Data::UniqueGiftModel &value) {
-	return { .value = value.document->id, .type = AttributeIdType::Model };
-}
-
-[[nodiscard]] AttributeId IdFor(const Data::UniqueGiftPattern &value) {
-	return { .value = value.document->id, .type = AttributeIdType::Pattern };
-}
-
 [[nodiscard]] bool SortForBirthday(not_null<PeerData*> peer) {
 	const auto user = peer->asUser();
 	if (!user) {
@@ -700,30 +595,6 @@ auto GenerateGiftMedia(
 	const auto mask = Images::CornersMask(st::boxRadius);
 	return Images::Round(std::move(result), mask, RectPart::FullTop);
 }
-
-struct VisibleRange {
-	int top = 0;
-	int bottom = 0;
-
-	friend inline bool operator==(VisibleRange, VisibleRange) = default;
-};
-class WidgetWithRange final : public RpWidget {
-public:
-	using RpWidget::RpWidget;
-
-	[[nodiscard]] rpl::producer<VisibleRange> visibleRange() const {
-		return _visibleRange.value();
-	}
-private:
-	void visibleTopBottomUpdated(
-			int visibleTop,
-			int visibleBottom) override {
-		_visibleRange = VisibleRange{ visibleTop, visibleBottom };
-	}
-
-	rpl::variable<VisibleRange> _visibleRange;
-
-};
 
 void PrepareImage(
 		QImage &image,
@@ -1064,130 +935,6 @@ void PreviewWrap::paintEvent(QPaintEvent *e) {
 	};
 }
 
-[[nodiscard]] bool AllowedToSend(
-		const GiftTypeStars &gift,
-		not_null<PeerData*> peer) {
-	using Type = Api::DisallowedGiftType;
-	const auto user = peer->asUser();
-	if (!user || user->isSelf()) {
-		return true;
-	}
-	const auto disallowedTypes = user ? user->disallowedGiftTypes() : Type();
-	const auto allowLimited = !(disallowedTypes & Type::Limited);
-	const auto allowUnlimited = !(disallowedTypes & Type::Unlimited);
-	const auto allowUnique = !(disallowedTypes & Type::Unique);
-	if (gift.resale) {
-		return allowUnique;
-	} else if (!gift.info.limitedCount) {
-		return allowUnlimited;
-	}
-	return allowLimited || (gift.info.starsToUpgrade && allowUnique);
-}
-
-[[nodiscard]] rpl::producer<std::vector<GiftTypeStars>> GiftsStars(
-		not_null<Main::Session*> session,
-		not_null<PeerData*> peer) {
-	struct Session {
-		std::vector<GiftTypeStars> last;
-	};
-	static auto Map = base::flat_map<not_null<Main::Session*>, Session>();
-
-	const auto filtered = [=](std::vector<GiftTypeStars> list) {
-		list.erase(ranges::remove_if(list, [&](const GiftTypeStars &gift) {
-			return !AllowedToSend(gift, peer);
-		}), end(list));
-		return list;
-	};
-	return [=](auto consumer) {
-		auto lifetime = rpl::lifetime();
-
-		auto i = Map.find(session);
-		if (i == end(Map)) {
-			i = Map.emplace(session, Session()).first;
-			session->lifetime().add([=] { Map.remove(session); });
-		}
-		if (!i->second.last.empty()) {
-			consumer.put_next(filtered(i->second.last));
-		}
-
-		using namespace Api;
-		const auto api = lifetime.make_state<PremiumGiftCodeOptions>(peer);
-		api->requestStarGifts(
-		) | rpl::start_with_error_done([=](QString error) {
-			consumer.put_next({});
-		}, [=] {
-			auto list = std::vector<GiftTypeStars>();
-			const auto &gifts = api->starGifts();
-			list.reserve(gifts.size());
-			for (auto &gift : gifts) {
-				list.push_back({ .info = gift });
-				if (gift.resellCount > 0) {
-					list.push_back({ .info = gift, .resale = true });
-				}
-			}
-			ranges::stable_sort(list, [](const auto &a, const auto &b) {
-				const auto soldOut = [](const auto &gift) {
-					return gift.info.soldOut && !gift.resale;
-				};
-				return soldOut(a) < soldOut(b);
-			});
-
-			auto &map = Map[session];
-			if (map.last != list || list.empty()) {
-				map.last = list;
-				consumer.put_next(filtered(std::move(list)));
-			}
-		}, lifetime);
-
-		return lifetime;
-	};
-}
-
-[[nodiscard]] rpl::producer<MyGiftsDescriptor> UniqueGiftsSlice(
-		not_null<Main::Session*> session,
-		QString offset = QString()) {
-	return [=](auto consumer) {
-		using Flag = MTPpayments_GetSavedStarGifts::Flag;
-		const auto user = session->user();
-		const auto requestId = session->api().request(
-			MTPpayments_GetSavedStarGifts(
-			MTP_flags(Flag::f_exclude_upgradable
-				| Flag::f_exclude_unupgradable
-				| Flag::f_exclude_unlimited),
-			user->input,
-			MTP_int(0), // collection_id
-			MTP_string(offset),
-			MTP_int(kMyGiftsPerPage)
-		)).done([=](const MTPpayments_SavedStarGifts &result) {
-			auto gifts = MyGiftsDescriptor();
-			const auto &data = result.data();
-			if (const auto next = data.vnext_offset()) {
-				gifts.offset = qs(*next);
-			}
-
-			const auto owner = &session->data();
-			owner->processUsers(data.vusers());
-			owner->processChats(data.vchats());
-
-			gifts.list.reserve(data.vgifts().v.size());
-			for (const auto &gift : data.vgifts().v) {
-				if (auto parsed = Api::FromTL(user, gift)) {
-					gifts.list.push_back(std::move(*parsed));
-				}
-			}
-			consumer.put_next(std::move(gifts));
-			consumer.put_done();
-		}).fail([=] {
-			consumer.put_next({});
-			consumer.put_done();
-		}).send();
-
-		auto lifetime = rpl::lifetime();
-		lifetime.add([=] { session->api().request(requestId).cancel(); });
-		return lifetime;
-	};
-}
-
 [[nodiscard]] Text::String TabTextForPrice(int price) {
 	const auto simple = [](const QString &text) {
 		return Text::String(st::semiboldTextStyle, text);
@@ -1211,12 +958,12 @@ void PreviewWrap::paintEvent(QPaintEvent *e) {
 	return result;
 }
 
-[[nodiscard]] Text::String SortModeText(ResaleSort mode) {
+[[nodiscard]] Text::String SortModeText(ResaleGiftsSort mode) {
 	auto text = [&] {
-		if (mode == ResaleSort::Number) {
+		if (mode == ResaleGiftsSort::Number) {
 			return Ui::Text::IconEmoji(&st::giftBoxResaleMiniNumber).append(
 				tr::lng_gift_resale_number(tr::now));
-		} else if (mode == ResaleSort::Price) {
+		} else if (mode == ResaleGiftsSort::Price) {
 			return Ui::Text::IconEmoji(&st::giftBoxResaleMiniPrice).append(
 				tr::lng_gift_resale_price(tr::now));
 		}
@@ -1232,14 +979,14 @@ void PreviewWrap::paintEvent(QPaintEvent *e) {
 }
 
 struct ResaleTabs {
-	rpl::producer<ResaleFilter> filter;
+	rpl::producer<ResaleGiftsFilter> filter;
 	object_ptr<RpWidget> widget;
 };
 [[nodiscard]] ResaleTabs MakeResaleTabs(
 		std::shared_ptr<ChatHelpers::Show> show,
 		not_null<PeerData*> peer,
 		const ResaleGiftsDescriptor &info,
-		rpl::producer<ResaleFilter> filter) {
+		rpl::producer<ResaleGiftsFilter> filter) {
 	auto widget = object_ptr<RpWidget>((QWidget*)nullptr);
 	const auto raw = widget.data();
 
@@ -1248,7 +995,7 @@ struct ResaleTabs {
 		Text::String text;
 	};
 	struct State {
-		rpl::variable<ResaleFilter> filter;
+		rpl::variable<ResaleGiftsFilter> filter;
 		rpl::variable<int> fullWidth;
 		std::vector<Button> buttons;
 		base::unique_qptr<Ui::PopupMenu> menu;
@@ -1275,10 +1022,10 @@ struct ResaleTabs {
 		Expects(index > 0 && index < 4);
 
 		return (index == 1)
-			? AttributeIdType::Model
+			? GiftAttributeIdType::Model
 			: (index == 2)
-			? AttributeIdType::Backdrop
-			: AttributeIdType::Pattern;
+			? GiftAttributeIdType::Backdrop
+			: GiftAttributeIdType::Pattern;
 	};
 
 	const auto setSelected = [=](int index) {
@@ -1297,7 +1044,7 @@ struct ResaleTabs {
 			raw,
 			st::giftBoxResaleFilter);
 		const auto menu = state->menu.get();
-		const auto modify = [=](Fn<void(ResaleFilter&)> modifier) {
+		const auto modify = [=](Fn<void(ResaleGiftsFilter&)> modifier) {
 			auto now = state->filter.current();
 			modifier(now);
 			state->filter = now;
@@ -1365,30 +1112,33 @@ struct ResaleTabs {
 				checked);
 		};
 		if (!index) {
-			const auto sort = [=](ResaleSort value) {
-				modify([&](ResaleFilter &filter) {
+			const auto sort = [=](ResaleGiftsSort value) {
+				modify([&](ResaleGiftsFilter &filter) {
 					filter.sort = value;
 				});
 			};
-			const auto is = [&](ResaleSort value) {
+			const auto is = [&](ResaleGiftsSort value) {
 				return state->filter.current().sort == value;
 			};
 			actionWithIcon(tr::lng_gift_resale_sort_price(tr::now), [=] {
-				sort(ResaleSort::Price);
-			}, &st::menuIconOrderPrice, is(ResaleSort::Price));
+				sort(ResaleGiftsSort::Price);
+			}, &st::menuIconOrderPrice, is(ResaleGiftsSort::Price));
 			actionWithIcon(tr::lng_gift_resale_sort_date(tr::now), [=] {
-				sort(ResaleSort::Date);
-			}, &st::menuIconOrderDate, is(ResaleSort::Date));
+				sort(ResaleGiftsSort::Date);
+			}, &st::menuIconOrderDate, is(ResaleGiftsSort::Date));
 			actionWithIcon(tr::lng_gift_resale_sort_number(tr::now), [=] {
-				sort(ResaleSort::Number);
-			}, &st::menuIconOrderNumber, is(ResaleSort::Number));
+				sort(ResaleGiftsSort::Number);
+			}, &st::menuIconOrderNumber, is(ResaleGiftsSort::Number));
 		} else {
 			const auto now = state->filter.current().attributes;
 			const auto type = IndexToType(index);
-			const auto has = ranges::contains(now, type, &AttributeId::type);
+			const auto has = ranges::contains(
+				now,
+				type,
+				&GiftAttributeId::type);
 			if (has) {
 				actionWithIcon(tr::lng_gift_resale_filter_all(tr::now), [=] {
-					modify([&](ResaleFilter &filter) {
+					modify([&](ResaleGiftsFilter &filter) {
 						auto &list = filter.attributes;
 						for (auto i = begin(list); i != end(list);) {
 							if (i->type == type) {
@@ -1400,8 +1150,8 @@ struct ResaleTabs {
 					});
 				}, &st::menuIconSelect);
 			}
-			const auto toggle = [=](AttributeId id) {
-				modify([&](ResaleFilter &filter) {
+			const auto toggle = [=](GiftAttributeId id) {
+				modify([&](ResaleGiftsFilter &filter) {
 					auto &list = filter.attributes;
 					if (ranges::contains(list, id)) {
 						list.remove(id);
@@ -1410,10 +1160,10 @@ struct ResaleTabs {
 					}
 				});
 			};
-			const auto checked = [=](AttributeId id) {
+			const auto checked = [=](GiftAttributeId id) {
 				return !has || ranges::contains(now, id);
 			};
-			if (type == AttributeIdType::Model) {
+			if (type == GiftAttributeIdType::Model) {
 				for (auto &entry : state->lists.models) {
 					const auto id = IdFor(entry.model);
 					const auto text = TextWithEntities{
@@ -1425,7 +1175,7 @@ struct ResaleTabs {
 						toggle(id);
 					}, id.value, checked(id));
 				}
-			} else if (type == AttributeIdType::Backdrop) {
+			} else if (type == GiftAttributeIdType::Backdrop) {
 				for (auto &entry : state->lists.backdrops) {
 					const auto id = IdFor(entry.backdrop);
 					const auto text = TextWithEntities{
@@ -1437,7 +1187,7 @@ struct ResaleTabs {
 						toggle(id);
 					}, entry.backdrop.centerColor, checked(id));
 				}
-			} else if (type == AttributeIdType::Pattern) {
+			} else if (type == GiftAttributeIdType::Pattern) {
 				for (auto &entry : state->lists.patterns) {
 					const auto id = IdFor(entry.pattern);
 					const auto text = TextWithEntities{
@@ -1455,7 +1205,7 @@ struct ResaleTabs {
 	};
 
 	state->filter.value(
-	) | rpl::start_with_next([=](const ResaleFilter &fields) {
+	) | rpl::start_with_next([=](const ResaleGiftsFilter &fields) {
 		auto x = st::giftBoxResaleTabsMargin.left();
 		auto y = st::giftBoxResaleTabsMargin.top();
 
@@ -1464,7 +1214,10 @@ struct ResaleTabs {
 		const auto &list = fields.attributes;
 		const auto setForIndex = [&](int i, auto many, auto one) {
 			const auto type = IndexToType(i);
-			const auto count = ranges::count(list, type, &AttributeId::type);
+			const auto count = ranges::count(
+				list,
+				type,
+				&GiftAttributeId::type);
 			state->buttons[i].text = ResaleTabText((count > 0)
 				? many(tr::now, lt_count, count)
 				: one(tr::now));
@@ -2626,99 +2379,12 @@ void SendGiftBox(
 		&st::giftBox.button.textFg);
 }
 
-[[nodiscard]] rpl::producer<ResaleGiftsDescriptor> ResaleGiftsSlice(
-		not_null<Main::Session*> session,
-		uint64 giftId,
-		ResaleFilter filter = {},
-		QString offset = QString()) {
-	return [=](auto consumer) {
-		using Flag = MTPpayments_GetResaleStarGifts::Flag;
-		const auto requestId = session->api().request(
-			MTPpayments_GetResaleStarGifts(
-				MTP_flags(Flag::f_attributes_hash
-					| ((filter.sort == ResaleSort::Price)
-						? Flag::f_sort_by_price
-						: (filter.sort == ResaleSort::Number)
-						? Flag::f_sort_by_num
-						: Flag())
-					| (filter.attributes.empty()
-						? Flag()
-						: Flag::f_attributes)),
-				MTP_long(filter.attributesHash),
-				MTP_long(giftId),
-				MTP_vector_from_range(filter.attributes
-					| ranges::views::transform(AttributeToTL)),
-				MTP_string(offset),
-				MTP_int(kResaleGiftsPerPage)
-			)).done([=](const MTPpayments_ResaleStarGifts &result) {
-			const auto &data = result.data();
-			session->data().processUsers(data.vusers());
-			session->data().processChats(data.vchats());
-
-			auto info = ResaleGiftsDescriptor{
-				.giftId = giftId,
-				.offset = qs(data.vnext_offset().value_or_empty()),
-				.count = data.vcount().v,
-			};
-			const auto &list = data.vgifts().v;
-			info.list.reserve(list.size());
-			for (const auto &entry : list) {
-				if (auto gift = Api::FromTL(session, entry)) {
-					info.list.push_back(std::move(*gift));
-				}
-			}
-			info.attributesHash = data.vattributes_hash().value_or_empty();
-			const auto &attributes = data.vattributes()
-				? data.vattributes()->v
-				: QVector<MTPStarGiftAttribute>();
-			const auto &counters = data.vcounters()
-				? data.vcounters()->v
-				: QVector<MTPStarGiftAttributeCounter>();
-			auto counts = base::flat_map<AttributeId, int>();
-			counts.reserve(counters.size());
-			for (const auto &counter : counters) {
-				const auto &data = counter.data();
-				counts.emplace(FromTL(data.vattribute()), data.vcount().v);
-			}
-			const auto count = [&](AttributeId id) {
-				const auto i = counts.find(id);
-				return i != end(counts) ? i->second : 0;
-			};
-			info.models.reserve(attributes.size());
-			info.patterns.reserve(attributes.size());
-			info.backdrops.reserve(attributes.size());
-			for (const auto &attribute : attributes) {
-				attribute.match([&](const MTPDstarGiftAttributeModel &data) {
-					const auto parsed = Api::FromTL(session, data);
-					info.models.push_back({ parsed, count(IdFor(parsed)) });
-				}, [&](const MTPDstarGiftAttributePattern &data) {
-					const auto parsed = Api::FromTL(session, data);
-					info.patterns.push_back({ parsed, count(IdFor(parsed)) });
-				}, [&](const MTPDstarGiftAttributeBackdrop &data) {
-					const auto parsed = Api::FromTL(data);
-					info.backdrops.push_back({ parsed, count(IdFor(parsed)) });
-				}, [](const MTPDstarGiftAttributeOriginalDetails &data) {
-				});
-			}
-			consumer.put_next(std::move(info));
-			consumer.put_done();
-		}).fail([=](const MTP::Error &error) {
-			consumer.put_next({});
-			consumer.put_done();
-		}).send();
-
-		auto lifetime = rpl::lifetime();
-		lifetime.add([=] { session->api().request(requestId).cancel(); });
-		return lifetime;
-	};
-}
-
 [[nodiscard]] object_ptr<RpWidget> MakeGiftsList(
 		not_null<Window::SessionController*> window,
 		not_null<PeerData*> peer,
 		rpl::producer<GiftsDescriptor> gifts,
 		Fn<void()> loadMore) {
-	auto result = object_ptr<WidgetWithRange>((QWidget*)nullptr);
+	auto result = object_ptr<VisibleRangeWidget>((QWidget*)nullptr);
 	const auto raw = result.data();
 
 	Data::AmPremiumValue(&window->session()) | rpl::start_with_next([=] {
@@ -3139,7 +2805,7 @@ void AddBlock(
 		if (state->priceTab.current() == kPriceTabMy
 			&& !state->my.offset.isEmpty()
 			&& !state->myLoading) {
-			state->myLoading = UniqueGiftsSlice(
+			state->myLoading = Data::MyUniqueGiftsSlice(
 				&peer->session(),
 				state->my.offset
 			) | rpl::start_with_next([=](MyGiftsDescriptor &&descriptor) {
@@ -3342,7 +3008,7 @@ void GiftResaleBox(
 	struct State {
 		rpl::event_stream<> updated;
 		ResaleGiftsDescriptor data;
-		rpl::variable<ResaleFilter> filter;
+		rpl::variable<ResaleGiftsFilter> filter;
 		rpl::variable<bool> ton;
 		rpl::lifetime loading;
 		int lastMinHeight = 0;
@@ -3378,7 +3044,7 @@ void GiftResaleBox(
 	state->filter = std::move(tabs.filter);
 	content->add(std::move(tabs.widget));
 
-	state->filter.changes() | rpl::start_with_next([=](ResaleFilter value) {
+	state->filter.changes() | rpl::start_with_next([=](ResaleGiftsFilter value) {
 		state->data.offset = QString();
 		state->loading = ResaleGiftsSlice(
 			&peer->session(),
@@ -3964,7 +3630,7 @@ void ShowStarGiftBox(
 		checkReady();
 	}, i->second.lifetime);
 
-	UniqueGiftsSlice(
+	Data::MyUniqueGiftsSlice(
 		session
 	) | rpl::start_with_next([=](MyGiftsDescriptor &&gifts) {
 		auto &entry = Map[session];
@@ -5773,7 +5439,7 @@ rpl::lifetime ShowStarGiftResale(
 		Fn<void()> finishRequesting) {
 	const auto weak = base::make_weak(controller);
 	const auto session = &controller->session();
-	return ResaleGiftsSlice(
+	return Data::ResaleGiftsSlice(
 		session,
 		giftId
 	) | rpl::start_with_next([=](ResaleGiftsDescriptor &&info) {

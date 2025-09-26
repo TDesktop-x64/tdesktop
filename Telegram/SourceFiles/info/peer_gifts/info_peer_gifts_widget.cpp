@@ -1214,6 +1214,7 @@ void InnerWidget::refreshCollectionsTabs() {
 			: u"all"_q;
 		_collectionsTabs = std::make_unique<Ui::SubTabs>(
 			this,
+			st::collectionSubTabs,
 			Ui::SubTabs::Options{ .selected = selected, .centered = true },
 			std::move(tabs),
 			context);

@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "info/peer_gifts/info_peer_gifts_common.h"
 
+#include "api/api_global_privacy.h"
+#include "api/api_premium.h"
 #include "base/unixtime.h"
 #include "boxes/send_credits_box.h" // SetButtonMarkedLabel
 #include "boxes/star_gift_box.h"
@@ -19,6 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_document.h"
 #include "data/data_document_media.h"
 #include "data/data_session.h"
+#include "data/data_user.h"
 #include "history/view/media/history_view_sticker_player.h"
 #include "lang/lang_keys.h"
 #include "info/channel_statistics/earn/earn_icons.h"
@@ -45,6 +48,26 @@ namespace {
 
 constexpr auto kGiftsPerRow = 3;
 
+[[nodiscard]] bool AllowedToSend(
+		const GiftTypeStars &gift,
+		not_null<PeerData*> peer) {
+	using Type = Api::DisallowedGiftType;
+	const auto user = peer->asUser();
+	if (!user || user->isSelf()) {
+		return true;
+	}
+	const auto disallowedTypes = user ? user->disallowedGiftTypes() : Type();
+	const auto allowLimited = !(disallowedTypes & Type::Limited);
+	const auto allowUnlimited = !(disallowedTypes & Type::Unlimited);
+	const auto allowUnique = !(disallowedTypes & Type::Unique);
+	if (gift.resale) {
+		return allowUnique;
+	} else if (!gift.info.limitedCount) {
+		return allowUnlimited;
+	}
+	return allowLimited || (gift.info.starsToUpgrade && allowUnique);
+}
+
 } // namespace
 
 std::strong_ordering operator<=>(const GiftBadge &a, const GiftBadge &b) {
@@ -69,6 +92,65 @@ std::strong_ordering operator<=>(const GiftBadge &a, const GiftBadge &b) {
 		return result5;
 	}
 	return a.gradient <=> b.gradient;
+}
+
+rpl::producer<std::vector<GiftTypeStars>> GiftsStars(
+		not_null<Main::Session*> session,
+		not_null<PeerData*> peer) {
+	struct Session {
+		std::vector<GiftTypeStars> last;
+	};
+	static auto Map = base::flat_map<not_null<Main::Session*>, Session>();
+
+	const auto filtered = [=](std::vector<GiftTypeStars> list) {
+		list.erase(ranges::remove_if(list, [&](const GiftTypeStars &gift) {
+			return !AllowedToSend(gift, peer);
+		}), end(list));
+		return list;
+	};
+	return [=](auto consumer) {
+		auto lifetime = rpl::lifetime();
+
+		auto i = Map.find(session);
+		if (i == end(Map)) {
+			i = Map.emplace(session, Session()).first;
+			session->lifetime().add([=] { Map.remove(session); });
+		}
+		if (!i->second.last.empty()) {
+			consumer.put_next(filtered(i->second.last));
+		}
+
+		using namespace Api;
+		const auto api = lifetime.make_state<PremiumGiftCodeOptions>(peer);
+		api->requestStarGifts(
+		) | rpl::start_with_error_done([=](QString error) {
+			consumer.put_next({});
+		}, [=] {
+			auto list = std::vector<GiftTypeStars>();
+			const auto &gifts = api->starGifts();
+			list.reserve(gifts.size());
+			for (auto &gift : gifts) {
+				list.push_back({ .info = gift });
+				if (gift.resellCount > 0) {
+					list.push_back({ .info = gift, .resale = true });
+				}
+			}
+			ranges::stable_sort(list, [](const auto &a, const auto &b) {
+				const auto soldOut = [](const auto &gift) {
+					return gift.info.soldOut && !gift.resale;
+				};
+				return soldOut(a) < soldOut(b);
+			});
+
+			auto &map = Map[session];
+			if (map.last != list || list.empty()) {
+				map.last = list;
+				consumer.put_next(filtered(std::move(list)));
+			}
+		}, lifetime);
+
+		return lifetime;
+	};
 }
 
 GiftButton::GiftButton(

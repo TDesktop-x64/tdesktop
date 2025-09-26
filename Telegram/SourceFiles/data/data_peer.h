@@ -143,6 +143,9 @@ struct AllowedReactions {
 	not_null<Session*> owner,
 	const MTPInputUser &input);
 
+[[nodiscard]] Ui::ColorCollectible ParseColorCollectible(
+	const MTPDpeerColorCollectible &data);
+
 } // namespace Data
 
 class PeerClickHandler : public ClickHandler {
@@ -219,6 +222,8 @@ public:
 	-> const std::shared_ptr<Ui::ColorCollectible> & {
 		return _colorCollectible;
 	}
+	bool changeColorCollectible(Ui::ColorCollectible data);
+	bool clearColorCollectible();
 	bool changeColorIndex(uint8 index);
 	bool clearColorIndex();
 	[[nodiscard]] DocumentId backgroundEmojiId() const;

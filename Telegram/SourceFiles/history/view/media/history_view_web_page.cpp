@@ -903,9 +903,23 @@ void WebPage::draw(Painter &p, const PaintContext &context) const {
 		: from
 		? from->colorIndex()
 		: view->colorIndex();
-	const auto cache = context.outbg
-		? stm->replyCache[st->colorPatternIndex(colorIndex)].get()
-		: st->coloredReplyCache(selected, colorIndex).get();
+	const auto &colorCollectible = factcheck
+		? nullptr
+		: (sponsored && sponsored->colorIndex)
+		? nullptr
+		: from
+		? from->colorCollectible()
+		: nullptr;
+	const auto colorPattern = colorCollectible
+		? st->collectiblePatternIndex(colorCollectible)
+		: st->colorPatternIndex(colorIndex);
+	const auto useColorCollectible = colorCollectible && !context.outbg;
+	const auto useColorIndex = !context.outbg;
+	const auto cache = useColorCollectible
+		? st->collectibleReplyCache(selected, colorCollectible).get()
+		: useColorIndex
+		? st->coloredReplyCache(selected, colorIndex).get()
+		: stm->replyCache[colorPattern].get();
 	const auto backgroundEmojiId = factcheck
 		? DocumentId()
 		: (sponsored && sponsored->backgroundEmojiId)
@@ -916,13 +930,15 @@ void WebPage::draw(Painter &p, const PaintContext &context) const {
 	const auto backgroundEmoji = backgroundEmojiId
 		? st->backgroundEmojiData(backgroundEmojiId).get()
 		: nullptr;
-	const auto backgroundEmojiCache = backgroundEmoji
-		? &backgroundEmoji->caches[Ui::BackgroundEmojiData::CacheIndex(
+	const auto backgroundEmojiCache = !backgroundEmoji
+		? nullptr
+		: useColorCollectible
+		? &backgroundEmoji->collectibleCaches[colorCollectible]
+		: &backgroundEmoji->caches[Ui::BackgroundEmojiData::CacheIndex(
 			selected,
 			context.outbg,
 			true,
-			colorIndex + 1)]
-		: nullptr;
+			useColorIndex ? (colorIndex + 1) : 0)];
 	Ui::Text::ValidateQuotePaintCache(*cache, _st);
 	Ui::Text::FillQuotePaint(p, outer, *cache, _st);
 	if (backgroundEmoji) {
@@ -1030,9 +1046,11 @@ void WebPage::draw(Painter &p, const PaintContext &context) const {
 	}
 	if (_siteNameLines) {
 		p.setPen(cache->icon);
-		p.setTextPalette(context.outbg
-			? stm->semiboldPalette
-			: st->coloredTextPalette(selected, colorIndex));
+		p.setTextPalette(useColorCollectible
+			? st->collectibleTextPalette(selected, colorCollectible)
+			: useColorIndex
+			? st->coloredTextPalette(selected, colorIndex)
+			: stm->semiboldPalette);
 
 		const auto endskip = _siteName.hasSkipBlock()
 			? _parent->skipBlockWidth()

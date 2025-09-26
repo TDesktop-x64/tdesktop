@@ -46,6 +46,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/wrap/vertical_layout.h"
 #include "ui/new_badges.h"
 #include "ui/vertical_list.h"
+#include "ui/controls/swipe_handler.h"
+#include "ui/controls/swipe_handler_data.h"
 #include "window/window_session_controller.h"
 #include "apiwrap.h"
 #include "api/api_premium.h"
@@ -346,6 +348,7 @@ public:
 
 private:
 	void setupContent();
+	void setupSwipeBack();
 
 	const not_null<Window::SessionController*> _controller;
 
@@ -372,6 +375,7 @@ Business::Business(
 , _controller(controller)
 , _radioGroup(std::make_shared<Ui::RadiobuttonGroup>()) {
 	setupContent();
+	setupSwipeBack();
 	_controller->session().api().premium().reload();
 }
 
@@ -396,6 +400,46 @@ void Business::setStepDataReference(std::any &data) {
 		) | rpl::map_to(true);
 		_wrap = std::move(my->wrapValue);
 	}
+}
+
+void Business::setupSwipeBack() {
+	using namespace Ui::Controls;
+	
+	auto swipeBackData = lifetime().make_state<SwipeBackResult>();
+	
+	auto update = [=](SwipeContextData data) {
+		if (data.translation > 0) {
+			if (!swipeBackData->callback) {
+				(*swipeBackData) = SetupSwipeBack(
+					this,
+					[]() -> std::pair<QColor, QColor> {
+						return {
+							st::historyForwardChooseBg->c,
+							st::historyForwardChooseFg->c,
+						};
+					});
+			}
+			swipeBackData->callback(data);
+			return;
+		} else if (swipeBackData->lifetime) {
+			(*swipeBackData) = {};
+		}
+	};
+	
+	auto init = [=](int, Qt::LayoutDirection direction) {
+		return (direction == Qt::RightToLeft)
+			? DefaultSwipeBackHandlerFinishData([=] {
+				_showBack.fire({});
+			})
+			: SwipeHandlerFinishData();
+	};
+	
+	SetupSwipeHandler({
+		.widget = this,
+		.scroll = v::null,
+		.update = std::move(update),
+		.init = std::move(init),
+	});
 }
 
 void Business::setupContent() {

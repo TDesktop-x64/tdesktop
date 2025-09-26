@@ -207,7 +207,6 @@ menuBlueIconWallpaper: icon{{ "settings/premium/features/feature_wallpaper", lig
 menuBlueIconEmojiStatus: icon{{ "settings/premium/features/feature_status", lightButtonFg }};
 menuBlueIconEmojiPack: icon{{ "settings/premium/features/feature_emoji_pack", lightButtonFg }};
 menuBlueIconGroupCreate: icon {{ "menu/groups_create", lightButtonFg }};
-menuBlueIconGiftPremium: icon {{ "menu/gift_premium", lightButtonFg }};
 
 mediaMenuIconStickers: icon {{ "menu/stickers", mediaviewMenuFg }};
 mediaMenuIconCancel: icon {{ "menu/cancel", mediaviewMenuFg }};

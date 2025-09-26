@@ -506,7 +506,7 @@ void Controller::setupPhotoButtons() {
 		suggestBirthdayWrap->entity(),
 		tr::lng_suggest_birthday(),
 		st::settingsButtonLight,
-		{ &st::menuBlueIconGiftPremium });
+		{ &st::editContactSuggestBirthday });
 	suggestBirthdayButton->setClickedCallback([=] {
 		Core::App().openInternalUrl(
 			u"internal:edit_birthday:suggest:%1"_q.arg(

@@ -393,7 +393,8 @@ void SubsectionTabs::startFillingSlider(
 			if (item.thread->fixedOnTopIndex()) {
 				++fixedCount;
 			}
-			if (item.thread->isPinnedDialog(FilterId())) {
+			if (item.thread->isPinnedDialog(FilterId())
+				&& item.thread->asTopic()) {
 				++pinnedCount;
 			}
 			const auto textFg = [=] {

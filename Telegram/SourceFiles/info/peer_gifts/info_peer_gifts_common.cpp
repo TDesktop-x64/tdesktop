@@ -537,6 +537,21 @@ void GiftButton::contextMenuEvent(QContextMenuEvent *e) {
 		: QCursor::pos());
 }
 
+void GiftButton::mousePressEvent(QMouseEvent *e) {
+	_mouseEvents.fire_copy(e);
+	AbstractButton::mousePressEvent(e);
+}
+
+void GiftButton::mouseMoveEvent(QMouseEvent *e) {
+	_mouseEvents.fire_copy(e);
+	AbstractButton::mouseMoveEvent(e);
+}
+
+void GiftButton::mouseReleaseEvent(QMouseEvent *e) {
+	_mouseEvents.fire_copy(e);
+	AbstractButton::mouseReleaseEvent(e);
+}
+
 void GiftButton::cacheUniqueBackground(
 		not_null<Data::UniqueGift*> unique,
 		int width,
@@ -982,7 +997,7 @@ QSize Delegate::buttonSize() {
 	return _single;
 }
 
-QMargins Delegate::buttonExtend() {
+QMargins Delegate::buttonExtend() const {
 	return st::defaultDropdownMenu.wrap.shadow.extend;
 }
 

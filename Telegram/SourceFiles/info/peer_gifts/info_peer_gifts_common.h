@@ -147,7 +147,7 @@ public:
 	[[nodiscard]] virtual TextWithEntities ministar() = 0;
 	[[nodiscard]] virtual Ui::Text::MarkedContext textContext() = 0;
 	[[nodiscard]] virtual QSize buttonSize() = 0;
-	[[nodiscard]] virtual QMargins buttonExtend() = 0;
+	[[nodiscard]] virtual QMargins buttonExtend() const = 0;
 	[[nodiscard]] virtual auto buttonPatternEmoji(
 		not_null<Data::UniqueGift*> unique,
 		Fn<void()> repaint)
@@ -178,10 +178,17 @@ public:
 		return _contextMenuRequests.events();
 	}
 
+	[[nodiscard]] rpl::producer<QMouseEvent*> mouseEvents() const {
+		return _mouseEvents.events();
+	}
+
 private:
 	void paintEvent(QPaintEvent *e) override;
 	void resizeEvent(QResizeEvent *e) override;
 	void contextMenuEvent(QContextMenuEvent *e) override;
+	void mousePressEvent(QMouseEvent *e) override;
+	void mouseMoveEvent(QMouseEvent *e) override;
+	void mouseReleaseEvent(QMouseEvent *e) override;
 
 	void paintBackground(QPainter &p, const QImage &background);
 	void cacheUniqueBackground(
@@ -199,6 +206,7 @@ private:
 
 	const not_null<GiftButtonDelegate*> _delegate;
 	rpl::event_stream<QPoint> _contextMenuRequests;
+	rpl::event_stream<QMouseEvent*> _mouseEvents;
 	QImage _hiddenBgCache;
 	GiftDescriptor _descriptor;
 	Ui::Text::String _text;
@@ -247,7 +255,7 @@ public:
 	TextWithEntities ministar() override;
 	Ui::Text::MarkedContext textContext() override;
 	QSize buttonSize() override;
-	QMargins buttonExtend() override;
+	QMargins buttonExtend() const override;
 	auto buttonPatternEmoji(
 		not_null<Data::UniqueGift*> unique,
 		Fn<void()> repaint)

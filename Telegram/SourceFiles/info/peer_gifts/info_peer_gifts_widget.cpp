@@ -48,6 +48,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_menu_icons.h"
 #include "styles/style_credits.h" // giftBoxPadding
 
+#include <QtWidgets/QApplication>
+
 namespace Info::PeerGifts {
 namespace {
 
@@ -160,6 +162,18 @@ private:
 		uint64 giftId = 0;
 		int index = 0;
 	};
+	struct DragState {
+		bool enabled = false;
+		int index = -1;
+		int lastSelected = -1;
+		QPoint point;
+		QPoint startPos;
+	};
+	struct ShiftAnimation {
+		Ui::Animations::Simple xAnimation;
+		Ui::Animations::Simple yAnimation;
+		int shift = 0;
+	};
 
 public:
 	InnerWidget(
@@ -175,6 +189,9 @@ private:
 		int visibleTop,
 		int visibleBottom) override;
 	void paintEvent(QPaintEvent *e) override;
+	void mousePressEvent(QMouseEvent *e) override;
+	void mouseMoveEvent(QMouseEvent *e) override;
+	void mouseReleaseEvent(QMouseEvent *e) override;
 
 	void subscribeToUpdates();
 	void applyUpdateTo(Entries &entries, const Data::GiftUpdate &update);
@@ -189,6 +206,12 @@ private:
 	void showMenuForCollection(int id);
 	void refreshAbout();
 	void refreshCollectionsTabs();
+
+	void updateSelected();
+	int giftFromGlobalPos(const QPoint &p) const;
+	[[nodiscard]] QPoint posFromIndex(int index) const;
+	[[nodiscard]] bool isDraggedAnimating() const;
+	void requestReorder(int fromIndex, int toIndex);
 
 	void collectionRenamed(int id, QString name);
 	void collectionRemoved(int id);
@@ -242,6 +265,10 @@ private:
 	int _perRow = 0;
 	int _visibleFrom = 0;
 	int _visibleTill = 0;
+
+	DragState _dragging;
+	base::flat_map<int, ShiftAnimation> _shiftAnimations;
+	int _selected = -1;
 
 	base::unique_qptr<Ui::PopupMenu> _menu;
 
@@ -745,14 +772,33 @@ void InnerWidget::validateButtons() {
 				) | rpl::start_with_next([=](QPoint point) {
 					showMenuFor(raw, point);
 				}, raw->lifetime());
+
+				raw->mouseEvents(
+				) | rpl::start_with_next([=](QMouseEvent *e) {
+					switch (e->type()) {
+					case QEvent::MouseButtonPress:
+						raw->raise();
+						mousePressEvent(e);
+						break;
+					case QEvent::MouseMove:
+						mouseMoveEvent(e);
+						break;
+					case QEvent::MouseButtonRelease:
+						mouseReleaseEvent(e);
+						break;
+					default:
+						break;
+					}
+				}, raw->lifetime());
+
 				raw->show();
 				views.push_back({ .button = std::move(button) });
 			}
 		}
 		auto &view = views.back();
-		const auto callback = [=] {
-			showGift(index);
-		};
+		const auto callback = _addingToCollectionId
+			? Fn<void()>([=] { showGift(index); })
+			: nullptr;
 		view.index = index;
 		view.manageId = manageId;
 		view.giftId = giftId;
@@ -763,7 +809,9 @@ void InnerWidget::validateButtons() {
 				anim::type::instant);
 		}
 		view.button->setDescriptor(descriptor, _mode);
-		view.button->setClickedCallback(callback);
+		if (callback) {
+			view.button->setClickedCallback(callback);
+		}
 		return true;
 	};
 	for (auto j = fromRow; j != tillRow; ++j) {
@@ -771,8 +819,36 @@ void InnerWidget::validateButtons() {
 			if (!add(i, j)) {
 				break;
 			}
-			views.back().button->setGeometry(
-				QRect(QPoint(x, y), _single),
+			const auto &view = views.back();
+			const auto viewIndex = view.index;
+			auto pos = QPoint(x, y);
+
+			if (_dragging.enabled && viewIndex >= 0) {
+				if (viewIndex == _dragging.index && !isDraggedAnimating()) {
+					pos = mapFromGlobal(QCursor::pos()) - _dragging.point;
+				} else if (viewIndex == _dragging.index && isDraggedAnimating()) {
+					const auto it = _shiftAnimations.find(viewIndex);
+					if (it != _shiftAnimations.end()) {
+						pos = QPoint(
+							it->second.xAnimation.value(pos.x()),
+							it->second.yAnimation.value(pos.y()));
+					}
+				} else {
+					const auto it = _shiftAnimations.find(viewIndex);
+					if (it != _shiftAnimations.end()) {
+						const auto &entry = it->second;
+						const auto toPos = posFromIndex(viewIndex + entry.shift);
+						pos = QPoint(
+							entry.xAnimation.value(toPos.x()),
+							entry.yAnimation.value(toPos.y()));
+					}
+				}
+			} else if (_dragging.enabled && viewIndex == _dragging.index) {
+				pos = mapFromGlobal(QCursor::pos()) - _dragging.point;
+			}
+
+			view.button->setGeometry(
+				QRect(pos, _single),
 				_delegate.buttonExtend());
 			x += _single.width() + skipw;
 		}
@@ -1562,6 +1638,339 @@ void InnerWidget::flushCollectionReorder() {
 	}).send();
 
 	_pendingCollectionReorder = false;
+}
+
+void InnerWidget::mousePressEvent(QMouseEvent *e) {
+	if (e->button() != Qt::LeftButton || _addingToCollectionId) {
+		return;
+	}
+	const auto index = giftFromGlobalPos(e->globalPos());
+	if (index < 0 || index >= _list->size()) {
+		return;
+	}
+	if (_peer->canManageGifts()
+		&& _descriptor.current().collectionId
+		&& _list->size() > 1) {
+		if (isDraggedAnimating()) {
+			return;
+		}
+		_dragging.enabled = false;
+		_dragging.index = index;
+		_dragging.point = mapFromGlobal(e->globalPos()) - posFromIndex(index);
+		_dragging.startPos = e->globalPos();
+		return;
+	}
+}
+
+void InnerWidget::mouseMoveEvent(QMouseEvent *e) {
+	updateSelected();
+	const auto draggedAnimating = isDraggedAnimating();
+
+	if (!_dragging.enabled && _dragging.index >= 0) {
+		const auto distance
+			= (e->globalPos() - _dragging.startPos).manhattanLength();
+		if (distance > QApplication::startDragDistance()) {
+			_dragging.enabled = true;
+		}
+	}
+
+	if (_selected >= 0 && !draggedAnimating) {
+		_dragging.lastSelected = _selected;
+	}
+
+	if (_dragging.enabled
+		&& _dragging.index >= 0
+		&& _dragging.index < _list->size()
+		&& _dragging.lastSelected >= 0
+		&& !draggedAnimating) {
+		for (auto i = 0; i < _list->size(); i++) {
+			if (i == _dragging.index) {
+				continue;
+			}
+			auto &entry = _shiftAnimations[i];
+			const auto wasShift = entry.shift;
+			if ((i >= _dragging.index) && (i <= _dragging.lastSelected)) {
+				if (entry.shift == 0) {
+					entry.shift = -1;
+				} else if (entry.shift == 1) {
+					entry.shift = 0;
+				}
+			} else if ((i < _dragging.index)
+					&& (i >= _dragging.lastSelected)) {
+				if (entry.shift == 0) {
+					entry.shift = 1;
+				} else if (entry.shift == -1) {
+					entry.shift = 0;
+				}
+			}
+			if ((i < std::min(_dragging.index, _dragging.lastSelected))
+				|| (i > std::max(_dragging.index, _dragging.lastSelected))) {
+				entry.shift = 0;
+			}
+			if (wasShift != entry.shift) {
+				const auto fromPoint = posFromIndex(i + wasShift);
+				const auto toPoint = posFromIndex(i + entry.shift);
+				const auto toX = float64(toPoint.x());
+				const auto toY = float64(toPoint.y());
+				const auto ratio = [&] {
+					const auto fromX = entry.xAnimation.value(toX);
+					const auto ratioX = std::min(toX, fromX)
+						/ std::max(toX, fromX);
+					const auto fromY = entry.yAnimation.value(toY);
+					const auto ratioY = std::min(toY, fromY)
+						/ std::max(toY, fromY);
+					return (ratioX == 1.)
+						? ratioY
+						: (ratioY == 1.)
+						? ratioX
+						: std::max(ratioX, ratioY);
+				}();
+				if (!entry.xAnimation.animating()) {
+					entry.xAnimation.stop();
+					entry.xAnimation.start(
+						[this, i](float64 value) {
+							for (auto &view : _views) {
+								if (view.index == i && view.button) {
+									view.button->moveToLeft(
+										value,
+										view.button->y());
+								}
+							}
+						},
+						fromPoint.x(),
+						toX,
+						st::fadeWrapDuration);
+				} else {
+					entry.xAnimation.change(
+						toX,
+						st::fadeWrapDuration * (1. - ratio),
+						anim::linear);
+				}
+				if (!entry.yAnimation.animating()) {
+					entry.yAnimation.stop();
+					entry.yAnimation.start(
+						[this, i](float64 value) {
+							for (auto &view : _views) {
+								if (view.index == i && view.button) {
+									view.button->moveToLeft(
+										view.button->x(),
+										value);
+								}
+							}
+						},
+						fromPoint.y(),
+						toY,
+						st::fadeWrapDuration);
+				} else {
+					entry.yAnimation.change(
+						toY,
+						st::fadeWrapDuration * (1. - ratio),
+						anim::linear);
+				}
+			}
+		}
+
+		for (auto &view : _views) {
+			if (view.index >= 0 && view.button) {
+				auto pos = posFromIndex(view.index);
+
+				if (view.index == _dragging.index && !isDraggedAnimating()) {
+					pos = mapFromGlobal(QCursor::pos()) - _dragging.point;
+				} else if (view.index == _dragging.index
+					&& isDraggedAnimating()) {
+					const auto it = _shiftAnimations.find(view.index);
+					if (it != _shiftAnimations.end()) {
+						pos = QPoint(
+							it->second.xAnimation.value(pos.x()),
+							it->second.yAnimation.value(pos.y()));
+					}
+				} else {
+					const auto it = _shiftAnimations.find(view.index);
+					if (it != _shiftAnimations.end()) {
+						const auto &entry = it->second;
+						const auto toPos
+							= posFromIndex(view.index + entry.shift);
+						pos = QPoint(
+							entry.xAnimation.value(toPos.x()),
+							entry.yAnimation.value(toPos.y()));
+					}
+				}
+				view.button->moveToLeft(pos.x(), pos.y());
+			}
+		}
+
+		update();
+	}
+}
+
+void InnerWidget::mouseReleaseEvent(QMouseEvent *e) {
+	if (_dragging.enabled && _dragging.index >= 0 && !isDraggedAnimating()) {
+		for (auto &[index, entry] : _shiftAnimations) {
+			if (index != _dragging.index) {
+				entry.xAnimation.stop();
+				entry.yAnimation.stop();
+				if (auto view = ranges::find(_views, index, &View::index);
+					view != end(_views) && view->button) {
+					const auto finalPos = posFromIndex(index + entry.shift);
+					view->button->moveToLeft(finalPos.x(), finalPos.y());
+				}
+			}
+		}
+
+		const auto fromPos = mapFromGlobal(e->globalPos()) - _dragging.point;
+		const auto toPos = posFromIndex(_dragging.lastSelected);
+		const auto wasPosition = _dragging.index;
+		const auto nowPosition = _dragging.lastSelected;
+		const auto finish = [=, this] {
+			base::reorder(*_list, wasPosition, nowPosition);
+			for (auto &view : _views) {
+				view.index = base::reorder_index(
+					view.index,
+					wasPosition,
+					nowPosition);
+			}
+			requestReorder(wasPosition, nowPosition);
+			_dragging = {};
+			_shiftAnimations.clear();
+		};
+		auto &entry = _shiftAnimations[_dragging.index];
+		entry.xAnimation.stop();
+		entry.yAnimation.stop();
+		entry.xAnimation.start(
+			[finish, toPos, this](float64 value) {
+				const auto index = _dragging.index;
+				if (value >= toPos.x()
+					&& index >= 0
+					&& !_shiftAnimations[index].yAnimation.animating()) {
+					finish();
+				}
+				for (auto &view : _views) {
+					if (view.index == index && view.button) {
+						view.button->moveToLeft(value, view.button->y());
+					}
+				}
+			},
+			fromPos.x(),
+			toPos.x(),
+			st::fadeWrapDuration);
+		entry.yAnimation.start(
+			[finish, toPos, this](float64 value) {
+				const auto index = _dragging.index;
+				if (value >= toPos.y()
+					&& index >= 0
+					&& !_shiftAnimations[index].xAnimation.animating()) {
+					finish();
+				}
+				for (auto &view : _views) {
+					if (view.index == index && view.button) {
+						view.button->moveToLeft(view.button->x(), value);
+					}
+				}
+			},
+			fromPos.y(),
+			toPos.y(),
+			st::fadeWrapDuration);
+	} else {
+		_dragging = {};
+		_shiftAnimations.clear();
+		const auto index = giftFromGlobalPos(e->globalPos());
+		if (index >= 0 && index < _list->size()) {
+			showGift(index);
+		}
+	}
+}
+
+void InnerWidget::updateSelected() {
+	const auto selected = giftFromGlobalPos(QCursor::pos());
+	if (_selected != selected) {
+		_selected = selected;
+	}
+}
+
+int InnerWidget::giftFromGlobalPos(const QPoint &p) const {
+	const auto l = mapFromGlobal(p);
+	if (!_perRow) {
+		return -1;
+	}
+	const auto padding = st::giftBoxPadding;
+	const auto vskip = (_collectionsTabs && !_collectionsTabs->isHidden())
+		? (padding.top() + _collectionsTabs->height() + padding.top())
+		: padding.bottom();
+	const auto row = (l.y() >= vskip)
+		? ((l.y() - vskip) / (_single.height() + st::giftBoxGiftSkip.y()))
+		: -1;
+	const auto available = width() - padding.left() - padding.right();
+	const auto skipw = st::giftBoxGiftSkip.x();
+	const auto fullw = _perRow * (_single.width() + skipw) - skipw;
+	const auto left = padding.left() + (available - fullw) / 2;
+	const auto col = (l.x() >= left)
+		? ((l.x() - left) / (_single.width() + skipw))
+		: -1;
+	if (row >= 0 && col >= 0 && col < _perRow) {
+		const auto result = row * _perRow + col;
+		return (result < _list->size()) ? result : -1;
+	}
+	return -1;
+}
+
+QPoint InnerWidget::posFromIndex(int index) const {
+	if (!_perRow) {
+		return {};
+	}
+	const auto padding = st::giftBoxPadding;
+	const auto vskip = (_collectionsTabs && !_collectionsTabs->isHidden())
+		? (padding.top() + _collectionsTabs->height() + padding.top())
+		: padding.bottom();
+	const auto available = width() - padding.left() - padding.right();
+	const auto skipw = st::giftBoxGiftSkip.x();
+	const auto skiph = st::giftBoxGiftSkip.y();
+	const auto fullw = _perRow * (_single.width() + skipw) - skipw;
+	const auto left = padding.left() + (available - fullw) / 2;
+	const auto extend = _delegate.buttonExtend();
+	return {
+		left + (index % _perRow) * (_single.width() + skipw) - extend.left(),
+		vskip + (index / _perRow) * (_single.height() + skiph) - extend.top(),
+	};
+}
+
+bool InnerWidget::isDraggedAnimating() const {
+	if (_dragging.index < 0) {
+		return false;
+	}
+	const auto it = _shiftAnimations.find(_dragging.index);
+	return (it == _shiftAnimations.end())
+		? false
+		: (it->second.xAnimation.animating()
+			|| it->second.yAnimation.animating());
+}
+
+void InnerWidget::requestReorder(int fromIndex, int toIndex) {
+	if (fromIndex == toIndex || !_peer->canManageGifts()) {
+		return;
+	}
+	const auto collectionId = _descriptor.current().collectionId;
+	if (!collectionId) {
+		return;
+	}
+
+	auto order = QVector<MTPInputSavedStarGift>();
+	order.reserve(_list->size());
+	for (const auto &entry : *_list) {
+		order.push_back(Api::InputSavedStarGiftId(entry.gift.manageId));
+	}
+
+	_api.request(
+		MTPpayments_UpdateStarGiftCollection(
+			MTP_flags(MTPpayments_UpdateStarGiftCollection::Flag::f_order),
+			_peer->input,
+			MTP_int(collectionId),
+			MTPstring(),
+			MTPVector<MTPInputSavedStarGift>(),
+			MTPVector<MTPInputSavedStarGift>(),
+			MTP_vector<MTPInputSavedStarGift>(order))
+	).fail([show = _window->uiShow()](const MTP::Error &error) {
+		show->showToast(error.type());
+	}).send();
 }
 
 void InnerWidget::reorderCollections(

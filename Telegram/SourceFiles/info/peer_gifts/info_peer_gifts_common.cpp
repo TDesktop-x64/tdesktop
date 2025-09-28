@@ -539,16 +539,25 @@ void GiftButton::contextMenuEvent(QContextMenuEvent *e) {
 
 void GiftButton::mousePressEvent(QMouseEvent *e) {
 	_mouseEvents.fire_copy(e);
+	if (e->isAccepted()) {
+		return;
+	}
 	AbstractButton::mousePressEvent(e);
 }
 
 void GiftButton::mouseMoveEvent(QMouseEvent *e) {
 	_mouseEvents.fire_copy(e);
+	if (e->isAccepted()) {
+		return;
+	}
 	AbstractButton::mouseMoveEvent(e);
 }
 
 void GiftButton::mouseReleaseEvent(QMouseEvent *e) {
 	_mouseEvents.fire_copy(e);
+	if (e->isAccepted()) {
+		return;
+	}
 	AbstractButton::mouseReleaseEvent(e);
 }
 

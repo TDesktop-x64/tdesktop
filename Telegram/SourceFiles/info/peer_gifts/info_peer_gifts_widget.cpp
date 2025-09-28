@@ -136,6 +136,7 @@ public:
 	void confirmDeleteCollection(int id);
 	void collectionAdded(MTPStarGiftCollection result);
 	void fillMenu(const Ui::Menu::MenuCallback &addAction);
+	void reorderCollections(const Ui::SubTabs::ReorderUpdate &update);
 
 	void saveState(not_null<Memento*> memento);
 	void restoreState(not_null<Memento*> memento);
@@ -1267,6 +1268,16 @@ void InnerWidget::refreshCollectionsTabs() {
 			}
 			showMenuForCollection(id.toInt());
 		}, _collectionsTabs->lifetime());
+
+		using ReorderUpdate = Ui::SubTabs::ReorderUpdate;
+		_collectionsTabs->reorderUpdates(
+		) | rpl::start_with_next([=](const ReorderUpdate &update) {
+			if (update.state == ReorderUpdate::State::Applied) {
+				Ui::PostponeCall(this, [=] {
+					reorderCollections(update);
+				});
+			}
+		}, _collectionsTabs->lifetime());
 	} else {
 		_collectionsTabs->setTabs(std::move(tabs), context);
 	}
@@ -1490,6 +1501,46 @@ void InnerWidget::fillMenu(const Ui::Menu::MenuCallback &addAction) {
 			});
 		}, filter.skipUnsaved ? nullptr : &st::mediaPlayerMenuCheck);
 	}
+}
+
+void InnerWidget::reorderCollections(
+		const Ui::SubTabs::ReorderUpdate &update) {
+	if (!_collectionsTabs || !_peer->canManageGifts()) {
+		return;
+	}
+
+	const auto collectionId = update.id.toInt();
+	if (collectionId <= 0) {
+		return;
+	}
+
+	const auto it = ranges::find(
+		_collections,
+		collectionId,
+		&Data::GiftCollection::id);
+	if (it == _collections.end()) {
+		return;
+	}
+
+	const auto collection = *it;
+	_collections.erase(it);
+
+	const auto newPos = std::max(
+		0,
+		std::min(update.newPosition - 1, int(_collections.size())));
+	_collections.insert(_collections.begin() + newPos, collection);
+
+	auto order = QVector<MTPint>();
+	for (const auto &c : _collections) {
+		order.push_back(MTP_int(c.id));
+	}
+
+	_api.request(MTPpayments_ReorderStarGiftCollections(
+		_peer->input,
+		MTP_vector<MTPint>(order)
+	)).fail([show = _window->uiShow()](const MTP::Error &error) {
+		show->showToast(error.type());
+	}).send();
 }
 
 Memento::Memento(not_null<Controller*> controller)

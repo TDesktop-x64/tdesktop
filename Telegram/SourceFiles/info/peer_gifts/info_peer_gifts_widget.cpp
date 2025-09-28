@@ -201,6 +201,7 @@ private:
 	void markInCollection(const Data::SavedStarGift &gift);
 	void refreshButtons();
 	void validateButtons();
+	[[nodiscard]] std::unique_ptr<GiftButton> createGiftButton();
 	void showGift(int index);
 	void showMenuFor(not_null<GiftButton*> button, QPoint point);
 	void showMenuForCollection(int id);
@@ -256,6 +257,7 @@ private:
 	rpl::event_stream<Descriptor> _descriptorChanges;
 	rpl::event_stream<bool> _notifyEnabled;
 	std::vector<View> _views;
+	std::unique_ptr<View> _draggedView;
 	int _viewsForWidth = 0;
 	int _viewsFromRow = 0;
 	int _viewsTillRow = 0;
@@ -702,6 +704,36 @@ void InnerWidget::refreshButtons() {
 	validateButtons();
 }
 
+std::unique_ptr<GiftButton> InnerWidget::createGiftButton() {
+	auto button = std::make_unique<GiftButton>(this, &_delegate);
+	const auto raw = button.get();
+	raw->contextMenuRequests(
+	) | rpl::start_with_next([=](QPoint point) {
+		showMenuFor(raw, point);
+	}, raw->lifetime());
+
+	raw->mouseEvents(
+	) | rpl::start_with_next([=](QMouseEvent *e) {
+		switch (e->type()) {
+		case QEvent::MouseButtonPress:
+			raw->raise();
+			mousePressEvent(e);
+			break;
+		case QEvent::MouseMove:
+			mouseMoveEvent(e);
+			break;
+		case QEvent::MouseButtonRelease:
+			mouseReleaseEvent(e);
+			break;
+		default:
+			break;
+		}
+	}, raw->lifetime());
+
+	raw->show();
+	return button;
+}
+
 void InnerWidget::validateButtons() {
 	if (!_perRow) {
 		return;
@@ -766,33 +798,7 @@ void InnerWidget::validateButtons() {
 			if (unused != end(_views)) {
 				views.push_back(base::take(*unused));
 			} else {
-				auto button = std::make_unique<GiftButton>(this, &_delegate);
-				const auto raw = button.get();
-				raw->contextMenuRequests(
-				) | rpl::start_with_next([=](QPoint point) {
-					showMenuFor(raw, point);
-				}, raw->lifetime());
-
-				raw->mouseEvents(
-				) | rpl::start_with_next([=](QMouseEvent *e) {
-					switch (e->type()) {
-					case QEvent::MouseButtonPress:
-						raw->raise();
-						mousePressEvent(e);
-						break;
-					case QEvent::MouseMove:
-						mouseMoveEvent(e);
-						break;
-					case QEvent::MouseButtonRelease:
-						mouseReleaseEvent(e);
-						break;
-					default:
-						break;
-					}
-				}, raw->lifetime());
-
-				raw->show();
-				views.push_back({ .button = std::move(button) });
+				views.push_back({ .button = createGiftButton() });
 			}
 		}
 		auto &view = views.back();
@@ -855,6 +861,46 @@ void InnerWidget::validateButtons() {
 		x = left;
 		y += oneh;
 	}
+
+	if (_dragging.enabled
+		&& _dragging.index >= 0
+		&& _dragging.index < _list->size()) {
+		const auto alreadyInViews = ranges::find(
+			views,
+			_dragging.index,
+			&View::index);
+		if (alreadyInViews == end(views)) {
+			if (!_draggedView) {
+				const auto &entry = (*_list)[_dragging.index];
+				_draggedView = std::make_unique<View>();
+				_draggedView->button = createGiftButton();
+				_draggedView->index = _dragging.index;
+				_draggedView->manageId = entry.gift.manageId;
+				_draggedView->giftId = entry.gift.info.id;
+				_draggedView->button->setDescriptor(entry.descriptor, _mode);
+				if (_addingToCollectionId) {
+					_draggedView->button->toggleSelected(
+						_inCollection.contains(entry.gift.manageId),
+						GiftSelectionMode::Check,
+						anim::type::instant);
+					const auto callback = [=] { showGift(_dragging.index); };
+					_draggedView->button->setClickedCallback(callback);
+				}
+			} else {
+				_draggedView->index = _dragging.index;
+			}
+			auto pos = mapFromGlobal(QCursor::pos()) - _dragging.point;
+			_draggedView->button->setGeometry(
+				QRect(pos, _single),
+				_delegate.buttonExtend());
+			_draggedView->button->raise();
+		} else {
+			_draggedView = nullptr;
+		}
+	} else {
+		_draggedView = nullptr;
+	}
+
 	std::swap(_views, views);
 }
 
@@ -1799,6 +1845,12 @@ void InnerWidget::mouseMoveEvent(QMouseEvent *e) {
 			}
 		}
 
+		if (_draggedView && _draggedView->button) {
+			auto pos = mapFromGlobal(QCursor::pos()) - _dragging.point;
+			_draggedView->button->moveToLeft(pos.x(), pos.y());
+			_draggedView->button->raise();
+		}
+
 		update();
 	}
 }
@@ -1849,6 +1901,13 @@ void InnerWidget::mouseReleaseEvent(QMouseEvent *e) {
 						view.button->moveToLeft(value, view.button->y());
 					}
 				}
+				if (_draggedView
+					&& _draggedView->index == index
+					&& _draggedView->button) {
+					_draggedView->button->moveToLeft(
+						value,
+						_draggedView->button->y());
+				}
 			},
 			fromPos.x(),
 			toPos.x(),
@@ -1865,6 +1924,13 @@ void InnerWidget::mouseReleaseEvent(QMouseEvent *e) {
 					if (view.index == index && view.button) {
 						view.button->moveToLeft(view.button->x(), value);
 					}
+				}
+				if (_draggedView
+					&& _draggedView->index == index
+					&& _draggedView->button) {
+					_draggedView->button->moveToLeft(
+						_draggedView->button->x(),
+						value);
 				}
 			},
 			fromPos.y(),

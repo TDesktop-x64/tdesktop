@@ -823,6 +823,19 @@ void InnerWidget::showMenuForCollection(int id) {
 	}
 	_menu = base::make_unique_q<Ui::PopupMenu>(this, st::popupMenuWithIcons);
 	const auto addAction = Ui::Menu::CreateAddActionCallback(_menu);
+
+	if (_collectionsTabs && _collectionsTabs->reorderEnabled()) {
+		addAction(
+			tr::lng_gift_collection_reorder_exit(tr::now),
+			[=] {
+				flushCollectionReorder();
+				_collectionsTabs->setReorderEnabled(false);
+			},
+			&st::menuIconManage);
+		_menu->popup(QCursor::pos());
+		return;
+	}
+
 	addAction(tr::lng_gift_collection_add_button(tr::now), [=] {
 		editCollectionGifts(id);
 	}, &st::menuIconGiftPremium);
@@ -835,17 +848,9 @@ void InnerWidget::showMenuForCollection(int id) {
 		editCollectionName(id);
 	}, &st::menuIconEdit);
 	if (_collectionsTabs) {
-		const auto reorderEnabled = _collectionsTabs->reorderEnabled();
 		addAction(
-			reorderEnabled
-				? tr::lng_gift_collection_reorder_exit(tr::now)
-				: tr::lng_gift_collection_reorder(tr::now),
-			[=] {
-				if (reorderEnabled) {
-					flushCollectionReorder();
-				}
-				_collectionsTabs->setReorderEnabled(!reorderEnabled);
-			},
+			tr::lng_gift_collection_reorder(tr::now),
+			[=] { _collectionsTabs->setReorderEnabled(true); },
 			&st::menuIconManage);
 	}
 	addAction({

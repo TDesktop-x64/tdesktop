@@ -57,12 +57,28 @@ public:
 	[[nodiscard]] rpl::producer<QString> activated() const;
 	[[nodiscard]] rpl::producer<QString> contextMenuRequests() const;
 
+	struct ReorderUpdate {
+		QString id;
+		int oldPosition = 0;
+		int newPosition = 0;
+		enum class State : uchar {
+			Started,
+			Applied,
+			Cancelled,
+		} state = State::Started;
+	};
+	[[nodiscard]] rpl::producer<ReorderUpdate> reorderUpdates() const;
+
 private:
 	struct Button {
 		Tab tab;
 		QRect geometry;
 		Text::String text;
 		bool active = false;
+		Ui::Animations::Simple shiftAnimation;
+		int shift = 0;
+		int finalShift = 0;
+		int deltaShift = 0;
 	};
 
 	int resizeGetHeight(int newWidth) override;
@@ -80,10 +96,18 @@ private:
 	void shakeTransform(QPainter &p, int index, QPoint position, crl::time now) const;
 	[[nodiscard]] bool isIndexPinned(int index) const;
 
+	void startReorder(int index, QPoint globalPos);
+	void updateReorder(QPoint globalPos);
+	void finishReorder();
+	void cancelReorder();
+	void moveToShift(int index, int shift);
+	void updateShift(int index);
+
 	const style::SubTabs &_st;
 	std::vector<Button> _buttons;
 	rpl::event_stream<QString> _activated;
 	rpl::event_stream<QString> _contextMenuRequests;
+	rpl::event_stream<ReorderUpdate> _reorderUpdates;
 	std::optional<Qt::Orientation> _locked;
 	int _dragx = 0;
 	int _pressx = 0;
@@ -105,6 +129,11 @@ private:
 		int to;
 	};
 	std::vector<PinnedInterval> _pinnedIntervals;
+
+	int _reorderIndex = -1;
+	int _reorderStart = 0;
+	int _reorderDesiredIndex = 0;
+	ReorderUpdate::State _reorderState = ReorderUpdate::State::Cancelled;
 
 };
 

@@ -103,6 +103,10 @@ rpl::producer<QString> SubTabs::contextMenuRequests() const {
 	return _contextMenuRequests.events();
 }
 
+rpl::producer<SubTabs::ReorderUpdate> SubTabs::reorderUpdates() const {
+	return _reorderUpdates.events();
+}
+
 void SubTabs::setReorderEnabled(bool enabled) {
 	_reorderEnable = enabled;
 	if (enabled) {
@@ -203,6 +207,27 @@ bool SubTabs::eventHook(QEvent *e) {
 void SubTabs::mouseMoveEvent(QMouseEvent *e) {
 	const auto mousex = e->pos().x();
 	const auto drag = QApplication::startDragDistance();
+
+	if (_reorderEnable && _reorderIndex >= 0) {
+		if (_reorderState != ReorderUpdate::State::Started) {
+			const auto shift = e->globalPos().x() - _reorderStart;
+			if (std::abs(shift) > drag) {
+				_reorderState = ReorderUpdate::State::Started;
+				_reorderStart += (shift > 0) ? drag : -drag;
+				_reorderDesiredIndex = _reorderIndex;
+				_reorderUpdates.fire({
+					_buttons[_reorderIndex].tab.id,
+					_reorderIndex,
+					_reorderIndex,
+					_reorderState
+				});
+			}
+		} else {
+			updateReorder(e->globalPos());
+		}
+		return;
+	}
+
 	if (!_reorderEnable) {
 		if (_dragx > 0) {
 			_scrollAnimation.stop();
@@ -268,12 +293,22 @@ void SubTabs::mousePressEvent(QMouseEvent *e) {
 	}
 	_pressed = _selected;
 	_pressx = e->pos().x();
+
+	if (_reorderEnable && _selected >= 0 && !isIndexPinned(_selected)) {
+		startReorder(_selected, e->globalPos());
+	}
 }
 
 void SubTabs::mouseReleaseEvent(QMouseEvent *e) {
 	if (e->button() != Qt::LeftButton) {
 		return;
 	}
+
+	if (_reorderEnable && _reorderIndex >= 0) {
+		finishReorder();
+		return;
+	}
+
 	const auto dragx = std::exchange(_dragx, 0);
 	const auto pressed = std::exchange(_pressed, -1);
 	_pressx = 0;
@@ -306,17 +341,18 @@ void SubTabs::paintEvent(QPaintEvent *e) {
 			shakeTransform(p, i, geometry.topLeft(), now);
 		}
 
+		const auto shiftedGeometry = geometry.translated(button.shift, 0);
 		if (button.active) {
 			p.setBrush(st::giftBoxTabBgActive);
 			p.setPen(Qt::NoPen);
-			const auto radius = geometry.height() / 2.;
-			p.drawRoundedRect(geometry, radius, radius);
+			const auto radius = shiftedGeometry.height() / 2.;
+			p.drawRoundedRect(shiftedGeometry, radius, radius);
 			p.setPen(st::giftBoxTabFgActive);
 		} else {
 			p.setPen(st::giftBoxTabFg);
 		}
 		button.text.draw(p, {
-			.position = geometry.marginsRemoved(padding).topLeft(),
+			.position = shiftedGeometry.marginsRemoved(padding).topLeft(),
 			.availableWidth = button.text.maxWidth(),
 		});
 
@@ -345,6 +381,193 @@ void SubTabs::paintEvent(QPaintEvent *e) {
 
 QPoint SubTabs::scroll() const {
 	return QPoint(int(base::SafeRound(_scroll)) - _fullShift, 0);
+}
+
+void SubTabs::startReorder(int index, QPoint globalPos) {
+	cancelReorder();
+	_reorderIndex = index;
+	_reorderStart = globalPos.x();
+	_reorderState = ReorderUpdate::State::Cancelled;
+}
+
+void SubTabs::updateReorder(QPoint globalPos) {
+	if (_reorderIndex < 0 || isIndexPinned(_reorderIndex)) {
+		return;
+	}
+
+	const auto shift = globalPos.x() - _reorderStart;
+	auto &current = _buttons[_reorderIndex];
+	current.shiftAnimation.stop();
+	current.shift = current.finalShift = shift;
+
+	const auto count = _buttons.size();
+	const auto currentWidth = current.geometry.width();
+	const auto currentMiddle = current.geometry.x()
+		+ shift
+		+ currentWidth / 2;
+	_reorderDesiredIndex = _reorderIndex;
+
+	if (shift > 0) {
+		for (auto next = _reorderIndex + 1; next < count; ++next) {
+			if (isIndexPinned(next)) {
+				break;
+			}
+			const auto &e = _buttons[next];
+			if (currentMiddle < e.geometry.x() + e.geometry.width() / 2) {
+				moveToShift(next, 0);
+			} else {
+				_reorderDesiredIndex = next;
+				moveToShift(next, -currentWidth);
+			}
+		}
+		for (auto prev = _reorderIndex - 1; prev >= 0; --prev) {
+			moveToShift(prev, 0);
+		}
+	} else {
+		for (auto next = _reorderIndex + 1; next < count; ++next) {
+			moveToShift(next, 0);
+		}
+		for (auto prev = _reorderIndex - 1; prev >= 0; --prev) {
+			if (isIndexPinned(prev)) {
+				break;
+			}
+			const auto &e = _buttons[prev];
+			if (currentMiddle >= e.geometry.x() + e.geometry.width() / 2) {
+				moveToShift(prev, 0);
+			} else {
+				_reorderDesiredIndex = prev;
+				moveToShift(prev, currentWidth);
+			}
+		}
+	}
+	update();
+}
+
+void SubTabs::finishReorder() {
+	if (_reorderIndex < 0) {
+		return;
+	}
+
+	const auto index = _reorderIndex;
+	const auto result = _reorderDesiredIndex;
+	const auto id = _buttons[index].tab.id;
+
+	if (result == index || _reorderState != ReorderUpdate::State::Started) {
+		cancelReorder();
+		return;
+	}
+
+	_reorderState = ReorderUpdate::State::Applied;
+	_reorderIndex = -1;
+	_dragx = 0;
+	_pressx = 0;
+	_dragscroll = 0.;
+
+	auto &current = _buttons[index];
+	const auto width = current.geometry.width();
+
+	if (index < result) {
+		auto sum = 0;
+		for (auto i = index; i < result; ++i) {
+			auto &entry = _buttons[i + 1];
+			entry.deltaShift += width;
+			updateShift(i + 1);
+			sum += entry.geometry.width();
+		}
+		current.finalShift -= sum;
+	} else if (index > result) {
+		auto sum = 0;
+		for (auto i = result; i < index; ++i) {
+			auto &entry = _buttons[i];
+			entry.deltaShift -= width;
+			updateShift(i);
+			sum += entry.geometry.width();
+		}
+		current.finalShift += sum;
+	}
+
+	if (!(current.finalShift + current.deltaShift)) {
+		current.shift = 0;
+	}
+
+	base::reorder(_buttons, index, result);
+
+	auto x = st::giftBoxTabsMargin.left();
+	const auto y = st::giftBoxTabsMargin.top();
+	const auto padding = st::giftBoxTabPadding;
+	for (auto i = 0; i < _buttons.size(); ++i) {
+		auto &button = _buttons[i];
+		const auto width = button.text.maxWidth();
+		const auto height = st::giftBoxTabStyle.font->height;
+		const auto r = QRect(0, 0, width, height).marginsAdded(padding);
+		button.geometry = QRect(QPoint(x, y), r.size());
+		x += r.width() + st::giftBoxTabSkip;
+	}
+
+	for (auto i = 0; i < _buttons.size(); ++i) {
+		moveToShift(i, 0);
+	}
+
+	_reorderUpdates.fire(
+		{ id, index, result, ReorderUpdate::State::Applied });
+}
+
+void SubTabs::cancelReorder() {
+	if (_reorderIndex < 0) {
+		return;
+	}
+
+	const auto index = _reorderIndex;
+	const auto id = _buttons[index].tab.id;
+
+	if (_reorderState == ReorderUpdate::State::Started) {
+		_reorderState = ReorderUpdate::State::Cancelled;
+		_reorderUpdates.fire({ id, index, index, _reorderState });
+	}
+
+	_reorderIndex = -1;
+	_dragx = 0;
+	_pressx = 0;
+	_dragscroll = 0.;
+	for (auto i = 0; i < _buttons.size(); ++i) {
+		moveToShift(i, 0);
+	}
+}
+
+void SubTabs::moveToShift(int index, int shift) {
+	if (index < 0 || index >= _buttons.size()) {
+		return;
+	}
+
+	auto &entry = _buttons[index];
+	if (entry.finalShift + entry.deltaShift == shift) {
+		return;
+	}
+
+	entry.shiftAnimation.start(
+		[=, this] { updateShift(index); },
+		entry.finalShift,
+		shift - entry.deltaShift,
+		150);
+	entry.finalShift = shift - entry.deltaShift;
+}
+
+void SubTabs::updateShift(int index) {
+	if (index < 0 || index >= _buttons.size()) {
+		return;
+	}
+
+	auto &entry = _buttons[index];
+	entry.shift = base::SafeRound(
+		entry.shiftAnimation.value(entry.finalShift)
+	) + entry.deltaShift;
+
+	if (entry.deltaShift && !entry.shiftAnimation.animating()) {
+		entry.finalShift += entry.deltaShift;
+		entry.deltaShift = 0;
+	}
+
+	update();
 }
 
 void SubTabs::shakeTransform(

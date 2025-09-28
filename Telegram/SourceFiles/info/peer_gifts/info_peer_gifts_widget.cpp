@@ -886,6 +886,7 @@ void InnerWidget::validateButtons() {
 					const auto callback = [=] { showGift(_dragging.index); };
 					_draggedView->button->setClickedCallback(callback);
 				}
+				_draggedView->button->show();
 			} else {
 				_draggedView->index = _dragging.index;
 			}
@@ -894,10 +895,8 @@ void InnerWidget::validateButtons() {
 				QRect(pos, _single),
 				_delegate.buttonExtend());
 			_draggedView->button->raise();
-		} else {
-			_draggedView = nullptr;
 		}
-	} else {
+	} else if (!_dragging.enabled || _dragging.index < 0) {
 		_draggedView = nullptr;
 	}
 
@@ -1735,22 +1734,22 @@ void InnerWidget::mouseMoveEvent(QMouseEvent *e) {
 			}
 			auto &entry = _shiftAnimations[i];
 			const auto wasShift = entry.shift;
-			if ((i >= _dragging.index) && (i <= _dragging.lastSelected)) {
-				if (entry.shift == 0) {
+			const auto dragIndex = _dragging.index;
+			const auto targetIndex = _dragging.lastSelected;
+
+			if (dragIndex < targetIndex) {
+				if (i > dragIndex && i <= targetIndex) {
 					entry.shift = -1;
-				} else if (entry.shift == 1) {
+				} else {
 					entry.shift = 0;
 				}
-			} else if ((i < _dragging.index)
-					&& (i >= _dragging.lastSelected)) {
-				if (entry.shift == 0) {
+			} else if (dragIndex > targetIndex) {
+				if (i >= targetIndex && i < dragIndex) {
 					entry.shift = 1;
-				} else if (entry.shift == -1) {
+				} else {
 					entry.shift = 0;
 				}
-			}
-			if ((i < std::min(_dragging.index, _dragging.lastSelected))
-				|| (i > std::max(_dragging.index, _dragging.lastSelected))) {
+			} else {
 				entry.shift = 0;
 			}
 			if (wasShift != entry.shift) {
@@ -1820,22 +1819,13 @@ void InnerWidget::mouseMoveEvent(QMouseEvent *e) {
 			if (view.index >= 0 && view.button) {
 				auto pos = posFromIndex(view.index);
 
-				if (view.index == _dragging.index && !isDraggedAnimating()) {
+				if (view.index == _dragging.index) {
 					pos = mapFromGlobal(QCursor::pos()) - _dragging.point;
-				} else if (view.index == _dragging.index
-					&& isDraggedAnimating()) {
-					const auto it = _shiftAnimations.find(view.index);
-					if (it != _shiftAnimations.end()) {
-						pos = QPoint(
-							it->second.xAnimation.value(pos.x()),
-							it->second.yAnimation.value(pos.y()));
-					}
 				} else {
 					const auto it = _shiftAnimations.find(view.index);
 					if (it != _shiftAnimations.end()) {
 						const auto &entry = it->second;
-						const auto toPos
-							= posFromIndex(view.index + entry.shift);
+						const auto toPos = posFromIndex(view.index + entry.shift);
 						pos = QPoint(
 							entry.xAnimation.value(toPos.x()),
 							entry.yAnimation.value(toPos.y()));
@@ -1861,10 +1851,12 @@ void InnerWidget::mouseReleaseEvent(QMouseEvent *e) {
 			if (index != _dragging.index) {
 				entry.xAnimation.stop();
 				entry.yAnimation.stop();
-				if (auto view = ranges::find(_views, index, &View::index);
-					view != end(_views) && view->button) {
-					const auto finalPos = posFromIndex(index + entry.shift);
-					view->button->moveToLeft(finalPos.x(), finalPos.y());
+				for (auto &view : _views) {
+					if (view.index == index && view.button) {
+						const auto finalPos = posFromIndex(index + entry.shift);
+						view.button->moveToLeft(finalPos.x(), finalPos.y());
+						break;
+					}
 				}
 			}
 		}
@@ -1881,9 +1873,13 @@ void InnerWidget::mouseReleaseEvent(QMouseEvent *e) {
 					wasPosition,
 					nowPosition);
 			}
+			if (_draggedView) {
+				_draggedView->index = nowPosition;
+			}
 			requestReorder(wasPosition, nowPosition);
 			_dragging = {};
 			_shiftAnimations.clear();
+			refreshButtons();
 		};
 		auto &entry = _shiftAnimations[_dragging.index];
 		entry.xAnimation.stop();
@@ -1891,10 +1887,11 @@ void InnerWidget::mouseReleaseEvent(QMouseEvent *e) {
 		entry.xAnimation.start(
 			[finish, toPos, this](float64 value) {
 				const auto index = _dragging.index;
-				if (value >= toPos.x()
+				if (std::abs(value - toPos.x()) < 1.0
 					&& index >= 0
 					&& !_shiftAnimations[index].yAnimation.animating()) {
 					finish();
+					return;
 				}
 				for (auto &view : _views) {
 					if (view.index == index && view.button) {
@@ -1915,10 +1912,11 @@ void InnerWidget::mouseReleaseEvent(QMouseEvent *e) {
 		entry.yAnimation.start(
 			[finish, toPos, this](float64 value) {
 				const auto index = _dragging.index;
-				if (value >= toPos.y()
+				if (std::abs(value - toPos.y()) < 1.0
 					&& index >= 0
 					&& !_shiftAnimations[index].xAnimation.animating()) {
 					finish();
+					return;
 				}
 				for (auto &view : _views) {
 					if (view.index == index && view.button) {
@@ -1937,12 +1935,14 @@ void InnerWidget::mouseReleaseEvent(QMouseEvent *e) {
 			toPos.y(),
 			st::fadeWrapDuration);
 	} else {
+		const auto index = giftFromGlobalPos(e->globalPos());
 		_dragging = {};
 		_shiftAnimations.clear();
-		const auto index = giftFromGlobalPos(e->globalPos());
+		_draggedView = nullptr;
 		if (index >= 0 && index < _list->size()) {
 			showGift(index);
 		}
+		refreshButtons();
 	}
 }
 

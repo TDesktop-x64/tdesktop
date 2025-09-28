@@ -137,6 +137,8 @@ public:
 	void collectionAdded(MTPStarGiftCollection result);
 	void fillMenu(const Ui::Menu::MenuCallback &addAction);
 	void reorderCollections(const Ui::SubTabs::ReorderUpdate &update);
+	void reorderCollectionsLocally(const Ui::SubTabs::ReorderUpdate &update);
+	void flushCollectionReorder();
 
 	void saveState(not_null<Memento*> memento);
 	void restoreState(not_null<Memento*> memento);
@@ -210,6 +212,7 @@ private:
 	std::unique_ptr<Ui::RpWidget> _about;
 	rpl::event_stream<> _scrollToTop;
 	rpl::variable<bool> _collectionEmpty;
+	bool _pendingCollectionReorder = false;
 
 	std::vector<Data::GiftCollection> _collections;
 
@@ -837,7 +840,12 @@ void InnerWidget::showMenuForCollection(int id) {
 			reorderEnabled
 				? tr::lng_gift_collection_reorder_exit(tr::now)
 				: tr::lng_gift_collection_reorder(tr::now),
-			[=] { _collectionsTabs->setReorderEnabled(!reorderEnabled); },
+			[=] {
+				if (reorderEnabled) {
+					flushCollectionReorder();
+				}
+				_collectionsTabs->setReorderEnabled(!reorderEnabled);
+			},
 			&st::menuIconManage);
 	}
 	addAction({
@@ -1273,9 +1281,7 @@ void InnerWidget::refreshCollectionsTabs() {
 		_collectionsTabs->reorderUpdates(
 		) | rpl::start_with_next([=](const ReorderUpdate &update) {
 			if (update.state == ReorderUpdate::State::Applied) {
-				Ui::PostponeCall(this, [=] {
-					reorderCollections(update);
-				});
+				reorderCollectionsLocally(update);
 			}
 		}, _collectionsTabs->lifetime());
 	} else {
@@ -1503,7 +1509,7 @@ void InnerWidget::fillMenu(const Ui::Menu::MenuCallback &addAction) {
 	}
 }
 
-void InnerWidget::reorderCollections(
+void InnerWidget::reorderCollectionsLocally(
 		const Ui::SubTabs::ReorderUpdate &update) {
 	if (!_collectionsTabs || !_peer->canManageGifts()) {
 		return;
@@ -1530,6 +1536,14 @@ void InnerWidget::reorderCollections(
 		std::min(update.newPosition - 1, int(_collections.size())));
 	_collections.insert(_collections.begin() + newPos, collection);
 
+	_pendingCollectionReorder = true;
+}
+
+void InnerWidget::flushCollectionReorder() {
+	if (!_pendingCollectionReorder || !_peer->canManageGifts()) {
+		return;
+	}
+
 	auto order = QVector<MTPint>();
 	for (const auto &c : _collections) {
 		order.push_back(MTP_int(c.id));
@@ -1541,6 +1555,14 @@ void InnerWidget::reorderCollections(
 	)).fail([show = _window->uiShow()](const MTP::Error &error) {
 		show->showToast(error.type());
 	}).send();
+
+	_pendingCollectionReorder = false;
+}
+
+void InnerWidget::reorderCollections(
+		const Ui::SubTabs::ReorderUpdate &update) {
+	reorderCollectionsLocally(update);
+	flushCollectionReorder();
 }
 
 Memento::Memento(not_null<Controller*> controller)

@@ -1968,7 +1968,16 @@ void InnerWidget::requestReorder(int fromIndex, int toIndex) {
 			MTPVector<MTPInputSavedStarGift>(),
 			MTPVector<MTPInputSavedStarGift>(),
 			MTP_vector<MTPInputSavedStarGift>(order))
-	).fail([show = _window->uiShow()](const MTP::Error &error) {
+	).done([=] {
+		const auto i = ranges::find(
+			_collections,
+			collectionId,
+			&Data::GiftCollection::id);
+		if (i != end(_collections) && !_list->empty()) {
+			i->icon = (*_list)[0].gift.info.document;
+			refreshCollectionsTabs();
+		}
+	}).fail([show = _window->uiShow()](const MTP::Error &error) {
 		show->showToast(error.type());
 	}).send();
 }

@@ -36,6 +36,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/scroll_area.h"
 #include "ui/wrap/slide_wrap.h"
 #include "ui/ui_utility.h"
+#include "ui/effects/animations.h"
 #include "lang/lang_keys.h"
 #include "main/main_app_config.h"
 #include "main/main_session.h"
@@ -55,6 +56,7 @@ namespace {
 
 constexpr auto kPreloadPages = 2;
 constexpr auto kPerPage = 50;
+constexpr auto kScrollFactor = 0.05;
 
 [[nodiscard]] GiftDescriptor DescriptorForGift(
 		not_null<PeerData*> to,
@@ -108,7 +110,8 @@ public:
 		QWidget *parent,
 		not_null<Window::SessionController*> window,
 		not_null<PeerData*> peer,
-		rpl::producer<Descriptor> descriptor);
+		rpl::producer<Descriptor> descriptor,
+		Ui::ScrollArea *scroll = nullptr);
 
 	[[nodiscard]] not_null<PeerData*> peer() const {
 		return _peer;
@@ -181,6 +184,7 @@ public:
 		not_null<Window::SessionController*> window,
 		not_null<PeerData*> peer,
 		rpl::producer<Descriptor> descriptor,
+		Ui::ScrollArea *scroll,
 		int addingToCollectionId,
 		Entries all);
 
@@ -227,6 +231,7 @@ private:
 
 	const not_null<Window::SessionController*> _window;
 	const not_null<PeerData*> _peer;
+	Ui::ScrollArea * const _scroll;
 	const int _addingToCollectionId = 0;
 	const GiftButtonMode _mode;
 
@@ -272,6 +277,7 @@ private:
 	base::flat_map<int, ShiftAnimation> _shiftAnimations;
 	int _selected = -1;
 
+	Ui::Animations::Basic _scrollAnimation;
 	base::unique_qptr<Ui::PopupMenu> _menu;
 
 protected:
@@ -279,6 +285,9 @@ protected:
 
 private:
 	void cancelDragging();
+	void updateScrollCallback();
+	void checkForScrollAnimation();
+	[[nodiscard]] int deltaFromEdge();
 
 };
 
@@ -286,12 +295,14 @@ InnerWidget::InnerWidget(
 	QWidget *parent,
 	not_null<Window::SessionController*> window,
 	not_null<PeerData*> peer,
-	rpl::producer<Descriptor> descriptor)
+	rpl::producer<Descriptor> descriptor,
+	Ui::ScrollArea *scroll)
 : InnerWidget(
 	parent,
 	window,
 	peer,
 	std::move(descriptor),
+	scroll,
 	0,
 	{ .total = peer->peerGiftsCount() }) {
 }
@@ -301,11 +312,13 @@ InnerWidget::InnerWidget(
 	not_null<Window::SessionController*> window,
 	not_null<PeerData*> peer,
 	rpl::producer<Descriptor> descriptor,
+	Ui::ScrollArea *scroll,
 	int addingToCollectionId,
 	Entries all)
 : BoxContentDivider(parent)
 , _window(window)
 , _peer(peer)
+, _scroll(scroll)
 , _addingToCollectionId(addingToCollectionId)
 , _mode(_addingToCollectionId
 	? GiftButtonMode::Selection
@@ -319,7 +332,8 @@ InnerWidget::InnerWidget(
 	.peer = _peer,
 	.collectionId = addingToCollectionId,
 })
-, _api(&_peer->session().mtp()) {
+, _api(&_peer->session().mtp())
+, _scrollAnimation([=] { updateScrollCallback(); }) {
 	_singleMin = _delegate.buttonSize();
 
 	if (peer->canManageGifts()) {
@@ -1243,6 +1257,7 @@ void InnerWidget::editCollectionGifts(int id) {
 				_window,
 				_peer,
 				state->descriptor.value(),
+				nullptr,
 				id,
 				(_all.filter == Filter()) ? _all : Entries()),
 			style::margins());
@@ -1871,6 +1886,8 @@ void InnerWidget::mouseMoveEvent(QMouseEvent *e) {
 
 		update();
 	}
+
+	checkForScrollAnimation();
 }
 
 void InnerWidget::mouseReleaseEvent(QMouseEvent *e) {
@@ -2100,12 +2117,63 @@ void InnerWidget::cancelDragging() {
 	if (mouseGrabber() == this) {
 		releaseMouse();
 	}
+	_scrollAnimation.stop();
 	_dragging = {};
 	_shiftAnimations.clear();
 	if (_draggedView) {
 		_draggedView = nullptr;
 	}
 	refreshButtons();
+}
+
+void InnerWidget::updateScrollCallback() {
+	if (!_scroll) {
+		return;
+	}
+	const auto delta = deltaFromEdge();
+	const auto oldTop = _scroll->scrollTop();
+	_scroll->scrollToY(oldTop + delta);
+	const auto newTop = _scroll->scrollTop();
+
+	if (newTop == 0 || newTop == _scroll->scrollTopMax()) {
+		_scrollAnimation.stop();
+	}
+}
+
+void InnerWidget::checkForScrollAnimation() {
+	const auto delta = deltaFromEdge();
+	if (!_scroll || !delta || _scrollAnimation.animating()) {
+		return;
+	}
+	_scrollAnimation.start();
+}
+
+int InnerWidget::deltaFromEdge() {
+	if (!_dragging.enabled || _dragging.index < 0 || !_scroll) {
+		return 0;
+	}
+
+	const auto mousePos = QCursor::pos();
+	const auto scrollGlobalRect = QRect(
+		_scroll->mapToGlobal(QPoint(0, 0)),
+		_scroll->size());
+
+	const auto scrollTop = scrollGlobalRect.top();
+	const auto scrollBottom = scrollGlobalRect.bottom();
+
+	const auto scrollZone = 50;
+	const auto topDistance = mousePos.y() - scrollTop;
+	const auto bottomDistance = scrollBottom - mousePos.y();
+
+	if (topDistance < scrollZone) {
+		const auto effectiveDistance = std::max(1, scrollZone - topDistance);
+		return -int(effectiveDistance * kScrollFactor);
+	} else if (bottomDistance < scrollZone) {
+		const auto effectiveDistance
+			= std::max(1, scrollZone - bottomDistance);
+		return int(effectiveDistance * kScrollFactor);
+	}
+	return 0;
 }
 
 Memento::Memento(not_null<Controller*> controller)
@@ -2151,7 +2219,8 @@ Widget::Widget(QWidget *parent, not_null<Controller*> controller)
 			this,
 			controller->parentController(),
 			controller->giftsPeer(),
-			_descriptor.value()));
+			_descriptor.value(),
+			scroll()));
 	_emptyCollectionShown = _inner->collectionEmptyValue();
 	_inner->notifyEnabled(
 	) | rpl::take(1) | rpl::start_with_next([=](bool enabled) {

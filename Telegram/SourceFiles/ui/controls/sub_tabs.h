@@ -47,6 +47,9 @@ public:
 
 	void setActiveTab(const QString &id);
 
+	void setReorderEnabled(bool enabled);
+	[[nodiscard]] bool reorderEnabled() const;
+
 	[[nodiscard]] rpl::producer<QString> activated() const;
 	[[nodiscard]] rpl::producer<QString> contextMenuRequests() const;
 
@@ -89,6 +92,7 @@ private:
 	int _pressed = -1;
 	int _active = -1;
 	bool _centered = false;
+	bool _reorderEnable = false;
 
 };
 

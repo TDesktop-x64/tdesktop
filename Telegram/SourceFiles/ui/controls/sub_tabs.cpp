@@ -102,6 +102,14 @@ rpl::producer<QString> SubTabs::contextMenuRequests() const {
 	return _contextMenuRequests.events();
 }
 
+void SubTabs::setReorderEnabled(bool enabled) {
+	_reorderEnable = enabled;
+}
+
+bool SubTabs::reorderEnabled() const {
+	return _reorderEnable;
+}
+
 void SubTabs::setSelected(int index) {
 	const auto was = (_selected >= 0);
 	const auto now = (index >= 0);
@@ -170,17 +178,19 @@ bool SubTabs::eventHook(QEvent *e) {
 void SubTabs::mouseMoveEvent(QMouseEvent *e) {
 	const auto mousex = e->pos().x();
 	const auto drag = QApplication::startDragDistance();
-	if (_dragx > 0) {
-		_scrollAnimation.stop();
-		_scroll = std::clamp(
-			_dragscroll + _dragx - mousex,
-			0.,
-			_scrollMax * 1.);
-		update();
-		return;
-	} else if (_pressx > 0 && std::abs(_pressx - mousex) > drag) {
-		_dragx = _pressx;
-		_dragscroll = _scroll;
+	if (!_reorderEnable) {
+		if (_dragx > 0) {
+			_scrollAnimation.stop();
+			_scroll = std::clamp(
+				_dragscroll + _dragx - mousex,
+				0.,
+				_scrollMax * 1.);
+			update();
+			return;
+		} else if (_pressx > 0 && std::abs(_pressx - mousex) > drag) {
+			_dragx = _pressx;
+			_dragscroll = _scroll;
+		}
 	}
 	auto selected = -1;
 	const auto position = e->pos() + scroll();
@@ -194,6 +204,10 @@ void SubTabs::mouseMoveEvent(QMouseEvent *e) {
 }
 
 void SubTabs::wheelEvent(QWheelEvent *e) {
+	if (_reorderEnable) {
+		e->ignore();
+		return;
+	}
 	const auto delta = ScrollDeltaF(e);
 
 	const auto phase = e->phase();

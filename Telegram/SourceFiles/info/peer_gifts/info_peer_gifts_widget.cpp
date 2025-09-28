@@ -830,6 +830,15 @@ void InnerWidget::showMenuForCollection(int id) {
 	addAction(tr::lng_gift_collection_edit(tr::now), [=] {
 		editCollectionName(id);
 	}, &st::menuIconEdit);
+	if (_collectionsTabs) {
+		const auto reorderEnabled = _collectionsTabs->reorderEnabled();
+		addAction(
+			reorderEnabled
+				? tr::lng_gift_collection_reorder_exit(tr::now)
+				: tr::lng_gift_collection_reorder(tr::now),
+			[=] { _collectionsTabs->setReorderEnabled(!reorderEnabled); },
+			&st::menuIconManage);
+	}
 	addAction({
 		.text = tr::lng_gift_collection_delete(tr::now),
 		.handler = [=] { confirmDeleteCollection(id); },

@@ -631,13 +631,6 @@ void SubTabs::shakeTransform(
 		? anim::interpolateF(0, -kMaxTranslation, (pY - kYStep * 2.) / kYStep)
 		: anim::interpolateF(-kMaxTranslation, 0, (pY - kYStep * 3) / kYStep);
 
-	const auto center = position + QPoint(
-		_buttons[index].geometry.width() / 2,
-		_buttons[index].geometry.height() / 2);
-
-	p.translate(center);
-	p.rotate(angle);
-	p.translate(-center);
 	p.translate(x, y);
 }
 

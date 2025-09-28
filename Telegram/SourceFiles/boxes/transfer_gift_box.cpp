@@ -143,6 +143,8 @@ void ExportOnBlockchain(
 		) | rpl::take(
 			1
 		) | rpl::start_with_next([=](const Core::CloudPasswordState &pass) {
+			state->lifetime.destroy();
+
 			auto fields = PasscodeBox::CloudFields::From(pass);
 			fields.customTitle = tr::lng_gift_transfer_password_title();
 			fields.customDescription

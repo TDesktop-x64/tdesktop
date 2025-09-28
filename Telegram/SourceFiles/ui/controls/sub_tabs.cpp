@@ -29,6 +29,7 @@ SubTabs::SubTabs(
 , _st(st)
 , _centered(options.centered) {
 	setMouseTracking(true);
+	_reorderScrollAnimation.init([this] { updateScrollCallback(); });
 	setTabs(std::move(tabs), context);
 	if (!options.selected.isEmpty()) {
 		setActiveTab(options.selected);
@@ -341,7 +342,9 @@ void SubTabs::paintEvent(QPaintEvent *e) {
 			shakeTransform(p, i, geometry.topLeft(), now);
 		}
 
-		const auto shiftedGeometry = geometry.translated(button.shift, 0);
+		const auto shiftedGeometry = geometry.translated(
+			base::SafeRound(button.shift),
+			0);
 		if (button.active) {
 			p.setBrush(st::giftBoxTabBgActive);
 			p.setPen(Qt::NoPen);
@@ -395,10 +398,13 @@ void SubTabs::updateReorder(QPoint globalPos) {
 		return;
 	}
 
+	_reorderMousePos = mapFromGlobal(globalPos);
 	const auto shift = globalPos.x() - _reorderStart;
 	auto &current = _buttons[_reorderIndex];
 	current.shiftAnimation.stop();
 	current.shift = current.finalShift = shift;
+
+	checkForScrollAnimation();
 
 	const auto count = _buttons.size();
 	const auto currentWidth = current.geometry.width();
@@ -444,6 +450,7 @@ void SubTabs::updateReorder(QPoint globalPos) {
 }
 
 void SubTabs::finishReorder() {
+	_reorderScrollAnimation.stop();
 	if (_reorderIndex < 0) {
 		return;
 	}
@@ -513,6 +520,7 @@ void SubTabs::finishReorder() {
 }
 
 void SubTabs::cancelReorder() {
+	_reorderScrollAnimation.stop();
 	if (_reorderIndex < 0) {
 		return;
 	}
@@ -534,7 +542,7 @@ void SubTabs::cancelReorder() {
 	}
 }
 
-void SubTabs::moveToShift(int index, int shift) {
+void SubTabs::moveToShift(int index, float64 shift) {
 	if (index < 0 || index >= _buttons.size()) {
 		return;
 	}
@@ -558,9 +566,8 @@ void SubTabs::updateShift(int index) {
 	}
 
 	auto &entry = _buttons[index];
-	entry.shift = base::SafeRound(
-		entry.shiftAnimation.value(entry.finalShift)
-	) + entry.deltaShift;
+	entry.shift = entry.shiftAnimation.value(entry.finalShift)
+		+ entry.deltaShift;
 
 	if (entry.deltaShift && !entry.shiftAnimation.animating()) {
 		entry.finalShift += entry.deltaShift;
@@ -632,6 +639,56 @@ void SubTabs::shakeTransform(
 	p.rotate(angle);
 	p.translate(-center);
 	p.translate(x, y);
+}
+
+void SubTabs::checkForScrollAnimation() {
+	if (_reorderIndex < 0
+		|| !deltaFromEdge()
+		|| _reorderScrollAnimation.animating()) {
+		return;
+	}
+	_reorderScrollAnimation.start();
+}
+
+void SubTabs::updateScrollCallback() {
+	const auto delta = deltaFromEdge();
+	if (!delta) {
+		return;
+	}
+
+	const auto oldScroll = _scroll;
+	_scroll = std::clamp(_scroll + delta * 0.1, 0., float64(_scrollMax));
+
+	const auto scrollDelta = oldScroll - _scroll;
+	_reorderStart += scrollDelta;
+
+	if (_reorderIndex >= 0) {
+		auto &current = _buttons[_reorderIndex];
+		current.shift = current.finalShift -= scrollDelta;
+	}
+
+	if (_scroll == 0. || _scroll == _scrollMax) {
+		_reorderScrollAnimation.stop();
+	}
+	update();
+}
+
+int SubTabs::deltaFromEdge() {
+	if (_reorderIndex < 0) {
+		return 0;
+	}
+
+	const auto mouseX = _reorderMousePos.x();
+	const auto isLeftEdge = (mouseX < 0);
+	const auto isRightEdge = (mouseX > width());
+
+	if (!isLeftEdge && !isRightEdge) {
+		_reorderScrollAnimation.stop();
+		return 0;
+	}
+
+	const auto delta = isRightEdge ? (mouseX - width()) : mouseX;
+	return std::clamp(delta, -50, 50);
 }
 
 } // namespace Ui

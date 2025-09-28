@@ -76,9 +76,9 @@ private:
 		Text::String text;
 		bool active = false;
 		Ui::Animations::Simple shiftAnimation;
-		int shift = 0;
-		int finalShift = 0;
-		int deltaShift = 0;
+		float64 shift = 0.;
+		float64 finalShift = 0.;
+		float64 deltaShift = 0.;
 	};
 
 	int resizeGetHeight(int newWidth) override;
@@ -100,8 +100,12 @@ private:
 	void updateReorder(QPoint globalPos);
 	void finishReorder();
 	void cancelReorder();
-	void moveToShift(int index, int shift);
+	void moveToShift(int index, float64 shift);
 	void updateShift(int index);
+
+	void checkForScrollAnimation();
+	void updateScrollCallback();
+	[[nodiscard]] int deltaFromEdge();
 
 	const style::SubTabs &_st;
 	std::vector<Button> _buttons;
@@ -115,6 +119,7 @@ private:
 	float64 _scroll = 0.;
 	float64 _scrollTo = 0.;
 	Ui::Animations::Simple _scrollAnimation;
+	Ui::Animations::Basic _reorderScrollAnimation;
 	int _scrollMax = 0;
 	int _fullShift = 0;
 	int _fullWidth = 0;
@@ -131,9 +136,10 @@ private:
 	std::vector<PinnedInterval> _pinnedIntervals;
 
 	int _reorderIndex = -1;
-	int _reorderStart = 0;
+	float64 _reorderStart = 0.;
 	int _reorderDesiredIndex = 0;
 	ReorderUpdate::State _reorderState = ReorderUpdate::State::Cancelled;
+	QPoint _reorderMousePos;
 
 };
 

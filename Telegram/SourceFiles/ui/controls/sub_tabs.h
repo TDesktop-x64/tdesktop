@@ -51,6 +51,9 @@ public:
 	void setReorderEnabled(bool enabled);
 	[[nodiscard]] bool reorderEnabled() const;
 
+	void setPinnedInterval(int from, int to);
+	void clearPinnedIntervals();
+
 	[[nodiscard]] rpl::producer<QString> activated() const;
 	[[nodiscard]] rpl::producer<QString> contextMenuRequests() const;
 
@@ -75,6 +78,7 @@ private:
 	void setActive(int index);
 	[[nodiscard]] QPoint scroll() const;
 	void shakeTransform(QPainter &p, int index, QPoint position, crl::time now) const;
+	[[nodiscard]] bool isIndexPinned(int index) const;
 
 	const style::SubTabs &_st;
 	std::vector<Button> _buttons;
@@ -96,6 +100,11 @@ private:
 	bool _centered = false;
 	bool _reorderEnable = false;
 	Ui::Animations::Basic _shakeAnimation;
+	struct PinnedInterval {
+		int from;
+		int to;
+	};
+	std::vector<PinnedInterval> _pinnedIntervals;
 
 };
 

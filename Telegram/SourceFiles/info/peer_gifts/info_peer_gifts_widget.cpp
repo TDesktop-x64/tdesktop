@@ -1226,12 +1226,15 @@ void InnerWidget::refreshCollectionsTabs() {
 				&Data::GiftCollection::id))
 			? QString::number(selectedId)
 			: u"all"_q;
+		const auto tabsCount = tabs.size();
 		_collectionsTabs = std::make_unique<Ui::SubTabs>(
 			this,
 			st::collectionSubTabs,
 			Ui::SubTabs::Options{ .selected = selected, .centered = true },
 			std::move(tabs),
 			context);
+		_collectionsTabs->setPinnedInterval(0, 1);
+		_collectionsTabs->setPinnedInterval(tabsCount - 1, tabsCount);
 		_collectionsTabs->show();
 
 		_collectionsTabs->activated(

@@ -118,6 +118,23 @@ bool SubTabs::reorderEnabled() const {
 	return _reorderEnable;
 }
 
+void SubTabs::setPinnedInterval(int from, int to) {
+	_pinnedIntervals.push_back({ from, to });
+}
+
+void SubTabs::clearPinnedIntervals() {
+	_pinnedIntervals.clear();
+}
+
+bool SubTabs::isIndexPinned(int index) const {
+	for (const auto &interval : _pinnedIntervals) {
+		if (index >= interval.from && index < interval.to) {
+			return true;
+		}
+	}
+	return false;
+}
+
 void SubTabs::setSelected(int index) {
 	const auto was = (_selected >= 0);
 	const auto now = (index >= 0);
@@ -285,7 +302,7 @@ void SubTabs::paintEvent(QPaintEvent *e) {
 		const auto &button = _buttons[i];
 		const auto geometry = button.geometry.translated(shift);
 
-		if (hasShake && _reorderEnable) {
+		if (hasShake && _reorderEnable && !isIndexPinned(i)) {
 			shakeTransform(p, i, geometry.topLeft(), now);
 		}
 
@@ -303,7 +320,7 @@ void SubTabs::paintEvent(QPaintEvent *e) {
 			.availableWidth = button.text.maxWidth(),
 		});
 
-		if (hasShake && _reorderEnable) {
+		if (hasShake && _reorderEnable && !isIndexPinned(i)) {
 			p.resetTransform();
 		}
 	}

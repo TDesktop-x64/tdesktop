@@ -1896,20 +1896,6 @@ void InnerWidget::mouseReleaseEvent(QMouseEvent *e) {
 	}
 
 	if (_dragging.enabled && _dragging.index >= 0 && !isDraggedAnimating()) {
-		for (auto &[index, entry] : _shiftAnimations) {
-			if (index != _dragging.index) {
-				entry.xAnimation.stop();
-				entry.yAnimation.stop();
-				for (auto &view : _views) {
-					if (view.index == index && view.button) {
-						const auto finalPos = posFromIndex(index + entry.shift);
-						view.button->moveToLeft(finalPos.x(), finalPos.y());
-						break;
-					}
-				}
-			}
-		}
-
 		const auto fromPos = mapFromGlobal(e->globalPos()) - _dragging.point;
 		const auto toPos = posFromIndex(_dragging.lastSelected);
 		const auto wasPosition = _dragging.index;

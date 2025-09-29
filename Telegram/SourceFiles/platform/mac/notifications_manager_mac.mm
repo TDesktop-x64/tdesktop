@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "platform/mac/notifications_manager_mac.h"
 
 #include "base/platform/base_platform_info.h"
+#include "base/options.h"
 #include "base/platform/mac/base_utilities_mac.h"
 #include "base/random.h"
 #include "base/unixtime.h"
@@ -197,6 +198,21 @@ using Manager = Platform::Notifications::Manager;
 namespace Platform {
 namespace Notifications {
 
+const char kOptionMacCustomNotification[] = "mac-custom-notification";
+
+base::options::toggle OptionMacCustomNotification({
+	.id = kOptionMacCustomNotification,
+	.name = "Non-native notifications on macOS",
+	.scope = [] {
+#ifdef Q_OS_MAC
+		return true;
+#else // !Q_OS_MAC
+		return false;
+#endif // !Q_OS_MAC
+	},
+	.restartRequired = true,
+});
+
 bool SkipToastForCustom() {
 	return false;
 }
@@ -218,7 +234,7 @@ bool Supported() {
 }
 
 bool Enforced() {
-	return Supported();
+	return !OptionMacCustomNotification.value() && Supported();
 }
 
 bool ByDefault() {

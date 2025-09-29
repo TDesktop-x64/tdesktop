@@ -12,6 +12,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Platform {
 namespace Notifications {
 
+extern const char kOptionMacCustomNotification[];
+
 [[nodiscard]] bool SkipToastForCustom();
 void MaybePlaySoundForCustom(Fn<void()> playSound);
 void MaybeFlashBounceForCustom(Fn<void()> flashBounce);

@@ -36,6 +36,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_document_resolver.h"
 #include "styles/style_settings.h"
 #include "styles/style_layers.h"
+#include "platform/platform_notifications_manager.h"
 
 namespace Settings {
 namespace {
@@ -165,6 +166,7 @@ void SetupExperimental(
 		addToggle(kOptionFastButtonsMode);
 	}
 	addToggle(Window::kOptionDisableTouchbar);
+	addToggle(Platform::Notifications::kOptionMacCustomNotification);
 }
 
 } // namespace

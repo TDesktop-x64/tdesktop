@@ -42,6 +42,7 @@ class Track;
 } // namespace Media::Audio
 
 namespace Window {
+class Controller;
 class SessionController;
 } // namespace Window
 
@@ -467,5 +468,7 @@ protected:
 };
 
 [[nodiscard]] QString WrapFromScheduled(const QString &text);
+
+[[nodiscard]] QRect NotificationDisplayRect(Window::Controller *controller);
 
 } // namespace Window::Notifications

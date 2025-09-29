@@ -40,8 +40,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
 #include "ui/text/text_utilities.h"
+#include "platform/platform_specific.h"
 
 #include <QtGui/QWindow>
+#include <QtGui/QGuiApplication>
+#include <QtGui/QScreen>
 
 #if __has_include(<gio/gio.hpp>)
 #include <gio/gio.hpp>
@@ -1477,6 +1480,28 @@ System::~System() = default;
 
 QString WrapFromScheduled(const QString &text) {
 	return QString::fromUtf8("\xF0\x9F\x93\x85 ") + text;
+}
+
+QRect NotificationDisplayRect(Window::Controller *controller) {
+	const auto displayChecksum
+		= Core::App().settings().notificationsDisplayChecksum();
+
+	auto screen = (QScreen*)(nullptr);
+	if (displayChecksum) {
+		using namespace Platform;
+		for (const auto candidateScreen : QGuiApplication::screens()) {
+			if (ScreenNameChecksum(candidateScreen) == displayChecksum) {
+				screen = candidateScreen;
+				break;
+			}
+		}
+	}
+
+	return screen
+		? screen->availableGeometry()
+		: controller
+		? controller->widget()->desktopRect()
+		: QGuiApplication::primaryScreen()->availableGeometry();
 }
 
 } // namespace Notifications

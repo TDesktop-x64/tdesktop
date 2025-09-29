@@ -724,4 +724,12 @@ int32 ScreenNameChecksum(const QString &name) {
 	return base::crc32(buffer, sizeof(buffer));
 }
 
+int32 ScreenNameChecksum(const QScreen *screen) {
+	return ScreenNameChecksum(screen->name());
+}
+
+QString ScreenDisplayLabel(const QScreen *screen) {
+	return screen ? screen->name() : QString();
+}
+
 } // namespace Platform

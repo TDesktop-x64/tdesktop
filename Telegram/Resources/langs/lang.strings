@@ -522,6 +522,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_use_native_notifications" = "Use native notifications";
 "lng_settings_notifications_position" = "Location on the screen";
 "lng_settings_notifications_count" = "Notifications count";
+"lng_settings_notifications_display" = "Display for notifications";
+"lng_settings_notifications_display_default" = "Default";
 "lng_settings_sound_allowed" = "Allow sound";
 "lng_settings_alert_windows" = "Flash the taskbar icon";
 "lng_settings_alert_mac" = "Bounce the Dock icon";

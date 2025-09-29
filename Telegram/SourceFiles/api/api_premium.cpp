@@ -915,10 +915,14 @@ std::optional<Data::StarGift> FromTL(
 				.initialGiftId = data.vgift_id().v,
 				.slug = qs(data.vslug()),
 				.title = qs(data.vtitle()),
+				.giftAddress = qs(data.vgift_address().value_or_empty()),
 				.ownerAddress = qs(data.vowner_address().value_or_empty()),
 				.ownerName = qs(data.vowner_name().value_or_empty()),
 				.ownerId = (data.vowner_id()
 					? peerFromMTP(*data.vowner_id())
+					: PeerId()),
+				.hostId = (data.vhost_id()
+					? peerFromMTP(*data.vhost_id())
 					: PeerId()),
 				.releasedBy = releasedBy,
 				.themeUser = themeUser,

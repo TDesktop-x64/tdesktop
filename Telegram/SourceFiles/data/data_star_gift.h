@@ -66,9 +66,11 @@ struct UniqueGift {
 	uint64 initialGiftId = 0;
 	QString slug;
 	QString title;
+	QString giftAddress;
 	QString ownerAddress;
 	QString ownerName;
 	PeerId ownerId = 0;
+	PeerId hostId = 0;
 	PeerData *releasedBy = nullptr;
 	PeerData *themeUser = nullptr;
 	int64 nanoTonForResale = -1;
@@ -253,8 +255,14 @@ struct MyGiftsDescriptor {
 	QString offset;
 };
 
+enum class MyUniqueType {
+	OwnedAndHosted,
+	OnlyOwned,
+};
+
 [[nodiscard]] rpl::producer<MyGiftsDescriptor> MyUniqueGiftsSlice(
 	not_null<Main::Session*> session,
+	MyUniqueType type,
 	QString offset = QString());
 
 struct ResaleGiftsDescriptor {

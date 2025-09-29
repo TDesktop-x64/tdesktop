@@ -949,3 +949,19 @@ bool ShowTransferGiftLater(
 	});
 	return true;
 }
+
+void ShowActionLocked(
+		std::shared_ptr<ChatHelpers::Show> show,
+		const QString &slug) {
+	const auto open = [=] {
+		UrlClickHandler::Open(u"https://fragment.com/gift/"_q
+			+ slug
+			+ u"?collection=my"_q);
+	};
+	show->show(Ui::MakeConfirmBox({
+		.text = tr::lng_gift_transfer_locked_text(),
+		.confirmed = [=](Fn<void()> close) { open(); close(); },
+		.confirmText = tr::lng_gift_transfer_confirm_button(),
+		.title = tr::lng_gift_transfer_locked_title(),
+	}));
+}

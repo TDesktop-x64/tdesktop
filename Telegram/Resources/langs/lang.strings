@@ -2231,6 +2231,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_action_gift_transferred_unknown" = "Someone transferred you a gift";
 "lng_action_gift_transferred_unknown_channel" = "Someone transferred a gift to {channel}";
 "lng_action_gift_transferred_self" = "You transferred a unique collectible";
+"lng_action_gift_displayed_self" = "You've started displaying {name} on your Telegram profile page.";
 "lng_action_gift_transferred_self_channel" = "You transferred a gift to {channel}";
 "lng_action_gift_transferred_mine" = "You transferred a gift to {user}";
 "lng_action_gift_received_anonymous" = "Unknown user sent you a gift for {cost}";
@@ -3684,6 +3685,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_gift_released_by" = "released by {name}";
 "lng_gift_unique_owner" = "Owner";
 "lng_gift_unique_address_copied" = "Address copied to clipboard.";
+"lng_gift_unique_telegram" = "Telegram";
 "lng_gift_unique_status" = "Status";
 "lng_gift_unique_status_non" = "Non-Unique";
 "lng_gift_unique_upgrade" = "Upgrade";
@@ -3822,6 +3824,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_gift_transfer_sell" = "Sell";
 "lng_gift_transfer_update" = "Change Price";
 "lng_gift_transfer_unlist" = "Unlist";
+"lng_gift_transfer_locked_title" = "Action Locked";
+"lng_gift_transfer_locked_text" = "Transfer this gift to your Telegram account on Fragment to unlock this action.";
 "lng_gift_sell_unlist_title" = "Unlist {name}";
 "lng_gift_sell_unlist_sure" = "Are you sure you want to unlist your gift?";
 "lng_gift_sell_title" = "Price in Stars";

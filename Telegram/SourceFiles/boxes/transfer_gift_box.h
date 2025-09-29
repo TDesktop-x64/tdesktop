@@ -64,3 +64,7 @@ void SetPeerTheme(
 	not_null<PeerData*> peer,
 	const QString &token,
 	const std::shared_ptr<Ui::ChatTheme> &theme);
+
+void ShowActionLocked(
+	std::shared_ptr<ChatHelpers::Show> show,
+	const QString &slug);

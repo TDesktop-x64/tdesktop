@@ -968,11 +968,29 @@ void ProcessReceivedSubscriptions(
 	}
 }
 
+[[nodiscard]] bool ShowResellButton(
+		not_null<Main::Session*> session,
+		const Data::CreditsHistoryEntry &e) {
+	const auto unique = e.uniqueGift.get();
+	const auto host = (unique && unique->hostId)
+		? session->data().peer(unique->hostId).get()
+		: (unique && unique->ownerId)
+		? session->data().peer(unique->ownerId).get()
+		: nullptr;
+	return !host
+		? false
+		: host->isSelf()
+		? e.in
+		: false;
+	// Currently we're not reselling channel gifts.
+	// (host->isChannel() && host->asChannel()->canTransferGifts());
+}
+
 [[nodiscard]] bool CanResellGift(
 		not_null<Main::Session*> session,
 		const Data::CreditsHistoryEntry &e) {
 	const auto unique = e.uniqueGift.get();
-	const auto owner = unique
+	const auto owner = (unique && unique->ownerId)
 		? session->data().peer(unique->ownerId).get()
 		: nullptr;
 	return !owner
@@ -1101,45 +1119,60 @@ void FillUniqueGiftMenu(
 			}
 		}, st.theme ? st.theme : &st::menuIconChangeColors);
 	}
+	const auto owner = unique->ownerId
+		? show->session().data().peer(unique->ownerId).get()
+		: (PeerData*)nullptr;
+	const auto host = unique->hostId
+		? show->session().data().peer(unique->hostId).get()
+		: owner;
+	if (!host) {
+		return;
+	}
 	const auto transfer = savedId
 		&& (savedId.isUser() ? e.in : savedId.chat()->canTransferGifts())
 		&& (unique->starsForTransfer >= 0);
 	if (transfer) {
 		menu->addAction(tr::lng_gift_transfer_button(tr::now), [=] {
-			if (const auto window = show->resolveWindow()) {
+			if (!owner) {
+				ShowActionLocked(show, unique->slug);
+			} else if (const auto window = show->resolveWindow()) {
 				ShowTransferGiftBox(window, unique, savedId);
 			}
 		}, st.transfer ? st.transfer : &st::menuIconReplace);
 	}
-	const auto owner = show->session().data().peer(unique->ownerId);
-	const auto wear = owner->isSelf()
+	const auto wear = host->isSelf()
 		? e.in
-		: (owner->isChannel() && owner->asChannel()->canEditEmoji());
+		: (host->isChannel() && host->asChannel()->canEditEmoji());
 	if (wear) {
 		const auto name = UniqueGiftName(*unique);
-		const auto now = owner->emojiStatusId().collectible;
+		const auto now = host->emojiStatusId().collectible;
 		if (now && unique->slug == now->slug) {
 			menu->addAction(tr::lng_gift_transfer_take_off(tr::now), [=] {
-				show->session().data().emojiStatuses().set(owner, {});
+				show->session().data().emojiStatuses().set(host, {});
 			}, st.takeoff ? st.takeoff : &st::menuIconNftTakeOff);
 		} else {
 			menu->addAction(tr::lng_gift_transfer_wear(tr::now), [=] {
-				ShowUniqueGiftWearBox(show, owner, *unique, st.giftWearBox
+				ShowUniqueGiftWearBox(show, host, *unique, st.giftWearBox
 					? *st.giftWearBox
 					: GiftWearBoxStyleOverride());
 			}, st.wear ? st.wear : &st::menuIconNftWear);
 		}
 	}
-	if (CanResellGift(&show->session(), e)) {
+	if (ShowResellButton(&show->session(), e)) {
+		const auto can = CanResellGift(&show->session(), e);
 		const auto inResale = (unique->starsForResale > 0);
 		const auto editPrice = (inResale
 			? tr::lng_gift_transfer_update
 			: tr::lng_gift_transfer_sell)(tr::now);
 		menu->addAction(editPrice, [=] {
-			const auto style = st.giftWearBox
-				? *st.giftWearBox
-				: GiftWearBoxStyleOverride();
-			ShowUniqueGiftSellBox(show, unique, savedId, style);
+			if (!can) {
+				ShowActionLocked(show, unique->slug);
+			} else {
+				const auto style = st.giftWearBox
+					? *st.giftWearBox
+					: GiftWearBoxStyleOverride();
+				ShowUniqueGiftSellBox(show, unique, savedId, style);
+			}
 		}, st.resell ? st.resell : &st::menuIconTagSell);
 		if (inResale) {
 			menu->addAction(tr::lng_gift_transfer_unlist(tr::now), [=] {
@@ -1807,6 +1840,40 @@ void GenericCreditsEntryBox(
 	}
 
 	Ui::AddSkip(content);
+
+	const auto addGiftLinkTON = [&] {
+		if (!uniqueGift) {
+			return;
+		}
+		const auto address = !uniqueGift->giftAddress.isEmpty()
+			? uniqueGift->giftAddress
+			: uniqueGift->ownerAddress;
+		if (address.isEmpty()) {
+			return;
+		}
+		const auto label = box->addRow(
+			object_ptr<Ui::FlatLabel>(
+				box,
+				tr::lng_gift_in_blockchain(
+					lt_link,
+					tr::lng_gift_in_blockchain_link_arrow(
+						lt_arrow,
+						rpl::single(arrow),
+						Ui::Text::WithEntities
+					) | Ui::Text::ToLink(),
+					Ui::Text::WithEntities),
+				st::creditsBoxAboutDivider),
+			style::al_top);
+		label->setClickHandlerFilter([=](const auto &...) {
+			UrlClickHandler::Open(TonAddressUrl(session, address));
+			return false;
+		});
+	};
+
+	if (starGiftCanManage) {
+		addGiftLinkTON();
+	}
+
 	Ui::AddSkip(content);
 
 	struct State final {
@@ -2040,25 +2107,8 @@ void GenericCreditsEntryBox(
 			toggleVisibility(!e.savedToProfile);
 			return false;
 		});
-	} else if (uniqueGift && !uniqueGift->ownerAddress.isEmpty()) {
-		const auto label = box->addRow(
-			object_ptr<Ui::FlatLabel>(
-				box,
-				tr::lng_gift_in_blockchain(
-					lt_link,
-					tr::lng_gift_in_blockchain_link_arrow(
-						lt_arrow,
-						rpl::single(arrow),
-						Ui::Text::WithEntities
-					) | Ui::Text::ToLink(),
-					Ui::Text::WithEntities),
-				st::creditsBoxAboutDivider),
-			style::al_top);
-		label->setClickHandlerFilter([=](const auto &...) {
-			UrlClickHandler::Open(
-				TonAddressUrl(session, uniqueGift->ownerAddress));
-			return false;
-		});
+	} else {
+		addGiftLinkTON();
 	}
 	if (s) {
 		const auto user = peer ? peer->asUser() : nullptr;
@@ -2531,6 +2581,7 @@ void GlobalStarGiftBox(
 		CreditsEntryBoxStyleOverrides st) {
 	const auto selfId = show->session().userPeerId();
 	const auto ownerId = data.unique ? data.unique->ownerId.value : 0;
+	const auto hostId = data.unique ? data.unique->hostId.value : 0;
 	Settings::GenericCreditsEntryBox(
 		box,
 		show,
@@ -2538,6 +2589,7 @@ void GlobalStarGiftBox(
 			.credits = CreditsAmount(data.stars),
 			.bareGiftStickerId = data.document->id,
 			.bareGiftOwnerId = ownerId,
+			.bareGiftHostId = hostId,
 			.bareGiftResaleRecipientId = ((resale.recipientId != selfId)
 				? resale.recipientId.value
 				: 0),
@@ -2560,6 +2612,12 @@ Data::CreditsHistoryEntry SavedStarGiftEntry(
 		not_null<PeerData*> owner,
 		const Data::SavedStarGift &data) {
 	const auto chatGiftPeer = data.manageId.chat();
+	const auto ownerId = data.info.unique
+		? data.info.unique->ownerId
+		: owner->id;
+	const auto hostId = data.info.unique
+		? data.info.unique->hostId
+		: PeerId();
 	return {
 		.description = data.message,
 		.date = base::unixtime::parse(data.date),
@@ -2567,7 +2625,8 @@ Data::CreditsHistoryEntry SavedStarGiftEntry(
 		.bareMsgId = uint64(data.manageId.userMessageId().bare),
 		.barePeerId = data.fromId.value,
 		.bareGiftStickerId = data.info.document->id,
-		.bareGiftOwnerId = owner->id.value,
+		.bareGiftOwnerId = ownerId.value,
+		.bareGiftHostId = hostId.value,
 		.bareActorId = data.fromId.value,
 		.bareEntryOwnerId = chatGiftPeer ? chatGiftPeer->id.value : 0,
 		.giftChannelSavedId = data.manageId.chatSavedId(),
@@ -2647,6 +2706,7 @@ void ShowStarGiftViewBox(
 	const auto fromId = incoming ? peer->id : peer->session().userPeerId();
 	const auto toId = incoming ? peer->session().userPeerId() : peer->id;
 	const auto ownerId = data.unique ? data.unique->ownerId : toId;
+	const auto hostId = data.unique ? data.unique->hostId : PeerId();
 	const auto nextToUpgradeStickerId = upgradeNext
 		? upgradeNext->info.document->id
 		: uint64();
@@ -2667,6 +2727,7 @@ void ShowStarGiftViewBox(
 		.barePeerId = fromId.value,
 		.bareGiftStickerId = data.document ? data.document->id : 0,
 		.bareGiftOwnerId = ownerId.value,
+		.bareGiftHostId = hostId.value,
 		.bareGiftReleasedById = (data.stargiftReleasedBy
 			? data.stargiftReleasedBy->id.value
 			: 0),

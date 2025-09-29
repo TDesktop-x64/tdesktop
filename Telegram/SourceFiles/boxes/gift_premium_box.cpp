@@ -1618,6 +1618,38 @@ void AddStarGiftTable(
 				tr::lng_gift_unique_owner(),
 				std::move(label));
 		}
+
+		if (const auto hostId = PeerId(entry.bareGiftHostId)) {
+			const auto was = std::make_shared<std::optional<CollectibleId>>();
+			const auto handleChange = [=](
+					not_null<Ui::RpWidget*> badge,
+					EmojiStatusId emojiStatusId) {
+				const auto id = emojiStatusId.collectible
+					? emojiStatusId.collectible->id
+					: 0;
+				const auto show = [&](const auto &phrase) {
+					showTooltip(badge, phrase(
+						lt_name,
+						rpl::single(Ui::Text::Bold(UniqueGiftName(*unique))),
+						Ui::Text::WithEntities));
+				};
+				if (!*was || *was == id) {
+					*was = id;
+					return;
+				} else if (*was == unique->id) {
+					show(tr::lng_gift_wear_end_toast);
+				} else if (id == unique->id) {
+					show(tr::lng_gift_wear_start_toast);
+				}
+				*was = id;
+			};
+			AddTableRow(
+				table,
+				tr::lng_gift_unique_telegram(),
+				MakePeerWithStatusValue(table, show, hostId, handleChange),
+				st::giveawayGiftCodePeerMargin);
+		}
+
 	} else if (giftToChannel) {
 		AddTableRow(
 			table,

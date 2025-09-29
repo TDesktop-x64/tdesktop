@@ -120,6 +120,7 @@ GiftAttributeId IdFor(const UniqueGiftPattern &value) {
 
 rpl::producer<MyGiftsDescriptor> MyUniqueGiftsSlice(
 		not_null<Main::Session*> session,
+		MyUniqueType type,
 		QString offset) {
 	return [=](auto consumer) {
 		using Flag = MTPpayments_GetSavedStarGifts::Flag;
@@ -128,7 +129,10 @@ rpl::producer<MyGiftsDescriptor> MyUniqueGiftsSlice(
 			MTPpayments_GetSavedStarGifts(
 			MTP_flags(Flag::f_exclude_upgradable
 				| Flag::f_exclude_unupgradable
-				| Flag::f_exclude_unlimited),
+				| Flag::f_exclude_unlimited
+				| ((type == MyUniqueType::OnlyOwned)
+					? Flag::f_exclude_hosted
+					: Flag())),
 			user->input,
 			MTP_int(0), // collection_id
 			MTP_string(offset),

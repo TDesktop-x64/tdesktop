@@ -6231,6 +6231,18 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 								lt_user,
 								Ui::Text::Link(from->shortName(), 1),
 								Ui::Text::WithEntities);
+			} else if (action.is_assigned()) {
+				const auto gift = Api::FromTL(
+					&history()->session(),
+					action.vgift());
+				result.text = tr::lng_action_gift_displayed_self(
+					tr::now,
+					lt_name,
+					TextWithEntities{ (gift && gift->unique)
+						? Data::UniqueGiftName(*gift->unique)
+						: QString(),
+					},
+					Ui::Text::WithEntities);
 			} else {
 				result.text = resale
 					? tr::lng_action_gift_self_bought(

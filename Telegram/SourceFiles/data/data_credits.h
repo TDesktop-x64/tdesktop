@@ -66,6 +66,7 @@ struct CreditsHistoryEntry final {
 	uint64 bareGiveawayMsgId = 0;
 	uint64 bareGiftStickerId = 0;
 	uint64 bareGiftOwnerId = 0;
+	uint64 bareGiftHostId = 0;
 	uint64 bareGiftReleasedById = 0;
 	uint64 bareGiftResaleRecipientId = 0;
 	uint64 bareActorId = 0;

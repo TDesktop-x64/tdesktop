@@ -2807,6 +2807,7 @@ void AddBlock(
 			&& !state->myLoading) {
 			state->myLoading = Data::MyUniqueGiftsSlice(
 				&peer->session(),
+				Data::MyUniqueType::OnlyOwned,
 				state->my.offset
 			) | rpl::start_with_next([=](MyGiftsDescriptor &&descriptor) {
 				state->myLoading.destroy();
@@ -3631,7 +3632,8 @@ void ShowStarGiftBox(
 	}, i->second.lifetime);
 
 	Data::MyUniqueGiftsSlice(
-		session
+		session,
+		Data::MyUniqueType::OnlyOwned
 	) | rpl::start_with_next([=](MyGiftsDescriptor &&gifts) {
 		auto &entry = Map[session];
 		entry.my = std::move(gifts);
@@ -3714,6 +3716,7 @@ void AddUniqueGiftCover(
 		Released() : white(QColor(255, 255, 255)) {
 		}
 
+		rpl::variable<TextWithEntities> subtitleText;
 		style::owned_color white;
 		style::FlatLabel st;
 		PeerData *by = nullptr;
@@ -3743,7 +3746,7 @@ void AddUniqueGiftCover(
 		) | rpl::map([](const Data::UniqueGift &now) { return now.title; }),
 		st::uniqueGiftTitle);
 	title->setTextColorOverride(QColor(255, 255, 255));
-	auto subtitleText = subtitleOverride
+	released->subtitleText = subtitleOverride
 		? std::move(
 			subtitleOverride
 		) | Ui::Text::ToWithEntities() | rpl::type_erased()
@@ -3764,9 +3767,13 @@ void AddUniqueGiftCover(
 					TextWithEntities{ QString::number(gift.number) },
 					Ui::Text::WithEntities);
 		});
+	if (!released->by) {
+		released->st = st::uniqueGiftSubtitle;
+		released->st.palette.linkFg = released->white.color();
+	}
 	const auto subtitle = CreateChild<FlatLabel>(
 		cover,
-		std::move(subtitleText),
+		released->subtitleText.value(),
 		released->st);
 	if (released->by) {
 		const auto button = CreateChild<AbstractButton>(cover);

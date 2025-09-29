@@ -30,6 +30,17 @@ struct SubTabsTab {
 		const SubTabsTab &) = default;
 };
 
+struct SubTabsReorderUpdate {
+	QString id;
+	int oldPosition = 0;
+	int newPosition = 0;
+	enum class State : uchar {
+		Started,
+		Applied,
+		Cancelled,
+	} state = State::Started;
+};
+
 class SubTabs : public RpWidget {
 public:
 	using Options = SubTabsOptions;
@@ -57,16 +68,7 @@ public:
 	[[nodiscard]] rpl::producer<QString> activated() const;
 	[[nodiscard]] rpl::producer<QString> contextMenuRequests() const;
 
-	struct ReorderUpdate {
-		QString id;
-		int oldPosition = 0;
-		int newPosition = 0;
-		enum class State : uchar {
-			Started,
-			Applied,
-			Cancelled,
-		} state = State::Started;
-	};
+	using ReorderUpdate = SubTabsReorderUpdate;
 	[[nodiscard]] rpl::producer<ReorderUpdate> reorderUpdates() const;
 
 private:
@@ -138,7 +140,8 @@ private:
 	int _reorderIndex = -1;
 	float64 _reorderStart = 0.;
 	int _reorderDesiredIndex = 0;
-	ReorderUpdate::State _reorderState = ReorderUpdate::State::Cancelled;
+	SubTabsReorderUpdate::State _reorderState
+		= SubTabsReorderUpdate::State::Cancelled;
 	QPoint _reorderMousePos;
 
 };

@@ -210,10 +210,10 @@ void SubTabs::mouseMoveEvent(QMouseEvent *e) {
 	const auto drag = QApplication::startDragDistance();
 
 	if (_reorderEnable && _reorderIndex >= 0) {
-		if (_reorderState != ReorderUpdate::State::Started) {
+		if (_reorderState != SubTabsReorderUpdate::State::Started) {
 			const auto shift = e->globalPos().x() - _reorderStart;
 			if (std::abs(shift) > drag) {
-				_reorderState = ReorderUpdate::State::Started;
+				_reorderState = SubTabsReorderUpdate::State::Started;
 				_reorderStart += (shift > 0) ? drag : -drag;
 				_reorderDesiredIndex = _reorderIndex;
 				_reorderUpdates.fire({
@@ -390,7 +390,7 @@ void SubTabs::startReorder(int index, QPoint globalPos) {
 	cancelReorder();
 	_reorderIndex = index;
 	_reorderStart = globalPos.x();
-	_reorderState = ReorderUpdate::State::Cancelled;
+	_reorderState = SubTabsReorderUpdate::State::Cancelled;
 }
 
 void SubTabs::updateReorder(QPoint globalPos) {
@@ -459,12 +459,13 @@ void SubTabs::finishReorder() {
 	const auto result = _reorderDesiredIndex;
 	const auto id = _buttons[index].tab.id;
 
-	if (result == index || _reorderState != ReorderUpdate::State::Started) {
+	if (result == index
+		|| _reorderState != SubTabsReorderUpdate::State::Started) {
 		cancelReorder();
 		return;
 	}
 
-	_reorderState = ReorderUpdate::State::Applied;
+	_reorderState = SubTabsReorderUpdate::State::Applied;
 	_reorderIndex = -1;
 	_dragx = 0;
 	_pressx = 0;
@@ -528,8 +529,8 @@ void SubTabs::cancelReorder() {
 	const auto index = _reorderIndex;
 	const auto id = _buttons[index].tab.id;
 
-	if (_reorderState == ReorderUpdate::State::Started) {
-		_reorderState = ReorderUpdate::State::Cancelled;
+	if (_reorderState == SubTabsReorderUpdate::State::Started) {
+		_reorderState = SubTabsReorderUpdate::State::Cancelled;
 		_reorderUpdates.fire({ id, index, index, _reorderState });
 	}
 

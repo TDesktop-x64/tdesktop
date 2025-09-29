@@ -56,6 +56,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/text_utilities.h"
 #include "ui/widgets/buttons.h"
 #include "ui/wrap/slide_wrap.h"
+#include "ui/color_contrast.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
 #include "ui/vertical_list.h"
@@ -83,8 +84,10 @@ class ColorSample final : public Ui::AbstractButton {
 public:
 	ColorSample(
 		not_null<QWidget*> parent,
+		not_null<Main::Session*> session,
 		std::shared_ptr<Ui::ChatStyle> style,
 		rpl::producer<uint8> colorIndex,
+		rpl::producer<std::shared_ptr<Ui::ColorCollectible>> collectible,
 		const QString &name);
 	ColorSample(
 		not_null<QWidget*> parent,
@@ -102,6 +105,7 @@ private:
 	std::shared_ptr<Ui::ChatStyle> _style;
 	Ui::Text::String _name;
 	uint8 _index = 0;
+	std::shared_ptr<Ui::ColorCollectible> _collectible;
 	Ui::Animations::Simple _selectAnimation;
 	bool _selected = false;
 	bool _simple = false;
@@ -183,16 +187,33 @@ private:
 
 ColorSample::ColorSample(
 	not_null<QWidget*> parent,
+	not_null<Main::Session*> session,
 	std::shared_ptr<Ui::ChatStyle> style,
 	rpl::producer<uint8> colorIndex,
+	rpl::producer<std::shared_ptr<Ui::ColorCollectible>> collectible,
 	const QString &name)
 : AbstractButton(parent)
-, _style(style)
-, _name(st::semiboldTextStyle, name) {
-	std::move(
-		colorIndex
-	) | rpl::start_with_next([=](uint8 index) {
+, _style(style) {
+	rpl::combine(
+		std::move(colorIndex),
+		std::move(collectible)
+	) | rpl::start_with_next([=](
+			uint8 index,
+			std::shared_ptr<Ui::ColorCollectible> collectible) {
 		_index = index;
+		_collectible = std::move(collectible);
+		if (const auto raw = _collectible.get()) {
+			_name.setMarkedText(
+				st::semiboldTextStyle,
+				Data::SingleCustomEmoji(raw->giftEmojiId),
+				kMarkupTextOptions,
+				Core::TextContext({
+					.session = session,
+					.repaint = [=] { update(); },
+				}));
+		} else {
+			_name.setText(st::semiboldTextStyle, name);
+		}
 		setNaturalWidth([&] {
 			if (_name.isEmpty() || _style->colorPatternIndex(_index)) {
 				return st::settingsColorSampleSize;
@@ -238,7 +259,21 @@ void ColorSample::paintEvent(QPaintEvent *e) {
 	if (!_simple && !colors.outlines[1].alpha()) {
 		const auto radius = height() / 2;
 		p.setPen(Qt::NoPen);
-		p.setBrush(colors.bg);
+		if (const auto raw = _collectible.get()) {
+			const auto withBg = [&](const QColor &color) {
+				return Ui::CountContrast(st::windowBg->c, color);
+			};
+			const auto dark = (withBg({ 0, 0, 0 })
+				< withBg({ 255, 255, 255 }));
+			const auto name = (dark && raw->darkAccentColor.alpha() > 0)
+				? raw->darkAccentColor
+				: raw->accentColor;
+			auto bg = name;
+			bg.setAlpha(0.12 * 255);
+			p.setBrush(bg);
+		} else {
+			p.setBrush(colors.bg);
+		}
 		p.drawRoundedRect(rect(), radius, radius);
 
 		const auto padding = st::settingsColorSamplePadding;
@@ -1322,6 +1357,7 @@ void AddGiftSelector(
 		} else {
 			state->current->loading = Data::MyUniqueGiftsSlice(
 				session,
+				Data::MyUniqueType::OwnedAndHosted,
 				state->current->offset
 			) | rpl::start_with_next([=](Data::MyGiftsDescriptor slice) {
 				auto &entry = state->lists[shownGiftId];
@@ -1860,12 +1896,20 @@ void SetupPeerColorSample(
 	) | rpl::map([=] {
 		return peer->colorIndex();
 	});
+	auto colorCollectibleValue = peer->session().changes().peerFlagsValue(
+		peer,
+		Data::PeerUpdate::Flag::Color
+	) | rpl::map([=] {
+		return peer->colorCollectible();
+	});
 	const auto name = peer->shortName();
 
 	const auto sample = Ui::CreateChild<ColorSample>(
 		button.get(),
+		&peer->session(),
 		style,
 		rpl::duplicate(colorIndexValue),
+		rpl::duplicate(colorCollectibleValue),
 		name);
 	sample->show();
 

@@ -44,6 +44,7 @@ class PaddingWrap;
 class ScrollArea;
 class GenericBox;
 class GroupCallScheduledLeft;
+struct CallButtonColors;
 } // namespace Ui
 
 namespace Ui::Toast {
@@ -159,6 +160,7 @@ private:
 	void setupControlsBackgroundWide();
 	void setupControlsBackgroundNarrow();
 	void showControls();
+	void createMessageButton();
 	void refreshLeftButton();
 	void refreshVideoButtons(
 		std::optional<bool> overrideWideMode = std::nullopt);
@@ -170,6 +172,8 @@ private:
 	[[nodiscard]] bool videoButtonInNarrowMode() const;
 	[[nodiscard]] Fn<void()> shareConferenceLinkCallback();
 	void toggleMessageTyping();
+	[[nodiscard]] rpl::producer<Ui::CallButtonColors> toggleableOverrides(
+		rpl::producer<bool> active);
 
 	void endCall();
 

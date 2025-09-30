@@ -260,8 +260,10 @@ callMuteButtonLabel: FlatLabel(defaultFlatLabel) {
 	}
 }
 callMuteButtonActiveInner: IconButton {
-	width: 112px;
-	height: 138px;
+//	width: 112px;
+//	height: 138px;
+	width: 68px;
+	height: 79px;
 }
 callMuteButtonSmallActiveInner: IconButton {
 	width: 68px;
@@ -270,11 +272,15 @@ callMuteButtonSmallActiveInner: IconButton {
 callMuteButtonActive: CallButton {
 	button: callMuteButtonActiveInner;
 	bg: groupCallLive1;
-	bgSize: 77px;
-	bgPosition: point(18px, 18px);
-	outerRadius: 18px;
+//	bgSize: 77px;
+//	bgPosition: point(18px, 18px);
+//	outerRadius: 18px;
+	bgSize: 42px;
+	bgPosition: point(13px, 13px);
+	outerRadius: 13px;
 	outerBg: callAnswerBgOuter;
-	label: callMuteButtonLabel;
+	//label: callMuteButtonLabel;
+	label: callButtonLabel;
 }
 callMuteButton: CallMuteButton {
 	active: callMuteButtonActive;
@@ -286,10 +292,14 @@ callMuteButton: CallMuteButton {
 	sublabel: FlatLabel(defaultFlatLabel) {
 		textFg: groupCallMemberNotJoinedStatus;
 	}
-	labelsSkip: 8px;
-	sublabelSkip: 14px;
-	lottieSize: size(54px, 54px);
-	lottieTop: 31px;
+	labelsSkip: 0px;
+	sublabelSkip: 0px;
+//	labelsSkip: 8px;
+//	sublabelSkip: 14px;
+	lottieSize: size(36px, 36px);
+	lottieTop: 17px;
+//	lottieSize: size(54px, 54px);
+//	lottieTop: 31px;
 }
 callMuteButtonSmallActive: CallButton(callMuteButtonActive) {
 	button: callMuteButtonSmallActiveInner;

@@ -599,6 +599,7 @@ void Panel::initControls() {
 	}, _mute->lifetime());
 
 	initShareAction();
+	createMessageButton();
 	refreshLeftButton();
 	refreshVideoButtons();
 
@@ -709,6 +710,19 @@ void Panel::refreshLeftButton() {
 	updateButtonsStyles();
 }
 
+rpl::producer<Ui::CallButtonColors> Panel::toggleableOverrides(
+		rpl::producer<bool> active) {
+	return rpl::combine(
+		std::move(active),
+		_mute->colorOverrides()
+	) | rpl::map([](bool active, Ui::CallButtonColors colors) {
+		if (active && colors.bg) {
+			colors.bg->setAlpha(kOverrideActiveColorBgAlpha);
+		}
+		return colors;
+	});
+}
+
 void Panel::refreshVideoButtons(std::optional<bool> overrideWideMode) {
 	const auto create = overrideWideMode.value_or(mode() == PanelMode::Wide)
 		|| (!_call->scheduleDate() && _call->videoIsWorking());
@@ -723,17 +737,6 @@ void Panel::refreshVideoButtons(std::optional<bool> overrideWideMode) {
 		}
 		return;
 	}
-	auto toggleableOverrides = [&](rpl::producer<bool> active) {
-		return rpl::combine(
-			std::move(active),
-			_mute->colorOverrides()
-		) | rpl::map([](bool active, Ui::CallButtonColors colors) {
-			if (active && colors.bg) {
-				colors.bg->setAlpha(kOverrideActiveColorBgAlpha);
-			}
-			return colors;
-		});
-	};
 	if (!_video) {
 		_video.create(
 			widget(),
@@ -778,6 +781,12 @@ void Panel::refreshVideoButtons(std::optional<bool> overrideWideMode) {
 		_wideMenu->setColorOverrides(
 			toggleableOverrides(_wideMenuShown.value()));
 	}
+	updateButtonsStyles();
+	updateButtonsGeometry();
+	raiseControls();
+}
+
+void Panel::createMessageButton() {
 	if (!_message) {
 		_message.create(
 			widget(),
@@ -788,9 +797,6 @@ void Panel::refreshVideoButtons(std::optional<bool> overrideWideMode) {
 		_message->setColorOverrides(
 			toggleableOverrides(_messageTyping.value()));
 	}
-	updateButtonsStyles();
-	updateButtonsGeometry();
-	raiseControls();
 }
 
 void Panel::hideStickedTooltip(StickedTooltipHide hide) {
@@ -2508,11 +2514,21 @@ void Panel::updateButtonsGeometry() {
 			refreshTitleGeometry();
 		}
 	} else {
+		const auto addSkip = st::callMuteButton.active.outerRadius;
 		const auto muteSize = _mute->innerSize().width();
 		const auto single = (_settings ? _settings : _callShare)->width();
-		const auto five = !_callShare && _message;
+		const auto showVideoButton = videoButtonInNarrowMode();
+		const auto four = !_callShare && !showVideoButton && _message;
+		const auto five = !four && !_callShare && _message;
+		const auto buttonSkip = four
+			? (st::groupCallButtonSkip / 2)
+			: five
+			? ((st::groupCallWidth - 5 * single) / 6)
+			: st::groupCallButtonSkip;
 		const auto fullWidth = five
 			? st::groupCallWidth
+			: four
+			? (4 * single + 3 * buttonSkip)
 			: (muteSize + 2 * (single + st::groupCallButtonSkip));
 		const auto forMessagesWidth = st::groupCallWidth
 			- st::groupCallMembersMargin.left()
@@ -2525,16 +2541,21 @@ void Panel::updateButtonsGeometry() {
 			_messageField->resizeToWidth(forMessagesWidth);
 
 			const auto height = _messageField->height();
-			messagesBottomSkip += height
-				+ std::min(height, existingBottomSkip / 3);
+			messagesBottomSkip += height;
 
-			const auto y = widget()->height() - messagesBottomSkip;
+			const auto y = widget()->height()
+				- messagesBottomSkip
+				- (existingBottomSkip / 3);
 			_messageField->move(forMessagesLeft, y);
 		}
 
-		const auto muteTop = widget()->height()
+		const auto buttonsTop = widget()->height()
 			- messagesBottomSkip
-			- st::groupCallMuteBottomSkip;
+			- st::groupCallButtonBottomSkip;
+		const auto muteTop = buttonsTop + addSkip;
+		//const auto muteTop = widget()->height()
+		//	- messagesBottomSkip
+		//	- st::groupCallMuteBottomSkip;
 		const auto forMessagesBottom = muteTop
 			- (existingBottomSkip / 3);
 		const auto forMessagesHeight = forMessagesBottom
@@ -2547,20 +2568,21 @@ void Panel::updateButtonsGeometry() {
 			forMessagesWidth,
 			forMessagesHeight);
 
-		const auto buttonsTop = widget()->height()
-			- messagesBottomSkip
-			- st::groupCallButtonBottomSkip;
 		toggle(_mute, true);
-		_mute->moveInner({ (widget()->width() - muteSize) / 2, muteTop });
-		const auto leftButtonLeft = (widget()->width() - fullWidth) / 2;
-		const auto nextButtonLeft = leftButtonLeft + (five ? single : 0);
+		const auto leftButtonLeft = (widget()->width() - fullWidth) / 2
+			+ (five ? buttonSkip : 0);
+		const auto nextButtonLeft = leftButtonLeft
+			+ ((five || four) ? (single + buttonSkip) : 0);
+		const auto muteButtonLeft = four
+			? (nextButtonLeft + addSkip)
+			: ((widget()->width() - muteSize) / 2);
+		_mute->moveInner({ muteButtonLeft, muteTop });
 		//toggle(_screenShare, false);
 		toggle(_wideMenu, false);
 		toggle(_callShare, true);
 		if (_callShare) {
 			_callShare->moveToLeft(leftButtonLeft, buttonsTop);
 		}
-		const auto showVideoButton = videoButtonInNarrowMode();
 		toggle(_video, !_callShare && showVideoButton);
 		if (_video) {
 			_video->setStyle(st::groupCallVideo, &st::groupCallVideoActive);
@@ -2568,7 +2590,9 @@ void Panel::updateButtonsGeometry() {
 		}
 		toggle(_settings, !_callShare && (five || !showVideoButton));
 		if (_settings) {
-			_settings->moveToLeft(nextButtonLeft, buttonsTop);
+			_settings->moveToLeft(
+				four ? leftButtonLeft : nextButtonLeft,
+				buttonsTop);
 		}
 		toggle(_message, !_callShare);
 		if (_message) {

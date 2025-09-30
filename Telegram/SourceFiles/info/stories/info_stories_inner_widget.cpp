@@ -1025,7 +1025,6 @@ void InnerWidget::flushAlbumReorder() {
 		_reorderRequestId = 0;
 	}).fail([=, show = _controller->uiShow()](const MTP::Error &error) {
 		_reorderRequestId = 0;
-		show->showToast(tr::lng_error_generic(tr::now));
 	}).send();
 
 	_pendingAlbumReorder = false;

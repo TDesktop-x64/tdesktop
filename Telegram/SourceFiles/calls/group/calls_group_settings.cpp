@@ -257,7 +257,9 @@ void SettingsBox(
 	};
 	const auto peer = call->peer();
 	const auto state = box->lifetime().make_state<State>();
-	const auto real = peer->groupCall();
+	const auto real = call->conference()
+		? call->lookupReal()
+		: peer->groupCall();
 	const auto rtmp = call->rtmp();
 	const auto id = call->id();
 	const auto goodReal = (real && real->id() == id);
@@ -265,17 +267,19 @@ void SettingsBox(
 	const auto layout = box->verticalLayout();
 	const auto &settings = Core::App().settings();
 
-	const auto joinMuted = goodReal ? real->joinMuted() : false;
-	const auto messagesEnabled = goodReal ? real->messagesEnabled() : false;
+	const auto joinMuted = !call->conference()
+		&& goodReal
+		&& real->joinMuted();
+	const auto messagesEnabled = goodReal && real->messagesEnabled();
 	const auto canChangeJoinMuted = !rtmp
 		&& goodReal
 		&& real->canChangeJoinMuted();
 	const auto canChangeMessagesEnabled = !rtmp
 		&& goodReal
 		&& real->canChangeMessagesEnabled();
-	const auto addCheck = peer->canManageGroupCall() && canChangeJoinMuted;
-	const auto addMessages = peer->canManageGroupCall()
-		&& canChangeMessagesEnabled;
+	const auto addCheck = canChangeJoinMuted && peer->canManageGroupCall();
+	const auto addMessages = canChangeMessagesEnabled
+		&& (call->conference() || peer->canManageGroupCall());
 
 	const auto addDivider = [&] {
 		layout->add(object_ptr<Ui::BoxContentDivider>(
@@ -850,7 +854,12 @@ void SettingsBox(
 		if (canChangeMessagesEnabled
 			&& enableMessages
 			&& enableMessages->toggled() != messagesEnabled) {
-			SaveCallMessagesEnabled(peer, id, enableMessages->toggled());
+			const auto value = enableMessages->toggled();
+			if (!call->conference()) {
+				SaveCallMessagesEnabled(peer, id, value);
+			} else if (const auto real = call->lookupReal()) {
+				real->setMessagesEnabledLocally(value);
+			}
 		}
 	}, box->lifetime());
 	box->addButton(tr::lng_box_done(), [=] {

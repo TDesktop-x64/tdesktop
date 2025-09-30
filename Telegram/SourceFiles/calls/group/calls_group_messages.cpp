@@ -65,7 +65,7 @@ void Messages::send(TextWithTags text) {
 			Api::ConvertOption::SkipLocal)));
 
 	const auto randomId = base::RandomValue<uint64>();
-	const auto from = _call->peer()->session().user();
+	const auto from = _call->joinAs();
 	_messages.push_back({
 		.randomId = randomId,
 		.peer = from,

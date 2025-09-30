@@ -2314,7 +2314,9 @@ void GroupCall::handlePossibleCreateOrJoinResponse(
 			const auto rtmp = data.is_rtmp_stream();
 			_rtmp = rtmp;
 			setScheduledDate(scheduleDate);
-			setMessagesEnabled(data.is_messages_enabled());
+			if (!conference()) {
+				setMessagesEnabled(data.is_messages_enabled());
+			}
 			if (const auto chat = _peer->asChat()) {
 				chat->setGroupCall(input, scheduleDate, rtmp);
 			} else if (const auto group = _peer->asChannel()) {
@@ -2330,7 +2332,9 @@ void GroupCall::handlePossibleCreateOrJoinResponse(
 		return;
 	}
 	setScheduledDate(data.vschedule_date().value_or_empty());
-	setMessagesEnabled(data.is_messages_enabled());
+	if (!conference()) {
+		setMessagesEnabled(data.is_messages_enabled());
+	}
 	if (const auto streamDcId = data.vstream_dc_id()) {
 		_broadcastDcId = MTP::BareDcId(streamDcId->v);
 	}

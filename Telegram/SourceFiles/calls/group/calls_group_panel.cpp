@@ -241,7 +241,8 @@ Panel::Panel(not_null<GroupCall*> call, ConferencePanelMigration info)
 , _messages(std::make_unique<MessagesUi>(
 	widget(),
 	uiShow(),
-	_call->messages()->listValue()))
+	_call->messages()->listValue(),
+	_call->messagesEnabledValue()))
 , _toasts(std::make_unique<Toasts>(this))
 , _controlsBackgroundColor([] {
 	auto result = st::groupCallBg->c;

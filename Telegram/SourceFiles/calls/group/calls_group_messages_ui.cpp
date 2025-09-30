@@ -125,7 +125,8 @@ struct MessagesUi::MessageView {
 MessagesUi::MessagesUi(
 	not_null<QWidget*> parent,
 	std::shared_ptr<ChatHelpers::Show> show,
-	rpl::producer<std::vector<Message>> messages)
+	rpl::producer<std::vector<Message>> messages,
+	rpl::producer<bool> shown)
 : _parent(parent)
 , _show(std::move(show))
 , _messageBg([] {
@@ -135,15 +136,21 @@ MessagesUi::MessagesUi(
 })
 , _messageBgRect(CountMessageRadius(), _messageBg.color())
 , _fadeHeight(st::normalFont->height) {
-	setupList(std::move(messages));
+	setupList(std::move(messages), std::move(shown));
 }
 
 MessagesUi::~MessagesUi() = default;
 
-void MessagesUi::setupList(rpl::producer<std::vector<Message>> messages) {
-	std::move(
-		messages
-	) | rpl::start_with_next([=](std::vector<Message> &&list) {
+void MessagesUi::setupList(
+		rpl::producer<std::vector<Message>> messages,
+		rpl::producer<bool> shown) {
+	rpl::combine(
+		std::move(messages),
+		std::move(shown)
+	) | rpl::start_with_next([=](std::vector<Message> &&list, bool shown) {
+		if (!shown) {
+			list.clear();
+		}
 		auto from = begin(list);
 		auto till = end(list);
 		for (auto &entry : _views) {

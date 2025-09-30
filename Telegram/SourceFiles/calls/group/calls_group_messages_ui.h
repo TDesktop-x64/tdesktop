@@ -38,7 +38,8 @@ public:
 	MessagesUi(
 		not_null<QWidget*> parent,
 		std::shared_ptr<ChatHelpers::Show> show,
-		rpl::producer<std::vector<Message>> messages);
+		rpl::producer<std::vector<Message>> messages,
+		rpl::producer<bool> shown);
 	~MessagesUi();
 
 	void move(int left, int bottom, int width, int availableHeight);
@@ -49,7 +50,9 @@ public:
 private:
 	struct MessageView;
 
-	void setupList(rpl::producer<std::vector<Message>> messages);
+	void setupList(
+		rpl::producer<std::vector<Message>> messages,
+		rpl::producer<bool> shown);
 	void toggleMessage(MessageView &entry, bool shown);
 	void setContentFailed(MessageView &entry);
 	void setContent(MessageView &entry, const TextWithEntities &text);

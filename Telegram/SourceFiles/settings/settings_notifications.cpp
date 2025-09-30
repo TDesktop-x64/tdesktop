@@ -1225,7 +1225,7 @@ void SetupNotificationsContent(
 
 	auto nativeText = [&] {
 		if (!Platform::Notifications::Supported()
-			|| Platform::Notifications::Enforced()) {
+			|| Core::App().notifications().nativeEnforced()) {
 			return rpl::producer<QString>();
 		} else if (Platform::IsWindows()) {
 			return tr::lng_settings_use_windows();
@@ -1248,7 +1248,7 @@ void SetupNotificationsContent(
 		))->toggleOn(rpl::single(settings.nativeNotifications()));
 	}();
 
-	const auto advancedSlide = !Platform::Notifications::Enforced()
+	const auto advancedSlide = !Core::App().notifications().nativeEnforced()
 		? container->add(
 			object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
 				container,

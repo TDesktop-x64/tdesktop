@@ -52,9 +52,6 @@ using winrt::com_ptr;
 
 namespace Platform {
 namespace Notifications {
-
-const char kOptionMacCustomNotification[] = "";
-
 namespace {
 
 constexpr auto kQuerySettingsEachMs = 1000;

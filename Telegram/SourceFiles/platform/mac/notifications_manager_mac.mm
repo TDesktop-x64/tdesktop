@@ -198,21 +198,6 @@ using Manager = Platform::Notifications::Manager;
 namespace Platform {
 namespace Notifications {
 
-const char kOptionMacCustomNotification[] = "mac-custom-notification";
-
-base::options::toggle OptionMacCustomNotification({
-	.id = kOptionMacCustomNotification,
-	.name = "Non-native notifications on macOS",
-	.scope = [] {
-#ifdef Q_OS_MAC
-		return true;
-#else // !Q_OS_MAC
-		return false;
-#endif // !Q_OS_MAC
-	},
-	.restartRequired = true,
-});
-
 bool SkipToastForCustom() {
 	return false;
 }
@@ -234,7 +219,7 @@ bool Supported() {
 }
 
 bool Enforced() {
-	return !OptionMacCustomNotification.value() && Supported();
+	return Supported();
 }
 
 bool ByDefault() {

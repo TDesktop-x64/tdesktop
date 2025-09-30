@@ -548,7 +548,27 @@ int32 ScreenNameChecksum(const QScreen *screen) {
 }
 
 QString ScreenDisplayLabel(const QScreen *screen) {
-	return screen ? screen->name() : QString();
+	if (!screen) {
+		return QString();
+	}
+
+	const auto model = (screen->manufacturer()
+		+ ' '
+		+ screen->model()).simplified();
+
+	if (!model.isEmpty()) {
+		if (!screen->name().isEmpty()) {
+			return (model
+				+ ' '
+				+ QChar(8212)
+				+ ' '
+				+ screen->name()).simplified();
+		}
+
+		return model;
+	}
+
+	return screen->name();
 }
 
 } // namespace Platform

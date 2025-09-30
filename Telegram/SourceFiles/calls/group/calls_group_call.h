@@ -422,6 +422,12 @@ public:
 	[[nodiscard]] rpl::producer<bool> videoIsWorkingValue() const {
 		return _videoIsWorking.value();
 	}
+	[[nodiscard]] bool messagesEnabled() const {
+		return _messagesEnabled.current();
+	}
+	[[nodiscard]] rpl::producer<bool> messagesEnabledValue() const {
+		return _messagesEnabled.value();
+	}
 
 	[[nodiscard]] bool isSharingScreen() const;
 	[[nodiscard]] rpl::producer<bool> isSharingScreenValue() const;
@@ -591,6 +597,7 @@ private:
 	void saveDefaultJoinAs(not_null<PeerData*> as);
 	void subscribeToReal(not_null<Data::GroupCall*> real);
 	void setScheduledDate(TimeId date);
+	void setMessagesEnabled(bool enabled);
 	void rejoinPresentation();
 	void leavePresentation();
 	void checkNextJoinAction();
@@ -711,6 +718,7 @@ private:
 	rpl::variable<bool> _canManage = false;
 	rpl::variable<bool> _videoIsWorking = false;
 	rpl::variable<bool> _emptyRtmp = false;
+	rpl::variable<bool> _messagesEnabled = false;
 	bool _initialMuteStateSent = false;
 	bool _acceptFields = false;
 

@@ -522,6 +522,8 @@ void GroupCall::applyCallFields(const MTPDgroupCall &data) {
 	_scheduleDate = data.vschedule_date().value_or_empty();
 	_scheduleStartSubscribed = data.is_schedule_start_subscribed();
 	_unmutedVideoLimit = data.vunmuted_video_limit().v;
+	_messagesEnabled = data.is_messages_enabled();
+	_canChangeMessagesEnabled = data.is_can_change_messages_enabled();
 	_allParticipantsLoaded
 		= (_serverParticipantsCount == _participants.size());
 	_conferenceInviteLink = qs(data.vinvite_link().value_or_empty());
@@ -1096,6 +1098,10 @@ bool GroupCall::canChangeJoinMuted() const {
 
 bool GroupCall::joinedToTop() const {
 	return _joinedToTop;
+}
+
+void GroupCall::setMessagesEnabledLocally(bool enabled) {
+	_messagesEnabled = enabled;
 }
 
 ApiWrap &GroupCall::api() const {

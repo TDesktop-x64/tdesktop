@@ -80,12 +80,35 @@ void SaveCallJoinMuted(
 		|| call->joinMuted() == joinMuted) {
 		return;
 	}
+	using Flag = MTPphone_ToggleGroupCallSettings::Flag;
 	call->setJoinMutedLocally(joinMuted);
 	peer->session().api().request(MTPphone_ToggleGroupCallSettings(
-		MTP_flags(MTPphone_ToggleGroupCallSettings::Flag::f_join_muted),
+		MTP_flags(Flag::f_join_muted),
 		call->input(),
 		MTP_bool(joinMuted),
 		MTPBool() // messages_enabled
+	)).send();
+}
+
+void SaveCallMessagesEnabled(
+		not_null<PeerData*> peer,
+		CallId callId,
+		bool messagesEnabled) {
+	const auto call = peer->groupCall();
+	if (!call
+		|| call->id() != callId
+		|| !peer->canManageGroupCall()
+		|| !call->canChangeJoinMuted()
+		|| call->messagesEnabled() == messagesEnabled) {
+		return;
+	}
+	using Flag = MTPphone_ToggleGroupCallSettings::Flag;
+	call->setMessagesEnabledLocally(messagesEnabled);
+	peer->session().api().request(MTPphone_ToggleGroupCallSettings(
+		MTP_flags(Flag::f_messages_enabled),
+		call->input(),
+		MTPBool(), // join_muted
+		MTP_bool(messagesEnabled)
 	)).send();
 }
 
@@ -243,10 +266,16 @@ void SettingsBox(
 	const auto &settings = Core::App().settings();
 
 	const auto joinMuted = goodReal ? real->joinMuted() : false;
+	const auto messagesEnabled = goodReal ? real->messagesEnabled() : false;
 	const auto canChangeJoinMuted = !rtmp
 		&& goodReal
 		&& real->canChangeJoinMuted();
-	const auto addCheck = (peer->canManageGroupCall() && canChangeJoinMuted);
+	const auto canChangeMessagesEnabled = !rtmp
+		&& goodReal
+		&& real->canChangeMessagesEnabled();
+	const auto addCheck = peer->canManageGroupCall() && canChangeJoinMuted;
+	const auto addMessages = peer->canManageGroupCall()
+		&& canChangeMessagesEnabled;
 
 	const auto addDivider = [&] {
 		layout->add(object_ptr<Ui::BoxContentDivider>(
@@ -255,7 +284,7 @@ void SettingsBox(
 			st::groupCallDividerBg));
 	};
 
-	if (addCheck) {
+	if (addCheck || addMessages) {
 		Ui::AddSkip(layout);
 	}
 	const auto muteJoined = addCheck
@@ -264,7 +293,14 @@ void SettingsBox(
 			tr::lng_group_call_new_muted(),
 			st::groupCallSettingsButton))->toggleOn(rpl::single(joinMuted))
 		: nullptr;
-	if (addCheck) {
+	const auto enableMessages = addMessages
+		? layout->add(object_ptr<Ui::SettingsButton>(
+			layout,
+			tr::lng_group_call_enable_messages(),
+			st::groupCallSettingsButton))->toggleOn(
+				rpl::single(messagesEnabled))
+		: nullptr;
+	if (addCheck || addMessages) {
 		Ui::AddSkip(layout);
 	}
 
@@ -810,6 +846,11 @@ void SettingsBox(
 			&& muteJoined
 			&& muteJoined->toggled() != joinMuted) {
 			SaveCallJoinMuted(peer, id, muteJoined->toggled());
+		}
+		if (canChangeMessagesEnabled
+			&& enableMessages
+			&& enableMessages->toggled() != messagesEnabled) {
+			SaveCallMessagesEnabled(peer, id, enableMessages->toggled());
 		}
 	}, box->lifetime());
 	box->addButton(tr::lng_box_done(), [=] {

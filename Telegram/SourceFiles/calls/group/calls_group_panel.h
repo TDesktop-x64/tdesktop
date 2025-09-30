@@ -251,7 +251,7 @@ private:
 	object_ptr<Ui::CallButton> _wideMenu = { nullptr };
 	object_ptr<Ui::CallButton> _callShare = { nullptr };
 	object_ptr<Ui::CallButton> _video = { nullptr };
-	//object_ptr<Ui::CallButton> _screenShare = { nullptr };
+	object_ptr<Ui::CallButton> _screenShare = { nullptr };
 	object_ptr<Ui::CallButton> _message = { nullptr };
 	std::unique_ptr<Ui::CallMuteButton> _mute;
 	object_ptr<Ui::CallButton> _hangup;

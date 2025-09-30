@@ -5266,6 +5266,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_group_call_invite_search_results" = "Search results";
 "lng_group_call_invite_limit" = "This is currently the maximum allowed number of participants.";
 "lng_group_call_new_muted" = "Mute new participants";
+"lng_group_call_enable_messages" = "Enable messages";
 "lng_group_call_speakers" = "Speakers";
 "lng_group_call_microphone" = "Microphone";
 "lng_group_call_push_to_talk" = "Push-to-Talk Shortcut";

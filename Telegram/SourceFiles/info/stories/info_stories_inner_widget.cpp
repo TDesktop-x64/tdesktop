@@ -738,7 +738,13 @@ void InnerWidget::refreshAlbumsTabs() {
 			}
 		}, _albumsTabs->lifetime());
 	} else {
+		const auto tabsCount = tabs.size();
 		_albumsTabs->setTabs(std::move(tabs));
+		_albumsTabs->clearPinnedIntervals();
+		_albumsTabs->setPinnedInterval(0, 1);
+		if (has) {
+			_albumsTabs->setPinnedInterval(tabsCount - 1, tabsCount);
+		}
 		if (!selected.isEmpty()) {
 			_albumsTabs->setActiveTab(selected);
 		}

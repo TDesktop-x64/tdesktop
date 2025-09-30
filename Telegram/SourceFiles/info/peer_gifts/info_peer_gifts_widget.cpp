@@ -1441,7 +1441,13 @@ void InnerWidget::refreshCollectionsTabs() {
 			}
 		}, _collectionsTabs->lifetime());
 	} else {
+		const auto tabsCount = tabs.size();
 		_collectionsTabs->setTabs(std::move(tabs), context);
+		_collectionsTabs->clearPinnedIntervals();
+		_collectionsTabs->setPinnedInterval(0, 1);
+		if (_peer->canManageGifts()) {
+			_collectionsTabs->setPinnedInterval(tabsCount - 1, tabsCount);
+		}
 	}
 	resizeToWidth(width());
 }

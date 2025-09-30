@@ -1700,6 +1700,11 @@ groupCallMessagesScroll: ScrollArea(defaultScrollArea) {
 }
 groupCallMessagePadding: margins(8px, 2px, 8px, 2px);
 groupCallMessageSkip: 8px;
+groupCallMessagePalette: TextPalette(defaultTextPalette) {
+	linkFg: radialFg;
+	monoFg: radialFg;
+	spoilerFg: radialFg;
+}
 groupCallUserpic: 20px;
 groupCallUserpicPadding: margins(2px, 2px, 4px, 2px);
 

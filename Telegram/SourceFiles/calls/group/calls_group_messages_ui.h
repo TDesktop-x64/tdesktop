@@ -99,6 +99,8 @@ private:
 	int _width = 0;
 	int _availableHeight = 0;
 
+	uint64 _revealedSpoilerId = 0;
+
 	rpl::lifetime _lifetime;
 
 };

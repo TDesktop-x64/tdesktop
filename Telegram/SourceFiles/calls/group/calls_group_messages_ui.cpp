@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "calls/group/calls_group_messages_ui.h"
 
+#include "boxes/peers/prepare_short_info_box.h"
 #include "boxes/premium_preview_box.h"
 #include "calls/group/calls_group_messages.h"
 #include "chat_helpers/compose/compose_show.h"
@@ -55,47 +56,84 @@ constexpr auto kMessageBgOpacity = 0.8;
 	return minHeight / 2;
 }
 
-void ReceiveOnlyWheelEvents(not_null<Ui::ElasticScroll*> scroll) {
+void ReceiveSomeMouseEvents(
+		not_null<Ui::ElasticScroll*> scroll,
+		Fn<bool(QPoint)> handleClick) {
 	class EventFilter final : public QObject {
 	public:
-		explicit EventFilter(not_null<Ui::ElasticScroll*> scroll)
-		: QObject(scroll) {
+		explicit EventFilter(
+			not_null<Ui::ElasticScroll*> scroll,
+			Fn<bool(QPoint)> handleClick)
+		: QObject(scroll)
+		, _handleClick(std::move(handleClick)) {
 		}
 
 		bool eventFilter(QObject *watched, QEvent *event) {
-			if (event->type() != QEvent::Wheel) {
+			if (event->type() == QEvent::MouseButtonPress) {
+				return mousePressFilter(
+					watched,
+					static_cast<QMouseEvent*>(event));
+			} else if (event->type() == QEvent::Wheel) {
+				return wheelFilter(
+					watched,
+					static_cast<QWheelEvent*>(event));
+			}
+			return false;
+		}
+
+		bool mousePressFilter(
+				QObject *watched,
+				not_null<QMouseEvent*> event) {
+			Expects(parent()->isWidgetType());
+
+			const auto scroll = static_cast<Ui::ElasticScroll*>(parent());
+			if (watched != scroll->window()->windowHandle()) {
 				return false;
 			}
-			const auto e = static_cast<QWheelEvent*>(event);
-			Assert(parent()->isWidgetType());
+			const auto global = event->globalPos();
+			const auto local = scroll->mapFromGlobal(global);
+			if (!scroll->rect().contains(local)) {
+				return false;
+			}
+			return _handleClick(local + QPoint(0, scroll->scrollTop()));
+		}
+
+		bool wheelFilter(QObject *watched, not_null<QWheelEvent*> event) {
+			Expects(parent()->isWidgetType());
+
 			const auto scroll = static_cast<Ui::ElasticScroll*>(parent());
 			if (watched != scroll->window()->windowHandle()
 				|| !scroll->scrollTopMax()) {
 				return false;
 			}
-			const auto global = e->globalPosition().toPoint();
+			const auto global = event->globalPosition().toPoint();
 			const auto local = scroll->mapFromGlobal(global);
 			if (!scroll->rect().contains(local)) {
 				return false;
 			}
-			auto ev = QWheelEvent(
-				e->position(),
-				e->globalPosition(),
-				e->pixelDelta(),
-				e->angleDelta(),
-				e->buttons(),
-				e->modifiers(),
-				e->phase(),
-				e->inverted(),
-				e->source());
-			ev.setTimestamp(crl::now());
-			QGuiApplication::sendEvent(scroll, &ev);
+			auto e = QWheelEvent(
+				event->position(),
+				event->globalPosition(),
+				event->pixelDelta(),
+				event->angleDelta(),
+				event->buttons(),
+				event->modifiers(),
+				event->phase(),
+				event->inverted(),
+				event->source());
+			e.setTimestamp(crl::now());
+			QGuiApplication::sendEvent(scroll, &e);
 			return true;
 		}
+
+	private:
+		Fn<bool(QPoint)> _handleClick;
+
 	};
 
 	scroll->setAttribute(Qt::WA_TransparentForMouseEvents);
-	qApp->installEventFilter(new EventFilter(scroll));
+	qApp->installEventFilter(
+		new EventFilter(scroll, std::move(handleClick)));
 }
 
 } // namespace
@@ -103,6 +141,7 @@ void ReceiveOnlyWheelEvents(not_null<Ui::ElasticScroll*> scroll) {
 struct MessagesUi::MessageView {
 	uint64 id = 0;
 	PeerData *from = nullptr;
+	ClickHandlerPtr fromLink;
 	Ui::Animations::Simple toggleAnimation;
 	Ui::Animations::Simple sentAnimation;
 	Data::ReactionId reactionId;
@@ -273,6 +312,25 @@ void MessagesUi::setContent(
 			.session = &_show->session(),
 			.repaint = [this, id = entry.id] { repaintMessage(id); },
 		}));
+	entry.text.setLink(1, entry.fromLink);
+	if (entry.text.hasSpoilers()) {
+		const auto id = entry.id;
+		const auto guard = base::make_weak(_messages);
+		entry.text.setSpoilerLinkFilter([=](const ClickContext &context) {
+			if (context.button != Qt::LeftButton || !guard) {
+				return false;
+			}
+			const auto i = ranges::find(
+				_views,
+				_revealedSpoilerId,
+				&MessageView::id);
+			if (i != end(_views) && _revealedSpoilerId != id) {
+				i->text.setSpoilerRevealed(false, anim::type::normal);
+			}
+			_revealedSpoilerId = id;
+			return true;
+		});
+	}
 }
 
 void MessagesUi::toggleMessage(MessageView &entry, bool shown) {
@@ -341,15 +399,19 @@ void MessagesUi::appendMessage(const Message &data) {
 	const auto repaint = [=] {
 		repaintMessage(id);
 	};
-	entry.from = data.peer;
+	const auto peer = entry.from = data.peer;
+	entry.fromLink = std::make_shared<LambdaClickHandler>([=] {
+		_show->show(
+			PrepareShortInfoBox(peer, _show, &st::storiesShortInfoBox));
+	});
 	entry.sending = !data.date;
 	if (data.failed) {
 		setContentFailed(entry);
 	} else {
 		setContent(
 			entry,
-			Ui::Text::Bold(
-				data.peer->shortName()).append(' ').append(data.text));
+			Ui::Text::Link(Ui::Text::Bold(data.peer->shortName()), 1).append(
+				' ').append(data.text));
 	}
 	entry.top = top;
 	updateMessageSize(entry);
@@ -527,8 +589,6 @@ void MessagesUi::setupMessagesWidget() {
 		st::groupCallMessagesScroll);
 	const auto scroll = _scroll.get();
 
-	ReceiveOnlyWheelEvents(scroll);
-
 	_messages = scroll->setOwnedWidget(object_ptr<Ui::RpWidget>(scroll));
 	rpl::combine(
 		scroll->scrollTopValue(),
@@ -538,6 +598,41 @@ void MessagesUi::setupMessagesWidget() {
 		updateTopFade();
 		updateBottomFade();
 	}, scroll->lifetime());
+
+	ReceiveSomeMouseEvents(scroll, [=](QPoint point) {
+		for (const auto &entry : _views) {
+			if (entry.failed || entry.top + entry.height <= point.y()) {
+				continue;
+			} else if (entry.top >= point.y()
+				|| entry.left >= point.x()
+				|| entry.left + entry.width <= point.x()) {
+				return false;
+			}
+
+			const auto padding = st::groupCallMessagePadding;
+			const auto userpicSize = st::groupCallUserpic;
+			const auto userpicPadding = st::groupCallUserpicPadding;
+			const auto leftSkip = userpicPadding.left()
+				+ userpicSize
+				+ userpicPadding.right();
+			const auto userpic = QRect(
+				entry.left + userpicPadding.left(),
+				entry.top + userpicPadding.top(),
+				userpicSize,
+				userpicSize);
+			const auto link = userpic.contains(point)
+				? entry.fromLink
+				: entry.text.getState(point - QPoint(
+					entry.left + leftSkip,
+					entry.top + padding.top()
+				), entry.width - leftSkip - padding.right()).link;
+			if (link) {
+				ActivateClickHandler(_messages, link, Qt::LeftButton);
+			}
+			return true;
+		}
+		return false;
+	});
 
 	_messages->paintRequest() | rpl::start_with_next([=](QRect clip) {
 		const auto start = scroll->scrollTop();
@@ -631,6 +726,7 @@ void MessagesUi::setupMessagesWidget() {
 					entry.top + padding.top()
 				},
 				.availableWidth = entry.width - leftSkip - padding.right(),
+				.palette = &st::groupCallMessagePalette,
 				.spoiler = Ui::Text::DefaultSpoilerCache(),
 				.now = now,
 				.paused = !_messages->window()->isActiveWindow(),

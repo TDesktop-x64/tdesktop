@@ -1474,3 +1474,6 @@ birthdaySuggestTableLastPadding: margins(2px, 4px, 2px, 24px);
 birthdaySuggestTableSkip: 2px;
 
 messageGiftIconSkip: 30px;
+
+newChatIcon: icon{{ "chat/new_topic", windowFgActive }};
+newChatIconPadding: margins(2px, 2px, 2px, 2px);

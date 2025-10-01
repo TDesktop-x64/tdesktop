@@ -13,6 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/dynamic_image.h"
 #include "ui/unread_badge_paint.h"
 #include "ui/unread_counter_format.h"
+#include "ui/painter.h"
 #include "ui/round_rect.h"
 #include "styles/style_chat.h"
 #include "styles/style_dialogs.h"
@@ -918,17 +919,25 @@ std::unique_ptr<SubsectionButton> HorizontalSlider::makeButton(
 
 std::shared_ptr<DynamicImage> MakeIconSubsectionsThumbnail(
 		const style::icon &icon,
-		Fn<QColor()> textColor) {
+		Fn<QColor()> textColor,
+		std::optional<QMargins> invertedPadding = {}) {
 	class Image final : public DynamicImage {
 	public:
-		Image(const style::icon &icon, Fn<QColor()> textColor)
+		Image(
+			const style::icon &icon,
+			Fn<QColor()> textColor,
+			std::optional<QMargins> invertedPadding)
 		: _icon(icon)
-		, _textColor(std::move(textColor)) {
+		, _textColor(std::move(textColor))
+		, _invertedPadding(invertedPadding) {
 			Expects(_textColor != nullptr);
 		}
 
 		std::shared_ptr<DynamicImage> clone() override {
-			return std::make_shared<Image>(_icon, _textColor);
+			return std::make_shared<Image>(
+				_icon,
+				_textColor,
+				_invertedPadding);
 		}
 
 		QImage image(int size) override {
@@ -939,11 +948,36 @@ std::shared_ptr<DynamicImage> MakeIconSubsectionsThumbnail(
 				_cache = QImage(
 					QSize(full, full),
 					QImage::Format_ARGB32_Premultiplied);
-				_cache.fill(Qt::TransparentMode);
+				_cache.setDevicePixelRatio(ratio);
 			} else if (_color == color) {
 				return _cache;
 			}
 			_color = color;
+			if (_invertedPadding) {
+				_cache.fill(Qt::transparent);
+				auto p = QPainter(&_cache);
+				const auto fill = QRect(QPoint(), _icon.size()).marginsAdded(
+					*_invertedPadding).size();
+				const auto inner = QRect(
+					(size - fill.width()) / 2,
+					(size - fill.height()) / 2,
+					fill.width(),
+					fill.height());
+				auto hq = PainterHighQualityEnabler(p);
+				const auto radius = fill.width() / 6.;
+				p.setPen(Qt::NoPen);
+				p.setBrush(color);
+				p.drawRoundedRect(inner, radius, radius);
+				_icon.paint(
+					p,
+					(inner.topLeft()
+						+ QPoint(
+							_invertedPadding->left(),
+							_invertedPadding->top())),
+					size);
+				return _cache;
+			}
+
 			if (_mask.isNull()) {
 				_mask = _icon.instance(QColor(255, 255, 255));
 			}
@@ -951,7 +985,12 @@ std::shared_ptr<DynamicImage> MakeIconSubsectionsThumbnail(
 				(size - (_mask.width() / ratio)) / 2,
 				(size - (_mask.height() / ratio)) / 2);
 			if (_mask.width() <= full && _mask.height() <= full) {
-				style::colorizeImage(_mask, color, &_cache, QRect(), position);
+				style::colorizeImage(
+					_mask,
+					color,
+					&_cache,
+					QRect(),
+					position);
 			} else {
 				_cache = style::colorizeImage(_mask, color).scaled(
 					full,
@@ -975,9 +1014,13 @@ std::shared_ptr<DynamicImage> MakeIconSubsectionsThumbnail(
 		QImage _mask;
 		QImage _cache;
 		QColor _color;
+		std::optional<QMargins> _invertedPadding;
 
 	};
-	return std::make_shared<Image>(icon, std::move(textColor));
+	return std::make_shared<Image>(
+		icon,
+		std::move(textColor),
+		invertedPadding);
 }
 
 std::shared_ptr<DynamicImage> MakeAllSubsectionsThumbnail(
@@ -990,8 +1033,9 @@ std::shared_ptr<DynamicImage> MakeAllSubsectionsThumbnail(
 std::shared_ptr<DynamicImage> MakeNewChatSubsectionsThumbnail(
 		Fn<QColor()> textColor) {
 	return MakeIconSubsectionsThumbnail(
-		st::foldersUnread,
-		std::move(textColor));
+		st::newChatIcon,
+		std::move(textColor),
+		st::newChatIconPadding);
 }
 
 } // namespace Ui

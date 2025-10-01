@@ -17,12 +17,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_text_entities.h"
 #include "history/history.h"
 #include "boxes/abstract_box.h"
-#include "ui/toast/toast.h"
-#include "ui/widgets/fields/input_field.h"
+#include "ui/boxes/confirm_box.h"
 #include "ui/chat/attach/attach_prepare.h"
 #include "ui/text/format_values.h"
 #include "ui/text/text_entity.h"
 #include "ui/text/text_options.h"
+#include "ui/toast/toast.h"
+#include "ui/widgets/fields/input_field.h"
 #include "chat_helpers/message_field.h"
 #include "chat_helpers/emoji_suggestions_widget.h"
 #include "base/unixtime.h"
@@ -292,8 +293,32 @@ Helper::Helper(not_null<Main::Session*> session)
 
 std::unique_ptr<Helper> Helper::Create(not_null<Main::Session*> session) {
 	//return std::make_unique<Helper>(session); AssertIsDebug();
-	const auto valid = session->user()->phone().startsWith(u"424"_q);
-	return valid ? std::make_unique<Helper>(session) : nullptr;
+	return ShouldUse(session) ? std::make_unique<Helper>(session) : nullptr;
+}
+
+void Helper::CheckIfLost(not_null<Window::SessionController*> controller) {
+	static auto Checked = false;
+	if (Checked) {
+		return;
+	}
+	Checked = true;
+
+	const auto session = &controller->session();
+	if (!ShouldUse(session) || session->supportMode()) {
+		return;
+	}
+	session->local().writeSelf();
+	controller->show(Ui::MakeConfirmBox({
+		.text = u"This account should have support mode, "
+			"but it seems it was lost. Restart?"_q,
+		.confirmed = [=] { Core::Restart(); },
+		.confirmText = u"Restart"_q,
+		.title = u"Support Mode Lost"_q,
+	}));
+}
+
+bool Helper::ShouldUse(not_null<Main::Session*> session) {
+	return session->user()->phone().startsWith(u"424"_q);
 }
 
 void Helper::registerWindow(not_null<Window::SessionController*> controller) {

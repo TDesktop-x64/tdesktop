@@ -2025,6 +2025,10 @@ void Account::readStickerSets(
 		Data::StickersSetFlags readingFlags) {
 	using SetFlag = Data::StickersSetFlag;
 
+	if (!stickersKey) {
+		return;
+	}
+
 	FileReadDescriptor stickers;
 	if (!ReadEncryptedFile(stickers, stickersKey, _basePath, _localKey)) {
 		ClearKey(stickersKey, _basePath);
@@ -2948,12 +2952,16 @@ void Account::writeExportSettings(const Export::Settings &settings) {
 }
 
 Export::Settings Account::readExportSettings() {
+	if (!_exportSettingsKey) {
+		return {};
+	}
+
 	FileReadDescriptor file;
 	if (!ReadEncryptedFile(file, _exportSettingsKey, _basePath, _localKey)) {
 		ClearKey(_exportSettingsKey, _basePath);
 		_exportSettingsKey = 0;
 		writeMapDelayed();
-		return Export::Settings();
+		return {};
 	}
 
 	quint32 types = 0, fullChats = 0;

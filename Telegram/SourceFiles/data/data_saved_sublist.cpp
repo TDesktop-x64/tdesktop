@@ -189,7 +189,8 @@ rpl::producer<> SavedSublist::destroyed() const {
 
 void SavedSublist::applyMaybeLast(not_null<HistoryItem*> item, bool added) {
 	growLastKnownServerMessageId(item->id);
-	if (!_lastServerMessage || (*_lastServerMessage)->id < item->id) {
+	if (!_lastServerMessage.value_or(nullptr)
+		|| (*_lastServerMessage)->id < item->id) {
 		setLastServerMessage(item);
 		resolveChatListMessageGroup();
 	}

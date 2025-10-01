@@ -176,6 +176,14 @@ void SavedMessages::requestSomeStale() {
 		for (const auto &peer : peers) {
 			finishSublistRequest(peer);
 		}
+		for (const auto &peer : peers) {
+			if (const auto sublist = sublistLoaded(peer)) {
+				if (!sublist->lastMessage()
+					&& !sublist->lastServerMessage()) {
+					applySublistDeleted(peer);
+				}
+			}
+		}
 	};
 	auto &histories = owner().histories();
 	_staleRequestId = histories.sendRequest(_owningHistory, type, [=](

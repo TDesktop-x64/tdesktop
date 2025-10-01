@@ -2058,8 +2058,8 @@ void AddSelectRestrictionAction(
 			: (peer->isChannel())
 			? tr::lng_context_noforwards_info_channel
 			: (peer->isUser() && peer->asUser()->isBot())
-			? tr::lng_context_noforwards_info_channel
-			: tr::lng_context_noforwards_info_bot)(
+			? tr::lng_context_noforwards_info_bot
+			: tr::lng_context_noforwards_info_channel)(
 			tr::now,
 			Ui::Text::RichLangValue),
 		addIcon ? &st::menuIconCopyright : nullptr);

@@ -728,8 +728,8 @@ QString PeerListRow::generateShortName() {
 }
 
 Ui::PeerUserpicView &PeerListRow::ensureUserpicView() {
-	if (!_userpic.cloud && peer()->userpicPaintingPeer()->hasUserpic()) {
-		_userpic = peer()->userpicPaintingPeer()->createUserpicView();
+	if (!_userpic.cloud && peer()->hasUserpic()) {
+		_userpic = peer()->createUserpicView();
 	}
 	return _userpic;
 }
@@ -738,9 +738,9 @@ PaintRoundImageCallback PeerListRow::generatePaintUserpicCallback(
 		bool forceRound) {
 	const auto saved = !_savedMessagesStatus.isEmpty();
 	const auto replies = _isRepliesMessagesChat;
-	const auto peer = this->peer()->userpicPaintingPeer();
+	const auto peer = this->peer();
 	auto userpic = saved ? Ui::PeerUserpicView() : ensureUserpicView();
-	if (forceRound && peer->isForum()) {
+	if (forceRound && (peer->isForum() || peer->isMonoforum())) {
 		return ForceRoundUserpicCallback(peer);
 	}
 	return [=](Painter &p, int x, int y, int outerWidth, int size) mutable {

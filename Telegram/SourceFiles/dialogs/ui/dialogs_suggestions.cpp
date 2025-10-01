@@ -1427,20 +1427,13 @@ void Suggestions::setupTabs() {
 		},
 	};
 
-	auto helper = Ui::Text::CustomEmojiHelper();
 	auto sections = std::vector<TextWithEntities>();
 	for (const auto key : _tabKeys) {
 		const auto i = labels.find(key);
 		Assert(i != end(labels));
-		auto text = TextWithEntities{ i->second };
-		if (key.tab == Tab::Posts) {
-			text.append(' ').append(helper.paletteDependent(
-				Ui::Text::CustomEmojiTextBadge(
-					tr::lng_premium_summary_new_badge(tr::now))));
-		}
-		sections.push_back(std::move(text));
+		sections.push_back({ i->second });
 	}
-	_tabs->setSections(sections, helper.context());
+	_tabs->setSections(sections);
 	_tabs->sectionActivated(
 	) | rpl::start_with_next([=](int section) {
 		Assert(section >= 0 && section < _tabKeys.size());

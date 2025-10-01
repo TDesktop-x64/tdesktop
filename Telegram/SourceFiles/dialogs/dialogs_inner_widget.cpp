@@ -1978,11 +1978,14 @@ void InnerWidget::mousePressEvent(QMouseEvent *e) {
 		});
 	} else if (_pressed) {
 		auto row = _pressed;
-		const auto weak = base::make_weak(this);
-		const auto updateCallback = [weak, row] {
-			const auto strong = weak.get();
-			if (!strong || !strong->_pinnedShiftAnimation.animating()) {
-				row->entry()->updateChatListEntry();
+		const auto weakThis = base::make_weak(this);
+		const auto weakEntry = base::make_weak(row->entry());
+		const auto updateCallback = [weakThis, weakEntry] {
+			const auto that = weakThis.get();
+			if (!that || !that->_pinnedShiftAnimation.animating()) {
+				if (const auto entry = weakEntry.get()) {
+					entry->updateChatListEntry();
+				}
 			}
 		};
 		const auto origin = e->pos()

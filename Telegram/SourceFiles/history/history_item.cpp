@@ -1784,6 +1784,10 @@ UserData *HistoryItem::getMessageBot() const {
 	return (bot && bot->isBot()) ? bot : nullptr;
 }
 
+bool HistoryItem::hideLinks() const {
+	return !out() && history()->peer->hideLinks();
+}
+
 bool HistoryItem::isHistoryEntry() const {
 	return (_flags & MessageFlag::HistoryEntry);
 }
@@ -3195,9 +3199,38 @@ const TextWithEntities &HistoryItem::translatedText() const {
 TextWithEntities HistoryItem::translatedTextWithLocalEntities() const {
 	if (isService()) {
 		return {};
-	} else {
-		return withLocalEntities(translatedText());
 	}
+	auto result = withLocalEntities(translatedText());
+
+	if (hideLinks()) {
+		const auto isUrl = [](const EntityInText &entity) {
+			const auto type = entity.type();
+			return (type == EntityType::Mention)
+				|| (type == EntityType::Hashtag)
+				|| (type == EntityType::Cashtag)
+				|| (type == EntityType::Url)
+				|| (type == EntityType::CustomUrl);
+		};
+		const auto from = ranges::remove_if(result.entities, isUrl);
+		if (from != result.entities.end()) {
+			result.entities.erase(from, result.entities.end());
+			setHasHiddenLinks(true);
+		}
+	}
+
+	return result;
+}
+
+void HistoryItem::setHasHiddenLinks(bool has) const {
+	if (has) {
+		_flags |= MessageFlag::HasHiddenLinks;
+	} else {
+		_flags &= ~MessageFlag::HasHiddenLinks;
+	}
+}
+
+bool HistoryItem::hasHiddenLinks() const {
+	return _flags & MessageFlag::HasHiddenLinks;
 }
 
 TextForMimeData HistoryItem::clipboardText() const {

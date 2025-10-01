@@ -915,6 +915,18 @@ void PeerData::setBarSettings(const MTPPeerSettings &data) {
 	});
 }
 
+void PeerData::setBarSettings(PeerBarSettings which) {
+	const auto was = hideLinks();
+	_barSettings.set(which);
+	if (was && !hideLinks()) {
+		if (const auto history = owner().historyLoaded(this)) {
+			crl::on_main(&history->session(), [=] {
+				history->refreshHiddenLinksItems();
+			});
+		}
+	}
+}
+
 int PeerData::paysPerMessage() const {
 	return _barDetails ? _barDetails->paysPerMessage : 0;
 }
@@ -934,6 +946,14 @@ void PeerData::clearPaysPerMessage() {
 				UpdateFlag::PaysPerMessage);
 		}
 	}
+}
+
+bool PeerData::hideLinks() const {
+	if (!isUser()) {
+		return false;
+	}
+	const auto settings = barSettings();
+	return !settings || (*settings & PeerBarSetting::ReportSpam);
 }
 
 QString PeerData::requestChatTitle() const {

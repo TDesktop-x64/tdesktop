@@ -184,6 +184,7 @@ public:
 
 	[[nodiscard]] UserData *viaBot() const;
 	[[nodiscard]] UserData *getMessageBot() const;
+	[[nodiscard]] bool hideLinks() const;
 	[[nodiscard]] bool isHistoryEntry() const;
 	[[nodiscard]] bool isAdminLogEntry() const;
 	[[nodiscard]] bool isFromScheduled() const;
@@ -418,6 +419,9 @@ public:
 	void setRealId(MsgId newId);
 	void incrementReplyToTopCounter();
 	void applyEffectWatchedOnUnreadKnown();
+
+	void setHasHiddenLinks(bool has) const;
+	[[nodiscard]] bool hasHiddenLinks() const;
 
 	[[nodiscard]] bool emptyText() const {
 		return _text.empty();

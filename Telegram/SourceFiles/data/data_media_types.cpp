@@ -1992,6 +1992,10 @@ std::unique_ptr<HistoryView::Media> MediaWebPage::createView(
 		not_null<HistoryView::Element*> message,
 		not_null<HistoryItem*> realParent,
 		HistoryView::Element *replacing) {
+	if (realParent->hideLinks()) {
+		realParent->setHasHiddenLinks(true);
+		return nullptr;
+	}
 	return std::make_unique<HistoryView::WebPage>(message, _page, _flags);
 }
 

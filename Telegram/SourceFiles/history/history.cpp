@@ -4079,6 +4079,22 @@ HistoryTranslation *History::translation() const {
 	return _translation.get();
 }
 
+void History::refreshHiddenLinksItems() {
+	auto refresh = base::flat_set<FullMsgId>();
+	for (const auto &item : _items) {
+		if (item->hasHiddenLinks()) {
+			refresh.emplace(item->fullId());
+		}
+	}
+	const auto owner = &this->owner();
+	for (const auto &id : refresh) {
+		if (const auto item = owner->message(id)) {
+			item->setHasHiddenLinks(false);
+			owner->requestItemViewRefresh(item);
+		}
+	}
+}
+
 HistoryBlock::HistoryBlock(not_null<History*> history)
 : _history(history) {
 }

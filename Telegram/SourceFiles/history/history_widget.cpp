@@ -122,6 +122,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_item_preview.h"
 #include "history/view/history_view_reply.h"
 #include "history/view/history_view_requests_bar.h"
+#include "history/view/history_view_self_forwards_tagger.h"
 #include "history/view/history_view_sticker_toast.h"
 #include "history/view/history_view_subsection_tabs.h"
 #include "history/view/history_view_translate_bar.h"
@@ -1017,6 +1018,12 @@ HistoryWidget::HistoryWidget(
 			handleSupportSwitch(action.history);
 		}
 	}, lifetime());
+
+	_selfForwardsTagger = std::make_unique<HistoryView::SelfForwardsTagger>(
+		controller,
+		this,
+		[=] { return _list; },
+		_scroll.data());
 
 	if (session().supportMode()) {
 		session().data().chatListEntryRefreshes(

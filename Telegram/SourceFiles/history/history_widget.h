@@ -100,6 +100,7 @@ struct FileChosen;
 namespace HistoryView {
 class StickerToast;
 class PaidReactionToast;
+class SelfForwardsTagger;
 class TopBarWidget;
 class PaysStatus;
 class ContactStatus;
@@ -894,6 +895,7 @@ private:
 
 	HistoryView::InfoTooltip _topToast;
 	std::unique_ptr<HistoryView::StickerToast> _stickerToast;
+	std::unique_ptr<HistoryView::SelfForwardsTagger> _selfForwardsTagger;
 	std::unique_ptr<ChooseMessagesForReport> _chooseForReport;
 
 	std::unique_ptr<HistoryView::PaidReactionToast> _paidReactionToast;

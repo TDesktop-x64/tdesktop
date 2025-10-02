@@ -220,6 +220,9 @@ private:
 
 	void collectionRenamed(int id, QString name);
 	void collectionRemoved(int id);
+	void removeGiftFromCollection(
+		Data::SavedStarGiftId giftId,
+		int collectionId);
 
 	void markPinned(std::vector<Entry>::iterator i);
 	void markUnpinned(std::vector<Entry>::iterator i);
@@ -1077,6 +1080,23 @@ void InnerWidget::showMenuFor(not_null<GiftButton*> button, QPoint point) {
 		_menu.get(),
 		entry,
 		::Settings::SavedStarGiftMenuType::List);
+
+	const auto collectionId = _descriptor.current().collectionId;
+	if (collectionId > 0 && _peer->canManageGifts()) {
+		const auto &gift = (*_list)[index].gift;
+		if (ranges::contains(gift.collectionIds, collectionId)) {
+			const auto addAction = Ui::Menu::CreateAddActionCallback(_menu);
+			addAction({
+				.text = tr::lng_gift_collection_remove_from(tr::now),
+				.handler = [=] {
+					removeGiftFromCollection(gift.manageId, collectionId);
+				},
+				.icon = &st::menuIconDeleteAttention,
+				.isAttention = true,
+			});
+		}
+	}
+
 	if (_menu->empty()) {
 		return;
 	}
@@ -1458,6 +1478,75 @@ void InnerWidget::collectionRenamed(int id, QString name) {
 		i->title = name;
 		refreshCollectionsTabs();
 	}
+}
+
+void InnerWidget::removeGiftFromCollection(
+		Data::SavedStarGiftId giftId,
+		int collectionId) {
+	auto changes = Data::GiftsUpdate{
+		.peer = _peer,
+		.collectionId = collectionId,
+		.removed = { giftId },
+	};
+	using Flag = MTPpayments_UpdateStarGiftCollection::Flag;
+	_window->session().api().request(
+		MTPpayments_UpdateStarGiftCollection(
+			MTP_flags(Flag::f_delete_stargift),
+			_peer->input,
+			MTP_int(collectionId),
+			MTPstring(),
+			MTP_vector<MTPInputSavedStarGift>({
+				Api::InputSavedStarGiftId(giftId)
+			}),
+			MTPVector<MTPInputSavedStarGift>(),
+			MTPVector<MTPInputSavedStarGift>())
+	).done([=](const MTPStarGiftCollection &result) {
+		_window->session().data().notifyGiftsUpdate(base::duplicate(changes));
+
+		const auto i = ranges::find(
+			_collections,
+			collectionId,
+			&Data::GiftCollection::id);
+		if (i != end(_collections)) {
+			const auto updated = FromTL(&_window->session(), result);
+			*i = updated;
+
+			auto &per = _perCollection[collectionId];
+			per.total = updated.count;
+
+			if (_descriptor.current().collectionId == collectionId) {
+				const auto it = ranges::find(
+					*_list,
+					giftId,
+					[](const Entry &entry) { return entry.gift.manageId; });
+				if (it != end(*_list)) {
+					_list->erase(it);
+					if (_entries->total > 0) {
+						--_entries->total;
+					}
+					refreshButtons();
+				}
+			}
+
+			const auto giftIt = ranges::find(
+				per.list,
+				giftId,
+				[](const Entry &entry) { return entry.gift.manageId; });
+			if (giftIt != end(per.list)) {
+				per.list.erase(giftIt);
+			}
+
+			if (_addingToCollectionId == collectionId) {
+				auto currentChanges = _collectionChanges.current();
+				currentChanges.removed.push_back(giftId);
+				_collectionChanges = std::move(currentChanges);
+			}
+
+			refreshCollectionsTabs();
+		}
+	}).fail([=, show = _window->uiShow()](const MTP::Error &error) {
+		show->showToast(error.type());
+	}).send();
 }
 
 void InnerWidget::collectionRemoved(int id) {

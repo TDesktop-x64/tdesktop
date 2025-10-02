@@ -223,6 +223,12 @@ private:
 	void removeGiftFromCollection(
 		Data::SavedStarGiftId giftId,
 		int collectionId);
+	void addGiftToCollection(
+		Data::SavedStarGiftId giftId,
+		int collectionId);
+	void fillCollectionsMenu(
+		not_null<Ui::PopupMenu*> menu,
+		const Data::SavedStarGift &gift);
 
 	void markPinned(std::vector<Entry>::iterator i);
 	void markUnpinned(std::vector<Entry>::iterator i);
@@ -1054,6 +1060,89 @@ void InnerWidget::confirmDeleteCollection(int id) {
 	}));
 }
 
+void InnerWidget::fillCollectionsMenu(
+		not_null<Ui::PopupMenu*> menu,
+		const Data::SavedStarGift &gift) {
+	if (!_peer->canManageGifts() || _collections.empty()) {
+		return;
+	}
+
+	const auto addAction = Ui::Menu::CreateAddActionCallback(menu);
+	for (const auto &collection : _collections) {
+		const auto id = collection.id;
+		const auto contains = ranges::contains(gift.collectionIds, id);
+		const auto title = collection.title;
+
+		auto callback = [=] {
+			if (contains) {
+				removeGiftFromCollection(gift.manageId, id);
+			} else {
+				addGiftToCollection(gift.manageId, id);
+			}
+		};
+
+		addAction(
+			title,
+			std::move(callback),
+			contains ? &st::mediaPlayerMenuCheck : nullptr);
+	}
+}
+
+void InnerWidget::addGiftToCollection(
+		Data::SavedStarGiftId giftId,
+		int collectionId) {
+	auto changes = Data::GiftsUpdate{
+		.peer = _peer,
+		.collectionId = collectionId,
+		.added = { giftId },
+	};
+	using Flag = MTPpayments_UpdateStarGiftCollection::Flag;
+	_window->session().api().request(
+		MTPpayments_UpdateStarGiftCollection(
+			MTP_flags(Flag::f_add_stargift),
+			_peer->input,
+			MTP_int(collectionId),
+			MTPstring(),
+			MTPVector<MTPInputSavedStarGift>(),
+			MTP_vector<MTPInputSavedStarGift>({
+				Api::InputSavedStarGiftId(giftId)
+			}),
+			MTPVector<MTPInputSavedStarGift>())
+	).done([=](const MTPStarGiftCollection &result) {
+		_window->session().data().notifyGiftsUpdate(base::duplicate(changes));
+
+		const auto i = ranges::find(
+			_collections,
+			collectionId,
+			&Data::GiftCollection::id);
+		if (i != end(_collections)) {
+			const auto updated = FromTL(&_window->session(), result);
+			*i = updated;
+
+			auto &per = _perCollection[collectionId];
+			per.total = updated.count;
+
+			const auto giftIt = ranges::find(
+				_all.list,
+				giftId,
+				[](const Entry &entry) { return entry.gift.manageId; });
+			if (giftIt != end(_all.list)) {
+				per.list.insert(per.list.begin(), *giftIt);
+			}
+
+			if (_addingToCollectionId == collectionId) {
+				auto currentChanges = _collectionChanges.current();
+				currentChanges.added.push_back(giftId);
+				_collectionChanges = std::move(currentChanges);
+			}
+
+			refreshCollectionsTabs();
+		}
+	}).fail([=, show = _window->uiShow()](const MTP::Error &error) {
+		show->showToast(error.type());
+	}).send();
+}
+
 void InnerWidget::showMenuFor(not_null<GiftButton*> button, QPoint point) {
 	if (_menu || _addingToCollectionId) {
 		return;
@@ -1075,6 +1164,18 @@ void InnerWidget::showMenuFor(not_null<GiftButton*> button, QPoint point) {
 		(*_list)[index].gift);
 	entry.pinnedSavedGifts = pinnedSavedGifts();
 	_menu = base::make_unique_q<Ui::PopupMenu>(this, st::popupMenuWithIcons);
+	if (_peer->canManageGifts() && !_collections.empty()) {
+		const auto &gift = (*_list)[index].gift;
+		const auto addAction = Ui::Menu::CreateAddActionCallback(_menu);
+		const auto submenuAction = addAction(
+			tr::lng_gift_collection_add_to(tr::now),
+			[]{},
+			&st::menuIconAddToFolder);
+		const auto submenu = _menu->ensureSubmenu(
+			submenuAction,
+			st::popupMenuWithIcons);
+		fillCollectionsMenu(submenu, gift);
+	}
 	::Settings::FillSavedStarGiftMenu(
 		_window->uiShow(),
 		_menu.get(),

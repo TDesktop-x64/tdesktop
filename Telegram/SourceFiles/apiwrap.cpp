@@ -3523,6 +3523,20 @@ void ApiWrap::forwardMessages(
 					shared->callback();
 				}
 				finish();
+				if (peer->isSelf() && session().premium()) {
+					auto newIds = MessageIdsList();
+					result.match([&](const MTPDupdates &data) {
+						for (const auto &update : data.vupdates().v) {
+							update.match([&](const MTPDupdateMessageID &d) {
+								newIds.push_back(
+									FullMsgId(peer->id, d.vid().v));
+							}, [](const auto &) {});
+						}
+					}, [](const auto &) {});
+					if (!newIds.empty()) {
+						session().data().addRecentSelfForwards(newIds);
+					}
+				}
 			}).fail([=](const MTP::Error &error) {
 				if (idsCopy) {
 					for (const auto &[randomId, itemId] : *idsCopy) {

@@ -5285,6 +5285,14 @@ StarsRatingPending Session::pendingStarsRating() const {
 	return _pendingStarsRating ? *_pendingStarsRating : StarsRatingPending();
 }
 
+void Session::addRecentSelfForwards(const MessageIdsList &ids) {
+	_recentSelfForwards.fire_copy(ids);
+}
+
+rpl::producer<MessageIdsList> Session::recentSelfForwards() const {
+	return _recentSelfForwards.events();
+}
+
 void Session::clearLocalStorage() {
 	_cache->close();
 	_cache->clear();

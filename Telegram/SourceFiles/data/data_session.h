@@ -887,6 +887,9 @@ public:
 	void setPendingStarsRating(StarsRatingPending value);
 	[[nodiscard]] StarsRatingPending pendingStarsRating() const;
 
+	void addRecentSelfForwards(const MessageIdsList &ids);
+	[[nodiscard]] rpl::producer<MessageIdsList> recentSelfForwards() const;
+
 	void clearLocalStorage();
 
 private:
@@ -1254,6 +1257,8 @@ private:
 	base::flat_map<
 		not_null<PeerData*>,
 		NextToUpgradeGift> _nextForUpgradeGifts;
+
+	rpl::event_stream<MessageIdsList> _recentSelfForwards;
 
 	rpl::lifetime _lifetime;
 

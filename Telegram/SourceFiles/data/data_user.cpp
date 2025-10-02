@@ -770,7 +770,10 @@ const TextWithEntities &UserData::note() const {
 }
 
 void UserData::setNote(const TextWithEntities &note) {
-	_note = note;
+	if (_note != note) {
+		_note = note;
+		session().changes().peerUpdated(this, UpdateFlag::ContactNote);
+	}
 }
 
 namespace Data {

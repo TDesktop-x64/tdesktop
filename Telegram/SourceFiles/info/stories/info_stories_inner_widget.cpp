@@ -768,7 +768,7 @@ void InnerWidget::showMenuForAlbum(int id) {
 				flushAlbumReorder();
 				_albumsTabs->setReorderEnabled(false);
 			},
-			&st::menuIconManage);
+			&st::menuIconReorder);
 		_menu->popup(QCursor::pos());
 		return;
 	}
@@ -791,7 +791,7 @@ void InnerWidget::showMenuForAlbum(int id) {
 			addAction(
 				tr::lng_gift_collection_reorder(tr::now),
 				[=] { _albumsTabs->setReorderEnabled(true); },
-				&st::menuIconManage);
+				&st::menuIconReorder);
 		}
 		addAction({
 			.text = tr::lng_stories_album_delete(tr::now),

@@ -981,7 +981,7 @@ void InnerWidget::showMenuForCollection(int id) {
 				flushCollectionReorder();
 				_collectionsTabs->setReorderEnabled(false);
 			},
-			&st::menuIconManage);
+			&st::menuIconReorder);
 		_menu->popup(QCursor::pos());
 		return;
 	}
@@ -1001,7 +1001,7 @@ void InnerWidget::showMenuForCollection(int id) {
 		addAction(
 			tr::lng_gift_collection_reorder(tr::now),
 			[=] { _collectionsTabs->setReorderEnabled(true); },
-			&st::menuIconManage);
+			&st::menuIconReorder);
 	}
 	addAction({
 		.text = tr::lng_gift_collection_delete(tr::now),

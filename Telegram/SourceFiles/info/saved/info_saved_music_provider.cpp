@@ -120,7 +120,9 @@ void MusicProvider::checkPreload(
 	const auto visibleWidth = viewport.width();
 	const auto visibleHeight = viewport.height();
 	const auto preloadedHeight = kPreloadedScreensCountFull * visibleHeight;
-	const auto minItemHeight = MinStoryHeight(visibleWidth);
+	const auto minItemHeight = MinItemHeight(
+		Type::MusicFile,
+		visibleWidth);
 	const auto preloadedCount = preloadedHeight / minItemHeight;
 	const auto preloadIdsLimitMin = (preloadedCount / 2) + 1;
 	const auto preloadIdsLimit = preloadIdsLimitMin
@@ -165,7 +167,7 @@ void MusicProvider::setSearchQuery(QString query) {
 void MusicProvider::refreshViewer() {
 	_viewerLifetime.destroy();
 	const auto aroundId = _aroundId;
-	auto ids = Data::SavedMusicList(_peer, aroundId, _idsLimit);
+ 	auto ids = Data::SavedMusicList(_peer, aroundId, _idsLimit);
 	std::move(
 		ids
 	) | rpl::start_with_next([=](Data::SavedMusicSlice &&slice) {

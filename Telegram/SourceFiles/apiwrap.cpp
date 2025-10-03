@@ -3534,7 +3534,10 @@ void ApiWrap::forwardMessages(
 						}
 					}, [](const auto &) {});
 					if (!newIds.empty()) {
-						session().data().addRecentSelfForwards(newIds);
+						session().data().addRecentSelfForwards({
+							.fromPeerId = forwardFrom->id,
+							.ids = newIds,
+						});
 					}
 				}
 			}).fail([=](const MTP::Error &error) {

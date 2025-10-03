@@ -53,8 +53,8 @@ SelfForwardsTagger::~SelfForwardsTagger() = default;
 
 void SelfForwardsTagger::setup() {
 	_controller->session().data().recentSelfForwards(
-	) | rpl::start_with_next([=](const MessageIdsList &ids) {
-		showSelectorForMessages(ids);
+	) | rpl::start_with_next([=](const Data::RecentSelfForwards &data) {
+		showSelectorForMessages(data.ids);
 	}, _lifetime);
 }
 

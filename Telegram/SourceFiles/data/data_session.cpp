@@ -5285,11 +5285,11 @@ StarsRatingPending Session::pendingStarsRating() const {
 	return _pendingStarsRating ? *_pendingStarsRating : StarsRatingPending();
 }
 
-void Session::addRecentSelfForwards(const MessageIdsList &ids) {
-	_recentSelfForwards.fire_copy(ids);
+void Session::addRecentSelfForwards(const RecentSelfForwards &data) {
+	_recentSelfForwards.fire_copy(data);
 }
 
-rpl::producer<MessageIdsList> Session::recentSelfForwards() const {
+rpl::producer<RecentSelfForwards> Session::recentSelfForwards() const {
 	return _recentSelfForwards.events();
 }
 

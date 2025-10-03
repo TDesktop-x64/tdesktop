@@ -443,7 +443,8 @@ ChatWidget::ChatWidget(
 		controller,
 		this,
 		[=] { return _inner.data(); },
-		_scroll.get());
+		_scroll.get(),
+		[=] { return _history; });
 
 	setupTopicViewer();
 	setupComposeControls();

@@ -9,6 +9,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/weak_ptr.h"
 
+class History;
+
 namespace Lottie {
 class Icon;
 } // namespace Lottie
@@ -41,7 +43,8 @@ public:
 		not_null<Window::SessionController*> controller,
 		not_null<Ui::RpWidget*> parent,
 		Fn<Ui::RpWidget*()> listWidget,
-		not_null<QWidget*> scroll);
+		not_null<QWidget*> scroll,
+		Fn<History*()> history);
 
 	~SelfForwardsTagger();
 
@@ -57,6 +60,7 @@ private:
 	const not_null<Ui::RpWidget*> _parent;
 	const Fn<Ui::RpWidget*()> _listWidget;
 	const not_null<QWidget*> _scroll;
+	const Fn<History*()> _history;
 
 	base::weak_ptr<Ui::Toast::Instance> _toast;
 	rpl::lifetime _lifetime;

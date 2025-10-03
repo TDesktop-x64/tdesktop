@@ -1023,7 +1023,8 @@ HistoryWidget::HistoryWidget(
 		controller,
 		this,
 		[=] { return _list; },
-		_scroll.data());
+		_scroll.data(),
+		[=] { return _history; });
 
 	if (session().supportMode()) {
 		session().data().chatListEntryRefreshes(

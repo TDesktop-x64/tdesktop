@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/ui_integration.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
+#include "history/history.h"
 #include "history/history_item.h"
 #include "history/view/reactions/history_view_reactions_selector.h"
 #include "lang/lang_keys.h"
@@ -41,11 +42,13 @@ SelfForwardsTagger::SelfForwardsTagger(
 	not_null<Window::SessionController*> controller,
 	not_null<Ui::RpWidget*> parent,
 	Fn<Ui::RpWidget*()> listWidget,
-	not_null<QWidget*> scroll)
+	not_null<QWidget*> scroll,
+	Fn<History*()> history)
 : _controller(controller)
 , _parent(parent)
 , _listWidget(std::move(listWidget))
-, _scroll(scroll) {
+, _scroll(scroll)
+, _history(std::move(history)) {
 	setup();
 }
 
@@ -54,6 +57,10 @@ SelfForwardsTagger::~SelfForwardsTagger() = default;
 void SelfForwardsTagger::setup() {
 	_controller->session().data().recentSelfForwards(
 	) | rpl::start_with_next([=](const Data::RecentSelfForwards &data) {
+		const auto history = _history ? _history() : nullptr;
+		if (!history || history->peer->id != data.fromPeerId) {
+			return;
+		}
 		showSelectorForMessages(data.ids);
 	}, _lifetime);
 }

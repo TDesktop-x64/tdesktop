@@ -107,7 +107,11 @@ void SelfForwardsTagger::showSelectorForMessages(
 		st::reactPanelEmojiPan,
 		_controller->uiShow(),
 		reactions,
-		TextWithEntities(),
+		tr::lng_add_tag_selector(
+			tr::now,
+			lt_count,
+			float64(ids.size()),
+			TextWithEntities::Simple),
 		[](bool) {},
 		IconFactory(),
 		[] { return false; },

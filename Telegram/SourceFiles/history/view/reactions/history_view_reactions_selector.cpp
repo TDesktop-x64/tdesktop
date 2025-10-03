@@ -499,7 +499,10 @@ void Selector::initGeometry(int innerTop) {
 	if (_about) {
 		_about->move(
 			_inner.x() + (_inner.width() - _about->width()) / 2,
-			_outer.y() + margins.top() + _st.aboutPadding.top());
+			_outer.y()
+				+ margins.top()
+				+ _st.aboutPadding.top()
+				- skipYBubbleUpShift());
 		_aboutCache = Ui::GrabWidgetToImage(_about.get());
 	}
 

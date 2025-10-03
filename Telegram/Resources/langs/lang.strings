@@ -4529,6 +4529,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_add_tag_phrase" = "to messages {arrow}";
 "lng_add_tag_phrase_long" = "to your Saved Messages {arrow}";
 "lng_unlock_tags" = "Unlock";
+"lng_add_tag_selector#one" = "You can add a tag to the message";
+"lng_add_tag_selector#other" = "You can add a tag to the messages";
 
 "lng_context_animated_emoji" = "This message contains emoji from **{name} pack**.";
 "lng_context_animated_emoji_many#one" = "This message contains emoji from **{count} pack**.";

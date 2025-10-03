@@ -1167,14 +1167,14 @@ void InnerWidget::showMenuFor(not_null<GiftButton*> button, QPoint point) {
 	if (_peer->canManageGifts() && !_collections.empty()) {
 		const auto &gift = (*_list)[index].gift;
 		const auto addAction = Ui::Menu::CreateAddActionCallback(_menu);
-		const auto submenuAction = addAction(
-			tr::lng_gift_collection_add_to(tr::now),
-			[]{},
-			&st::menuIconAddToFolder);
-		const auto submenu = _menu->ensureSubmenu(
-			submenuAction,
-			st::popupMenuWithIcons);
-		fillCollectionsMenu(submenu, gift);
+		addAction(Ui::Menu::MenuCallback::Args{
+			.text = tr::lng_gift_collection_add_to(tr::now),
+			.handler = nullptr,
+			.icon = &st::menuIconAddToFolder,
+			.fillSubmenu = [&](not_null<Ui::PopupMenu*> menu) {
+				fillCollectionsMenu(menu, gift);
+			},
+		});
 	}
 	::Settings::FillSavedStarGiftMenu(
 		_window->uiShow(),

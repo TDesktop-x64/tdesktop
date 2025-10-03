@@ -949,9 +949,9 @@ void PeerData::clearPaysPerMessage() {
 }
 
 bool PeerData::hideLinks() const {
-	if (!isUser()) {
-		return false;
-	}
+	//if (!isUser()) {
+	//	return false;
+	//}
 	const auto settings = barSettings();
 	return !settings || (*settings & PeerBarSetting::ReportSpam);
 }

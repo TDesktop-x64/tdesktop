@@ -3568,10 +3568,10 @@ void Message::validateInlineKeyboard(HistoryMessageReplyMarkup *markup) {
 		return;
 	}
 	const auto item = data();
-	if (item->hideLinks()) {
-		item->setHasHiddenLinks(true);
-		return;
-	}
+	//if (item->hideLinks()) {
+	//	item->setHasHiddenLinks(true);
+	//	return;
+	//}
 	markup->inlineKeyboard = std::make_unique<ReplyKeyboard>(
 		item,
 		std::make_unique<KeyboardStyle>(

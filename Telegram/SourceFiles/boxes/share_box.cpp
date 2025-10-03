@@ -1796,7 +1796,9 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 							auto phrase = rpl::variable<TextWithEntities>(
 								ChatHelpers::ForwardedMessagePhrase(
 									donePhraseArgs)).current();
-							show->showToast(std::move(phrase));
+							if (!phrase.empty()) {
+								show->showToast(std::move(phrase));
+							}
 							show->hideLayer();
 						}
 					}
@@ -1954,7 +1956,9 @@ void FastShareMessageToSelf(
 			auto phrase = rpl::variable<TextWithEntities>(
 				ChatHelpers::ForwardedMessagePhrase(
 					donePhraseArgs)).current();
-			show->showToast(std::move(phrase));
+			if (!phrase.empty()) {
+				show->showToast(std::move(phrase));
+			}
 		});
 }
 

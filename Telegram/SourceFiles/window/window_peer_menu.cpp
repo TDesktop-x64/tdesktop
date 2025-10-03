@@ -3908,7 +3908,9 @@ void ForwardToSelf(
 					.singleMessage = (count == 1),
 					.to1 = session->user(),
 				})).current();
-				show->showToast(std::move(phrase));
+				if (!phrase.empty()) {
+					show->showToast(std::move(phrase));
+				}
 			});
 	}
 }

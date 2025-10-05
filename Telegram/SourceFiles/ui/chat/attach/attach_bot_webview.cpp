@@ -2125,10 +2125,6 @@ TextWithEntities ErrorText(const Webview::Available &info) {
 			Ui::Text::WithEntities);
 	case Error::NoWebKitGTK:
 		return { tr::lng_payments_webview_install_webkit(tr::now) };
-	case Error::NoOpenGL:
-		return { tr::lng_payments_webview_enable_opengl(tr::now) };
-	case Error::NonX11:
-		return { tr::lng_payments_webview_switch_x11(tr::now) };
 	case Error::OldWindows:
 		return { tr::lng_payments_webview_update_windows(tr::now) };
 	default:

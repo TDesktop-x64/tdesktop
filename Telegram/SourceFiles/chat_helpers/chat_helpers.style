@@ -420,6 +420,7 @@ emojiPanHover: windowBgOver;
 emojiPanSlideDuration: 200;
 emojiPanArea: size(34px, 32px);
 emojiPanRadius: 8px;
+emojiPanReactionsPreviewPadding: margins(10px, 20px, 10px, 20px);
 
 defaultTabbedSearchCancel: CrossButton {
 	width: 33px;

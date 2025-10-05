@@ -71,6 +71,9 @@ mediaviewPipButton: IconButton(mediaviewControlsButton) {
 	iconPosition: point(4px, 4px);
 }
 
+mediaviewPipMargins: callShadowExtend;
+mediaviewPipShadow: callShadow;
+
 mediaviewFullScreenButtonSkip: 4px;
 mediaviewFullScreenButton: IconButton(mediaviewPipButton) {
 	icon: icon {{ "player/player_fullscreen", mediaviewPlaybackIconFg }};

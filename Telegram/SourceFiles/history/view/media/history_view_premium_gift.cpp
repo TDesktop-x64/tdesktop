@@ -55,9 +55,7 @@ int PremiumGift::top() {
 }
 
 int PremiumGift::width() {
-	return _data.stargiftReleasedBy
-		? st::msgServiceStarGiftByWidth
-		: st::msgServiceStarGiftBoxWidth;
+	return st::msgServiceStarGiftBoxWidth;
 }
 
 QSize PremiumGift::size() {
@@ -388,7 +386,9 @@ QImage PremiumGift::cornerTag(const PaintContext &context) {
 	}
 	if (_badgeCache.isNull() || _badgeKey != badge) {
 		_badgeKey = badge;
-		_badgeCache = ValidateRotatedBadge(badge, 0);
+		_badgeCache = ValidateRotatedBadge(
+			badge,
+			st::msgServiceGiftBoxBadgePadding);
 	}
 	return _badgeCache;
 }

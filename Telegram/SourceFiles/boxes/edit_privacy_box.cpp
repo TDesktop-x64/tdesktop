@@ -478,15 +478,15 @@ auto PrivacyExceptionsBoxController::createRow(not_null<History*> history)
 	const auto labels = raw->add(object_ptr<Ui::RpWidget>(raw));
 	const auto min = Ui::CreateChild<Ui::FlatLabel>(
 		raw,
-		QString::number(minValue),
+		Lang::FormatCountDecimal(minValue),
 		*labelStyle);
 	const auto max = Ui::CreateChild<Ui::FlatLabel>(
 		raw,
-		QString::number(maxValue),
+		Lang::FormatCountDecimal(maxValue),
 		*labelStyle);
 	const auto current = Ui::CreateChild<Ui::FlatLabel>(
 		raw,
-		QString::number(value),
+		Lang::FormatCountDecimal(value),
 		*labelStyle);
 	min->setTextColorOverride(st::windowSubTextFg->c);
 	max->setTextColorOverride(st::windowSubTextFg->c);
@@ -516,7 +516,7 @@ auto PrivacyExceptionsBoxController::createRow(not_null<History*> history)
 	};
 	const auto updateByValue = [=](int value) {
 		current->setText(value > 0
-			? tr::lng_action_gift_for_stars(tr::now, lt_count, value)
+			? tr::lng_action_gift_for_stars(tr::now, lt_count_decimal, value)
 			: tr::lng_manage_monoforum_free(tr::now));
 
 		state->index = 0;

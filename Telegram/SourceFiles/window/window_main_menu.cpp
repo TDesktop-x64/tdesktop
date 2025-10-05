@@ -952,8 +952,8 @@ OthersUnreadState OtherAccountsUnreadStateCurrent(
 		if (account.get() == current) {
 			continue;
 		} else if (const auto session = account->maybeSession()) {
-			counter += session->data().unreadBadge();
-			if (!session->data().unreadBadgeMuted()) {
+			counter += session->data().unreadWithMentionsBadge();
+			if (!session->data().unreadWithMentionsBadgeMuted()) {
 				allMuted = false;
 			}
 		}

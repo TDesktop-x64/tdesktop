@@ -112,8 +112,9 @@ void DeleteMessagesBox::prepare() {
 					Ui::Text::RichLangValue);
 			deleteStyle = &st::attentionBoxButton;
 		} else if (_wipeHistoryJustClear) {
-			_revokeJustClearForChannel = true;
-			details.text = (peer->isChannel() && !peer->isMegagroup())
+			const auto isChannel = peer->isChannel() && !peer->isMegagroup();
+			_revokeJustClearForChannel = isChannel;
+			details.text = isChannel
 				? tr::lng_sure_delete_channel_history(
 					tr::now,
 					lt_channel,

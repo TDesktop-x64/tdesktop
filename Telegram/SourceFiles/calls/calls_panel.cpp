@@ -1154,6 +1154,9 @@ void Panel::updateControlsGeometry() {
 		_bodySt->muteSize,
 		_bodySt->muteStroke);
 
+	if (_name->naturalWidth() > innerWidth) {
+		_name->resizeToWidth(innerWidth);
+	}
 	_name->moveToLeft(
 		(widget()->width() - _name->width()) / 2,
 		_bodyTop + _bodySt->nameTop);

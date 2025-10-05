@@ -34,6 +34,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/effects/premium_graphics.h"
 #include "ui/painter.h"
 #include "window/window_session_controller.h"
+#include "styles/style_chat.h"
 #include "styles/style_credits.h"
 #include "styles/style_layers.h"
 #include "styles/style_overview.h"
@@ -937,7 +938,8 @@ QImage Delegate::cachedBadge(const GiftBadge &badge) {
 	auto &image = _badges[badge];
 	if (image.isNull()) {
 		const auto &extend = buttonExtend();
-		image = ValidateRotatedBadge(badge, extend.top());
+		const auto padding = QMargins(extend.top(), 0, extend.top(), 0);
+		image = ValidateRotatedBadge(badge, padding);
 	}
 	return image;
 }
@@ -979,17 +981,19 @@ rpl::producer<not_null<DocumentData*>> GiftStickerValue(
 	});
 }
 
-QImage ValidateRotatedBadge(const GiftBadge &badge, int added) {
+QImage ValidateRotatedBadge(const GiftBadge &badge, QMargins padding) {
 	const auto &font = badge.small
 		? st::giftBoxGiftBadgeFont
-		: st::semiboldFont;
-	const auto twidth = font->width(badge.text) + 2 * added;
+		: st::msgServiceGiftBoxBadgeFont;
+	const auto twidth = font->width(badge.text)
+		+ padding.left()
+		+ padding.right();
 	const auto skip = int(std::ceil(twidth / M_SQRT2));
 	const auto ratio = style::DevicePixelRatio();
 	const auto multiplier = ratio * 3;
 	const auto size = (twidth + font->height * 2);
-	const auto height = font->height + st::lineWidth;
-	const auto textpos = QPoint(size - skip, added);
+	const auto height = padding.top() + font->height + padding.bottom();
+	const auto textpos = QPoint(size - skip, padding.top());
 	auto image = QImage(
 		QSize(size, size) * multiplier,
 		QImage::Format_ARGB32_Premultiplied);
@@ -1002,7 +1006,9 @@ QImage ValidateRotatedBadge(const GiftBadge &badge, int added) {
 		p.rotate(45.);
 		p.setFont(font);
 		p.setPen(badge.fg);
-		p.drawText(QPoint(added, font->ascent), badge.text);
+		p.drawText(
+			QPoint(padding.left(), padding.top() + font->ascent),
+			badge.text);
 	}
 
 	auto scaled = image.scaled(

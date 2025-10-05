@@ -636,7 +636,7 @@ auto GenerateGiftMedia(
 						Ui::Text::Link('@' + by->username()),
 						Ui::Text::WithEntities),
 					st::giftBoxReleasedByMargin,
-					st::defaultTextStyle));
+					st::uniqueGiftReleasedBy.style));
 			}
 		}
 
@@ -4052,7 +4052,7 @@ void AddUniqueGiftCover(
 		QColor bg;
 	};
 	const auto released = cover->lifetime().make_state<Released>();
-	released->st = st::uniqueGiftSubtitle;
+	released->st = st::uniqueGiftReleasedBy;
 	released->st.palette.linkFg = released->white.color();
 
 	if (resalePrice) {

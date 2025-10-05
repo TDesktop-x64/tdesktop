@@ -18,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/boxes/confirm_box.h"
 #include "boxes/delete_messages_box.h"
 #include "boxes/send_credits_box.h"
+#include "boxes/send_gif_with_caption_box.h"
 #include "boxes/send_files_box.h"
 #include "boxes/share_box.h"
 #include "boxes/edit_caption_box.h"
@@ -7626,17 +7627,26 @@ void HistoryWidget::keyPressEvent(QKeyEvent *e) {
 	} else if (e->key() == Qt::Key_Down && !commonModifiers) {
 		_scroll->keyPressEvent(e);
 	} else if (e->key() == Qt::Key_Up && !commonModifiers) {
-		const auto item = _history
-			? _history->lastEditableMessage()
-			: nullptr;
-		if (item
-			&& _field->empty()
-			&& !_editMsgId
-			&& !_replyTo) {
-			editMessage(item, {});
-			return;
+		if (!_field->empty()
+			|| _editMsgId
+			|| _replyTo) {
+			_scroll->keyPressEvent(e);
+		} else {
+			const auto last = _history->lastMessage();
+			if (last && last->isUploading()) {
+				if (const auto view = last->mainView()) {
+					controller()->show(Box(Ui::EditCaptionBox, view));
+				}
+				return;
+			}
+			const auto item = _history
+				? _history->lastEditableMessage()
+				: nullptr;
+			if (item) {
+				editMessage(item, {});
+				return;
+			}
 		}
-		_scroll->keyPressEvent(e);
 	} else if (e->key() == Qt::Key_Up
 		&& commonModifiers == Qt::ControlModifier) {
 		if (!replyToPreviousMessage()) {

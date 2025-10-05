@@ -38,6 +38,9 @@ public:
 		Data::FileOrigin origin,
 		not_null<PhotoData*> photo);
 	void hidePreview();
+	void setCustomPadding(const QMargins &padding = QMargins());
+	void setBackgroundMargins(const QMargins &margins = QMargins());
+	void setCornersSkip(int pixels);
 
 	~MediaPreviewWidget();
 
@@ -87,6 +90,9 @@ private:
 	mutable CacheStatus _cacheStatus = CacheNotLoaded;
 	mutable QPixmap _cache;
 	mutable QSize _cachedSize;
+	QMargins _customPadding;
+	QMargins _backgroundMargins;
+	int _cornersSkip = 0;
 
 };
 

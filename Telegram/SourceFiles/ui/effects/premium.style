@@ -120,6 +120,9 @@ premiumPreviewAbout: FlatLabel(defaultFlatLabel) {
 	minWidth: 240px;
 	textFg: membersAboutLimitFg;
 	align: align(top);
+	style: TextStyle(defaultTextStyle) {
+		font: font(12px);
+	}
 }
 premiumPreviewAboutPadding: margins(18px, 8px, 18px, 8px);
 premiumPreviewButtonLabel: FlatLabel(defaultFlatLabel) {

@@ -2600,8 +2600,9 @@ void OverlayWidget::saveAs() {
 					QFile(location.name()).copy(file);
 				} else {
 					QFile f(file);
-					f.open(QIODevice::WriteOnly);
-					f.write(bytes);
+					if (f.open(QIODevice::WriteOnly)) {
+						f.write(bytes);
+					}
 				}
 				if (_message) {
 					auto &manager = Core::App().downloadManager();

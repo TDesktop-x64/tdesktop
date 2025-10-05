@@ -21,6 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/effects/animation_value_f.h"
 #include "ui/effects/animations.h"
 #include "ui/painter.h"
+#include "ui/rect.h"
 #include "ui/rp_widget.h"
 #include "window/window_session_controller.h"
 #include "styles/style_chat.h"
@@ -58,6 +59,7 @@ private:
 
 	const not_null<Window::SessionController*> _controller;
 	const bool _crop;
+	const bool _isText;
 	MessageSendingAnimationController::SendingInfoTo _toInfo;
 	QRect _from;
 	QPoint _to;
@@ -84,10 +86,18 @@ Content::Content(
 : RpWidget(parent)
 , _controller(controller)
 , _crop(fromInfo.crop)
+, _isText(fromInfo.type == MessageSendingAnimationFrom::Type::Text)
 , _toInfo(std::move(to))
 , _from(parent->mapFromGlobal(fromInfo.globalStartGeometry))
-, _innerContentRect(maybeView()->media()->contentRectForReactions())
-, _minScale(float64(_from.height()) / _innerContentRect.height()) {
+, _innerContentRect(_isText
+	? [&] {
+		const auto g = maybeView()->innerGeometry();
+		return Rect(g.size()) + QMargins(0, g.top(), 0, 0);
+	}()
+	: maybeView()->media()->contentRectForReactions())
+, _minScale(!_isText
+	? float64(_from.height()) / _innerContentRect.height()
+	: 1.) {
 	Expects(_toInfo.view != nullptr);
 	Expects(_toInfo.paintContext != nullptr);
 
@@ -117,24 +127,41 @@ Content::Content(
 
 	auto animationCallback = [=](float64 value) {
 		auto resultFrom = rect();
-		resultFrom.moveCenter(_from.center());
+		if (_isText) {
+			resultFrom.moveTo(
+				style::RightToLeft()
+					? (rect::right(_from) - resultFrom.width())
+					: _from.left(),
+				_from.y());
+			// Calculating relative values for all possible cases
+			// is too complex, so we manually set the position
+			// for the simplest case.
+			resultFrom.translate(st::messageSendingAnimationTextFromOffset);
+		} else {
+			resultFrom.moveCenter(_from.center());
+		}
 
-		const auto resultTo = _to
-			+ innerGeometry.topLeft()
-			+ _innerContentRect.topLeft();
+		const auto resultTo = _isText
+			? _to + innerGeometry.topLeft()
+			: _to + innerGeometry.topLeft() + _innerContentRect.topLeft();
 		const auto x = anim::interpolate(resultFrom.x(), resultTo.x(), value);
 		const auto y = anim::interpolate(resultFrom.y(), resultTo.y(), value);
-		moveToLeft(x, y);
-		update();
+		if (!_isText) {
+			// Text-only messages are drawing only in _bubble.widget.
+			moveToLeft(x, y);
+			update();
+		} else {
+			setUpdatesEnabled(false);
+		}
 
-		if ((value > kSurroundingProgress)
+		if ((value > kSurroundingProgress || _isText)
 			&& !_surrounding
 			&& !_bubble.widget) {
 			const auto currentView = maybeView();
 			if (!checkView(currentView)) {
 				return;
 			}
-			if (currentView->hasBubble()) {
+			if (_isText || currentView->hasBubble()) {
 				createBubble();
 			} else {
 				createSurrounding();
@@ -280,12 +307,12 @@ void Content::createSurrounding() {
 		const auto alpha = (divider - revProgress) / divider;
 		p.setOpacity(alpha);
 
-	 	const auto scale = anim::interpolateF(_minScale, 1., progress);
+		const auto scale = anim::interpolateF(_minScale, 1., progress);
 
-	 	p.translate(
-	 		revProgress * OffsetMid(size.width() + offset.x(), _minScale),
-	 		revProgress * OffsetMid(size.height() + offset.y(), _minScale));
-	 	p.scale(scale, scale);
+		p.translate(
+			revProgress * OffsetMid(size.width() + offset.x(), _minScale),
+			revProgress * OffsetMid(size.height() + offset.y(), _minScale));
+		p.scale(scale, scale);
 
 		const auto currentView = maybeView();
 		if (!checkView(currentView)) {
@@ -312,7 +339,11 @@ void Content::createBubble() {
 
 	const auto tailWidth = st::historyBubbleTailOutLeft.width();
 	_bubble.offsetFromContent = QPoint(
-		currentView->hasOutLayout() ? 0 : tailWidth,
+		(currentView->hasOutLayout()
+			&& (currentView->delegate()->elementChatMode()
+				!= HistoryView::ElementChatMode::Wide))
+			? 0
+			: tailWidth,
 		innerGeometry.y());
 
 	const auto scaleOffset = QPoint(0, innerGeometry.y());
@@ -323,8 +354,11 @@ void Content::createBubble() {
 		|| currentView->data()->externalReply();
 	_bubble.widget->resize(innerGeometry.size()
 		+ QSize(
-			currentView->hasOutLayout() ? tailWidth : 0,
-			hasCommentsButton ? innerGeometry.y() : 0));
+			(currentView->hasOutLayout() ? tailWidth : 0)
+				+ (_isText && currentView->data()->isPost()
+					? rect::m::sum::h(st::msgPadding)
+					: 0),
+			(hasCommentsButton || _isText) ? innerGeometry.y() : 0));
 	_bubble.widget->show();
 
 	_bubble.widget->stackUnder(this);
@@ -338,7 +372,7 @@ void Content::createBubble() {
 		const auto progress = _animation.value(0.);
 		const auto revProgress = 1. - progress;
 
-		const auto divider = 1. - kSurroundingProgress;
+		const auto divider = 1. - (_isText ? 0. : kSurroundingProgress);
 		const auto alpha = (divider - revProgress) / divider;
 		p.setOpacity(alpha);
 
@@ -443,6 +477,7 @@ bool MessageSendingAnimationController::checkExpectedType(
 	const auto type = it->second.type;
 	const auto isSticker = type == MessageSendingAnimationFrom::Type::Sticker;
 	const auto isGif = type == MessageSendingAnimationFrom::Type::Gif;
+	const auto isText = type == MessageSendingAnimationFrom::Type::Text;
 	if (isSticker || isGif) {
 		if (item->emptyText()) {
 			if (const auto media = item->media()) {
@@ -454,6 +489,8 @@ bool MessageSendingAnimationController::checkExpectedType(
 				}
 			}
 		}
+	} else if (isText && !item->media()) {
+		return true;
 	}
 	_itemSendPending.erase(it);
 	return false;

@@ -243,7 +243,7 @@ struct ChatPaintContext {
 	};
 
 
-	// This is supported only in unwrapped media for now.
+	// This is supported only in unwrapped media and text messages for now.
 	enum class SkipDrawingParts {
 		None,
 		Content,

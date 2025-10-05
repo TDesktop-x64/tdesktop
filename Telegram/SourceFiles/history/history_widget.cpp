@@ -4752,10 +4752,20 @@ void HistoryWidget::send(Api::SendOptions options) {
 		return;
 	}
 
+	const auto nextLocalMessageId = session().data().nextLocalMessageId();
+
+	if (HasSendText(_field) && message.webPage.url.isEmpty()) {
+		controller()->sendingAnimation().appendSending({
+			.type = Ui::MessageSendingAnimationFrom::Type::Text,
+			.localId = nextLocalMessageId,
+			.globalStartGeometry = _field->mapToGlobal(Rect(_field->size())),
+		});
+	}
+
 	// Just a flag not to drop reply info if we're not sending anything.
 	_justMarkingAsRead = !HasSendText(_field)
 		&& message.webPage.url.isEmpty();
-	session().api().sendMessage(std::move(message));
+	session().api().sendMessage(std::move(message), nextLocalMessageId);
 	_justMarkingAsRead = false;
 
 	clearFieldText();
@@ -7141,7 +7151,6 @@ void HistoryWidget::startMessageSendingAnimation(
 		return;
 	}
 	Assert(item->mainView() != nullptr);
-	Assert(item->mainView()->media() != nullptr);
 
 	auto globalEndTopLeft = rpl::merge(
 		_scroll->innerResizes() | rpl::to_empty,

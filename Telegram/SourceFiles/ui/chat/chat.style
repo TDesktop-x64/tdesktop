@@ -1396,6 +1396,8 @@ chatTabsOutlineHorizontal: ChatTabsOutline {
 chatTabsOutlineVertical: ChatTabsOutline(chatTabsOutlineHorizontal) {
 }
 
+messageSendingAnimationTextFromOffset: point(-6px, 9px);
+
 suggestPriceBox: Box(defaultBox) {
 	buttonPadding: margins(22px, 22px, 22px, 22px);
 	buttonHeight: 42px;

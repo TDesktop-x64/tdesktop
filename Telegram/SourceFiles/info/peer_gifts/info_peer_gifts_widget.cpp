@@ -840,9 +840,6 @@ void InnerWidget::validateButtons() {
 			}
 		}
 		auto &view = views.back();
-		const auto callback = _addingToCollectionId
-			? Fn<void()>([=] { showGift(index); })
-			: nullptr;
 		view.index = index;
 		view.manageId = manageId;
 		view.giftId = giftId;
@@ -853,9 +850,6 @@ void InnerWidget::validateButtons() {
 				anim::type::instant);
 		}
 		view.button->setDescriptor(descriptor, _mode);
-		if (callback) {
-			view.button->setClickedCallback(callback);
-		}
 		return true;
 	};
 	for (auto j = fromRow; j != tillRow; ++j) {
@@ -921,8 +915,6 @@ void InnerWidget::validateButtons() {
 						_inCollection.contains(entry.gift.manageId),
 						GiftSelectionMode::Check,
 						anim::type::instant);
-					const auto callback = [=] { showGift(_dragging.index); };
-					_draggedView->button->setClickedCallback(callback);
 				}
 				_draggedView->button->show();
 			} else {

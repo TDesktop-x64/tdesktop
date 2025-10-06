@@ -538,6 +538,9 @@ void GiftButton::contextMenuEvent(QContextMenuEvent *e) {
 }
 
 void GiftButton::mousePressEvent(QMouseEvent *e) {
+	if (e->button() != Qt::LeftButton) {
+		return;
+	}
 	_mouseEvents.fire_copy(e);
 	if (e->isAccepted()) {
 		return;
@@ -546,6 +549,9 @@ void GiftButton::mousePressEvent(QMouseEvent *e) {
 }
 
 void GiftButton::mouseMoveEvent(QMouseEvent *e) {
+	if (e->button() != Qt::LeftButton) {
+		return;
+	}
 	_mouseEvents.fire_copy(e);
 	if (e->isAccepted()) {
 		return;
@@ -554,6 +560,9 @@ void GiftButton::mouseMoveEvent(QMouseEvent *e) {
 }
 
 void GiftButton::mouseReleaseEvent(QMouseEvent *e) {
+	if (e->button() != Qt::LeftButton) {
+		return;
+	}
 	_mouseEvents.fire_copy(e);
 	if (e->isAccepted()) {
 		return;

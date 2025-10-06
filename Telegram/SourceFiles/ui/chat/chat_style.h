@@ -248,6 +248,7 @@ struct ChatPaintContext {
 		None,
 		Content,
 		Surrounding,
+		Bubble,
 	};
 	SkipDrawingParts skipDrawingParts = SkipDrawingParts::None;
 

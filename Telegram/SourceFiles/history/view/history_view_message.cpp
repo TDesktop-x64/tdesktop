@@ -1378,10 +1378,24 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 			textSelection = media->skipSelection(textSelection);
 			highlightRange = media->skipSelection(highlightRange);
 		}
-		auto copy = context;
-		copy.selection = textSelection;
-		copy.highlight.range = highlightRange;
-		paintText(p, trect, copy);
+		const auto drawText = context.skipDrawingParts
+			!= PaintContext::SkipDrawingParts::Content;
+		const auto drawOnlyText = drawText
+			&& (context.skipDrawingParts
+				!= PaintContext::SkipDrawingParts::None);
+		if (drawOnlyText) {
+			p.save();
+			p.setClipping(false);
+		}
+		if (drawText) {
+			auto copy = context;
+			copy.selection = textSelection;
+			copy.highlight.range = highlightRange;
+			paintText(p, trect, copy);
+		}
+		if (drawOnlyText) {
+			p.restore();
+		}
 		if (mediaDisplayed && !_invertMedia) {
 			paintMedia(trect.y() + trect.height() - mediaHeight);
 			if (context.reactionInfo && !displayInfo && !_reactions) {

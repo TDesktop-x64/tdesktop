@@ -396,6 +396,12 @@ void Content::createBubble() {
 		p.translate(-paintOffsetLeft, 0);
 
 		currentView->draw(p, context);
+		if (_isText) {
+			p.setOpacity(1.);
+			p.setClipRect(QRect(0, 0, 0, 0));
+			context.skipDrawingParts = Context::SkipDrawingParts::Bubble;
+			currentView->draw(p, context);
+		}
 	}, _bubble.widget->lifetime());
 }
 

@@ -328,7 +328,7 @@ void CreateModerateMessagesBox(
 						: rpl::merge(
 							controller->toggleRequestsFromInner.events(),
 							controller->checkAllRequests.events())
-				) | rpl::map([=, s = itemsCount](const auto &map, bool c) {
+				) | rpl::map([=](const auto &map, bool c) {
 					const auto checked = (isSingle && !c)
 						? Participants()
 						: controller->collectRequests

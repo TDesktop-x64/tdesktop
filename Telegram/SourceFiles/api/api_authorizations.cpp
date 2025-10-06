@@ -98,7 +98,7 @@ Authorizations::Authorizations(not_null<ApiWrap*> api)
 	api->session().saveSettingsDelayed();
 }) {
 	_unreviewed = api->session().settings().unreviewed();
-	removeExpiredUnreviewed();
+	crl::on_main(&api->session(), [=] { removeExpiredUnreviewed(); });
 	Core::App().settings().deviceModelChanges(
 	) | rpl::start_with_next([=](const QString &model) {
 		auto changed = false;

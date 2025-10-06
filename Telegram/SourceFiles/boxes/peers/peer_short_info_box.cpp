@@ -230,9 +230,13 @@ void PeerShortInfoCover::paintCoverImage(QPainter &p, const QImage &image) {
 	if (fill > 0) {
 		const auto t = roundedHeight + _scrollTop;
 		p.drawImage(
-			QRect(0, t, roundedWidth * factor, (roundedWidth - t) * factor),
+			QRect(0, t, roundedWidth, roundedWidth - t),
 			image,
-			QRect(0, t, roundedWidth * factor, (roundedWidth - t) * factor));
+			QRect(
+				0,
+				t * factor,
+				roundedWidth * factor,
+				(roundedWidth - t) * factor));
 	}
 	if (covered <= 0) {
 		return;
@@ -241,9 +245,9 @@ void PeerShortInfoCover::paintCoverImage(QPainter &p, const QImage &image) {
 	const auto from = top - rounded;
 	auto q = QPainter(&_roundedTopImage);
 	q.drawImage(
-		QRect(0, 0, roundedWidth * factor, rounded * factor),
+		QRect(0, 0, roundedWidth, rounded),
 		image,
-		QRect(0, _scrollTop, roundedWidth * factor, rounded * factor));
+		QRect(0, _scrollTop * factor, roundedWidth * factor, rounded * factor));
 	q.end();
 	_roundedTopImage = Images::Round(
 		std::move(_roundedTopImage),

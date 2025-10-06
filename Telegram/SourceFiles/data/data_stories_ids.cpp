@@ -63,7 +63,7 @@ rpl::producer<StoriesIdsSlice> AlbumStoriesIds(
 				std::move(ids),
 				count,
 				(hasBefore - takeBefore),
-				count - hasBefore - added);
+				count - (hasBefore - takeBefore) - added);
 			consumer.put_next_copy(state->slice);
 		};
 		const auto schedule = [=] {

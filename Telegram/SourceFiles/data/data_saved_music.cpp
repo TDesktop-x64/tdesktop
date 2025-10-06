@@ -260,7 +260,8 @@ void SavedMusic::loadMore(PeerId peerId, bool reload) {
 						musicIdToMsg(peerId, entry, document));
 				}
 			}
-			entry.loaded = list.empty() || (count == entry.list.size());
+			entry.loaded = list.empty()
+				|| (entry.total == entry.list.size());
 		});
 		_changed.fire_copy(peerId);
 	}).fail([=](const MTP::Error &error) {
@@ -332,24 +333,24 @@ rpl::producer<SavedMusicSlice> SavedMusicList(
 			if (i == end(loaded)) {
 				i = begin(loaded);
 			}
-			const auto hasBefore = int(i - begin(loaded));
-			const auto hasAfter = int(end(loaded) - i);
-			if (hasAfter < limit) {
+			const auto hasAfter = int(i - begin(loaded));
+			const auto hasBefore = int(end(loaded) - i);
+			if (hasBefore < limit) {
 				savedMusic->loadMore(peerId);
 			}
-			const auto takeBefore = std::min(hasBefore, limit);
 			const auto takeAfter = std::min(hasAfter, limit);
+			const auto takeBefore = std::min(hasBefore, limit);
 			auto ids = std::vector<not_null<HistoryItem*>>();
-			ids.reserve(takeBefore + takeAfter);
-			for (auto j = i - takeBefore; j != i + takeAfter; ++j) {
+			ids.reserve(takeAfter + takeBefore);
+			for (auto j = i - takeAfter; j != i + takeBefore; ++j) {
 				ids.push_back(*j);
 			}
 			const auto added = int(ids.size());
 			state->slice = SavedMusicSlice(
 				std::move(ids),
 				count,
-				(hasBefore - takeBefore),
-				count - hasBefore - added);
+				count - (hasAfter - takeAfter) - added,
+				hasAfter - takeAfter);
 			consumer.put_next_copy(state->slice);
 		};
 		const auto schedule = [=] {

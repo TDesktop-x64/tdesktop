@@ -1131,13 +1131,12 @@ void Panel::switchInlineQueryMessage(const QJsonObject &args) {
 	if (args.isEmpty()) {
 		_delegate->botClose();
 		return;
-	}
-	const auto query = args["query"].toString();
-	if (query.isEmpty()) {
-		LOG(("BotWebView Error: Bad 'query' in switchInlineQueryMessage."));
+	} else if (!args.contains("query")) {
+		LOG(("BotWebView Error: No 'query' in switchInlineQueryMessage."));
 		_delegate->botClose();
 		return;
 	}
+	const auto query = args["query"].toString();
 	const auto valid = base::flat_set<QString>{
 		u"users"_q,
 		u"bots"_q,

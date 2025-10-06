@@ -151,6 +151,10 @@ void SubsectionTabs::setupHorizontal(not_null<QWidget*> parent) {
 					{ 0, 0, 0, st::lineWidth })),
 			st::windowBg);
 	}, _horizontal->lifetime());
+
+	_layoutRequests.fire({});
+
+	startFillingSlider(scroll, slider, false);
 }
 
 void SubsectionTabs::setupVertical(not_null<QWidget*> parent) {
@@ -204,6 +208,10 @@ void SubsectionTabs::setupVertical(not_null<QWidget*> parent) {
 	_vertical->paintRequest() | rpl::start_with_next([=](QRect clip) {
 		QPainter(_vertical).fillRect(clip, st::windowBg);
 	}, _vertical->lifetime());
+
+	_layoutRequests.fire({});
+
+	startFillingSlider(scroll, slider, true);
 }
 
 void SubsectionTabs::setupSlider(
@@ -261,7 +269,12 @@ void SubsectionTabs::setupSlider(
 			}
 		}
 	}, slider->lifetime());
+}
 
+void SubsectionTabs::startScrollChecking(
+		not_null<Ui::ScrollArea*> scroll,
+		not_null<Ui::SubsectionSlider*> slider,
+		bool vertical) {
 	rpl::merge(
 		scroll->scrolls(),
 		_scrollCheckRequests.events(),
@@ -298,6 +311,13 @@ void SubsectionTabs::setupSlider(
 			refreshAroundMiddle(scroll, slider);
 		}
 	}, scroll->lifetime());
+}
+
+void SubsectionTabs::startFillingSlider(
+		not_null<Ui::ScrollArea*> scroll,
+		not_null<Ui::SubsectionSlider*> slider,
+		bool vertical) {
+	// We need to fill the content after the initial size is set.
 
 	using ImagePointer = std::shared_ptr<Ui::DynamicImage>;
 	struct Cache {
@@ -457,6 +477,8 @@ void SubsectionTabs::setupSlider(
 
 		_scrollCheckRequests.fire({});
 	}, scroll->lifetime());
+
+	startScrollChecking(scroll, slider, vertical);
 }
 
 void SubsectionTabs::showThreadContextMenu(not_null<Data::Thread*> thread) {
@@ -503,17 +525,16 @@ rpl::producer<> SubsectionTabs::dataChanged() const {
 void SubsectionTabs::toggleModes() {
 	Expects((_horizontal || _vertical) && _shadow);
 
+	const auto peerId = _history->peer->id;
+	const auto nowVertical = (_horizontal != nullptr);
+	session().settings().setVerticalSubsectionTabs(peerId, nowVertical);
+	session().saveSettingsDelayed();
+
 	if (_horizontal) {
 		setupVertical(_horizontal->parentWidget());
 	} else {
 		setupHorizontal(_vertical->parentWidget());
 	}
-	const auto peerId = _history->peer->id;
-	const auto vertical = (_vertical != nullptr);
-	session().settings().setVerticalSubsectionTabs(peerId, vertical);
-	session().saveSettingsDelayed();
-
-	_layoutRequests.fire({});
 }
 
 bool SubsectionTabs::dying() const {

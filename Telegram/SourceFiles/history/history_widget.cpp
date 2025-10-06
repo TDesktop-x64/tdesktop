@@ -1236,6 +1236,7 @@ void HistoryWidget::initVoiceRecordBar() {
 
 	_voiceRecordBar->recordingStateChanges(
 	) | rpl::start_with_next([=](bool active) {
+		_field->setDisabled(active);
 		controller()->widget()->setInnerFocus();
 	}, lifetime());
 

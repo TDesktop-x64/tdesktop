@@ -16,6 +16,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_peer.h"
 #include "data/data_peer_values.h"
 #include "data/data_replies_list.h"
+#include "data/data_saved_sublist.h"
 #include "data/data_session.h"
 #include "data/data_thread.h"
 #include "history/view/reactions/history_view_reactions_button.h"
@@ -186,6 +187,7 @@ private:
 	const not_null<Main::Session*> _session;
 	const not_null<Data::Thread*> _thread;
 	const std::shared_ptr<Data::RepliesList> _replies;
+	Data::SavedSublist * const _sublist = nullptr;
 	const not_null<History*> _history;
 	const not_null<PeerData*> _peer;
 	const std::shared_ptr<Ui::ChatTheme> _theme;
@@ -273,6 +275,7 @@ Item::Item(not_null<Ui::RpWidget*> parent, not_null<Data::Thread*> thread)
 , _session(&thread->session())
 , _thread(thread)
 , _replies(thread->asTopic() ? thread->asTopic()->replies() : nullptr)
+, _sublist(thread->asSublist())
 , _history(thread->owningHistory())
 , _peer(thread->peer())
 , _theme(Window::Theme::DefaultChatThemeOn(lifetime()))
@@ -442,9 +445,10 @@ void Item::setupMarkRead() {
 	) | rpl::start_with_next([=] {
 		const auto state = _thread->chatListBadgesState();
 		const auto unread = (state.unreadCounter || state.unread);
-		const auto hidden = _thread->asTopic()
+		const auto hidden = (_thread->asTopic() || _thread->asSublist())
 			? (!unread)
-			: _thread->peer()->isForum();
+			: (_thread->peer()->isForum()
+				|| _thread->peer()->amMonoforumAdmin());
 		if (hidden) {
 			_markRead->hide();
 			return;
@@ -591,6 +595,8 @@ rpl::producer<Data::MessagesSlice> Item::listSource(
 		int limitAfter) {
 	return _replies
 		? _replies->source(aroundId, limitBefore, limitAfter)
+		: _sublist
+		? _sublist->source(aroundId, limitBefore, limitAfter)
 		: Data::HistoryMessagesViewer(
 			_thread->asHistory(),
 			aroundId,
@@ -640,32 +646,44 @@ MessagesBarData Item::listMessagesBar(
 		const std::vector<not_null<Element*>> &elements) {
 	if (elements.empty()) {
 		return {};
-	} else if (!_replies && !_history->unreadCount()) {
+	} else if (!_replies && !_sublist && !_history->unreadCount()) {
 		return {};
 	}
 	const auto repliesTill = _replies
 		? _replies->computeInboxReadTillFull()
 		: MsgId();
-	const auto migrated = _replies ? nullptr : _history->migrateFrom();
+	const auto sublistTill = _sublist
+		? _sublist->computeInboxReadTillFull()
+		: MsgId();
+	const auto migrated = (_replies || _sublist)
+		? nullptr
+		: _history->migrateFrom();
 	const auto migratedTill = (migrated && migrated->unreadCount() > 0)
 		? migrated->inboxReadTillId()
 		: 0;
-	const auto historyTill = (_replies || !_history->unreadCount())
+	const auto historyTill = (_replies
+		|| _sublist
+		|| !_history->unreadCount()
+		|| _history->amMonoforumAdmin())
 		? 0
 		: _history->inboxReadTillId();
-	if (!_replies && !migratedTill && !historyTill) {
+	if (!_replies && !_sublist && !migratedTill && !historyTill) {
 		return {};
 	}
 
 	auto skipped = false;
-	const auto hidden = _replies && (repliesTill < 2);
+	const auto hidden = (_replies && (repliesTill < 2))
+		|| (_sublist && (sublistTill < 2));
 	for (auto i = 0, count = int(elements.size()); i != count; ++i) {
 		const auto item = elements[i]->data();
-		if (!item->isRegular() || (_replies && !item->replyToId())) {
+		if (!item->isRegular()
+			|| (_replies && !item->replyToId())
+			|| (_sublist && !item->sublistPeerId())) {
 			continue;
 		}
 		const auto inHistory = (item->history() == _history);
 		const auto unread = (_replies && item->id > repliesTill)
+			|| (_sublist && item->id > sublistTill)
 			|| (migratedTill && (inHistory || item->id > migratedTill))
 			|| (historyTill && inHistory && item->id > historyTill);
 		if (!unread) {

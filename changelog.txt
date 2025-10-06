@@ -1,3 +1,9 @@
+6.1.4 (06.10.25)
+
+- Allow add to folder from recent / top chats.
+- Fix clear history of group chats.
+- Fix several crashes.
+
 6.1.3 (06.09.25)
 
 - Fix dead keys / alt combinations / input methods issues.

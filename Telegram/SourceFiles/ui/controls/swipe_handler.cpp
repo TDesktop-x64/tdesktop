@@ -202,7 +202,9 @@ void SetupSwipeHandler(SwipeHandlerArgs &&args) {
 				*state->direction);
 			state->threshold = style::ConvertFloatScale(kThresholdWidth)
 				* state->finishByTopData.speedRatio;
-			if (!state->finishByTopData.callback) {
+			if (!state->finishByTopData.callback
+				|| (state->finishByTopData.msgBareId == kMsgBareIdSwipeBack
+					&& !base::Platform::IsSwipeBackEnabled())) {
 				setOrientation(Qt::Vertical);
 			}
 		};

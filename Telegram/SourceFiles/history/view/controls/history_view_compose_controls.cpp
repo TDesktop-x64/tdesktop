@@ -2541,6 +2541,7 @@ void ComposeControls::initVoiceRecordBar() {
 			_recording = true;
 			changeFocusedControl();
 		}
+		_field->setDisabled(active);
 		_field->setVisible(!active);
 		if (!active) {
 			changeFocusedControl();

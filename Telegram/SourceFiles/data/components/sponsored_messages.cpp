@@ -15,6 +15,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_document.h"
 #include "data/data_file_origin.h"
 #include "data/data_media_preload.h"
+#include "data/data_peer_values.h"
 #include "data/data_photo.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
@@ -55,6 +56,13 @@ template <typename Fields>
 SponsoredMessages::SponsoredMessages(not_null<Main::Session*> session)
 : _session(session)
 , _clearTimer([=] { clearOldRequests(); }) {
+	Data::AmPremiumValue(
+		_session
+	) | rpl::start_with_next([=](bool premium) {
+		if (premium) {
+			clear();
+		}
+	}, _lifetime);
 }
 
 SponsoredMessages::~SponsoredMessages() {

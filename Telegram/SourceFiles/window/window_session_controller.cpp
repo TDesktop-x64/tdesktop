@@ -1573,6 +1573,9 @@ SessionController::SessionController(
 			}
 		}
 		if (update.flags & Data::PeerUpdate::Flag::FullInfo) {
+			if (update.peer->isSelf()) {
+				Support::Helper::CheckIfLost(this);
+			}
 			fullInfoLoadedHook(update.peer);
 		}
 		return (update.flags & Data::PeerUpdate::Flag::FullInfo)

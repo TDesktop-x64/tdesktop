@@ -12,6 +12,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/scroll_area.h"
 #include "ui/dynamic_image.h"
 #include "ui/unread_badge_paint.h"
+#include "ui/unread_counter_format.h"
+#include "ui/round_rect.h"
 #include "styles/style_chat.h"
 #include "styles/style_dialogs.h"
 #include "styles/style_filter_icons.h"
@@ -116,14 +118,10 @@ void VerticalButton::paintEvent(QPaintEvent *e) {
 	UnreadBadgeStyle st;
 	if (state.unread) {
 		st.muted = state.unreadMuted;
-		const auto counter = (state.unreadCounter <= 0)
-			? QString()
-			: ((state.mention || state.reaction)
-				&& (state.unreadCounter > 999))
-			? (u"99+"_q)
-			: (state.unreadCounter > 999999)
-			? (u"99999+"_q)
-			: QString::number(state.unreadCounter);
+		const auto counter = FormatUnreadCounter(
+			state.unreadCounter,
+			state.mention || state.reaction,
+			true);
 		const auto badge = PaintUnreadBadge(p, counter, right, top, st);
 		right -= badge.width() + st.padding;
 	}
@@ -162,9 +160,10 @@ void HorizontalButton::updateSize() {
 	const auto &state = _data.badges;
 	UnreadBadgeStyle st;
 	if (state.unread) {
-		const auto counter = (state.unreadCounter <= 0)
-			? QString()
-			: QString::number(state.unreadCounter);
+		const auto counter = FormatUnreadCounter(
+			state.unreadCounter,
+			false,
+			false);
 		const auto badge = CountUnreadBadgeSize(counter, st);
 		width += badge.width() + st.padding;
 	}
@@ -216,9 +215,10 @@ void HorizontalButton::paintEvent(QPaintEvent *e) {
 	const auto badgeTop = (height() - st.size) / 2;
 	if (state.unread) {
 		st.muted = state.unreadMuted;
-		const auto counter = (state.unreadCounter <= 0)
-			? QString()
-			: QString::number(state.unreadCounter);
+		const auto counter = FormatUnreadCounter(
+			state.unreadCounter,
+			false,
+			false);
 		const auto badge = PaintUnreadBadge(p, counter, right, badgeTop, st);
 		right -= badge.width() + st.padding;
 	}

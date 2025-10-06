@@ -53,6 +53,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/wrap/fade_wrap.h"
 #include "ui/wrap/slide_wrap.h"
 #include "ui/wrap/vertical_layout.h"
+#include "ui/controls/swipe_handler.h"
+#include "ui/controls/swipe_handler_data.h"
 #include "window/window_session_controller.h"
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
@@ -65,6 +67,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_statistics.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_channel_earn.h"
+#include "styles/style_chat.h"
 
 namespace Settings {
 namespace {
@@ -91,6 +94,7 @@ public:
 
 private:
 	void setupContent();
+	void setupSwipeBack();
 	void setupHistory(not_null<Ui::VerticalLayout*> container);
 	void setupSubscriptions(not_null<Ui::VerticalLayout*> container);
 	const not_null<Window::SessionController*> _controller;
@@ -128,6 +132,7 @@ Credits::Credits(
 		: Ui::GenerateStars(st::creditsBalanceStarHeight, 1)) {
 	_controller->session().giftBoxStickersPacks().tonLoad();
 	setupContent();
+	setupSwipeBack();
 
 	_controller->session().premiumPossibleValue(
 	) | rpl::start_with_next([=](bool premiumPossible) {
@@ -406,6 +411,46 @@ void Credits::setupHistory(not_null<Ui::VerticalLayout*> container) {
 			});
 		});
 	}
+}
+
+void Credits::setupSwipeBack() {
+	using namespace Ui::Controls;
+	
+	auto swipeBackData = lifetime().make_state<SwipeBackResult>();
+	
+	auto update = [=](SwipeContextData data) {
+		if (data.translation > 0) {
+			if (!swipeBackData->callback) {
+				(*swipeBackData) = SetupSwipeBack(
+					this,
+					[]() -> std::pair<QColor, QColor> {
+						return {
+							st::historyForwardChooseBg->c,
+							st::historyForwardChooseFg->c,
+						};
+					});
+			}
+			swipeBackData->callback(data);
+			return;
+		} else if (swipeBackData->lifetime) {
+			(*swipeBackData) = {};
+		}
+	};
+	
+	auto init = [=](int, Qt::LayoutDirection direction) {
+		return (direction == Qt::RightToLeft)
+			? DefaultSwipeBackHandlerFinishData([=] {
+				_showBack.fire({});
+			})
+			: SwipeHandlerFinishData();
+	};
+	
+	SetupSwipeHandler({
+		.widget = this,
+		.scroll = v::null,
+		.update = std::move(update),
+		.init = std::move(init),
+	});
 }
 
 void Credits::setupContent() {

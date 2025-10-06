@@ -279,9 +279,11 @@ void TodoList::updateTexts() {
 		_flags = _todolist->flags();
 		_subtitle.setText(
 			st::msgDateTextStyle,
-			(_todolist->othersCanComplete()
-				? tr::lng_todo_title_group(tr::now)
-				: tr::lng_todo_title(tr::now)));
+			(!_todolist->othersCanComplete()
+				? tr::lng_todo_title(tr::now)
+				: _parent->data()->history()->peer->isUser()
+				? tr::lng_todo_title_user(tr::now)
+				: tr::lng_todo_title_group(tr::now)));
 	}
 	updateTasks(skipAnimations);
 }
@@ -504,7 +506,7 @@ void TodoList::paintBottom(
 		const PaintContext &context) const {
 	const auto stringtop = top
 		+ st::msgPadding.bottom()
-		+ st::historyPollBottomButtonTop;
+		+ st::historyChecklistBottomTop;
 	const auto stm = context.messageStyle();
 
 	p.setPen(stm->msgDateFg);

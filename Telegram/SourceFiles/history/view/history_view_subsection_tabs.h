@@ -96,6 +96,14 @@ private:
 		not_null<Ui::ScrollArea*> scroll,
 		not_null<Ui::SubsectionSlider*> slider,
 		bool vertical);
+	void startScrollChecking(
+		not_null<Ui::ScrollArea*> scroll,
+		not_null<Ui::SubsectionSlider*> slider,
+		bool vertical);
+	void startFillingSlider(
+		not_null<Ui::ScrollArea*> scroll,
+		not_null<Ui::SubsectionSlider*> slider,
+		bool vertical);
 	void showThreadContextMenu(not_null<Data::Thread*> thread);
 
 	const not_null<Window::SessionController*> _controller;

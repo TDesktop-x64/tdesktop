@@ -53,12 +53,17 @@ private:
 	const std::shared_ptr<Ui::Show> _show;
 	const QString _name;
 
-	Ui::Text::String _collapsedText;
+	QString _collapsedText;
 
 	rpl::variable<Data::StarsRating> _value;
 	Fn<Data::StarsRatingPending()> _pending;
 	rpl::variable<int> _widthValue;
 	const style::LevelShape *_shape = nullptr;
+
+	QImage _cache;
+	int _cachedLevel = std::numeric_limits<int>::min();
+
+	int _currentLevel = 0;
 
 };
 

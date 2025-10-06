@@ -392,7 +392,7 @@ void Content::createBubble() {
 		context.skipDrawingParts = Context::SkipDrawingParts::Content;
 		context.outbg = currentView->hasOutLayout();
 
-		context.translate(paintOffsetLeft, 0);
+		context.translate(paintOffsetLeft, -context.viewport.y());
 		p.translate(-paintOffsetLeft, 0);
 
 		currentView->draw(p, context);

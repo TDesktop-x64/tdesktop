@@ -37,13 +37,6 @@ constexpr auto kPreloadedScreensCount = 4;
 constexpr auto kPreloadedScreensCountFull
 	= kPreloadedScreensCount + 1 + kPreloadedScreensCount;
 
-[[nodiscard]] int MinStoryHeight(int width) {
-	auto itemsLeft = st::infoMediaSkip;
-	auto itemsInRow = (width - itemsLeft)
-		/ (st::infoMediaMinGridSize + st::infoMediaSkip);
-	return (st::infoMediaMinGridSize + st::infoMediaSkip) / itemsInRow;
-}
-
 } // namespace
 
 MusicProvider::MusicProvider(not_null<AbstractController*> controller)

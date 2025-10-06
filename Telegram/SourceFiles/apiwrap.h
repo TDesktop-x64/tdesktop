@@ -365,7 +365,9 @@ public:
 	void sendShortcutMessages(
 		not_null<PeerData*> peer,
 		BusinessShortcutId id);
-	void sendMessage(MessageToSend &&message);
+	void sendMessage(
+		MessageToSend &&message,
+		std::optional<MsgId> localMessageId = std::nullopt);
 	void sendBotStart(
 		std::shared_ptr<Ui::Show> show,
 		not_null<UserData*> bot,

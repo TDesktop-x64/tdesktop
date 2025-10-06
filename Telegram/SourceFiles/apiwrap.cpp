@@ -3904,7 +3904,9 @@ void ApiWrap::sendShortcutMessages(
 	}).send();
 }
 
-void ApiWrap::sendMessage(MessageToSend &&message) {
+void ApiWrap::sendMessage(
+		MessageToSend &&message,
+		std::optional<MsgId> localMessageId) {
 	const auto history = message.action.history;
 	const auto peer = history->peer;
 	auto &textWithTags = message.textWithTags;
@@ -3954,7 +3956,9 @@ void ApiWrap::sendMessage(MessageToSend &&message) {
 
 		auto newId = FullMsgId(
 			peer->id,
-			_session->data().nextLocalMessageId());
+			localMessageId
+				? std::exchange(localMessageId, std::nullopt).value()
+				: _session->data().nextLocalMessageId());
 		auto randomId = base::RandomValue<uint64>();
 
 		TextUtilities::Trim(sending);

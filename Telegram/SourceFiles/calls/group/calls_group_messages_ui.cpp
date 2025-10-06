@@ -345,13 +345,32 @@ void MessagesUi::setupMessagesWidget() {
 	_messages = scroll->setOwnedWidget(object_ptr<Ui::RpWidget>(scroll));
 
 	_messages->paintRequest() | rpl::start_with_next([=](QRect clip) {
-		auto p = Painter(_messages);
+		const auto start = scroll->scrollTop();
+		const auto end = start + scroll->height();
+		const auto ratio = style::DevicePixelRatio();
+
+		if ((_canvas.width() < scroll->width() * ratio)
+			|| (_canvas.height() < scroll->height() * ratio)) {
+			_canvas = QImage(
+				scroll->size() * ratio,
+				QImage::Format_ARGB32_Premultiplied);
+			_canvas.setDevicePixelRatio(ratio);
+		}
+		auto p = Painter(&_canvas);
+
+		p.setCompositionMode(QPainter::CompositionMode_Clear);
+		p.fillRect(QRect(QPoint(), scroll->size()), QColor(0, 0, 0, 0));
+
+		p.setCompositionMode(QPainter::CompositionMode_SourceOver);
 		const auto skip = st::groupCallMessageSkip;
 		const auto padding = st::groupCallMessagePadding;
 		const auto widthSkip = padding.left() + padding.right();
+		p.translate(0, -start);
 		for (auto &entry : _views) {
-			if (entry.height <= skip) {
+			if (entry.height <= skip || entry.top + entry.height <= start) {
 				continue;
+			} else if (entry.top >= end) {
+				break;
 			}
 			const auto use = entry.realHeight - skip;
 			const auto width = entry.width;
@@ -421,6 +440,33 @@ void MessagesUi::setupMessagesWidget() {
 
 			p.restore();
 		}
+		p.translate(0, start);
+
+		const auto fadeHeight = st::normalFont->height;
+		p.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+		p.setPen(Qt::NoPen);
+
+		auto gradientTop = QLinearGradient(0, 0, 0, fadeHeight);
+		gradientTop.setStops({
+			{ 0., QColor(255, 255, 255, 0) },
+			{ 1., QColor(255, 255, 255, 255) },
+		});
+		p.setBrush(gradientTop);
+		p.drawRect(0, 0, scroll->width(), fadeHeight);
+
+		const auto till = scroll->height();
+		auto gradientBottom = QLinearGradient(0, till - fadeHeight, 0, till);
+		gradientBottom.setStops({
+			{ 0., QColor(255, 255, 255, 255) },
+			{ 1., QColor(255, 255, 255, 0) },
+		});
+		p.setBrush(gradientBottom);
+		p.drawRect(0, till - fadeHeight, scroll->width(), fadeHeight);
+
+		QPainter(_messages).drawImage(
+			QRect(QPoint(0, start), scroll->size()),
+			_canvas,
+			QRect(QPoint(), scroll->size() * ratio));
 	}, _lifetime);
 
 	scroll->show();

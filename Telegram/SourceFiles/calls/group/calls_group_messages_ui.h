@@ -63,6 +63,7 @@ private:
 	const std::shared_ptr<ChatHelpers::Show> _show;
 	std::unique_ptr<Ui::ElasticScroll> _scroll;
 	Ui::RpWidget *_messages = nullptr;
+	QImage _canvas;
 
 	std::vector<MessageView> _views;
 	style::complex_color _messageBg;

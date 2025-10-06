@@ -1901,7 +1901,9 @@ struct GiftPriceTabs {
 			current),
 		st::giftBoxTextPadding);
 	field->setMaxLength(limit);
-	AddLengthLimitLabel(field, limit, std::nullopt, st::giftBoxLimitTop);
+	AddLengthLimitLabel(field, limit, {
+		.limitLabelTop = st::giftBoxLimitTop,
+	});
 
 	const auto toggle = CreateChild<EmojiButton>(
 		container,

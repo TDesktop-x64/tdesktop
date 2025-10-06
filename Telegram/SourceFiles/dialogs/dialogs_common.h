@@ -7,6 +7,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#ifdef _DEBUG
+#include <QtCore/QDebug>
+#endif // _DEBUG
+
 namespace style {
 struct DialogRightButton;
 } // namespace style

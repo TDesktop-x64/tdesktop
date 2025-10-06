@@ -188,7 +188,7 @@ void Controller::confirmAdd(not_null<PeerData*> peer) {
 		}, field->lifetime());
 
 		field->setMaxLength(limit * 2);
-		Ui::AddLengthLimitLabel(field, limit, std::nullopt);
+		Ui::AddLengthLimitLabel(field, limit);
 
 		Ui::AddDividerText(box->verticalLayout(), phrases.about());
 	}));

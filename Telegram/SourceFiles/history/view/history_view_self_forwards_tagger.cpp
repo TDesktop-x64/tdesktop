@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/ui_integration.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
+#include "data/stickers/data_custom_emoji.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/view/reactions/history_view_reactions_selector.h"
@@ -25,6 +26,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast_widget.h"
 #include "ui/toast/toast.h"
+#include "ui/widgets/buttons.h"
 #include "ui/widgets/tooltip.h"
 #include "window/window_session_controller.h"
 #include "styles/style_chat.h"
@@ -141,14 +143,16 @@ void SelfForwardsTagger::showSelectorForMessages(
 	) | rpl::start_with_next([=](ChosenReaction reaction) {
 		selector->setAttribute(Qt::WA_TransparentForMouseEvents);
 		for (const auto &id : ids) {
-			if (const auto item = _controller->session().data().message(
-					id)) {
+			if (const auto item = _controller->session().data().message(id)) {
 				item->toggleReaction(
 					reaction.id,
 					HistoryReactionSource::Selector);
 			}
 		}
 		hideAndDestroy();
+		base::call_delayed(st::defaultToggle.duration, _parent, [=] {
+			showTaggedToast(reaction.id.custom());
+		});
 	}, selector->lifetime());
 
 	const auto eventFilterCallback = [=](not_null<QEvent*> event) {
@@ -234,7 +238,7 @@ void SelfForwardsTagger::showToast(
 	});
 	if (const auto strong = _toast.get()) {
 		const auto widget = strong->widget();
-		createLottieIcon(widget);
+		createLottieIcon(widget, u"toast/saved_messages"_q);
 		if (callback) {
 			QObject::connect(widget, &QObject::destroyed, callback);
 		}
@@ -244,14 +248,15 @@ void SelfForwardsTagger::showToast(
 }
 
 void SelfForwardsTagger::createLottieIcon(
-		not_null<QWidget*> widget) {
+		not_null<QWidget*> widget,
+		const QString &name) {
 	const auto lottieWidget = Ui::CreateChild<Ui::RpWidget>(widget);
 	struct State {
 		std::unique_ptr<Lottie::Icon> lottieIcon;
 	};
 	const auto state = lottieWidget->lifetime().make_state<State>();
 	state->lottieIcon = Lottie::MakeIcon({
-		.name = u"toast/saved_messages"_q,
+		.name = name,
 		.sizeOverride = st::selfForwardsTaggerIcon,
 	});
 	const auto icon = state->lottieIcon.get();
@@ -267,6 +272,68 @@ void SelfForwardsTagger::createLottieIcon(
 		auto p = QPainter(lottieWidget);
 		icon->paint(p, 0, 0);
 	}, lottieWidget->lifetime());
+}
+
+void SelfForwardsTagger::showTaggedToast(DocumentId reaction) {
+	auto text = tr::lng_message_tagged_with(
+		tr::now,
+		lt_emoji,
+		Data::SingleCustomEmoji(reaction),
+		Ui::Text::WithEntities);
+	hideToast();
+
+	const auto &st = st::selfForwardsTaggerToast;
+	const auto viewText = tr::lng_tagged_view_saved(tr::now);
+	const auto viewFont = st::historyPremiumViewSet.style.font;
+	const auto rightSkip = viewFont->width(viewText)
+		+ st::toastUndoSpace;
+
+	_toast = Ui::Toast::Show(_scroll, Ui::Toast::Config{
+		.text = text,
+		.textContext = Core::TextContext({
+			.session = &_controller->session(),
+		}),
+		.padding = rpl::single(QMargins(0, 0, rightSkip, 0)),
+		.st = &st,
+		.attach = RectPart::Top,
+		.acceptinput = true,
+		.duration = crl::time(3000),
+	});
+	if (const auto strong = _toast.get()) {
+		const auto widget = strong->widget();
+		createLottieIcon(widget, u"toast/tagged"_q);
+
+		const auto button = Ui::CreateChild<Ui::AbstractButton>(widget.get());
+		button->setClickedCallback([=] {
+			_controller->showPeerHistory(_controller->session().user());
+			hideToast();
+		});
+
+		button->paintRequest() | rpl::start_with_next([=] {
+			auto p = QPainter(button);
+			const auto font = st::historyPremiumViewSet.style.font;
+			const auto top = (button->height() - font->height) / 2;
+			p.setPen(st::historyPremiumViewSet.textFg);
+			p.setFont(font);
+			p.drawText(0, top + font->ascent, viewText);
+		}, button->lifetime());
+
+		button->resize(
+			viewFont->width(viewText),
+			st::historyPremiumViewSet.height);
+
+		rpl::combine(
+			widget->sizeValue(),
+			button->sizeValue()
+		) | rpl::start_with_next([=](const QSize &outer, const QSize &inner) {
+			button->moveToRight(
+				st.padding.right(),
+				(outer.height() - inner.height()) / 2,
+				outer.width());
+		}, widget->lifetime());
+
+		button->show();
+	}
 }
 
 void SelfForwardsTagger::hideToast() {

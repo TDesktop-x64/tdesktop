@@ -35,6 +35,10 @@ namespace Ui::Toast {
 class Instance;
 } // namespace Ui::Toast
 
+namespace Reactions {
+struct ChosenReaction;
+} // namespace Reactions
+
 namespace HistoryView {
 
 class SelfForwardsTagger final : public base::has_weak_ptr {
@@ -52,7 +56,8 @@ private:
 	void setup();
 	void showSelectorForMessages(const MessageIdsList &ids);
 	void showToast(const TextWithEntities &text, Fn<void()> callback);
-	void createLottieIcon(not_null<QWidget*> widget);
+	void showTaggedToast(DocumentId);
+	void createLottieIcon(not_null<QWidget*> widget, const QString &name);
 	void hideToast();
 	[[nodiscard]] QRect toastGeometry() const;
 

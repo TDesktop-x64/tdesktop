@@ -23,6 +23,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/painter.h"
 #include "ui/rect.h"
 #include "ui/rp_widget.h"
+#include "ui/text/text_isolated_emoji.h"
 #include "window/window_session_controller.h"
 #include "styles/style_chat.h"
 
@@ -441,7 +442,8 @@ void MessageSendingAnimationController::startAnimation(SendingInfoTo &&to) {
 		return;
 	}
 	const auto container = _controller->content();
-	const auto item = to.view()->data();
+	const auto view = to.view();
+	const auto item = view->data();
 
 	const auto it = _itemSendPending.find(item->fullId().msg);
 	if (it == end(_itemSendPending)) {
@@ -449,6 +451,10 @@ void MessageSendingAnimationController::startAnimation(SendingInfoTo &&to) {
 	}
 	auto from = std::move(it->second);
 	_itemSendPending.erase(it);
+
+	if (view->isolatedEmoji() || view->onlyCustomEmoji()) {
+		return;
+	}
 
 	auto content = base::make_unique_q<Content>(
 		container,

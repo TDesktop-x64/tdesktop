@@ -139,6 +139,7 @@ void SelfForwardsTagger::showSelectorForMessages(
 
 	selector->chosen(
 	) | rpl::start_with_next([=](ChosenReaction reaction) {
+		selector->setAttribute(Qt::WA_TransparentForMouseEvents);
 		for (const auto &id : ids) {
 			if (const auto item = _controller->session().data().message(
 					id)) {

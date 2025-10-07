@@ -432,6 +432,12 @@ public:
 
 	static constexpr auto kJoinErrorDuration = 5 * crl::time(1000);
 
+	static void ProcessRecentSelfForwards(
+		not_null<Main::Session*> session,
+		const MTPUpdates &updates,
+		PeerId targetPeerId,
+		PeerId fromPeerId);
+
 private:
 	struct MessageDataRequest {
 		using Callbacks = std::vector<Fn<void()>>;

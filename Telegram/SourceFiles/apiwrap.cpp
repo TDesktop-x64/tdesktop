@@ -209,6 +209,27 @@ ApiWrap::ApiWrap(not_null<Main::Session*> session)
 
 ApiWrap::~ApiWrap() = default;
 
+void ApiWrap::ProcessRecentSelfForwards(
+		not_null<Main::Session*> session,
+		const MTPUpdates &updates,
+		PeerId targetPeerId,
+		PeerId fromPeerId) {
+	auto newIds = MessageIdsList();
+	updates.match([&](const MTPDupdates &data) {
+		for (const auto &update : data.vupdates().v) {
+			update.match([&](const MTPDupdateMessageID &d) {
+				newIds.push_back(FullMsgId(targetPeerId, d.vid().v));
+			}, [](const auto &) {});
+		}
+	}, [](const auto &) {});
+	if (!newIds.empty()) {
+		session->data().addRecentSelfForwards({
+			.fromPeerId = fromPeerId,
+			.ids = newIds,
+		});
+	}
+}
+
 Main::Session &ApiWrap::session() const {
 	return *_session;
 }
@@ -3524,21 +3545,11 @@ void ApiWrap::forwardMessages(
 				}
 				finish();
 				if (peer->isSelf() && session().premium()) {
-					auto newIds = MessageIdsList();
-					result.match([&](const MTPDupdates &data) {
-						for (const auto &update : data.vupdates().v) {
-							update.match([&](const MTPDupdateMessageID &d) {
-								newIds.push_back(
-									FullMsgId(peer->id, d.vid().v));
-							}, [](const auto &) {});
-						}
-					}, [](const auto &) {});
-					if (!newIds.empty()) {
-						session().data().addRecentSelfForwards({
-							.fromPeerId = forwardFrom->id,
-							.ids = newIds,
-						});
-					}
+					ProcessRecentSelfForwards(
+						_session,
+						result,
+						peer->id,
+						forwardFrom->id);
 				}
 			}).fail([=](const MTP::Error &error) {
 				if (idsCopy) {

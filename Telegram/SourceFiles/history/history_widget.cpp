@@ -7603,14 +7603,19 @@ void HistoryWidget::keyPressEvent(QKeyEvent *e) {
 		_scroll->keyPressEvent(e);
 	} else if (e->key() == Qt::Key_Up && !commonModifiers) {
 		if (!_field->empty()
+			|| !canWriteMessage()
 			|| _editMsgId
 			|| _replyTo) {
 			_scroll->keyPressEvent(e);
 		} else {
 			const auto last = _history->lastMessage();
-			if (last && last->isUploading()) {
-				if (const auto view = last->mainView()) {
-					controller()->show(Box(Ui::EditCaptionBox, view));
+			if (last && last->isLocal()) {
+				if (last->media() && last->media()->allowsEdit()) {
+					if (const auto view = last->mainView()) {
+						controller()->show(Box(Ui::EditCaptionBox, view));
+					}
+				} else {
+					_scroll->keyPressEvent(e);
 				}
 				return;
 			}

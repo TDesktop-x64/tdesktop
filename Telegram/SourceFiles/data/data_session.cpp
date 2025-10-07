@@ -3002,12 +3002,20 @@ HistoryItem *Session::addNewMessage(
 	return result;
 }
 
+int Session::unreadBadge() const {
+	return computeUnreadBadge(_chatsList.unreadState());
+}
+
 int Session::unreadWithMentionsBadge() const {
 	auto state = _chatsList.unreadState();
 	if (state.mentions) {
 		state.messages -= state.mentions;
 	}
 	return computeUnreadBadge(state) + state.mentions;
+}
+
+bool Session::unreadBadgeMuted() const {
+	return computeUnreadBadgeMuted(_chatsList.unreadState());
 }
 
 bool Session::unreadWithMentionsBadgeMuted() const {

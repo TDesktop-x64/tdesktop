@@ -428,6 +428,7 @@ bool RoundVideoRecorder::Private::initAudio() {
 	_audioCodec->sample_fmt = AV_SAMPLE_FMT_FLTP;
 	_audioCodec->bit_rate = kAudioBitRate;
 	_audioCodec->sample_rate = kAudioFrequency;
+	_audioCodec->ch_layout = AV_CHANNEL_LAYOUT_MONO;
 
 	auto error = AvErrorWrap(avcodec_open2(
 		_audioCodec.get(),

@@ -1459,7 +1459,8 @@ void ChatWidget::send(Api::SendOptions options) {
 
 	if (const auto field = _composeControls->fieldForMention(); field
 		&& HasSendText(field)
-		&& message.webPage.url.isEmpty()) {
+		&& message.webPage.url.isEmpty()
+		&& (field->document()->size().height() <= field->height())) {
 		controller()->sendingAnimation().appendSending({
 			.type = Ui::MessageSendingAnimationFrom::Type::Text,
 			.localId = nextLocalMessageId,

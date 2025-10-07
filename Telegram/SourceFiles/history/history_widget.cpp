@@ -4754,7 +4754,9 @@ void HistoryWidget::send(Api::SendOptions options) {
 
 	const auto nextLocalMessageId = session().data().nextLocalMessageId();
 
-	if (HasSendText(_field) && message.webPage.url.isEmpty()) {
+	if (HasSendText(_field)
+		&& message.webPage.url.isEmpty()
+		&& (_field->document()->size().height() <= _field->height())) {
 		controller()->sendingAnimation().appendSending({
 			.type = Ui::MessageSendingAnimationFrom::Type::Text,
 			.localId = nextLocalMessageId,

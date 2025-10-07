@@ -669,6 +669,10 @@ bool Media::storyExpired(bool revalidate) {
 	return false;
 }
 
+bool Media::storyUnsupported() const {
+	return false;
+}
+
 bool Media::storyMention() const {
 	return false;
 }
@@ -2676,7 +2680,9 @@ MediaStory::MediaStory(
 	if (!maybeStory && maybeStory.error() == NoStory::Unknown) {
 		stories->resolve(storyId, crl::guard(this, [=] {
 			if (const auto maybeStory = stories->lookup(storyId)) {
-				if (!_mention && _viewMayExist) {
+				if ((*maybeStory)->unsupported()) {
+					_unsupported = true;
+				} else if (!_mention && _viewMayExist) {
 					parent->setText((*maybeStory)->caption());
 				}
 			} else {
@@ -2709,12 +2715,19 @@ bool MediaStory::storyExpired(bool revalidate) {
 	if (revalidate) {
 		const auto stories = &parent()->history()->owner().stories();
 		if (const auto maybeStory = stories->lookup(_storyId)) {
+			if ((*maybeStory)->unsupported()) {
+				_unsupported = true;
+			}
 			_expired = false;
 		} else if (maybeStory.error() == Data::NoStory::Deleted) {
 			_expired = true;
 		}
 	}
 	return _expired;
+}
+
+bool MediaStory::storyUnsupported() const {
+	return _unsupported;
 }
 
 bool MediaStory::storyMention() const {
@@ -2793,7 +2806,10 @@ std::unique_ptr<HistoryView::Media> MediaStory::createView(
 	_expired = false;
 	_viewMayExist = true;
 	const auto story = *maybeStory;
-	if (_mention) {
+	if (story->unsupported()) {
+		_unsupported = true;
+		return nullptr;
+	} else if (_mention) {
 		return std::make_unique<HistoryView::ServiceBox>(
 			message,
 			std::make_unique<HistoryView::StoryMention>(message, story));

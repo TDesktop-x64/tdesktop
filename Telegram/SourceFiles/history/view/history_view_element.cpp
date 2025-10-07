@@ -1323,13 +1323,16 @@ void Element::validateText() {
 	const auto item = data();
 	const auto media = item->media();
 	const auto storyMention = media && media->storyMention();
-	if (media && media->storyExpired()) {
+	const auto storyExpired = media && media->storyExpired();
+	const auto storyUnsupported = media && media->storyUnsupported();
+	if (storyExpired || storyUnsupported) {
 		_media = nullptr;
 		_textItem = item;
 		if (!storyMention) {
 			if (_text.isEmpty()) {
-				setTextWithLinks(Ui::Text::Italic(
-					tr::lng_forwarded_story_expired(tr::now)));
+				setTextWithLinks(Ui::Text::Italic(storyUnsupported
+					? tr::lng_stories_unsupported(tr::now)
+					: tr::lng_forwarded_story_expired(tr::now)));
 			}
 			return;
 		}

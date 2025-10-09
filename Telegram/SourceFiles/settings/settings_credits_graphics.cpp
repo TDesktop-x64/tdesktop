@@ -1992,7 +1992,7 @@ void GenericCreditsEntryBox(
 			: canToggle
 			? std::move(withHide)
 			: visiblePhrase(Ui::Text::WithEntities);
-		if (e.anonymous && e.barePeerId) {
+		if (e.anonymous && e.barePeerId && !uniqueGift) {
 			text = rpl::combine(
 				std::move(text),
 				(giftToChannelCanManage

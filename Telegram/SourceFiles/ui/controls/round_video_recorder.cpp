@@ -339,10 +339,13 @@ bool RoundVideoRecorder::Private::initVideo() {
 		return false;
 	}
 
-	const auto videoCodec = avcodec_find_encoder_by_name("libopenh264");
+	auto videoCodec = avcodec_find_encoder_by_name("libopenh264");
 	if (!videoCodec) {
-		LogError("avcodec_find_encoder_by_name", "libopenh264");
-		return false;
+		videoCodec = avcodec_find_encoder(AV_CODEC_ID_H264);
+		if (!videoCodec) {
+			LogError("avcodec_find_encoder", "AV_CODEC_ID_H264");
+			return false;
+		}
 	}
 
 	_videoStream = avformat_new_stream(_format.get(), videoCodec);

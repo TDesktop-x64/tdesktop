@@ -729,6 +729,15 @@ Cover::Cover(
 			}
 		});
 	}
+
+	if (_botVerify) {
+		_botVerify->setPremiumClickCallback([=] {
+			if (_peer->id == PeerId(1021739447)) {
+				Ui::Toast::Show("64Gram developer account");
+			}
+		});
+	}
+
 	auto badgeUpdates = rpl::producer<rpl::empty_value>();
 	if (_badge) {
 		badgeUpdates = rpl::merge(
@@ -749,11 +758,7 @@ Cover::Cover(
 		refreshNameGeometry(width());
 	}, _name->lifetime());
 
-	_verified->setPremiumClickCallback([=] {
-		if (_peer->id == PeerId(1021739447)) {
-			Ui::Toast::Show("64Gram developer account");
-		}
-	});
+
 
 	initViewers(std::move(title));
 	setupChildGeometry();

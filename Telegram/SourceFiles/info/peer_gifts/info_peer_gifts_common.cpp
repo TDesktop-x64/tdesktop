@@ -538,36 +538,45 @@ void GiftButton::contextMenuEvent(QContextMenuEvent *e) {
 }
 
 void GiftButton::mousePressEvent(QMouseEvent *e) {
-	if (e->button() != Qt::LeftButton) {
-		return;
+	if (_mouseEventsAreListening) {
+		if (e->button() != Qt::LeftButton) {
+			return;
+		}
+		_mouseEvents.fire_copy(e);
+	} else {
+		AbstractButton::mousePressEvent(e);
 	}
-	_mouseEvents.fire_copy(e);
-	if (e->isAccepted()) {
-		return;
-	}
-	AbstractButton::mousePressEvent(e);
 }
 
 void GiftButton::mouseMoveEvent(QMouseEvent *e) {
-	if (e->button() != Qt::LeftButton) {
-		return;
+	if (_mouseEventsAreListening) {
+		if (e->button() != Qt::LeftButton) {
+			return;
+		}
+		_mouseEvents.fire_copy(e);
+	} else {
+		AbstractButton::mouseMoveEvent(e);
 	}
-	_mouseEvents.fire_copy(e);
-	if (e->isAccepted()) {
-		return;
-	}
-	AbstractButton::mouseMoveEvent(e);
 }
 
 void GiftButton::mouseReleaseEvent(QMouseEvent *e) {
-	if (e->button() != Qt::LeftButton) {
-		return;
+	if (_mouseEventsAreListening) {
+		if (e->button() != Qt::LeftButton) {
+			return;
+		}
+		_mouseEvents.fire_copy(e);
+	} else {
+		AbstractButton::mouseReleaseEvent(e);
 	}
-	_mouseEvents.fire_copy(e);
-	if (e->isAccepted()) {
-		return;
-	}
-	AbstractButton::mouseReleaseEvent(e);
+}
+
+rpl::producer<QPoint> GiftButton::contextMenuRequests() const {
+	return _contextMenuRequests.events();
+}
+
+rpl::producer<QMouseEvent*> GiftButton::mouseEvents() {
+	_mouseEventsAreListening = true;
+	return _mouseEvents.events();
 }
 
 void GiftButton::cacheUniqueBackground(

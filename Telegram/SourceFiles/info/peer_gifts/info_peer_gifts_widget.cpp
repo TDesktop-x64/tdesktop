@@ -747,21 +747,12 @@ std::unique_ptr<GiftButton> InnerWidget::createGiftButton() {
 		case QEvent::MouseButtonPress:
 			raw->raise();
 			mousePressEvent(e);
-			if (e->isAccepted()) {
-				return;
-			}
 			break;
 		case QEvent::MouseMove:
 			mouseMoveEvent(e);
-			if (e->isAccepted()) {
-				return;
-			}
 			break;
 		case QEvent::MouseButtonRelease:
 			mouseReleaseEvent(e);
-			if (e->isAccepted()) {
-				return;
-			}
 			break;
 		default:
 			break;

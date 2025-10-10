@@ -11,7 +11,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_session.h"
 #include "history/history_item.h"
 #include "history/view/history_view_element.h"
-#include "history/view/history_view_list_widget.h" // kItemRevealDuration
 #include "history/view/media/history_view_media.h"
 #include "main/main_session.h"
 #include "mainwidget.h"
@@ -194,7 +193,8 @@ Content::Content(
 		std::move(animationCallback),
 		0.,
 		1.,
-		HistoryView::ListWidget::kItemRevealDuration);
+		st::itemRevealDuration,
+		anim::easeOutQuint);
 }
 
 HistoryView::Element *Content::maybeView() const {

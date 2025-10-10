@@ -15,6 +15,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_location_manager.h"
 #include "history/view/history_view_element.h"
 #include "history/view/history_view_item_preview.h"
+#include "history/view/media/history_view_birthday_suggestion.h"
 #include "history/view/media/history_view_photo.h"
 #include "history/view/media/history_view_sticker.h"
 #include "history/view/media/history_view_gif.h"
@@ -2593,7 +2594,19 @@ std::unique_ptr<HistoryView::Media> MediaGiftBox::createView(
 		not_null<HistoryView::Element*> message,
 		not_null<HistoryItem*> realParent,
 		HistoryView::Element *replacing) {
-	if (_data.type == GiftType::ChatTheme) {
+	if (_data.type == GiftType::BirthdaySuggest) {
+		return std::make_unique<HistoryView::MediaGeneric>(
+			message,
+			HistoryView::GenerateSuggetsBirthdayMedia(
+				message,
+				replacing,
+				Data::Birthday::FromSerialized(_data.count)),
+			HistoryView::MediaGenericDescriptor{
+				.maxWidth = st::birthdaySuggestStickerWidth,
+				.service = true,
+				.hideServiceText = true,
+			});
+	} else if (_data.type == GiftType::ChatTheme) {
 		return std::make_unique<HistoryView::ServiceBox>(
 			message,
 			std::make_unique<HistoryView::GiftThemeBox>(message, this));

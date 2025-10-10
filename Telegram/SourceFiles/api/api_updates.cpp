@@ -51,6 +51,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_helpers.h"
+#include "history/history_streamed_drafts.h"
 #include "history/history_unread_things.h"
 #include "core/application.h"
 #include "storage/storage_account.h"
@@ -1096,6 +1097,9 @@ void Updates::handleSendActionUpdate(
 	const auto from = (fromId == session().userPeerId())
 		? session().user().get()
 		: session().data().peerLoaded(fromId);
+	const auto when = requestingDifference()
+		? 0
+		: base::unixtime::now();
 	if (action.type() == mtpc_speakingInGroupCallAction) {
 		handleSpeakingInCall(peer, fromId, from);
 	}
@@ -1108,10 +1112,11 @@ void Updates::handleSendActionUpdate(
 		const auto &data = action.c_sendMessageEmojiInteractionSeen();
 		handleEmojiInteraction(peer, qs(data.vemoticon()));
 		return;
+	} else if (action.type() == mtpc_sendMessageTextDraftAction) {
+		const auto &data = action.c_sendMessageTextDraftAction();
+		history->streamedDrafts().apply(rootId, fromId, when, data);
+		return;
 	}
-	const auto when = requestingDifference()
-		? 0
-		: base::unixtime::now();
 	session().data().sendActionManager().registerFor(
 		history,
 		rootId,
@@ -1951,7 +1956,7 @@ void Updates::feedUpdate(const MTPUpdate &update) {
 		auto &d = update.c_updateUserTyping();
 		handleSendActionUpdate(
 			peerFromUser(d.vuser_id()),
-			0,
+			d.vtop_msg_id().value_or_empty(),
 			peerFromUser(d.vuser_id()),
 			d.vaction());
 	} break;
@@ -2123,7 +2128,9 @@ void Updates::feedUpdate(const MTPUpdate &update) {
 	case mtpc_updateGroupCallParticipants:
 	case mtpc_updateGroupCallChainBlocks:
 	case mtpc_updateGroupCallConnection:
-	case mtpc_updateGroupCall: {
+	case mtpc_updateGroupCall:
+	case mtpc_updateGroupCallMessage:
+	case mtpc_updateGroupCallEncryptedMessage: {
 		Core::App().calls().handleUpdate(&session(), update);
 	} break;
 
@@ -2484,9 +2491,9 @@ void Updates::feedUpdate(const MTPUpdate &update) {
 		}
 	} break;
 
-	case mtpc_updateChannelPinnedTopic: {
-		const auto &d = update.c_updateChannelPinnedTopic();
-		const auto peerId = peerFromChannel(d.vchannel_id());
+	case mtpc_updatePinnedForumTopic: {
+		const auto &d = update.c_updatePinnedForumTopic();
+		const auto peerId = peerFromMTP(d.vpeer());
 		if (const auto peer = session().data().peerLoaded(peerId)) {
 			const auto rootId = d.vtopic_id().v;
 			if (const auto topic = peer->forumTopicFor(rootId)) {
@@ -2497,9 +2504,9 @@ void Updates::feedUpdate(const MTPUpdate &update) {
 		}
 	} break;
 
-	case mtpc_updateChannelPinnedTopics: {
-		const auto &d = update.c_updateChannelPinnedTopics();
-		const auto peerId = peerFromChannel(d.vchannel_id());
+	case mtpc_updatePinnedForumTopics: {
+		const auto &d = update.c_updatePinnedForumTopics();
+		const auto peerId = peerFromMTP(d.vpeer());
 		if (const auto peer = session().data().peerLoaded(peerId)) {
 			if (const auto forum = peer->forum()) {
 				const auto done = [&] {

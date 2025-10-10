@@ -830,8 +830,22 @@ uint8 Element::colorIndex() const {
 	return data()->colorIndex();
 }
 
+auto Element::colorCollectible() const
+-> const std::shared_ptr<Ui::ColorCollectible> & {
+	return data()->colorCollectible();
+}
+
 uint8 Element::contentColorIndex() const {
 	return data()->contentColorIndex();
+}
+
+DocumentId Element::contentBackgroundEmojiId() const {
+	return data()->contentBackgroundEmojiId();
+}
+
+auto Element::contentColorCollectible() const
+-> const std::shared_ptr<Ui::ColorCollectible> & {
+	return data()->contentColorCollectible();
 }
 
 QDateTime Element::dateTime() const {
@@ -966,6 +980,17 @@ bool Element::isLastAndSelfMessage() const {
 		return last == data();
 	}
 	return false;
+}
+
+void Element::addVerticalMargins(int top, int bottom) {
+	if (top || bottom) {
+		AddComponents(ViewAddedMargins::Bit());
+		const auto margins = Get<ViewAddedMargins>();
+		margins->top = top;
+		margins->bottom = bottom;
+	} else {
+		RemoveComponents(ViewAddedMargins::Bit());
+	}
 }
 
 void Element::setPendingResize() {
@@ -1209,9 +1234,10 @@ auto Element::contextDependentServiceText() -> TextWithLinks {
 		return Ui::Text::Link(from->name(), index);
 	};
 	const auto placeholderLink = [&] {
-		return Ui::Text::Link(
-			tr::lng_action_topic_placeholder(tr::now),
-			topicUrl);
+		const auto linkText = history()->peer->isBot()
+			? tr::lng_action_topic_bot_thread(tr::now)
+			: tr::lng_action_topic_placeholder(tr::now);
+		return Ui::Text::Link(linkText, topicUrl);
 	};
 	const auto wrapTopic = [&](
 			const QString &title,
@@ -1620,8 +1646,8 @@ void Element::recountThreadBarInBlocks() {
 	const auto item = data();
 	const auto topic = item->topic();
 	const auto sublist = item->savedSublist();
-	const auto parentChat = (topic && topic->channel()->useSubsectionTabs())
-		? topic->channel().get()
+	const auto parentChat = (topic && topic->peer()->useSubsectionTabs())
+		? topic->peer().get()
 		: sublist
 		? sublist->parentChat()
 		: nullptr;
@@ -1635,7 +1661,7 @@ void Element::recountThreadBarInBlocks() {
 		if (const auto previous = previousDisplayedInBlocks()) {
 			const auto prev = previous->data();
 			if (const auto prevTopic = prev->topic()) {
-				Assert(prevTopic->channel() == parentChat);
+				Assert(prevTopic->peer() == parentChat);
 				const auto topicRootId = topic->rootId();
 				if (prevTopic->rootId() == topicRootId) {
 					return nullptr;
@@ -2364,9 +2390,6 @@ auto Element::takeReactionAnimations()
 		return _reactions->takeAnimations();
 	}
 	return {};
-}
-
-void Element::animateEffect(Ui::ReactionFlyAnimationArgs &&args) {
 }
 
 void Element::animateUnreadEffect() {

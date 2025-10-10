@@ -107,10 +107,6 @@ using PhotoFileLocationId = Data::PhotoFileLocationId;
 using DocumentFileLocationId = Data::DocumentFileLocationId;
 using UpdatedFileReferences = Data::UpdatedFileReferences;
 
-[[nodiscard]] TimeId UnixtimeFromMsgId(mtpMsgId msgId) {
-	return TimeId(msgId >> 32);
-}
-
 [[nodiscard]] std::shared_ptr<ChatHelpers::Show> ShowForPeer(
 		not_null<PeerData*> peer) {
 	if (const auto window = Core::App().windowFor(peer)) {
@@ -154,6 +150,14 @@ void ShowChannelsLimitBox(not_null<PeerData*> peer) {
 }
 
 } // namespace
+
+namespace Api {
+
+TimeId UnixtimeFromMsgId(mtpMsgId msgId) {
+	return TimeId(msgId >> 32);
+}
+
+} // namespace Api
 
 ApiWrap::ApiWrap(not_null<Main::Session*> session)
 : MTP::Sender(&session->account().mtp())
@@ -204,6 +208,27 @@ ApiWrap::ApiWrap(not_null<Main::Session*> session)
 }
 
 ApiWrap::~ApiWrap() = default;
+
+void ApiWrap::ProcessRecentSelfForwards(
+		not_null<Main::Session*> session,
+		const MTPUpdates &updates,
+		PeerId targetPeerId,
+		PeerId fromPeerId) {
+	auto newIds = MessageIdsList();
+	updates.match([&](const MTPDupdates &data) {
+		for (const auto &update : data.vupdates().v) {
+			update.match([&](const MTPDupdateMessageID &d) {
+				newIds.push_back(FullMsgId(targetPeerId, d.vid().v));
+			}, [](const auto &) {});
+		}
+	}, [](const auto &) {});
+	if (!newIds.empty()) {
+		session->data().addRecentSelfForwards({
+			.fromPeerId = fromPeerId,
+			.ids = newIds,
+		});
+	}
+}
 
 Main::Session &ApiWrap::session() const {
 	return *_session;
@@ -375,9 +400,9 @@ void ApiWrap::savePinnedOrder(not_null<Data::Forum*> forum) {
 		order,
 		ranges::back_inserter(topics),
 		input);
-	request(MTPchannels_ReorderPinnedForumTopics(
-		MTP_flags(MTPchannels_ReorderPinnedForumTopics::Flag::f_force),
-		forum->channel()->inputChannel,
+	request(MTPmessages_ReorderPinnedForumTopics(
+		MTP_flags(MTPmessages_ReorderPinnedForumTopics::Flag::f_force),
+		forum->peer()->input,
 		MTP_vector(topics)
 	)).done([=](const MTPUpdates &result) {
 		applyUpdates(result);
@@ -1925,7 +1950,7 @@ void ApiWrap::sendNotifySettingsUpdates() {
 	for (const auto topic : base::take(_updateNotifyTopics)) {
 		request(MTPaccount_UpdateNotifySettings(
 			MTP_inputNotifyForumTopic(
-				topic->channel()->input,
+				topic->peer()->input,
 				MTP_int(topic->rootId())),
 			topic->notify().serialize()
 		)).afterDelay(kSmallDelayMs).send();
@@ -2218,7 +2243,7 @@ void ApiWrap::saveDraftsToCloud() {
 			history->finishSavingCloudDraft(
 				topicRootId,
 				monoforumPeerId,
-				UnixtimeFromMsgId(response.outerMsgId));
+				Api::UnixtimeFromMsgId(response.outerMsgId));
 			const auto cloudDraft = history->cloudDraft(
 				topicRootId,
 				monoforumPeerId);
@@ -2239,7 +2264,7 @@ void ApiWrap::saveDraftsToCloud() {
 			history->finishSavingCloudDraft(
 				topicRootId,
 				monoforumPeerId,
-				UnixtimeFromMsgId(response.outerMsgId));
+				Api::UnixtimeFromMsgId(response.outerMsgId));
 			const auto cloudDraft = history->cloudDraft(
 				topicRootId,
 				monoforumPeerId);
@@ -3090,18 +3115,20 @@ void ApiWrap::requestMessageAfterDate(
 				return &messages.vmessages().v;
 			};
 			const auto list = result.match([&](
-				const MTPDmessages_messages &data) {
+					const MTPDmessages_messages &data) {
+				peer->processTopics(data.vtopics());
 				return handleMessages(data);
 			}, [&](const MTPDmessages_messagesSlice &data) {
+				peer->processTopics(data.vtopics());
 				return handleMessages(data);
 			}, [&](const MTPDmessages_channelMessages &data) {
 				if (const auto channel = peer->asChannel()) {
 					channel->ptsReceived(data.vpts().v);
-					channel->processTopics(data.vtopics());
 				} else {
 					LOG(("API Error: received messages.channelMessages when "
 						"no channel was passed! (ApiWrap::jumpToDate)"));
 				}
+				peer->processTopics(data.vtopics());
 				return handleMessages(data);
 			}, [&](const MTPDmessages_messagesNotModified &) {
 				LOG(("API Error: received messages.messagesNotModified! "
@@ -3553,6 +3580,13 @@ void ApiWrap::forwardMessages(
 					shared->callback();
 				}
 				finish();
+				if (peer->isSelf() && session().premium()) {
+					ProcessRecentSelfForwards(
+						_session,
+						result,
+						peer->id,
+						forwardFrom->id);
+				}
 			}).fail([=](const MTP::Error &error) {
 				if (idsCopy) {
 					for (const auto &[randomId, itemId] : *idsCopy) {
@@ -3917,7 +3951,9 @@ void ApiWrap::sendShortcutMessages(
 	}).send();
 }
 
-void ApiWrap::sendMessage(MessageToSend &&message) {
+void ApiWrap::sendMessage(
+		MessageToSend &&message,
+		std::optional<MsgId> localMessageId) {
 	const auto history = message.action.history;
 	const auto peer = history->peer;
 	auto &textWithTags = message.textWithTags;
@@ -3967,7 +4003,9 @@ void ApiWrap::sendMessage(MessageToSend &&message) {
 
 		auto newId = FullMsgId(
 			peer->id,
-			_session->data().nextLocalMessageId());
+			localMessageId
+				? std::exchange(localMessageId, std::nullopt).value()
+				: _session->data().nextLocalMessageId());
 		auto randomId = base::RandomValue<uint64>();
 
 		TextUtilities::Trim(sending);
@@ -4093,7 +4131,7 @@ void ApiWrap::sendMessage(MessageToSend &&message) {
 				history->finishSavingCloudDraft(
 					draftTopicRootId,
 					draftMonoforumPeerId,
-					UnixtimeFromMsgId(response.outerMsgId));
+					Api::UnixtimeFromMsgId(response.outerMsgId));
 			}
 		};
 		const auto fail = [=](
@@ -4108,7 +4146,7 @@ void ApiWrap::sendMessage(MessageToSend &&message) {
 				history->finishSavingCloudDraft(
 					draftTopicRootId,
 					draftMonoforumPeerId,
-					UnixtimeFromMsgId(response.outerMsgId));
+					Api::UnixtimeFromMsgId(response.outerMsgId));
 			}
 		};
 		const auto mtpShortcut = Data::ShortcutIdToMTP(
@@ -4304,7 +4342,7 @@ void ApiWrap::sendInlineResult(
 		history->finishSavingCloudDraft(
 			topicRootId,
 			monoforumPeerId,
-			UnixtimeFromMsgId(response.outerMsgId));
+			Api::UnixtimeFromMsgId(response.outerMsgId));
 		if (done) {
 			done(true);
 		}
@@ -4313,7 +4351,7 @@ void ApiWrap::sendInlineResult(
 		history->finishSavingCloudDraft(
 			topicRootId,
 			monoforumPeerId,
-			UnixtimeFromMsgId(response.outerMsgId));
+			Api::UnixtimeFromMsgId(response.outerMsgId));
 		if (done) {
 			done(false);
 		}

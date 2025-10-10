@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "calls/group/calls_group_call.h"
 
 #include "calls/group/calls_group_common.h"
+#include "calls/group/calls_group_messages.h"
 #include "calls/calls_instance.h"
 #include "main/session/session_show.h"
 #include "main/main_app_config.h"
@@ -599,6 +600,7 @@ GroupCall::GroupCall(
 , _peer(join.peer)
 , _history(_peer->owner().history(_peer))
 , _api(&_peer->session().mtp())
+, _messages(std::make_unique<Group::Messages>(this, &_api))
 , _joinAs(join.joinAs)
 , _possibleJoinAs(std::move(join.possibleJoinAs))
 , _joinHash(join.joinHash)
@@ -958,12 +960,21 @@ void GroupCall::setScheduledDate(TimeId date) {
 	}
 }
 
+void GroupCall::setMessagesEnabled(bool enabled) {
+	_messagesEnabled = enabled && !_rtmp;
+}
+
 void GroupCall::subscribeToReal(not_null<Data::GroupCall*> real) {
 	_listenersHidden = real->listenersHidden();
 
 	real->scheduleDateValue(
 	) | rpl::start_with_next([=](TimeId date) {
 		setScheduledDate(date);
+	}, _lifetime);
+
+	real->messagesEnabledValue(
+	) | rpl::start_with_next([=](bool enabled) {
+		setMessagesEnabled(enabled);
 	}, _lifetime);
 
 	// Postpone creating video tracks, so that we know if Panel
@@ -1712,6 +1723,8 @@ void GroupCall::startConference() {
 			return;
 		}
 		applyInputCall(_conferenceCall->input());
+		_realChanges.fire_copy(_conferenceCall.get());
+
 		initialJoinRequested();
 		joinDone(
 			TimestampInMsFromMsgId(response.outerMsgId),
@@ -2312,6 +2325,9 @@ void GroupCall::handlePossibleCreateOrJoinResponse(
 			const auto rtmp = data.is_rtmp_stream();
 			_rtmp = rtmp;
 			setScheduledDate(scheduleDate);
+			if (!conference()) {
+				setMessagesEnabled(data.is_messages_enabled());
+			}
 			if (const auto chat = _peer->asChat()) {
 				chat->setGroupCall(input, scheduleDate, rtmp);
 			} else if (const auto group = _peer->asChannel()) {
@@ -2327,6 +2343,9 @@ void GroupCall::handlePossibleCreateOrJoinResponse(
 		return;
 	}
 	setScheduledDate(data.vschedule_date().value_or_empty());
+	if (!conference()) {
+		setMessagesEnabled(data.is_messages_enabled());
+	}
 	if (const auto streamDcId = data.vstream_dc_id()) {
 		_broadcastDcId = MTP::BareDcId(streamDcId->v);
 	}
@@ -2379,6 +2398,32 @@ void GroupCall::handlePossibleCreateOrJoinResponse(
 			checkMediaChannelDescriptions();
 		});
 	}
+}
+
+void GroupCall::handleIncomingMessage(
+		const MTPDupdateGroupCallMessage &data) {
+	const auto id = data.vcall().match([&](const MTPDinputGroupCall &data) {
+		return data.vid().v;
+	}, [](const auto &) -> CallId {
+		Unexpected("slug/msg in GroupCall::handleIncomingMessage");
+	});
+	if (id != _id || conference()) {
+		return;
+	}
+	_messages->received(data);
+}
+
+void GroupCall::handleIncomingMessage(
+		const MTPDupdateGroupCallEncryptedMessage &data) {
+	const auto id = data.vcall().match([&](const MTPDinputGroupCall &data) {
+		return data.vid().v;
+	}, [](const auto &) -> CallId {
+		Unexpected("slug/msg in GroupCall::handleIncomingMessage");
+	});
+	if (id != _id || !conference()) {
+		return;
+	}
+	_messages->received(data);
 }
 
 void GroupCall::handlePossibleDiscarded(const MTPDgroupCallDiscarded &data) {
@@ -3041,9 +3086,7 @@ bool GroupCall::tryCreateController() {
 			});
 			return result;
 		},
-		.e2eEncryptDecrypt = (_e2eEncryptDecrypt
-			? _e2eEncryptDecrypt->callback()
-			: nullptr),
+		.e2eEncryptDecrypt = e2eEncryptDecrypt(),
 		.enableStereoMode = GetEnhancedBool("stereo_mode"),
 		.customBitrate = getCustomBitrate(),
 		.enableHDVideo = GetEnhancedBool("hd_video"),
@@ -3099,9 +3142,7 @@ bool GroupCall::tryCreateScreencast() {
 		.videoCapture = _screenCapture,
 		.videoContentType = tgcalls::VideoContentType::Screencast,
 		.videoCodecPreferences = lookupVideoCodecPreferences(),
-		.e2eEncryptDecrypt = (_e2eEncryptDecrypt
-			? _e2eEncryptDecrypt->callback()
-			: nullptr),
+		.e2eEncryptDecrypt = e2eEncryptDecrypt(),
 		.enableHDVideo = GetEnhancedBool("hd_video"),
 	};
 
@@ -4149,6 +4190,17 @@ void GroupCall::pushToTalkCancel() {
 
 void GroupCall::setNotRequireARGB32() {
 	_requireARGB32 = false;
+}
+
+std::function<std::vector<uint8_t>(
+		std::vector<uint8_t> const &,
+		int64_t, bool,
+		int32_t)> GroupCall::e2eEncryptDecrypt() const {
+	return _e2eEncryptDecrypt ? _e2eEncryptDecrypt->callback() : nullptr;
+}
+
+void GroupCall::sendMessage(TextWithTags message) {
+	_messages->send(std::move(message));
 }
 
 auto GroupCall::otherParticipantStateValue() const

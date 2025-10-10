@@ -139,6 +139,7 @@ enum class GiftType : uchar {
 	Ton, // count - nano tons
 	StarGift, // count - stars
 	ChatTheme,
+	BirthdaySuggest,
 };
 
 struct GiftCode {
@@ -157,6 +158,7 @@ struct GiftCode {
 	int starsConverted = 0;
 	int starsToUpgrade = 0;
 	int starsUpgradedBySender = 0;
+	int starsForDetailsRemove = 0;
 	int limitedCount = 0;
 	int limitedLeft = 0;
 	int64 count = 0;

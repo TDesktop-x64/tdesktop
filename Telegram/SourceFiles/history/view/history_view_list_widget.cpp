@@ -97,8 +97,6 @@ constexpr auto kClearUserpicsAfter = 50;
 
 } // namespace
 
-const crl::time ListWidget::kItemRevealDuration = crl::time(150);
-
 WindowListDelegate::WindowListDelegate(
 	not_null<Window::SessionController*> window)
 : _window(window) {
@@ -2010,8 +2008,8 @@ void ListWidget::startItemRevealAnimations() {
 					[=] { revealItemsCallback(); },
 					0.,
 					1.,
-					kItemRevealDuration,
-					anim::easeOutCirc);
+					st::itemRevealDuration,
+					anim::easeOutQuint);
 				if (view->data()->out()) {
 					_delegate->listChatTheme()->rotateComplexGradientBackground();
 				}

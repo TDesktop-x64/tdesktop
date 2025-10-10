@@ -1627,6 +1627,17 @@ void Updates::feedUpdate(const MTPUpdate &update) {
 		auto &d = update.c_updateNewChannelMessage();
 		auto channel = session().data().channelLoaded(peerToChannel(PeerFromMessage(d.vmessage())));
 		const auto isDataLoaded = AllDataLoadedForMessage(&session(), d.vmessage());
+		{
+			// Todo delete.
+			const auto messageId = IdFromMessage(d.vmessage());
+			if (const auto history = channel ? session().data().historyLoaded(channel) : nullptr) {
+				if (history->isUnknownMessageDeleted(messageId)) {
+					LOG(("Unknown message deleted detected for channel %1, message %2")
+						.arg(channel->id.value & PeerId::kChatTypeMask)
+						.arg(messageId.bare));
+				}
+			}
+		}
 		if (!requestingDifference() && (!channel || isDataLoaded != DataIsLoadedResult::Ok)) {
 			MTP_LOG(0, ("getDifference "
 				"{ good - after not all data loaded in updateNewChannelMessage }%1"

@@ -336,10 +336,9 @@ InnerWidget::InnerWidget(
 	) | rpl::start_with_next([=](
 			const Data::SendActionManager::AnimationUpdate &update) {
 		const auto updateRect = Ui::RowPainter::SendActionAnimationRect(
-			_st,
-			update.left,
-			update.width,
-			update.height,
+			update.thread,
+			_filterId,
+			update.rect,
 			width(),
 			update.textUpdated);
 		updateDialogRow(
@@ -374,9 +373,6 @@ InnerWidget::InnerWidget(
 	) | rpl::start_with_next([=](bool refreshHeight) {
 		if (refreshHeight) {
 			_chatsFilterTags.clear();
-		}
-		if (refreshHeight && _filterId) {
-			// Height of the main list will be refreshed in other way.
 			_shownList->updateHeights(_narrowRatio);
 		}
 		refreshWithCollapsedRows();

@@ -1108,7 +1108,6 @@ User ParseUser(const MTPUser &data) {
 	result.info = ParseContactInfo(data);
 	data.match([&](const MTPDuser &data) {
 		result.bareId = data.vid().v;
-		const auto color = data.vcolor();
 		result.colorIndex = PeerColorIndex(result.bareId);
 		if (const auto color = data.vcolor()) {
 			color->match([&](const MTPDpeerColor &data) {

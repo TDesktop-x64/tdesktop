@@ -13,7 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_basic.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_credits.h"
-#include "Styles/style_info.h"
+#include "styles/style_info.h"
 
 #include <QApplication>
 

@@ -206,6 +206,7 @@ public:
 	virtual bool paperForBoth() const;
 	virtual FullStoryId storyId() const;
 	virtual bool storyExpired(bool revalidate = false);
+	virtual bool storyUnsupported() const;
 	virtual bool storyMention() const;
 	virtual const GiveawayStart *giveawayStart() const;
 	virtual const GiveawayResults *giveawayResults() const;
@@ -753,6 +754,7 @@ public:
 
 	FullStoryId storyId() const override;
 	bool storyExpired(bool revalidate = false) override;
+	bool storyUnsupported() const override;
 	bool storyMention() const override;
 
 	TextWithEntities notificationText() const override;
@@ -774,6 +776,7 @@ private:
 	const FullStoryId _storyId;
 	const bool _mention = false;
 	bool _viewMayExist = false;
+	bool _unsupported = false;
 	bool _expired = false;
 
 };

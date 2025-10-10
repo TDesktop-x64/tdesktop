@@ -1125,6 +1125,8 @@ void ApiWrap::requestWallPaper(
 void ApiWrap::requestFullPeer(not_null<PeerData*> peer) {
 	if (_fullPeerRequests.contains(peer)) {
 		return;
+	} else if (!peer->isUser() && !peer->barSettings().has_value()) {
+		requestPeerSettings(peer);
 	}
 
 	const auto requestId = [&] {

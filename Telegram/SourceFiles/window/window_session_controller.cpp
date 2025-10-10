@@ -435,6 +435,7 @@ void SessionNavigation::fullInfoLoadedHook(not_null<PeerData*> peer) {
 	if (!_waitingDirectChannel || _waitingDirectChannel != peer) {
 		return;
 	}
+	_waitingDirectChannel = nullptr;
 	const auto monoforum = peer->broadcastMonoforum();
 	const auto open = monoforum ? monoforum : peer.get();
 	showPeerHistory(open, SectionShow::Way::Forward, ShowAtUnreadMsgId);
@@ -740,7 +741,7 @@ void SessionNavigation::showPeerByLinkResolved(
 		peer->updateFull();
 	} else if (const auto monoforum = peer->broadcastMonoforum()
 		; monoforum && resolveType == ResolveType::ChannelDirect) {
-		showPeerHistory(peer, params, ShowAtUnreadMsgId);
+		showPeerHistory(monoforum, params, ShowAtUnreadMsgId);
 	} else {
 		// Show specific posts only in channels / supergroups.
 		const auto msgId = peer->isChannel()

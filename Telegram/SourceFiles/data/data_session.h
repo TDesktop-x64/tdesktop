@@ -579,7 +579,9 @@ public:
 		MessageFlags localFlags,
 		NewMessageType type);
 
+	[[nodiscard]] int unreadBadge() const;
 	[[nodiscard]] int unreadWithMentionsBadge() const;
+	[[nodiscard]] bool unreadBadgeMuted() const;
 	[[nodiscard]] bool unreadWithMentionsBadgeMuted() const;
 	[[nodiscard]] int unreadBadgeIgnoreOne(Dialogs::Key key) const;
 	[[nodiscard]] bool unreadBadgeMutedIgnoreOne(Dialogs::Key key) const;

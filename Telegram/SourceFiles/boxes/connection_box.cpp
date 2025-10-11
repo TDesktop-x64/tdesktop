@@ -810,29 +810,6 @@ void ProxiesBox::setupTopButton() {
 void ProxiesBox::setupContent() {
 	const auto inner = setInnerWidget(object_ptr<Ui::VerticalLayout>(this));
 
-	const auto top = addTopButton(st::infoTopBarMenu);
-	const auto share = [=] {
-		_settings.removeProxyList();
-		_settings.setSelected(MTP::ProxyData());
-		_settings.setSettings(MTP::ProxyData::Settings::Disabled);
-		Core::App().refreshGlobalProxy();
-		_settings.connectionTypeChangesNotify();
-		Local::writeSettings();
-
-		closeBox();
-		//Ui::show(ProxiesBoxController::CreateOwningBox(&App::wnd()->account()));
-	};
-	const auto menu =
-			std::make_shared<base::unique_qptr<Ui::PopupMenu>>();
-	top->setClickedCallback([=] {
-		*menu = base::make_unique_q<Ui::PopupMenu>(top);
-		(*menu)->addAction(
-				tr::lng_proxy_remove_all(tr::now),
-				share);
-		(*menu)->popup(QCursor::pos());
-		return true;
-	});
-
 	_tryIPv6 = inner->add(
 		object_ptr<Ui::Checkbox>(
 			inner,

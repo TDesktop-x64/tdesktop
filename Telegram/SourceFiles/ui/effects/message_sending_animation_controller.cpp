@@ -502,7 +502,7 @@ bool MessageSendingAnimationController::checkExpectedType(
 			}
 		}
 	} else if (isText && !item->media()) {
-		return true;
+		return false;
 	}
 	_itemSendPending.erase(it);
 	return false;

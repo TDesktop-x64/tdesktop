@@ -809,11 +809,6 @@ void Controller::processChosenPhoto(QImage &&image, bool suggest) {
 	Api::PeerPhoto::UserPhoto photo{
 		.image = base::duplicate(image),
 	};
-	if (suggest && _suggestIcon && _suggestIcon->valid()) {
-		_suggestIcon->animate([=] { _suggestIconWidget->update(); });
-	} else if (!suggest && _cameraIcon && _cameraIcon->valid()) {
-		_cameraIcon->animate([=] { _cameraIconWidget->update(); });
-	}
 	if (suggest) {
 		_window->session().api().peerPhoto().suggest(_user, std::move(photo));
 		_window->showPeerHistory(_user->id);
@@ -830,11 +825,6 @@ void Controller::processChosenPhotoWithMarkup(
 		.markupDocumentId = data.id,
 		.markupColors = std::move(data.colors),
 	};
-	if (suggest && _suggestIcon && _suggestIcon->valid()) {
-		_suggestIcon->animate([=] { _suggestIconWidget->update(); });
-	} else if (!suggest && _cameraIcon && _cameraIcon->valid()) {
-		_cameraIcon->animate([=] { _cameraIconWidget->update(); });
-	}
 	if (suggest) {
 		_window->session().api().peerPhoto().suggest(_user, std::move(photo));
 		_window->showPeerHistory(_user->id);

@@ -449,25 +449,25 @@ void Controller::setupNotesField() {
 	};
 	const auto limitState = _notesField->lifetime().make_state<LimitState>();
 
-	const auto checkCharsLimitation = [=] {
+	const auto checkCharsLimitation = [=, w = _notesField->window()] {
 		const auto limit = Data::PremiumLimits(
 			&_user->session()).contactNoteLengthCurrent();
 		const auto remove = Ui::ComputeFieldCharacterCount(_notesField)
 			- limit;
 		if (!limitState->charsLimitation) {
+			const auto border = _notesField->st().borderActive;
 			limitState->charsLimitation = base::make_unique_q<Limit>(
 				_box->verticalLayout(),
 				emojiButton,
 				style::al_top,
-				QMargins{ 0, -st::lineWidth, 0, 0 });
-			_notesField->heightValue(
-			) | rpl::start_with_next([=](int height) {
-				const auto &st = _notesField->st();
-				const auto hasMultipleLines = height >
-					(st.textMargins.top()
-						+ st.style.font->height
-						+ st.textMargins.bottom() * 2);
-				limitState->charsLimitation->setVisible(hasMultipleLines);
+				QMargins{ 0, -border - _notesField->st().border, 0, 0 });
+			rpl::combine(
+				limitState->charsLimitation->geometryValue(),
+				_notesField->geometryValue()
+			) | rpl::start_with_next([=](QRect limit, QRect field) {
+				limitState->charsLimitation->setVisible(
+					(w->mapToGlobal(limit.bottomLeft()).y() - border)
+						< w->mapToGlobal(field.bottomLeft()).y());
 				limitState->charsLimitation->raise();
 			}, limitState->charsLimitation->lifetime());
 		}

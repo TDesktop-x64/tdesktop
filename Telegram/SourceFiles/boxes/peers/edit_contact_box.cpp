@@ -484,7 +484,7 @@ void Controller::setupNotesField() {
 }
 
 void Controller::setupPhotoButtons() {
-	const auto iconSize = st::restoreUserpicIcon.size;
+	const auto iconPlaceholder = st::restoreUserpicIcon.size * 2;
 	auto nameValue = _firstNameField
 		? rpl::merge(
 			rpl::single(_firstNameField->getLastText().trimmed()),
@@ -524,7 +524,7 @@ void Controller::setupPhotoButtons() {
 					QByteArray(),
 					u":/animations/photo_suggest_icon.tgs"_q));
 		},
-		.sizeOverride = iconSize * style::DevicePixelRatio(),
+		.sizeOverride = iconPlaceholder,
 		.colorized = true,
 	});
 
@@ -535,7 +535,7 @@ void Controller::setupPhotoButtons() {
 					QByteArray(),
 					u":/animations/camera_outline.tgs"_q));
 		},
-		.sizeOverride = iconSize * style::DevicePixelRatio(),
+		.sizeOverride = iconPlaceholder,
 		.colorized = true,
 	});
 
@@ -546,19 +546,18 @@ void Controller::setupPhotoButtons() {
 		{ nullptr });
 
 	_suggestIconWidget = Ui::CreateChild<Ui::RpWidget>(suggestButton);
-	_suggestIconWidget->resize(iconSize * style::DevicePixelRatio());
+	_suggestIconWidget->resize(iconPlaceholder);
 	_suggestIconWidget->paintRequest() | rpl::start_with_next([=] {
 		if (_suggestIcon && _suggestIcon->valid()) {
 			auto p = QPainter(_suggestIconWidget);
 			const auto frame = _suggestIcon->frame(st::lightButtonFg->c);
-			const auto rect = _suggestIconWidget->rect();
-			p.drawImage(rect, frame);
+			p.drawImage(_suggestIconWidget->rect(), frame);
 		}
 	}, _suggestIconWidget->lifetime());
 
 	suggestButton->sizeValue() | rpl::start_with_next([=](QSize size) {
 		_suggestIconWidget->move(
-			st::settingsButtonLight.iconLeft - iconSize.width() / 2,
+			st::settingsButtonLight.iconLeft - iconPlaceholder.width() / 4,
 			(size.height() - _suggestIconWidget->height()) / 2);
 	}, _suggestIconWidget->lifetime());
 
@@ -579,19 +578,18 @@ void Controller::setupPhotoButtons() {
 		{ nullptr });
 
 	_cameraIconWidget = Ui::CreateChild<Ui::RpWidget>(setButton);
-	_cameraIconWidget->resize(iconSize * style::DevicePixelRatio());
+	_cameraIconWidget->resize(iconPlaceholder);
 	_cameraIconWidget->paintRequest() | rpl::start_with_next([=] {
 		if (_cameraIcon && _cameraIcon->valid()) {
 			auto p = QPainter(_cameraIconWidget);
 			const auto frame = _cameraIcon->frame(st::lightButtonFg->c);
-			const auto rect = _cameraIconWidget->rect();
-			p.drawImage(rect, frame);
+			p.drawImage(_cameraIconWidget->rect(), frame);
 		}
 	}, _cameraIconWidget->lifetime());
 
 	setButton->sizeValue() | rpl::start_with_next([=](QSize size) {
 		_cameraIconWidget->move(
-			st::settingsButtonLight.iconLeft - iconSize.width() / 2,
+			st::settingsButtonLight.iconLeft - iconPlaceholder.width() / 4,
 			(size.height() - _cameraIconWidget->height()) / 2);
 	}, _cameraIconWidget->lifetime());
 

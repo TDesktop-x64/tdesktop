@@ -632,7 +632,7 @@ void Controller::setupPhotoButtons() {
 	resetButtonWrap->toggleOn(
 		_user->session().changes().peerFlagsValue(
 			_user,
-			Data::PeerUpdate::Flag::FullInfo
+			Data::PeerUpdate::Flag::FullInfo | Data::PeerUpdate::Flag::Photo
 		) | rpl::map([=] {
 			return _user->hasPersonalPhoto();
 		}) | rpl::distinct_until_changed());
@@ -643,8 +643,9 @@ void Controller::setupPhotoButtons() {
 				tr::now,
 				lt_user,
 				_user->shortName()),
-			.confirmed = [=] {
+			.confirmed = [=](Fn<void()> close) {
 				_window->session().api().peerPhoto().clearPersonal(_user);
+				close();
 			},
 			.confirmText = tr::lng_profile_photo_reset(tr::now),
 		}));

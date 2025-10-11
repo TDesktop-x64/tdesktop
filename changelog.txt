@@ -1,3 +1,12 @@
+6.2.2 (10.10.25)
+
+- Fix layer.
+
+6.2.1 (10.10.25)
+
+- Fix sending gifts.
+- Fix possible crash on Linux.
+
 6.2 (10.10.25)
 
 - Comments and reactions in group calls.

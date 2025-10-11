@@ -145,7 +145,8 @@ Content::Content(
 		const auto resultTo = _isText
 			? _to + innerGeometry.topLeft()
 			: _to + innerGeometry.topLeft() + _innerContentRect.topLeft();
-		const auto x = anim::interpolate(resultFrom.x(), resultTo.x(), value);
+		const auto xEase = anim::easeOutQuint(1.0, value);
+		const auto x = anim::interpolate(resultFrom.x(), resultTo.x(), xEase);
 		const auto y = anim::interpolate(resultFrom.y(), resultTo.y(), value);
 		if (!_isText) {
 			// Text-only messages are drawing only in _bubble.widget.
@@ -359,6 +360,7 @@ void Content::createBubble() {
 			(currentView->hasOutLayout() ? tailWidth : 0)
 				+ (_isText && currentView->data()->isPost()
 					? rect::m::sum::h(st::msgPadding)
+						+ st::historyFastShareSize
 					: 0),
 			(hasCommentsButton || _isText) ? innerGeometry.y() : 0));
 	_bubble.widget->show();

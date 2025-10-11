@@ -484,6 +484,9 @@ void Controller::setupNotesField() {
 }
 
 void Controller::setupPhotoButtons() {
+	if (!_user->isContact()) {
+		return;
+	}
 	const auto iconPlaceholder = st::restoreUserpicIcon.size * 2;
 	auto nameValue = _firstNameField
 		? rpl::merge(

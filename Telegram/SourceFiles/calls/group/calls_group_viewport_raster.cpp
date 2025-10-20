@@ -37,7 +37,7 @@ Viewport::RendererSW::RendererSW(not_null<Viewport*> owner)
 }
 
 void Viewport::RendererSW::paintFallback(
-		Painter &&p,
+		Painter &p,
 		const QRegion &clip,
 		Ui::GL::Backend backend) {
 	auto bg = clip;

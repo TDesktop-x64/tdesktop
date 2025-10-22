@@ -523,14 +523,25 @@ InnerWidget::InnerWidget(
 	) | rpl::start_with_next([=](
 			RowDescriptor previous,
 			RowDescriptor next) {
-		updateDialogRow(previous);
-		if (const auto sublist = previous.key.sublist()) {
-			updateDialogRow({ { sublist->owningHistory() }, {} });
-		}
-		updateDialogRow(next);
-		if (const auto sublist = next.key.sublist()) {
-			updateDialogRow({ { sublist->owningHistory() }, {} });
-		}
+		const auto update = [&](const RowDescriptor &descriptor) {
+			if (const auto topic = descriptor.key.topic()) {
+				if (_openedForum == topic->forum()) {
+					updateDialogRow(descriptor);
+				} else {
+					updateDialogRow({ { topic->owningHistory() }, {} });
+				}
+			} else if (const auto sublist = descriptor.key.sublist()) {
+				if (_savedSublists == sublist->parent()) {
+					updateDialogRow(descriptor);
+				} else {
+					updateDialogRow({ { sublist->owningHistory() }, {} });
+				}
+			} else {
+				updateDialogRow(descriptor);
+			}
+		};
+		update(previous);
+		update(next);
 	}, lifetime());
 
 	_controller->activeChatsFilter(

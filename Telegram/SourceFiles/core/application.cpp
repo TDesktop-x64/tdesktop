@@ -86,6 +86,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/qthelp_regex.h"
 #include "base/qthelp_url.h"
 #include "boxes/premium_limits_box.h"
+#include "ui/accessibility.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/controls/location_picker.h"
 #include "styles/style_window.h"
@@ -259,6 +260,8 @@ void Application::run() {
 	_notifications = std::make_unique<Window::Notifications::System>();
 
 	startLocalStorage();
+
+	Ui::InstallAccessibleFactory();
 
 	style::SetCustomFont(settings().customFontFamily());
 	style::internal::StartFonts();

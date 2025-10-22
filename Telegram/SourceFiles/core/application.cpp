@@ -694,7 +694,7 @@ bool Application::eventFilter(QObject *object, QEvent *e) {
 			const auto event = static_cast<QFileOpenEvent*>(e);
 			const auto flushQueued = [=] {
 				if (_filesToOpen.isEmpty()) {
-					InvokeQueued([=] {
+					InvokeQueued(this, [=] {
 						cSetSendPaths(_filesToOpen);
 						_filesToOpen.clear();
 						checkSendPaths();

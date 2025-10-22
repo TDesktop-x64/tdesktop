@@ -2483,7 +2483,8 @@ void Panel::updateButtonsGeometry() {
 		}
 
 		const auto wideMenuShown = _call->canManage()
-			|| _call->showChooseJoinAs();
+			|| _call->showChooseJoinAs()
+			|| (!rtmp && messagesEnabled); // Screen share there.
 		toggle(_settings, !hidden && !wideMenuShown);
 		toggle(_wideMenu, !hidden && wideMenuShown);
 

@@ -178,6 +178,11 @@ public:
 		QWidget *parent,
 		not_null<Window::Controller*> window);
 
+	QAccessible::Role accessibilityRole() override {
+		return QAccessible::Dialog;
+	}
+	QString accessibilityName() override;
+
 	void forceContentRepaint();
 
 	rpl::producer<int> desiredHeightValue() const override;
@@ -224,8 +229,6 @@ IntroWidget::IntroWidget(
 , _wrap(this)
 , _scroll(Ui::CreateChild<Ui::ScrollArea>(_wrap.data()))
 , _topShadow(this) {
-	setAccessibleRole(QAccessible::Dialog);
-	setAccessibleName(tr::lng_menu_settings(tr::now));
 	_wrap->setAttribute(Qt::WA_OpaquePaintEvent);
 	_wrap->paintRequest(
 	) | rpl::start_with_next([=](QRect clip) {
@@ -245,6 +248,10 @@ IntroWidget::IntroWidget(
 		) | rpl::filter([](bool shown) {
 			return true;
 		}));
+}
+
+QString IntroWidget::accessibilityName() {
+	return tr::lng_menu_settings(tr::now);
 }
 
 void IntroWidget::updateControlsGeometry() {

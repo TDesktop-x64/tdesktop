@@ -86,7 +86,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/qthelp_regex.h"
 #include "base/qthelp_url.h"
 #include "boxes/premium_limits_box.h"
-#include "ui/accessibility.h"
+#include "ui/accessible/ui_accessible_factory.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/controls/location_picker.h"
 #include "styles/style_window.h"
@@ -261,8 +261,6 @@ void Application::run() {
 
 	startLocalStorage();
 
-	Ui::InstallAccessibleFactory();
-
 	style::SetCustomFont(settings().customFontFamily());
 	style::internal::StartFonts();
 
@@ -289,6 +287,7 @@ void Application::run() {
 	QCoreApplication::instance()->installTranslator(_translator.get());
 
 	style::StartManager(cScale());
+	Ui::Accessible::Init();
 	Ui::InitTextOptions();
 	Ui::StartCachedCorners();
 	Ui::Emoji::Init();

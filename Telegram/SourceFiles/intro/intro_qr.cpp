@@ -79,9 +79,19 @@ namespace {
 	auto palettes = rpl::single(rpl::empty) | rpl::then(
 		style::PaletteChanged()
 	);
-	auto result = Ui::CreateChild<Ui::RpWidget>(parent.get());
-	result->setAccessibleRole(QAccessible::Role::Graphic);
-	result->setAccessibleName(tr::lng_intro_qr_title(tr::now));
+	class QrWidget final : public Ui::RpWidget {
+	public:
+		using RpWidget::RpWidget;
+
+		QAccessible::Role accessibilityRole() override {
+			return QAccessible::Role::Graphic;
+		}
+		QString accessibilityName() override {
+			return tr::lng_intro_qr_title(tr::now);
+		}
+
+	};
+	auto result = Ui::CreateChild<QrWidget>(parent.get());
 	const auto state = result->lifetime().make_state<State>(
 		[=] { result->update(); });
 	state->waiting.start();
@@ -183,20 +193,6 @@ QrWidget::QrWidget(
 	setTitleText(rpl::single(QString()));
 	setDescriptionText(rpl::single(QString()));
 	setErrorCentered(true);
-	setAccessibleRole(QAccessible::Role::Dialog);
-	setAccessibleName(tr::lng_intro_qr_title(tr::now));
-
-	const auto texts = {
-	tr::lng_intro_qr_step1,
-	tr::lng_intro_qr_step2,
-	tr::lng_intro_qr_step3,
-	};
-	QString fullDescription;
-	int index = 1;
-	for (const auto& text : texts) {
-		fullDescription += QString::number(index++) + ". " + text(tr::now) + "\n";
-	}
-	setAccessibleDescription(fullDescription);
 
 	cancelNearestDcRequest();
 
@@ -211,6 +207,24 @@ QrWidget::QrWidget(
 		api().request(base::take(_requestId)).cancel();
 		refreshCode();
 	}, lifetime());
+}
+
+QString QrWidget::accessibilityName() {
+	return tr::lng_intro_qr_title(tr::now);
+}
+
+QString QrWidget::accessibilityDescription() {
+	const auto phrases = {
+		tr::lng_intro_qr_step1,
+		tr::lng_intro_qr_step2,
+		tr::lng_intro_qr_step3,
+	};
+	auto result = QString();
+	auto index = 0;
+	for (const auto &phrase : phrases) {
+		result.append(QString::number(++index)).append(". ").append(phrase(tr::now)).append('\n');
+	}
+	return result;
 }
 
 int QrWidget::errorTop() const {

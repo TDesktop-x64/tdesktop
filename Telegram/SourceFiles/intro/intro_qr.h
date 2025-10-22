@@ -21,6 +21,12 @@ public:
 		not_null<Main::Account*> account,
 		not_null<Data*> data);
 
+	QAccessible::Role accessibilityRole() override {
+		return QAccessible::Role::Dialog;
+	}
+	QString accessibilityName() override;
+	QString accessibilityDescription() override;
+
 	void activate() override;
 	void finished() override;
 	void cancelled() override;

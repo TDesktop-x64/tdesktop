@@ -91,6 +91,10 @@ public:
 		not_null<Main::Account*> account,
 		const Layout &layout);
 
+	QAccessible::Role accessibilityRole() override {
+		return QAccessible::Role::StatusBar;
+	}
+
 	void refreshRetryLink(bool hasRetry);
 	void setLayout(const Layout &layout);
 	void setProgressVisibility(bool visible);
@@ -498,7 +502,6 @@ ConnectionState::Widget::Widget(
 : AbstractButton(parent)
 , _account(account)
 , _currentLayout(layout) {
-	setAccessibleRole(QAccessible::StatusBar);
 	_proxyIcon = Ui::CreateChild<ProxyIcon>(this);
 	_progress = Ui::CreateChild<Progress>(this);
 

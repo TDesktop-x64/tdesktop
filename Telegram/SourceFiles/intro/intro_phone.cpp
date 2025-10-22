@@ -62,7 +62,6 @@ PhoneWidget::PhoneWidget(
 	st::introPhone,
 	[](const QString &s) { return Countries::Groups(s); })
 , _checkRequestTimer([=] { checkRequest(); }) {
-	setAccessibleRole(QAccessible::Role::Dialog);
 	_code->setAccessibleName(tr::lng_country_code(tr::now));
 	_phone->setAccessibleName(tr::lng_phone_number(tr::now));
 	_phone->frontBackspaceEvent(
@@ -103,6 +102,10 @@ PhoneWidget::PhoneWidget(
 		_country->chooseCountry(u"US"_q);
 	}
 	_changed = false;
+}
+
+QString PhoneWidget::accessibilityName() {
+	return tr::lng_phone_title(tr::now);
 }
 
 void PhoneWidget::setupQrLogin() {

@@ -525,6 +525,14 @@ void EditCaptionBox::rebuildPreview() {
 	_content->modifyRequests(
 	) | rpl::start_to_stream(_photoEditorOpens, _content->lifetime());
 
+	_content->editCoverRequests() | rpl::start_with_next([=] {
+		setupEditCoverHandler();
+	}, _content->lifetime());
+
+	_content->clearCoverRequests() | rpl::start_with_next([=] {
+		setupClearCoverHandler();
+	}, _content->lifetime());
+
 	_content->heightValue(
 	) | rpl::start_to_stream(_contentHeight, _content->lifetime());
 
@@ -738,6 +746,89 @@ void EditCaptionBox::setupPhotoEditorEventHandler() {
 			});
 		}
 	}, lifetime());
+}
+
+void EditCaptionBox::setupEditCoverHandler() {
+	if (_preparedList.files.empty()) {
+		return;
+	}
+	const auto &file = _preparedList.files.front();
+	if (!file.isVideoFile()) {
+		return;
+	}
+	const auto show = _controller->uiShow();
+	const auto replace = [=](Ui::PreparedList list) {
+		if (list.files.empty()) {
+			return;
+		}
+		auto &entry = _preparedList.files.front();
+		const auto video = entry.information
+			? std::get_if<Ui::PreparedFileInformation::Video>(
+				&entry.information->media)
+			: nullptr;
+		if (!video) {
+			return;
+		}
+		auto old = std::shared_ptr<Ui::PreparedFile>(
+			std::move(entry.videoCover));
+		entry.videoCover = std::make_unique<Ui::PreparedFile>(
+			std::move(list.files.front()));
+		Editor::OpenWithPreparedFile(
+			this,
+			show,
+			entry.videoCover.get(),
+			st::sendMediaPreviewSize,
+			crl::guard(this, [=](bool ok) {
+				if (!ok) {
+					_preparedList.files.front().videoCover = old
+						? std::make_unique<Ui::PreparedFile>(
+							std::move(*old))
+						: nullptr;
+				}
+				rebuildPreview();
+			}),
+			video->thumbnail.size());
+	};
+	const auto checkResult = [=](const Ui::PreparedList &list) {
+		if (list.files.empty()) {
+			return true;
+		}
+		if (list.files.front().type != Ui::PreparedFile::Type::Photo) {
+			show->showToast(tr::lng_choose_cover_bad(tr::now));
+			return false;
+		}
+		return true;
+	};
+	const auto callback = [=](FileDialog::OpenResult &&result) {
+		const auto premium = show->session().premium();
+		const auto showError = [=](tr::phrase<> t) {
+			show->showToast(t(tr::now));
+		};
+		auto list = Storage::PreparedFileFromFilesDialog(
+			std::move(result),
+			checkResult,
+			showError,
+			st::sendMediaPreviewSize,
+			premium);
+		if (list) {
+			replace(std::move(*list));
+		}
+	};
+
+	FileDialog::GetOpenPath(
+		this,
+		tr::lng_choose_cover(tr::now),
+		FileDialog::ImagesFilter(),
+		crl::guard(this, callback));
+}
+
+void EditCaptionBox::setupClearCoverHandler() {
+	if (_preparedList.files.empty()) {
+		return;
+	}
+	auto &entry = _preparedList.files.front();
+	entry.videoCover = nullptr;
+	rebuildPreview();
 }
 
 void EditCaptionBox::setupDragArea() {

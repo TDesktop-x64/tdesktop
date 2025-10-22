@@ -1,3 +1,10 @@
+6.2.4 (22.10.25)
+
+- Highlight links in contact notes.
+- Show menu with screen share controls in wide group call mode.
+- Fix possible crash in saved music removing.
+- Fix crash in theme editor.
+
 6.2.3 (12.10.25)
 
 - Fix crash when viewing messages with hidden senders.

@@ -328,19 +328,19 @@ void QrWidget::setupControls() {
 			contentTop() + st::introQrStepsTop);
 	}, steps->lifetime());
 
-	const auto skip = Ui::CreateChild<Ui::LinkButton>(
+	_skip = Ui::CreateChild<Ui::LinkButton>(
 		this,
 		tr::lng_intro_qr_skip(tr::now));
 	rpl::combine(
 		sizeValue(),
-		skip->widthValue()
+		_skip->widthValue()
 	) | rpl::start_with_next([=](QSize size, int skipWidth) {
-		skip->moveToLeft(
+		_skip->moveToLeft(
 			(size.width() - skipWidth) / 2,
 			contentTop() + st::introQrSkipTop);
-	}, skip->lifetime());
+	}, _skip->lifetime());
 
-	skip->setClickedCallback([=] { submit(); });
+	_skip->setClickedCallback([=] { submit(); });
 }
 
 void QrWidget::refreshCode() {
@@ -441,8 +441,8 @@ void QrWidget::activate() {
 	Step::activate();
 	showChildren();
 
-	if (const auto skipButton = findChild<Ui::LinkButton*>()) {
-		skipButton->setFocus(Qt::OtherFocusReason);
+	if (_skip) {
+		_skip->setFocus(Qt::OtherFocusReason);
 	}
 }
 

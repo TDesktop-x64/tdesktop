@@ -11,6 +11,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "intro/intro_step.h"
 #include "base/timer.h"
 
+namespace Ui {
+class LinkButton;
+} // namespace Ui
+
 namespace Intro {
 namespace details {
 
@@ -52,6 +56,7 @@ private:
 	void done(const MTPauth_Authorization &authorization);
 
 	rpl::event_stream<QByteArray> _qrCodes;
+	Ui::LinkButton *_skip = nullptr;
 	base::Timer _refreshTimer;
 	mtpRequestId _requestId = 0;
 	bool _forceRefresh = false;

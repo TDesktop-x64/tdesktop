@@ -27,7 +27,7 @@ bool OverlayWidget::RendererSW::handleHideWorkaround() {
 }
 
 void OverlayWidget::RendererSW::paintFallback(
-		Painter &&p,
+		Painter &p,
 		const QRegion &clip,
 		Ui::GL::Backend backend) {
 	if (handleHideWorkaround()) {

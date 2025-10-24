@@ -87,6 +87,8 @@ private:
 	void rebuildPreview();
 	void setupEditEventHandler();
 	void setupPhotoEditorEventHandler();
+	void setupEditCoverHandler();
+	void setupClearCoverHandler();
 	void setupField();
 	void setupFieldAutocomplete();
 	void setupControls();

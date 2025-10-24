@@ -777,7 +777,8 @@ void DeleteContactNote(
 	std::move(
 		notesText
 	) | rpl::start_with_next([=, raw = notesLine.text](
-			const TextWithEntities &note) {
+			TextWithEntities note) {
+		TextUtilities::ParseEntities(note, TextParseLinks);
 		raw->setMarkedText(note, context);
 	}, notesLine.text->lifetime());
 

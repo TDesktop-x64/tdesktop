@@ -94,6 +94,7 @@ Step::Step(
 	_titleText.value(
 	) | rpl::start_with_next([=](const QString &text) {
 		_title->setText(text);
+		accessibilityNameChanged();
 		updateLabelsPosition();
 	}, lifetime());
 
@@ -106,6 +107,7 @@ Step::Step(
 			&EntityInText::type);
 		label->setMarkedText(text);
 		label->setAttribute(Qt::WA_TransparentForMouseEvents, hasSpoiler);
+		accessibilityDescriptionChanged();
 		updateLabelsPosition();
 	}, lifetime());
 }

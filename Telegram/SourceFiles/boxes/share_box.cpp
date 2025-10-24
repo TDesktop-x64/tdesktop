@@ -1745,7 +1745,8 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 			result,
 			msgIds);
 		const auto showRecentForwardsToSelf = result.size() == 1
-			&& result.front()->peer()->isSelf();
+			&& result.front()->peer()->isSelf()
+			&& history->owner().session().premium();
 		const auto requestType = Data::Histories::RequestType::Send;
 		for (const auto thread : result) {
 			if (!comment.text.isEmpty()) {

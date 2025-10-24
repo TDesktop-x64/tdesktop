@@ -156,9 +156,7 @@ Pip::RendererGL::RendererGL(not_null<Pip*> owner)
 	}, _lifetime);
 }
 
-void Pip::RendererGL::init(
-		not_null<QOpenGLWidget*> widget,
-		QOpenGLFunctions &f) {
+void Pip::RendererGL::init(QOpenGLFunctions &f) {
 	constexpr auto kQuads = 8;
 	constexpr auto kQuadVertices = kQuads * 4;
 	constexpr auto kQuadValues = kQuadVertices * 4;
@@ -233,9 +231,7 @@ void Pip::RendererGL::init(
 	createShadowTexture();
 }
 
-void Pip::RendererGL::deinit(
-		not_null<QOpenGLWidget*> widget,
-		QOpenGLFunctions *f) {
+void Pip::RendererGL::deinit(QOpenGLFunctions *f) {
 	_textures.destroy(f);
 	_imageProgram = std::nullopt;
 	_texturedVertexShader = nullptr;

@@ -312,9 +312,7 @@ Viewport::RendererGL::RendererGL(not_null<Viewport*> owner)
 	}, _lifetime);
 }
 
-void Viewport::RendererGL::init(
-		not_null<QOpenGLWidget*> widget,
-		QOpenGLFunctions &f) {
+void Viewport::RendererGL::init(QOpenGLFunctions &f) {
 	_frameBuffer.emplace();
 	_frameBuffer->setUsagePattern(QOpenGLBuffer::DynamicDraw);
 	_frameBuffer->create();
@@ -389,9 +387,7 @@ void Viewport::RendererGL::ensureARGB32Program() {
 		}));
 }
 
-void Viewport::RendererGL::deinit(
-		not_null<QOpenGLWidget*> widget,
-		QOpenGLFunctions *f) {
+void Viewport::RendererGL::deinit(QOpenGLFunctions *f) {
 	_frameBuffer = std::nullopt;
 	_frameVertexShader = nullptr;
 	_imageProgram = std::nullopt;

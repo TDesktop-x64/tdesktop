@@ -91,6 +91,10 @@ public:
 		not_null<Main::Account*> account,
 		const Layout &layout);
 
+	QAccessible::Role accessibilityRole() override {
+		return QAccessible::Role::StatusBar;
+	}
+
 	void refreshRetryLink(bool hasRetry);
 	void setLayout(const Layout &layout);
 	void setProgressVisibility(bool visible);
@@ -619,6 +623,7 @@ void ConnectionState::Widget::setLayout(const Layout &layout) {
 	_currentLayout = layout;
 	_proxyIcon->setToggled(_currentLayout.proxyEnabled);
 	refreshRetryLink(_currentLayout.hasRetry);
+	setAccessibleName(_currentLayout.text);
 }
 
 void ConnectionState::Widget::setProgressVisibility(bool visible) {

@@ -7,6 +7,7 @@ https://github.com/TDesktop-x64/tdesktop/blob/dev/LEGAL
 #pragma once
 
 #include <QtCore/QTimer>
+#include "data/filters/message_filter.h"
 
 namespace EnhancedSettings {
 
@@ -48,5 +49,12 @@ namespace EnhancedSettings {
 	void Write();
 
 	void Finish();
+	
+	// Message filter management
+	[[nodiscard]] QVector<MessageFilters::MessageFilter> GetMessageFilters();
+	void AddMessageFilter(const MessageFilters::MessageFilter &filter);
+	void UpdateMessageFilter(const MessageFilters::MessageFilter &filter);
+	void DeleteMessageFilter(const QString &filterId);
+	void ReorderFilters(const QVector<QString> &filterIds);
 
 } // namespace EnhancedSettings

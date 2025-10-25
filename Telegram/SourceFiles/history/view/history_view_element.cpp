@@ -24,6 +24,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "history/history_item_components.h"
 #include "history/history_item_helpers.h"
+#include "data/filters/message_filter_matcher.h"
 #include "base/unixtime.h"
 #include "boxes/premium_preview_box.h"
 #include "core/application.h"
@@ -1049,7 +1050,17 @@ bool Element::isHiddenByGroup() const {
 }
 
 bool Element::isHidden() const {
-	return isHiddenByGroup();
+	if (isHiddenByGroup()) {
+		return true;
+	}
+	
+	// Check message filters
+	const auto filterResult = MessageFilters::CheckMessageAgainstFilters(data());
+	if (filterResult.filtered && filterResult.displayMode == MessageFilters::FilterDisplayMode::Hide) {
+		return true;
+	}
+	
+	return false;
 }
 
 void Element::overrideMedia(std::unique_ptr<Media> media) {

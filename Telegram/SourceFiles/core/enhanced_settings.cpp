@@ -14,6 +14,7 @@ https://github.com/TDesktop-x64/tdesktop/blob/dev/LEGAL
 #include "facades.h"
 #include "ui/widgets/fields/input_field.h"
 #include "lang/lang_cloud_manager.h"
+#include "data/filters/message_filter.h"
 
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
@@ -21,6 +22,9 @@ https://github.com/TDesktop-x64/tdesktop/blob/dev/LEGAL
 #include <QtCore/QJsonValue>
 
 namespace EnhancedSettings {
+	// Global message filters storage
+	QVector<MessageFilters::MessageFilter> gMessageFilters;
+
 	namespace {
 
 		constexpr auto kWriteJsonTimeout = crl::time(5000);
@@ -213,14 +217,52 @@ namespace EnhancedSettings {
 			}
 		});
 
-		ReadBoolOption(settings, "blocked_user_spoiler_mode", [&](auto v) {
-			if (v) {
-				readBlocklist();
-			}
-		});
+	ReadBoolOption(settings, "blocked_user_spoiler_mode", [&](auto v) {
+		if (v) {
+			readBlocklist();
+		}
+	});
 
-		return true;
-	}
+	// Load message filters
+	ReadArrayOption(settings, "message_filters", [&](const QJsonArray &arr) {
+		gMessageFilters.clear();
+		gMessageFilters.reserve(arr.size());
+		for (const auto &item : arr) {
+			if (!item.isObject()) continue;
+			const auto obj = item.toObject();
+			
+			MessageFilters::MessageFilter filter;
+			filter.id = obj.value("id").toString();
+			filter.name = obj.value("name").toString();
+			filter.regex = obj.value("regex").toString();
+			filter.replacementText = obj.value("replacementText").toString();
+			filter.mode = static_cast<MessageFilters::FilterMode>(obj.value("mode").toInt());
+			filter.displayMode = static_cast<MessageFilters::FilterDisplayMode>(obj.value("displayMode").toInt());
+			filter.order = obj.value("order").toInt();
+			filter.enabled = obj.value("enabled").toBool();
+			
+			const auto userIdsArray = obj.value("userIds").toArray();
+			for (const auto &userId : userIdsArray) {
+				const auto id = userId.isString()
+					? userId.toString().toLongLong()
+					: userId.toVariant().toLongLong();
+				filter.userIds.insert(id);
+			}
+			
+			const auto chatIdsArray = obj.value("chatIds").toArray();
+			for (const auto &chatId : chatIdsArray) {
+				const auto id = chatId.isString()
+					? chatId.toString().toLongLong()
+					: chatId.toVariant().toLongLong();
+				filter.chatIds.insert(id);
+			}
+			
+			gMessageFilters.append(filter);
+		}
+	});
+
+	return true;
+}
 
 	void Manager::addIdToBlocklist(int64 userId) {
 		QFile file(cWorkingDir() + qsl("tdata/blocklist.json"));
@@ -375,6 +417,38 @@ namespace EnhancedSettings {
 		settings.insert(qsl("screenshot_mode"), GetEnhancedBool("screenshot_mode"));
 		settings.insert(qsl("update_url"), GetEnhancedString("update_url"));
 
+		// Write message filters array
+		auto filtersArray = QJsonArray();
+		const auto filters = GetMessageFilters();
+		for (const auto &filter : filters) {
+			auto filterObj = QJsonObject();
+			filterObj.insert(qsl("id"), filter.id);
+			filterObj.insert(qsl("name"), filter.name);
+			filterObj.insert(qsl("regex"), filter.regex);
+			filterObj.insert(qsl("replacementText"), filter.replacementText);
+			filterObj.insert(qsl("mode"), static_cast<int>(filter.mode));
+			filterObj.insert(qsl("displayMode"), static_cast<int>(filter.displayMode));
+			filterObj.insert(qsl("order"), filter.order);
+			filterObj.insert(qsl("enabled"), filter.enabled);
+			
+			auto userIdsArray = QJsonArray();
+			for (const auto &userId : filter.userIds) {
+				// Store as string to preserve full int64 precision
+				userIdsArray.append(QString::number(userId));
+			}
+			filterObj.insert(qsl("userIds"), userIdsArray);
+			
+			auto chatIdsArray = QJsonArray();
+			for (const auto &chatId : filter.chatIds) {
+				// Store as string to preserve full int64 precision
+				chatIdsArray.append(QString::number(chatId));
+			}
+			filterObj.insert(qsl("chatIds"), chatIdsArray);
+			
+			filtersArray.append(filterObj);
+		}
+		settings.insert(qsl("message_filters"), filtersArray);
+
 		auto document = QJsonDocument();
 		document.setObject(settings);
 		file.write(document.toJson(QJsonDocument::Indented));
@@ -405,6 +479,50 @@ namespace EnhancedSettings {
 		if (!Data) return;
 
 		Data->write(true);
+	}
+
+	// Message filter management
+	QVector<MessageFilters::MessageFilter> GetMessageFilters() {
+		return gMessageFilters;
+	}
+
+	void AddMessageFilter(const MessageFilters::MessageFilter &filter) {
+		gMessageFilters.append(filter);
+		Write();
+	}
+
+	void UpdateMessageFilter(const MessageFilters::MessageFilter &filter) {
+		for (auto &f : gMessageFilters) {
+			if (f.id == filter.id) {
+				f = filter;
+				break;
+			}
+		}
+		Write();
+	}
+
+	void DeleteMessageFilter(const QString &filterId) {
+		gMessageFilters.erase(
+			std::remove_if(gMessageFilters.begin(), gMessageFilters.end(),
+				[&](const auto &f) { return f.id == filterId; }),
+			gMessageFilters.end());
+		Write();
+	}
+
+	void ReorderFilters(const QVector<QString> &filterIds) {
+		QVector<MessageFilters::MessageFilter> reordered;
+		int order = 0;
+		for (const auto &id : filterIds) {
+			for (auto &filter : gMessageFilters) {
+				if (filter.id == id) {
+					filter.order = order++;
+					reordered.append(filter);
+					break;
+				}
+			}
+		}
+		gMessageFilters = reordered;
+		Write();
 	}
 
 } // namespace EnhancedSettings

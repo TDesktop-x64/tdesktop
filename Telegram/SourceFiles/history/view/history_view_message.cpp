@@ -15,6 +15,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_cursor_state.h"
 #include "history/history_item_components.h"
 #include "history/history_item_helpers.h"
+#include "data/filters/message_filter_matcher.h"
 #include "history/view/media/history_view_media_generic.h"
 #include "history/view/media/history_view_web_page.h"
 #include "history/view/media/history_view_suggest_decision.h"
@@ -1135,6 +1136,23 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 		service->paint(p, context, g, delegate()->elementChatMode());
 	}
 
+	// Check message filters for special display modes
+	const auto filterResult = MessageFilters::CheckMessageAgainstFilters(item);
+	auto filterDimMode = false;
+	auto filterReplaced = false;
+	if (filterResult.filtered) {
+		if (filterResult.displayMode == MessageFilters::FilterDisplayMode::Hide) {
+			return; // Hide completely
+		} else if (filterResult.displayMode == MessageFilters::FilterDisplayMode::Dim) {
+			// Draw with reduced opacity
+			p.setOpacity(0.3);
+			filterDimMode = true;
+		}
+	} else if (filterResult.isReplaced) {
+		// Replace mode: will draw replaced text overlay after normal rendering
+		filterReplaced = true;
+	}
+
 	if (isHidden()) {
 		return;
 	}
@@ -1614,6 +1632,29 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 		}
 		p.restore();
 	}
+	
+	// Restore opacity if dim mode was applied
+	if (filterDimMode) {
+		p.setOpacity(1.0);
+	}
+	
+	// Draw replaced text overlay if Replace mode was applied
+	if (filterReplaced && !filterResult.replacedText.isEmpty()) {
+		p.save();
+		p.setPen(stm->msgServiceFg);
+		p.setFont(st::msgFont);
+		
+		// Draw semi-transparent background
+		const auto textRect = QRect(g.left() + 10, g.top() + 10, g.width() - 20, g.height() - 20);
+		p.setOpacity(0.9);
+		p.fillRect(textRect, stm->msgBg);
+		
+		// Draw replaced text
+		p.setOpacity(1.0);
+		p.drawText(textRect, Qt::AlignLeft | Qt::AlignVCenter | Qt::TextWordWrap, filterResult.replacedText);
+		p.restore();
+	}
+	
 	if (selectionTranslation) {
 		p.translate(-selectionTranslation, 0);
 	}

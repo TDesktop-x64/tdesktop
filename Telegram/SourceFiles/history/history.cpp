@@ -19,11 +19,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_translation.h"
 #include "history/history_unread_things.h"
 #include "core/ui_integration.h"
+#include "core/enhanced_settings.h"
 #include "dialogs/ui/dialogs_layout.h"
 #include "data/business/data_shortcut_messages.h"
 #include "data/components/scheduled_messages.h"
 #include "data/components/sponsored_messages.h"
 #include "data/components/top_peers.h"
+#include "data/filters/message_filter_matcher.h"
 #include "data/notify/data_notify_settings.h"
 #include "data/stickers/data_stickers.h"
 #include "data/data_cloud_themes.h"
@@ -1447,11 +1449,15 @@ void History::newItemAdded(not_null<HistoryItem*> item) {
 		.item = item,
 		.type = Data::ItemNotificationType::Message,
 	};
-	if (item->showNotification()) {
+	
+	// Check if message should be filtered and suppress notification
+	const auto shouldSuppress = MessageFilters::ShouldSuppressNotification(item);
+	
+	if (item->showNotification() && !shouldSuppress) {
 		item->notificationThread()->pushNotification(notification);
 	}
 	owner().notifyNewItemAdded(item);
-	const auto stillShow = item->showNotification(); // Could be read already.
+	const auto stillShow = item->showNotification() && !shouldSuppress; // Could be read already.
 	if (stillShow) {
 		Core::App().notifications().schedule(notification);
 	}
@@ -2067,6 +2073,14 @@ void History::setUnreadCount(int newUnreadCount) {
 		_firstUnreadView = nullptr;
 		if (const auto last = msgIdForRead()) {
 			setInboxReadTill(last);
+		}
+		
+		// Reset soft mute counter when user reads all messages
+		const auto peerId = peer->id.value;
+		auto softMute = EnhancedSettings::GetSoftMuteState(peerId);
+		if (softMute.enabled && softMute.lastNotificationTime != 0) {
+			// Reset to 0 so next message will trigger notification
+			EnhancedSettings::UpdateSoftMuteLastNotification(peerId, 0);
 		}
 	} else if (!_firstUnreadView && !_unreadBarView && loadedAtBottom()) {
 		calculateFirstUnreadMessage();

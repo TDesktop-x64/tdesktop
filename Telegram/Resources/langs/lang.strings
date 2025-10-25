@@ -1488,6 +1488,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_mute_menu_sound_select" = "Select tone";
 "lng_mute_box_title" = "Mute notifications for...";
 
+"lng_soft_mute_menu_duration_any" = "Soft mute within {duration}";
+"lng_soft_mute_menu_duration" = "Soft mute within...";
+"lng_soft_mute_menu_disable" = "Disable soft mute";
+"lng_soft_mute_box_title" = "Soft mute within...";
+"lng_context_soft_unmute" = "Disable Soft Mute";
+
 "lng_preview_loading" = "Getting Link Info...";
 "lng_preview_cant" = "Could not generate preview for this link.";
 
@@ -7134,6 +7140,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_unpin_voice_chat" = "Unpin";
 "lng_settings_radio_controller" = "Radio controller";
 "lng_settings_auto_unmute" = "Auto unmute";
+"lng_settings_soft_mute_mode" = "Soft Mute Suppression Mode";
+"lng_settings_soft_mute_mode_silent" = "Show badge (silent)";
+"lng_settings_soft_mute_mode_hidden" = "Hide completely";
 "lng_settings_other" = "Other";
 "lng_settings_hide_all_chats" = "Hide \"All chats\" folder";
 "lng_settings_replace_edit_button" = "Replace \"Edit\" button by Saved Messages";
@@ -7259,4 +7268,42 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_group_requests_ban" = "Ban";
 
 "lng_blocked_user_hint" = "[Blocked User Message]\n";
+
+// Enhanced Settings - Message Filters
+"lng_settings_message_filters" = "Message Filters";
+"lng_filter_add" = "Add Filter";
+"lng_filter_edit" = "Edit Filter";
+"lng_filter_name" = "Filter Name";
+"lng_filter_regex" = "Text Pattern (Regex)";
+"lng_filter_user_ids" = "User IDs";
+"lng_filter_chats" = "Apply to Chats";
+"lng_filter_mode" = "Filter Mode";
+"lng_filter_mode_whitelist" = "Whitelist (Show only matching)";
+"lng_filter_mode_blacklist" = "Blacklist (Hide matching)";
+"lng_filter_mode_replace" = "Replace (Replace matching text)";
+"lng_filter_replacement_text" = "Replacement Text";
+"lng_filter_display" = "Display Mode";
+"lng_filter_display_hide" = "Hide completely";
+"lng_filter_display_dim" = "Dim message";
+"lng_add_to_message_filter" = "Add to Filter";
+"lng_filter_global" = "Global (All chats)";
+"lng_filter_enabled" = "Enabled";
+"lng_filter_select_chats" = "Select Chats/Groups/Channels";
+"lng_filter_chat_ids" = "Chat/Channel IDs (comma-separated)";
+"lng_filter_no_chats_selected" = "No specific chats selected";
+"lng_filter_chats_selected" = "chats/channels selected";
+"lng_filter_select_users" = "Select Users to Filter";
+"lng_filter_no_users_selected" = "No specific users selected";
+"lng_filter_users_selected" = "users selected";
+"lng_filter_delete_confirm" = "Delete this filter?";
+"lng_message_filtered" = "Message filtered";
+"lng_filter_manage_title" = "Manage Message Filters";
+"lng_filter_no_filters" = "No filters created yet.";
+"lng_filter_add_userid_title" = "Add User to Filter";
+"lng_filter_select_or_create" = "Select existing filter or create new one";
+
+// Enhanced Settings - Hide Ads
+"lng_settings_hide_ads" = "Hide Sponsored Content";
+"lng_premium_required" = "Premium subscription required";
+
 // Keys finished

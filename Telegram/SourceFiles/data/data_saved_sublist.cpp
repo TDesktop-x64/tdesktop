@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_unread_things.h"
 #include "apiwrap.h"
 #include "core/application.h"
+#include "core/enhanced_settings.h"
 #include "data/data_changes.h"
 #include "data/data_channel.h"
 #include "data/data_drafts.h"
@@ -506,6 +507,14 @@ void SavedSublist::setUnreadCount(std::optional<int> count) {
 	_unreadCount = count;
 	if (!count && !_readRequestTimer.isActive() && !_readRequestId) {
 		reloadUnreadCountIfNeeded();
+		
+		// Reset soft mute counter when user reads all messages in saved sublist
+		const auto peerId = sublistPeer()->id.value;
+		auto softMute = EnhancedSettings::GetSoftMuteState(peerId);
+		if (softMute.enabled && softMute.lastNotificationTime != 0) {
+			// Reset to 0 so next message will trigger notification
+			EnhancedSettings::UpdateSoftMuteLastNotification(peerId, 0);
+		}
 	}
 }
 

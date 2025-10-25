@@ -20,10 +20,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/peers/edit_participants_box.h"
 #include "boxes/peers/edit_peer_info_box.h"
 #include "boxes/peers/verify_peers_box.h"
+#include "boxes/message_filter_box.h"
 #include "boxes/report_messages_box.h"
 #include "boxes/share_box.h"
 #include "boxes/star_gift_box.h"
 #include "boxes/translate_box.h"
+#include "data/filters/message_filter.h"
+#include "core/enhanced_settings.h"
+
+#include <QtCore/QUuid>
 #include "core/application.h"
 #include "core/click_handler_types.h"
 #include "core/ui_integration.h"
@@ -2755,6 +2760,31 @@ void ActionsFiller::addReportAction() {
 void ActionsFiller::addBlockAction(not_null<UserData*> user) {
 	const auto controller = _controller->parentController();
 	const auto window = &controller->window();
+
+	// Add to message filter action
+	AddActionButton(
+		_wrap,
+		tr::lng_add_to_message_filter(),
+		rpl::single(true),
+		[=] {
+			const auto show = controller->uiShow();
+			if (show->showFrozenError()) {
+				return;
+			}
+		// Create a new filter with this user
+		MessageFilters::MessageFilter newFilter;
+		newFilter.id = QUuid::createUuid().toString();
+		newFilter.name = "User Filter";
+		newFilter.regex = "";
+		newFilter.userIds.insert(static_cast<int64>(user->id.value));
+		newFilter.mode = MessageFilters::FilterMode::Blacklist;
+		newFilter.displayMode = MessageFilters::FilterDisplayMode::Hide;
+		newFilter.order = EnhancedSettings::GetMessageFilters().size();
+		newFilter.enabled = true;
+		
+		show->show(Box<MessageFilterEditBox>(controller, newFilter, true));
+		},
+		&st::infoIconBlock);
 
 	auto text = user->session().changes().peerFlagsValue(
 		user,

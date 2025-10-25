@@ -265,6 +265,10 @@ void SponsoredMessages::request(not_null<History*> history, Fn<void()> done) {
 	if (!canHaveFor(history) || history->peer->isMegagroup()) {
 		return;
 	}
+	// Skip sponsored content if user enabled it and has premium
+	if (GetEnhancedBool("hide_sponsored_content") && _session->premium()) {
+		return;
+	}
 	auto &request = _requests[history];
 	if (request.requestId || TooEarlyForRequest(request.lastReceived)) {
 		return;

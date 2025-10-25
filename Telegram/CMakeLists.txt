@@ -299,6 +299,8 @@ PRIVATE
     boxes/max_invite_box.h
     boxes/enhanced_options_box.cpp
     boxes/enhanced_options_box.h
+    boxes/message_filter_box.cpp
+    boxes/message_filter_box.h
     boxes/moderate_messages_box.cpp
     boxes/moderate_messages_box.h
     boxes/peer_list_box.cpp
@@ -534,6 +536,9 @@ PRIVATE
     data/components/sponsored_messages.h
     data/components/top_peers.cpp
     data/components/top_peers.h
+    data/filters/message_filter.h
+    data/filters/message_filter_matcher.cpp
+    data/filters/message_filter_matcher.h
     data/notify/data_notify_settings.cpp
     data/notify/data_notify_settings.h
     data/notify/data_peer_notify_settings.cpp

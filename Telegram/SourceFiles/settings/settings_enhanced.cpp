@@ -23,6 +23,7 @@ https://github.com/TDesktop-x64/tdesktop/blob/dev/LEGAL
 #include "ui/text/text_utilities.h" // Ui::Text::ToUpper
 #include "boxes/connection_box.h"
 #include "boxes/enhanced_options_box.h"
+#include "boxes/message_filter_box.h"
 #include "boxes/about_box.h"
 #include "ui/boxes/confirm_box.h"
 #include "platform/platform_specific.h"
@@ -119,7 +120,9 @@ namespace Settings {
 		}).send();
 	}
 
-	void Enhanced::SetupEnhancedMessages(not_null<Ui::VerticalLayout *> container) {
+	void Enhanced::SetupEnhancedMessages(
+		not_null<Window::SessionController*> controller,
+		not_null<Ui::VerticalLayout *> container) {
 		AddDivider(container);
 		AddSkip(container);
 		AddSubsectionTitle(container, tr::lng_settings_messages());
@@ -129,6 +132,15 @@ namespace Settings {
 						container,
 						object_ptr<Ui::VerticalLayout>(container)));
 		const auto inner = wrap->entity();
+
+		// Message Filters Button
+		AddButtonWithIcon(
+			inner,
+			tr::lng_settings_message_filters(),
+			st::settingsButtonNoIcon
+		)->addClickHandler([=] {
+			controller->show(Box<MessageFilterListBox>(controller));
+		});
 
 		auto MsgIdBtn = AddButtonWithIcon(
 				inner,
@@ -177,28 +189,28 @@ namespace Settings {
 			}, container->lifetime());
 		}
 
-		auto value = rpl::single(
-				AlwaysDeleteBox::DeleteLabel(GetEnhancedInt("always_delete_for"))
-		) | rpl::then(
-				_AlwaysDeleteChanged.events()
-		) | rpl::map([] {
-			return AlwaysDeleteBox::DeleteLabel(GetEnhancedInt("always_delete_for"));
-		});
+	auto value = rpl::single(
+			AlwaysDeleteBox::DeleteLabel(GetEnhancedInt("always_delete_for"))
+	) | rpl::then(
+			_AlwaysDeleteChanged.events()
+	) | rpl::map([] {
+		return AlwaysDeleteBox::DeleteLabel(GetEnhancedInt("always_delete_for"));
+	});
 
-		auto btn = AddButtonWithLabel(
-				container,
-				tr::lng_settings_always_delete_for(),
-				std::move(value),
-				st::settingsButtonNoIcon
-		);
-		btn->events(
-		) | rpl::start_with_next([=](not_null<QEvent*> e) {
-			const auto event = e->type();
-			if (event == QEvent::UpdateLater) _AlwaysDeleteChanged.fire({});
-		}, container->lifetime());
-		btn->addClickHandler([=] {
-			Ui::show(Box<AlwaysDeleteBox>());
-		});
+	auto btn = AddButtonWithLabel(
+			inner,
+			tr::lng_settings_always_delete_for(),
+			std::move(value),
+			st::settingsButtonNoIcon
+	);
+	btn->events(
+	) | rpl::start_with_next([=, this](not_null<QEvent*> e) {
+		const auto event = e->type();
+		if (event == QEvent::UpdateLater) _AlwaysDeleteChanged.fire({});
+	}, inner->lifetime());
+	btn->addClickHandler([=] {
+		Ui::show(Box<AlwaysDeleteBox>());
+	});
 
 		AddButtonWithIcon(
 				inner,
@@ -340,29 +352,29 @@ namespace Settings {
 			tr::lng_settings_hide_messages(),
 			st::settingsButtonNoIcon
 		);
-		hideBtn->setColorOverride(QColor(255, 0, 0));
-		hideBtn->toggleOn(
-				rpl::single(GetEnhancedBool("blocked_user_spoiler_mode"))
-		)->toggledChanges(
-		) | rpl::filter([=](bool toggled) {
-			return (toggled != GetEnhancedBool("blocked_user_spoiler_mode"));
-		}) | rpl::start_with_next([=](bool toggled) {
-			SetEnhancedValue("blocked_user_spoiler_mode", toggled);
-			EnhancedSettings::Write();
-			if (toggled) {
-				Ui::Toast::Show("Please wait a moment, fetching blocklist...");
+	hideBtn->setColorOverride(QColor(255, 0, 0));
+	hideBtn->toggleOn(
+			rpl::single(GetEnhancedBool("blocked_user_spoiler_mode"))
+	)->toggledChanges(
+	) | rpl::filter([=](bool toggled) {
+		return (toggled != GetEnhancedBool("blocked_user_spoiler_mode"));
+	}) | rpl::start_with_next([=, this](bool toggled) {
+		SetEnhancedValue("blocked_user_spoiler_mode", toggled);
+		EnhancedSettings::Write();
+		if (toggled) {
+			Ui::Toast::Show("Please wait a moment, fetching blocklist...");
 
-				App::wnd()->sessionController()->session().api().blockedPeers().slice() | rpl::take(
-					1
-				) | rpl::start_with_next([&](const Api::BlockedPeers::Slice &result) {
-					if (blockList.length() == result.total) {
-						return;
-					}
-					blockList = QList<int64>();
-					reqBlocked(0);
-				}, container->lifetime());
-			}
-		}, container->lifetime());
+			App::wnd()->sessionController()->session().api().blockedPeers().slice() | rpl::take(
+				1
+			) | rpl::start_with_next([=, this](const Api::BlockedPeers::Slice &result) {
+				if (blockList.length() == result.total) {
+					return;
+				}
+				blockList = QList<int64>();
+				reqBlocked(0);
+			}, container->lifetime());
+		}
+	}, container->lifetime());
 
 		AddDividerText(inner, tr::lng_settings_hide_messages_desc());
 	}
@@ -497,6 +509,45 @@ namespace Settings {
 		AddSkip(container);
 		AddSubsectionTitle(container, tr::lng_settings_other());
 
+		// Soft Mute Suppression Mode - simple toggle button
+		AddButtonWithIcon(
+			container,
+			tr::lng_settings_soft_mute_mode(),
+			st::settingsButtonNoIcon
+		)->toggleOn(
+			rpl::single(GetEnhancedInt("soft_mute_default_mode") == 1)
+		)->toggledChanges(
+		) | rpl::filter([=](bool toggled) {
+			return (toggled ? 1 : 0) != GetEnhancedInt("soft_mute_default_mode");
+		}) | rpl::start_with_next([=](bool toggled) {
+			SetEnhancedValue("soft_mute_default_mode", toggled ? 1 : 0);
+			EnhancedSettings::Write();
+		}, container->lifetime());
+
+		AddDividerText(container, rpl::single(
+			tr::lng_settings_soft_mute_mode_silent(tr::now) + " / " + 
+			tr::lng_settings_soft_mute_mode_hidden(tr::now)));
+
+		// Hide Sponsored Content toggle
+		AddButtonWithIcon(
+			container,
+			tr::lng_settings_hide_ads(),
+			st::settingsButtonNoIcon
+		)->toggleOn(
+			rpl::single(GetEnhancedBool("hide_sponsored_content"))
+		)->toggledChanges(
+		) | rpl::filter([=](bool toggled) {
+			return (toggled != GetEnhancedBool("hide_sponsored_content"));
+		}) | rpl::start_with_next([=](bool toggled) {
+			// Check if user has premium
+			if (toggled && !controller->session().premium()) {
+				Ui::Toast::Show(tr::lng_premium_required(tr::now));
+				return;
+			}
+			SetEnhancedValue("hide_sponsored_content", toggled);
+			EnhancedSettings::Write();
+		}, container->lifetime());
+
 		auto hideBtn = AddButtonWithIcon(
 			container,
 			tr::lng_settings_hide_all_chats(),
@@ -614,7 +665,7 @@ namespace Settings {
 		const auto content = Ui::CreateChild<Ui::VerticalLayout>(this);
 
 		SetupEnhancedNetwork(content);
-		SetupEnhancedMessages(content);
+		SetupEnhancedMessages(controller, content);
 		SetupEnhancedButton(content);
 		SetupEnhancedVoiceChat(content);
 		SetupEnhancedOthers(controller, content);

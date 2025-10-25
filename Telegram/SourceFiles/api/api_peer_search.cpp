@@ -88,6 +88,11 @@ void PeerSearch::requestPeers() {
 }
 
 void PeerSearch::requestSponsored() {
+	// Skip sponsored content if user enabled it and has premium
+	if (GetEnhancedBool("hide_sponsored_content") && _session->premium()) {
+		finishSponsored(0, PeerSearchResult{});
+		return;
+	}
 	const auto requestId = _session->api().request(
 		MTPcontacts_GetSponsoredPeers(MTP_string(_query))
 	).done([=](

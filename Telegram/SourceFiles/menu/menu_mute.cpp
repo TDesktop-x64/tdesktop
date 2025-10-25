@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/ringtones_box.h"
 #include "data/data_session.h"
 #include "data/data_thread.h"
+#include "data/data_peer.h"
 #include "data/notify/data_notify_settings.h"
 #include "data/notify/data_peer_notify_settings.h"
 #include "info/profile/info_profile_values.h"
@@ -30,12 +31,39 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_info.h" // infoTopBarMenu
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
+#include "core/enhanced_settings.h"
+#include "base/unixtime.h"
 
 namespace MuteMenu {
 namespace {
 
 constexpr auto kMuteDurSecondsDefault = crl::time(8) * 3600;
 constexpr auto kMuteForeverValue = std::numeric_limits<TimeId>::max();
+constexpr auto kSoftMuteDurSecondsDefault = crl::time(1) * 3600; // 1 hour
+
+// Soft mute time picker values: 30 seconds to 1 day
+[[nodiscard]] std::vector<TimeId> SoftMuteTimePickerValues() {
+	return {
+		30,          // 30 seconds
+		60,          // 1 minute
+		120,         // 2 minutes
+		300,         // 5 minutes
+		600,         // 10 minutes
+		900,         // 15 minutes
+		1800,        // 30 minutes
+		3600,        // 1 hour
+		7200,        // 2 hours
+		14400,       // 4 hours
+		28800,       // 8 hours
+		43200,       // 12 hours
+		86400,       // 1 day
+	};
+}
+
+// Forward declarations
+void SoftMuteBox(
+	not_null<Ui::GenericBox*> box,
+	not_null<Data::Thread*> thread);
 
 class IconWithText final : public Ui::Menu::Action {
 public:
@@ -216,6 +244,98 @@ void PickMuteBox(
 	});
 }
 
+void PickSoftMuteBox(
+		not_null<Ui::GenericBox*> box,
+		not_null<Data::Thread*> thread) {
+	struct State {
+		base::unique_qptr<Ui::PopupMenu> menu;
+	};
+	const auto seconds = SoftMuteTimePickerValues();
+	const auto phrases = ranges::views::all(
+		seconds
+	) | ranges::views::transform(Ui::FormatMuteFor) | ranges::to_vector;
+
+	const auto state = box->lifetime().make_state<State>();
+
+	const auto pickerCallback = TimePickerBox(box, seconds, phrases, 0);
+
+	Ui::ConfirmBox(box, {
+		.confirmed = [=] {
+			const auto softMuteFor = pickerCallback();
+			auto muteState = EnhancedSettings::SoftMuteState{};
+			muteState.enabled = true;
+			muteState.period = softMuteFor;
+			muteState.lastNotificationTime = 0; // Will trigger on first message
+			muteState.suppressionMode = GetEnhancedInt("soft_mute_default_mode");
+			EnhancedSettings::SetSoftMuteState(thread->peer()->id.value, muteState);
+			box->closeBox();
+		},
+		.confirmText = tr::lng_mute_menu_mute(),
+		.cancelText = tr::lng_cancel(),
+	});
+
+	box->setTitle(tr::lng_soft_mute_box_title());
+
+	const auto top = box->addTopButton(st::infoTopBarMenu);
+	top->setClickedCallback([=] {
+		if (state->menu) {
+			return;
+		}
+		state->menu = base::make_unique_q<Ui::PopupMenu>(
+			top,
+			st::popupMenuWithIcons);
+		state->menu->addAction(
+			tr::lng_manage_messages_ttl_after_custom(tr::now),
+			[=] { box->getDelegate()->show(Box(SoftMuteBox, thread)); },
+			&st::menuIconCustomize);
+		state->menu->setDestroyedCallback(crl::guard(top, [=] {
+			top->setForceRippled(false);
+		}));
+		top->setForceRippled(true);
+		state->menu->popup(QCursor::pos());
+	});
+}
+
+void SoftMuteBox(
+		not_null<Ui::GenericBox*> box,
+		not_null<Data::Thread*> thread) {
+	struct State {
+		int lastSeconds = 0;
+	};
+
+	auto chooseTimeResult = ChooseTimeWidget(box, kSoftMuteDurSecondsDefault);
+	box->addRow(std::move(chooseTimeResult.widget));
+
+	const auto state = box->lifetime().make_state<State>();
+
+	box->setTitle(tr::lng_soft_mute_box_title());
+
+	auto confirmText = std::move(
+		chooseTimeResult.secondsValue
+	) | rpl::map([=](int seconds) {
+		state->lastSeconds = seconds;
+		return !seconds
+			? tr::lng_cancel()
+			: tr::lng_mute_menu_mute();
+	}) | rpl::flatten_latest();
+
+	Ui::ConfirmBox(box, {
+		.confirmed = [=] {
+			if (state->lastSeconds > 0) {
+				auto muteState = EnhancedSettings::SoftMuteState{};
+				muteState.enabled = true;
+				muteState.period = state->lastSeconds;
+				muteState.lastNotificationTime = 0; // Will trigger on first message
+				muteState.suppressionMode = GetEnhancedInt("soft_mute_default_mode");
+				EnhancedSettings::SetSoftMuteState(thread->peer()->id.value, muteState);
+			}
+			box->getDelegate()->hideLayer();
+		},
+		.confirmText = std::move(confirmText),
+		.cancelText = tr::lng_cancel(),
+	});
+}
+
 } // namespace
 
 Descriptor ThreadDescriptor(not_null<Data::Thread*> thread) {
@@ -254,6 +374,7 @@ Descriptor ThreadDescriptor(not_null<Data::Thread*> thread) {
 		.updateSound = updateSound,
 		.updateMutePeriod = updateMutePeriod,
 		.volumeController = Data::ThreadRingtonesVolumeController(thread),
+		.thread = thread.get(),
 	};
 }
 
@@ -362,6 +483,64 @@ void FillMuteMenu(
 
 	menu->addAction(
 		base::make_unique_q<MuteItem>(menu, menu->st().menu, descriptor));
+
+	// Add soft mute section (only for threads, not for default descriptors)
+	if (descriptor.thread) {
+		menu->addSeparator();
+
+		const auto thread = descriptor.thread;
+		const auto peerId = thread->peer()->id.value;
+		const auto softMuteState = EnhancedSettings::GetSoftMuteState(peerId);
+
+		if (softMuteState.enabled) {
+			// Show disable soft mute option
+			menu->addAction(
+				tr::lng_soft_mute_menu_disable(tr::now),
+				[=] {
+					EnhancedSettings::RemoveSoftMute(peerId);
+				},
+				&st::menuIconUnmute);
+		} else {
+			// Show soft mute duration options - use custom soft mute time range
+			const auto softMutePeriods = SoftMuteTimePickerValues();
+			// Show only a few preset options (skip the very short ones for menu)
+			const std::vector<TimeId> quickOptions = {
+				60,    // 1 minute
+				600,   // 10 minutes
+			};
+			
+			for (const auto softMuteFor : quickOptions) {
+				const auto callback = [=] {
+					auto state = EnhancedSettings::SoftMuteState{};
+					state.enabled = true;
+					state.period = softMuteFor;
+					state.lastNotificationTime = 0;
+					state.suppressionMode = GetEnhancedInt("soft_mute_default_mode");
+					EnhancedSettings::SetSoftMuteState(peerId, state);
+				};
+
+				auto item = base::make_unique_q<IconWithText>(
+					menu,
+					st,
+					Ui::Menu::CreateAction(
+						menu->menu().get(),
+						tr::lng_soft_mute_menu_duration_any(
+							tr::now,
+							lt_duration,
+							Ui::FormatMuteFor(softMuteFor)),
+						callback),
+					&st::menuIconMuteForAny,
+					&st::menuIconMuteForAny);
+				item->setData(Ui::FormatMuteForTiny(softMuteFor), iconTextPosition);
+				menu->addAction(std::move(item));
+			}
+
+			menu->addAction(
+				tr::lng_soft_mute_menu_duration(tr::now),
+				[=, show = show] { show->showBox(Box(PickSoftMuteBox, thread)); },
+				&st::menuIconMuteFor);
+		}
+	}
 }
 
 void SetupMuteMenu(

@@ -20,6 +20,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_forum_topic.h"
 #include "window/notifications_manager.h"
 #include "core/application.h"
+#include "core/enhanced_settings.h"
 #include "lang/lang_keys.h"
 #include "apiwrap.h"
 
@@ -844,6 +845,14 @@ void RepliesList::setUnreadCount(std::optional<int> count) {
 	_unreadCount = count;
 	if (!count && !_readRequestTimer.isActive() && !_readRequestId) {
 		reloadUnreadCountIfNeeded();
+		
+		// Reset soft mute counter when user reads all messages in topic
+		const auto peerId = _history->peer->id.value;
+		auto softMute = EnhancedSettings::GetSoftMuteState(peerId);
+		if (softMute.enabled && softMute.lastNotificationTime != 0) {
+			// Reset to 0 so next message will trigger notification
+			EnhancedSettings::UpdateSoftMuteLastNotification(peerId, 0);
+		}
 	}
 }
 

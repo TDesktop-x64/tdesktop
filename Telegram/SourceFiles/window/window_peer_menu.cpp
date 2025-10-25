@@ -35,9 +35,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/choose_filter_box.h"
 #include "boxes/create_poll_box.h"
 #include "boxes/edit_todo_list_box.h"
+#include "boxes/message_filter_box.h"
 #include "boxes/pin_messages_box.h"
 #include "boxes/premium_limits_box.h"
 #include "boxes/report_messages_box.h"
+#include "data/filters/message_filter.h"
+#include "core/enhanced_settings.h"
+
+#include <QtCore/QUuid>
 #include "boxes/peers/add_bot_to_chat_box.h"
 #include "boxes/peers/add_participants_box.h"
 #include "boxes/peers/edit_forum_topic_box.h"
@@ -297,6 +302,7 @@ private:
 	void addCreateTodoList();
 	void addThemeEdit();
 	void addBlockUser();
+	void addAddChatToFilter();
 	void addViewDiscussion();
 	void addDirectMessages();
 	void addToggleTopicClosed();
@@ -835,6 +841,27 @@ void Filler::addBlockUser() {
 		return;
 	}
 	const auto window = _controller;
+	
+	// Add to message filter action (for users)
+	_addAction(tr::lng_add_to_message_filter(tr::now), [=] {
+		const auto show = window->uiShow();
+		if (show->showFrozenError()) {
+			return;
+		}
+		// Create a new filter with this user
+		MessageFilters::MessageFilter newFilter;
+		newFilter.id = QUuid::createUuid().toString();
+		newFilter.name = "User Filter: " + user->name();
+		newFilter.regex = "";
+		newFilter.userIds.insert(static_cast<int64>(user->id.value));
+		newFilter.mode = MessageFilters::FilterMode::Blacklist;
+		newFilter.displayMode = MessageFilters::FilterDisplayMode::Hide;
+		newFilter.order = EnhancedSettings::GetMessageFilters().size();
+		newFilter.enabled = true;
+		
+		show->show(Box<MessageFilterEditBox>(window, newFilter, true));
+	}, &st::menuIconBlock);
+	
 	const auto blockText = [](not_null<UserData*> user) {
 		return user->isBlocked()
 			? ((user->isBot() && !user->isSupport())
@@ -875,6 +902,35 @@ void Filler::addBlockUser() {
 	if (user->blockStatus() == UserData::BlockStatus::Unknown) {
 		user->session().api().requestFullPeer(user);
 	}
+}
+
+void Filler::addAddChatToFilter() {
+	// Only for chats and channels, not users
+	if (!_peer || _peer->isUser()) {
+		return;
+	}
+	
+	const auto window = _controller;
+	const auto peer = _peer;
+	
+	_addAction(tr::lng_add_to_message_filter(tr::now), [=] {
+		const auto show = window->uiShow();
+		if (show->showFrozenError()) {
+			return;
+		}
+		// Create a new filter with this chat/channel
+		MessageFilters::MessageFilter newFilter;
+		newFilter.id = QUuid::createUuid().toString();
+		newFilter.name = "Chat Filter: " + peer->name();
+		newFilter.regex = "";
+		newFilter.chatIds.insert(static_cast<int64>(peer->id.value));
+		newFilter.mode = MessageFilters::FilterMode::Blacklist;
+		newFilter.displayMode = MessageFilters::FilterDisplayMode::Hide;
+		newFilter.order = EnhancedSettings::GetMessageFilters().size();
+		newFilter.enabled = true;
+		
+		show->show(Box<MessageFilterEditBox>(window, newFilter, true));
+	}, &st::menuIconBlock);
 }
 
 void Filler::addViewDiscussion() {
@@ -1616,6 +1672,7 @@ void Filler::fillHistoryActions() {
 	addCreatePoll();
 	addCreateTodoList();
 	addThemeEdit();
+	addAddChatToFilter();
 	// addViewDiscussion();
 	addDirectMessages();
 	addExportChat();
@@ -1646,6 +1703,7 @@ void Filler::fillProfileActions() {
 	addExportChat();
 	addToggleFolder();
 	addBlockUser();
+	addAddChatToFilter();
 	addReport();
 	addLeaveChat();
 	addDeleteContact();

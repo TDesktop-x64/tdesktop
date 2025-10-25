@@ -7259,4 +7259,37 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_group_requests_ban" = "Ban";
 
 "lng_blocked_user_hint" = "[Blocked User Message]\n";
+
+// Enhanced Settings - Message Filters
+"lng_settings_message_filters" = "Message Filters";
+"lng_filter_add" = "Add Filter";
+"lng_filter_edit" = "Edit Filter";
+"lng_filter_name" = "Filter Name";
+"lng_filter_regex" = "Text Pattern (Regex)";
+"lng_filter_user_ids" = "User IDs";
+"lng_filter_chats" = "Apply to Chats";
+"lng_filter_mode" = "Filter Mode";
+"lng_filter_mode_whitelist" = "Whitelist (Show only matching)";
+"lng_filter_mode_blacklist" = "Blacklist (Hide matching)";
+"lng_filter_mode_replace" = "Replace (Replace matching text)";
+"lng_filter_replacement_text" = "Replacement Text";
+"lng_filter_display" = "Display Mode";
+"lng_filter_display_hide" = "Hide completely";
+"lng_filter_display_dim" = "Dim message";
+"lng_add_to_message_filter" = "Add to Filter";
+"lng_filter_global" = "Global (All chats)";
+"lng_filter_enabled" = "Enabled";
+"lng_filter_select_chats" = "Select Chats/Groups/Channels";
+"lng_filter_chat_ids" = "Chat/Channel IDs (comma-separated)";
+"lng_filter_no_chats_selected" = "No specific chats selected";
+"lng_filter_chats_selected" = "chats/channels selected";
+"lng_filter_select_users" = "Select Users to Filter";
+"lng_filter_no_users_selected" = "No specific users selected";
+"lng_filter_users_selected" = "users selected";
+"lng_filter_delete_confirm" = "Delete this filter?";
+"lng_message_filtered" = "Message filtered";
+"lng_filter_manage_title" = "Manage Message Filters";
+"lng_filter_no_filters" = "No filters created yet.";
+"lng_filter_add_userid_title" = "Add User to Filter";
+"lng_filter_select_or_create" = "Select existing filter or create new one";
 // Keys finished

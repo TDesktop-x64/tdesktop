@@ -24,6 +24,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/components/scheduled_messages.h"
 #include "data/components/sponsored_messages.h"
 #include "data/components/top_peers.h"
+#include "data/filters/message_filter_matcher.h"
 #include "data/notify/data_notify_settings.h"
 #include "data/stickers/data_stickers.h"
 #include "data/data_cloud_themes.h"
@@ -1447,11 +1448,15 @@ void History::newItemAdded(not_null<HistoryItem*> item) {
 		.item = item,
 		.type = Data::ItemNotificationType::Message,
 	};
-	if (item->showNotification()) {
+	
+	// Check if message should be filtered and suppress notification
+	const auto shouldSuppress = MessageFilters::ShouldSuppressNotification(item);
+	
+	if (item->showNotification() && !shouldSuppress) {
 		item->notificationThread()->pushNotification(notification);
 	}
 	owner().notifyNewItemAdded(item);
-	const auto stillShow = item->showNotification(); // Could be read already.
+	const auto stillShow = item->showNotification() && !shouldSuppress; // Could be read already.
 	if (stillShow) {
 		Core::App().notifications().schedule(notification);
 	}

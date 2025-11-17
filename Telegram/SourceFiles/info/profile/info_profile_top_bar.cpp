@@ -1503,6 +1503,13 @@ void TopBar::updateStatusPosition(float64 progressCurrent) {
 	_id->moveToLeft(
 		idLeft,
 		idTop);
+
+	if (_idOpacity) {
+		_idOpacity->setOpacity(progressCurrent);
+	}
+	_id->setAttribute(
+		Qt::WA_TransparentForMouseEvents,
+		!progressCurrent);
 }
 
 void TopBar::resizeEvent(QResizeEvent *e) {
@@ -2559,6 +2566,10 @@ void TopBar::setupChatId() {
 		QGuiApplication::clipboard()->setText(id);
 		Ui::Toast::Show(tr::lng_copy_profile_id(tr::now));
 	}));
+
+	_idOpacity = Ui::CreateChild<QGraphicsOpacityEffect>(_id.get());
+	_id->setGraphicsEffect(_idOpacity);
+	_idOpacity->setOpacity(0.);
 }
 
 rpl::producer<std::optional<QColor>> TopBar::edgeColor() const {

@@ -226,6 +226,7 @@ private:
 	object_ptr<Ui::RoundButton> _forumButton = { nullptr };
 	QGraphicsOpacityEffect *_showLastSeenOpacity = nullptr;
 	object_ptr<Ui::FlatLabel> _id;
+	QGraphicsOpacityEffect *_idOpacity = nullptr;
 
 	std::shared_ptr<style::FlatLabel> _statusSt;
 	std::shared_ptr<style::InfoPeerBadge> _botVerifySt;

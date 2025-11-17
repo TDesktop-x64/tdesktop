@@ -318,7 +318,7 @@ TopBar::TopBar(
 	});
 	return owned;
 }())
-, _id(this, st::infoProfileCover.status) {
+, _id(this, st::infoProfileMegagroupCover.status) {
 	_peer->updateFull();
 	if (const auto broadcast = _peer->monoforumBroadcast()) {
 		broadcast->updateFull();

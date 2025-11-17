@@ -387,6 +387,7 @@ TopBar::TopBar(
 		updateLabelsPosition();
 	}, _title->lifetime());
 
+	setupChatId();
 	setupUniqueBadgeTooltip();
 	setupButtons(
 		controller,
@@ -1430,8 +1431,6 @@ void TopBar::updateLabelsPosition() {
 
 		updateGiftButtonsGeometry(progressCurrent, userpicRect);
 	}
-
-	setupChatId();
 }
 
 void TopBar::updateStatusPosition(float64 progressCurrent) {

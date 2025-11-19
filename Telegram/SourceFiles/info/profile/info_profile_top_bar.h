@@ -229,6 +229,7 @@ private:
 	QGraphicsOpacityEffect *_idOpacity = nullptr;
 
 	std::shared_ptr<style::FlatLabel> _statusSt;
+	std::shared_ptr<style::FlatLabel> _idSt;
 	std::shared_ptr<style::InfoPeerBadge> _botVerifySt;
 	std::shared_ptr<style::InfoPeerBadge> _badgeSt;
 	std::shared_ptr<style::InfoPeerBadge> _verifiedSt;

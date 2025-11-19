@@ -564,8 +564,11 @@ void TopBar::adjustColors(const std::optional<QColor> &edgeColor) {
 		} else {
 			_id.create(this, QString(), st::infoProfileMegagroupCover.status);
 		}
-		setupChatId();
 		_id->show();
+		_id->widthValue() | rpl::start_with_next([=] {
+			updateStatusPosition(_progress.current());
+		}, _id->lifetime());
+		setupChatId();
 		_id->setTextColorOverride(shouldOverrideId
 			? std::optional<QColor>(st::groupCallVideoSubTextFg->c)
 			: std::nullopt);

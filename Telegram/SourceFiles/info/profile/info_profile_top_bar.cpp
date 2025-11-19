@@ -502,6 +502,7 @@ void TopBar::adjustColors(const std::optional<QColor> &edgeColor) {
 	};
 	const auto shouldOverrideTitle = shouldOverride(_title->st().textFg);
 	const auto shouldOverrideStatus = shouldOverrideTitle; // shouldOverride(_status->st().textFg);
+	const auto shouldOverrideId = shouldOverrideTitle; // shouldOverride(_id->st().textFg);
 	_title->setTextColorOverride(shouldOverrideTitle
 		? std::optional<QColor>(st::groupCallMembersFg->c)
 		: std::nullopt);
@@ -546,6 +547,28 @@ void TopBar::adjustColors(const std::optional<QColor> &edgeColor) {
 			? std::optional<QColor>(st::groupCallVideoSubTextFg->c)
 			: std::nullopt);
 		_statusLabel->setColorized(!shouldOverrideStatus);
+	}
+	{
+		{
+			delete _id.release();
+		}
+		if (shouldOverrideId) {
+			const auto copySt = [&](const style::FlatLabel &st) {
+				auto result = std::make_unique<style::FlatLabel>(
+					base::duplicate(st));
+				result->palette.linkFg = st::groupCallVideoSubTextFg;
+				return result;
+			};
+			_idSt = copySt(st::infoProfileMegagroupCover.status);
+			_id.create(this, QString(), *(_idSt.get()));
+		} else {
+			_id.create(this, QString(), st::infoProfileMegagroupCover.status);
+		}
+		setupChatId();
+		_id->show();
+		_id->setTextColorOverride(shouldOverrideId
+			? std::optional<QColor>(st::groupCallVideoSubTextFg->c)
+			: std::nullopt);
 	}
 
 	const auto shouldOverrideBadges = shouldOverride(

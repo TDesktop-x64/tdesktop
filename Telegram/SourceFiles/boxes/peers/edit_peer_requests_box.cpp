@@ -405,7 +405,7 @@ void RequestsBoxController::prepare() {
 }
 
 object_ptr<Ui::RpWidget> RequestsBoxController::createBatchActionsWidget() {
-	auto result = object_ptr<Ui::RpWidget>((QWidget*)nullptr);
+	auto result = object_ptr<Ui::RpWidget>(static_cast<QWidget*>(nullptr));
 	const auto container = result.data();
 
 	const auto dismissAll = Ui::CreateChild<Ui::RoundButton>(
@@ -697,7 +697,6 @@ void RequestsBoxController::RowHelper::rowPaintBan(
 		std::unique_ptr<Ui::RippleAnimation> &ripple,
 		int outerWidth,
 		bool over) {
-	_banRect.setColor(st::banButtonBg);
 	paintButton(
 		p,
 		geometry,

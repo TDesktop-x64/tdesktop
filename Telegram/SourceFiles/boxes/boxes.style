@@ -1026,11 +1026,16 @@ requestsRejectButton: RoundButton(defaultLightButton) {
 	textTop: 6px;
 }
 requestsBanButton: RoundButton(defaultActiveButton) {
+    textBg: banButtonBg;
+	textBgOver: banButtonBgOver;
 	width: -28px;
 	height: 30px;
 	textTop: 6px;
+	ripple: RippleAnimation(defaultRippleAnimation) {
+        color: banButtonBgRipple;
+    }
 }
-requestsBanAllButton: RoundButton(defaultActiveButton) {
+requestsBanAllButton: RoundButton(requestsBanButton) {
 	width: -28px;
 	height: 30px;
 	textTop: 6px;

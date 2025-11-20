@@ -32,6 +32,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/painter.h"
 #include "ui/round_rect.h"
 #include "ui/text/text_utilities.h"
+#include "ui/widgets/buttons.h"
+#include "ui/boxes/confirm_box.h"
 #include "window/window_session_controller.h"
 #include "styles/style_boxes.h"
 
@@ -398,7 +400,113 @@ void RequestsBoxController::prepare() {
 		: tr::lng_manage_peer_requests());
 	setDescriptionText(tr::lng_contacts_loading(tr::now));
 	setSearchNoResultsText(tr::lng_blocked_list_not_found(tr::now));
+	delegate()->peerListSetAboveWidget(createBatchActionsWidget());
 	loadMoreRows();
+}
+
+object_ptr<Ui::RpWidget> RequestsBoxController::createBatchActionsWidget() {
+	auto result = object_ptr<Ui::RpWidget>((QWidget*)nullptr);
+	const auto container = result.data();
+
+	const auto dismissAll = Ui::CreateChild<Ui::RoundButton>(
+		container,
+		tr::lng_group_requests_dismiss_all(),
+		st::requestsRejectButton);
+	dismissAll->setTextTransform(Ui::RoundButton::TextTransform::NoTransform);
+	dismissAll->setClickedCallback([=] {
+		dismissAllRequests();
+	});
+
+	const auto banAll = Ui::CreateChild<Ui::RoundButton>(
+		container,
+		tr::lng_group_requests_ban_all(),
+		st::requestsBanAllButton);
+	banAll->setTextTransform(Ui::RoundButton::TextTransform::NoTransform);
+	banAll->setClickedCallback([=] {
+		banAllRequests();
+	});
+
+	container->widthValue(
+	) | rpl::start_with_next([=](int width) {
+		const auto padding = st::requestButtonsSkip * 2;
+		const auto buttonWidth = (width - padding * 3) / 2;
+		const auto height = st::requestsAcceptButton.height + st::requestButtonsSkip * 2;
+		container->resize(width, height);
+		dismissAll->setGeometry(
+			padding,
+			st::requestButtonsSkip,
+			buttonWidth,
+			st::requestsAcceptButton.height);
+		banAll->setGeometry(
+			padding * 2 + buttonWidth,
+			st::requestButtonsSkip,
+			buttonWidth,
+			st::requestsAcceptButton.height);
+	}, container->lifetime());
+
+	return result;
+}
+
+void RequestsBoxController::dismissAllRequests() {
+	const auto count = delegate()->peerListFullRowsCount();
+	if (count == 0) {
+		return;
+	}
+
+	const auto guard = base::make_weak(this);
+	delegate()->peerListUiShow()->showBox(Ui::MakeConfirmBox({
+		.text = tr::lng_group_requests_dismiss_all_confirm(tr::now),
+		.confirmed = [=] {
+			if (!guard) {
+				return;
+			}
+			// Collect all users
+			std::vector<not_null<UserData*>> users;
+			const auto fullCount = delegate()->peerListFullRowsCount();
+			for (auto i = 0; i < fullCount; ++i) {
+				const auto row = delegate()->peerListRowAt(i);
+				if (const auto user = row->peer()->asUser()) {
+					users.push_back(user);
+				}
+			}
+
+			// Process all requests
+			for (const auto user : users) {
+				processRequest(user, false, false);
+			}
+		}
+	}));
+}
+
+void RequestsBoxController::banAllRequests() {
+	const auto count = delegate()->peerListFullRowsCount();
+	if (count == 0) {
+		return;
+	}
+
+	const auto guard = base::make_weak(this);
+	delegate()->peerListUiShow()->showBox(Ui::MakeConfirmBox({
+		.text = tr::lng_group_requests_ban_all_confirm(tr::now),
+		.confirmed = [=] {
+			if (!guard) {
+				return;
+			}
+			// Collect all users
+			std::vector<not_null<UserData*>> users;
+			const auto fullCount = delegate()->peerListFullRowsCount();
+			for (auto i = 0; i < fullCount; ++i) {
+				const auto row = delegate()->peerListRowAt(i);
+				if (const auto user = row->peer()->asUser()) {
+					users.push_back(user);
+				}
+			}
+
+			// Process all requests
+			for (const auto user : users) {
+				processRequest(user, false, true);
+			}
+		}
+	}));
 }
 
 void RequestsBoxController::loadMoreRows() {

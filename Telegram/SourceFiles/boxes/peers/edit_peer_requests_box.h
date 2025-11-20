@@ -72,6 +72,10 @@ private:
 	void refreshDescription();
 	void processRequest(not_null<UserData*> user, bool approved, bool banned);
 
+	[[nodiscard]] object_ptr<Ui::RpWidget> createBatchActionsWidget();
+	void dismissAllRequests();
+	void banAllRequests();
+
 	void subscribeToMigration();
 	void migrate(not_null<ChatData*> chat, not_null<ChannelData*> channel);
 

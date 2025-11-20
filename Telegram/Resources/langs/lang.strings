@@ -2610,10 +2610,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_group_requests_add" = "Add to Group";
 "lng_group_requests_add_channel" = "Add to Channel";
 "lng_group_requests_dismiss" = "Dismiss";
+"lng_group_requests_dismiss_all" = "Dismiss all";
+"lng_group_requests_ban_all" = "Ban all";
 "lng_group_requests_was_added" = "{user} has been added to the group.";
 "lng_group_requests_was_added_channel" = "{user} has been added to the channel.";
 "lng_group_requests_none" = "There are no pending join requests.";
 "lng_group_requests_none_channel" = "There are no pending join requests.";
+"lng_group_requests_dismiss_all_confirm" = "Are you sure you want to dismiss all pending join requests?";
+"lng_group_requests_ban_all_confirm" = "Are you sure you want to ban all users who requested to join?";
 
 "lng_channel_public_link_copied" = "Link copied to clipboard.";
 "lng_context_about_private_link" = "This link will only work for members of this chat.";

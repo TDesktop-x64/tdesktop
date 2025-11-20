@@ -484,6 +484,14 @@ void RequestsBoxController::banAllRequests() {
 		return;
 	}
 
+	if (count >= 20) {
+		delegate()->peerListUiShow()->showBox(Ui::MakeConfirmBox({
+			.text = tr::lng_group_requests_ban_too_much_users(tr::now),
+			.inform = true
+		}));
+		return;
+	}
+
 	const auto guard = base::make_weak(this);
 	delegate()->peerListUiShow()->showBox(Ui::MakeConfirmBox({
 		.text = tr::lng_group_requests_ban_all_confirm(tr::now),

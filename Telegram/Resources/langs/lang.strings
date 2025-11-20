@@ -2618,6 +2618,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_group_requests_none_channel" = "There are no pending join requests.";
 "lng_group_requests_dismiss_all_confirm" = "Are you sure you want to dismiss all pending join requests?";
 "lng_group_requests_ban_all_confirm" = "Are you sure you want to ban all users who requested to join?";
+"lng_group_requests_ban_too_much_users" = "You cannot ban so many users at once. Try dismissing them instead.";
 
 "lng_channel_public_link_copied" = "Link copied to clipboard.";
 "lng_context_about_private_link" = "This link will only work for members of this chat.";

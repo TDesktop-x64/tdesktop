@@ -497,6 +497,8 @@ PRIVATE
     core/deadlock_detector.h
     core/enhanced_settings.cpp
     core/enhanced_settings.h
+    core/pangu_spacing.cpp
+    core/pangu_spacing.h
     core/file_utilities.cpp
     core/file_utilities.h
     core/launcher.cpp

@@ -485,6 +485,35 @@ std::vector<int> AppConfig::getIntArray(
 	});
 }
 
+std::vector<std::vector<int>> AppConfig::getIntIntArray(
+		const QString &key,
+		std::vector<std::vector<int>> &&fallback) const {
+	return getValue(key, [&](const MTPJSONValue &value) {
+		return value.match([&](const MTPDjsonArray &data) {
+			auto result = std::vector<std::vector<int>>();
+			result.reserve(data.vvalue().v.size());
+			for (const auto &entry : data.vvalue().v) {
+				if (entry.type() != mtpc_jsonArray) {
+					return std::move(fallback);
+				}
+				const auto &list = entry.c_jsonArray().vvalue().v;
+				auto &last = result.emplace_back();
+				last.reserve(list.size());
+				for (const auto &inner : list) {
+					if (inner.type() != mtpc_jsonNumber) {
+						return std::move(fallback);
+					}
+					last.push_back(
+						int(base::SafeRound(inner.c_jsonNumber().vvalue().v)));
+				}
+			}
+			return result;
+		}, [&](const auto &data) {
+			return std::move(fallback);
+		});
+	});
+}
+
 std::vector<int64> AppConfig::getInt64Array(
 		const QString &key,
 		std::vector<int64> &&fallback) const {
@@ -642,6 +671,17 @@ auto AppConfig::groupCallColorings() const -> std::vector<StarsColoring> {
 		ranges::sort(_groupCallColorings, ranges::less(), proj);
 	}
 	return _groupCallColorings;
+}
+
+std::vector<std::vector<int>> AppConfig::craftAttributePermilles() const {
+	return get<std::vector<std::vector<int>>>(
+		u"stargifts_craft_attribute_permilles"_q,
+		{
+			{ 90 },
+			{ 80, 200 },
+			{ 70, 190, 460 },
+			{ 60, 180, 450, 1000 },
+		});
 }
 
 } // namespace Main

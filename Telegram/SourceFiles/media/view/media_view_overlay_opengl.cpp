@@ -105,6 +105,34 @@ float roundedCorner() {
 	};
 }
 
+[[nodiscard]] QRectF StoryCropTextureRect(
+		QSizeF imageSize,
+		QSizeF targetSize) {
+	if (imageSize.isEmpty() || targetSize.isEmpty()) {
+		return QRectF(0., 0., 1., 1.);
+	}
+	const auto targetAspect = targetSize.width() / targetSize.height();
+	const auto imageAspect = imageSize.width() / imageSize.height();
+	if (imageAspect > targetAspect) {
+		const auto cropW = imageSize.height() * targetAspect;
+		const auto offset = (imageSize.width() - cropW) / 2.;
+		return QRectF(
+			offset / imageSize.width(),
+			0.,
+			cropW / imageSize.width(),
+			1.);
+	} else if (imageAspect < targetAspect) {
+		const auto cropH = imageSize.width() / targetAspect;
+		const auto offset = (imageSize.height() - cropH) / 2.;
+		return QRectF(
+			0.,
+			offset / imageSize.height(),
+			1.,
+			cropH / imageSize.height());
+	}
+	return QRectF(0., 0., 1., 1.);
+}
+
 } // namespace
 
 OverlayWidget::RendererGL::RendererGL(not_null<OverlayWidget*> owner)
@@ -433,7 +461,10 @@ void OverlayWidget::RendererGL::paintTransformedVideoFrame(
 	program->setUniformValue("f_texture", GLint(nv12 ? 2 : 3));
 
 	toggleBlending(geometry.roundRadius > 0.);
-	paintTransformedContent(program, geometry, false);
+	const auto textureRect = _owner->_stories
+		? StoryCropTextureRect(QSizeF(yuv->size), geometry.rect.size())
+		: QRectF(0., 0., 1., 1.);
+	paintTransformedContent(program, geometry, false, textureRect);
 
 	if (_owner->_recognitionResult.success
 		&& !_owner->_recognitionResult.items.empty()) {
@@ -517,7 +548,14 @@ void OverlayWidget::RendererGL::paintTransformedStaticContent(
 
 	toggleBlending((geometry.roundRadius > 0.)
 		|| (semiTransparent && !fillTransparentBackground));
-	paintTransformedContent(&*program, geometry, fillTransparentBackground);
+	const auto textureRect = _owner->_stories
+		? StoryCropTextureRect(QSizeF(image.size()), geometry.rect.size())
+		: QRectF(0., 0., 1., 1.);
+	paintTransformedContent(
+		&*program,
+		geometry,
+		fillTransparentBackground,
+		textureRect);
 
 	if (_owner->_recognitionResult.success
 		&& !_owner->_recognitionResult.items.empty()
@@ -533,7 +571,8 @@ void OverlayWidget::RendererGL::paintTransformedStaticContent(
 void OverlayWidget::RendererGL::paintTransformedContent(
 		not_null<QOpenGLShaderProgram*> program,
 		ContentGeometry geometry,
-		bool fillTransparentBackground) {
+		bool fillTransparentBackground,
+		QRectF textureRect) {
 	const auto rect = scaleRect(
 		transformRect(geometry.rect),
 		geometry.scale);
@@ -553,18 +592,22 @@ void OverlayWidget::RendererGL::paintTransformedContent(
 	const auto topright = rotated(rect.right(), rect.top());
 	const auto bottomright = rotated(rect.right(), rect.bottom());
 	const auto bottomleft = rotated(rect.left(), rect.bottom());
+	const auto texLeft = float(textureRect.x());
+	const auto texRight = float(textureRect.x() + textureRect.width());
+	const auto texTop = 1.f - float(textureRect.y());
+	const auto texBottom = 1.f - float(textureRect.y() + textureRect.height());
 	const GLfloat coords[] = {
 		topleft[0], topleft[1],
-		0.f, 1.f,
+		texLeft, texTop,
 
 		topright[0], topright[1],
-		1.f, 1.f,
+		texRight, texTop,
 
 		bottomright[0], bottomright[1],
-		1.f, 0.f,
+		texRight, texBottom,
 
 		bottomleft[0], bottomleft[1],
-		0.f, 0.f,
+		texLeft, texBottom,
 	};
 
 	_contentBuffer->bind();

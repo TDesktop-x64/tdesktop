@@ -952,7 +952,7 @@ void AuctionBidBox(not_null<GenericBox*> box, AuctionBidBoxArgs &&args) {
 			lt_gift,
 			tr::bold(name),
 			tr::marked),
-		helper.context());
+		helper.context()).widget;
 }
 
 [[nodiscard]] object_ptr<TableLayout> AuctionInfoTable(
@@ -1193,7 +1193,7 @@ void AuctionGotGiftsBox(
 		).append(' ').append(
 			helper.paletteDependent(
 				Text::CustomEmojiTextBadge(
-					'#' + QString::number(entry.position),
+					'#' + Lang::FormatCountDecimal(entry.position),
 					st::defaultTableSmallButton)));
 		AddTableRow(
 			table,
@@ -1304,7 +1304,7 @@ void AuctionInfoBox(
 
 	struct State {
 		explicit State(not_null<Main::Session*> session)
-			: delegate(session, GiftButtonMode::Minimal) {
+		: delegate(session, GiftButtonMode::Minimal) {
 		}
 
 		Delegate delegate;

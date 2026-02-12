@@ -56,7 +56,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/channel_statistics/earn/earn_format.h"
 #include "info/channel_statistics/earn/earn_icons.h"
 #include "info/channel_statistics/earn/info_channel_earn_list.h"
-#include "info/profile/info_profile_cover.h"
 #include "info/profile/info_profile_icon.h"
 #include "info/profile/info_profile_phone_menu.h"
 #include "info/profile/info_profile_text.h"
@@ -1823,12 +1822,14 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupPersonalChannel(
 		) | rpl::map([](TextWithEntities &&text, ChannelData *channel) {
 			const auto count = channel ? channel->membersCount() : 0;
 			if (count > 1) {
-				text.append(
-					QString::fromUtf8(" \xE2\x80\xA2 ")
-				).append(tr::lng_chat_status_subscribers(
-					tr::now,
-					lt_count_decimal,
-					count));
+				text.append(' ')
+				.append(Ui::kQBullet)
+				.append(' ')
+				.append(
+					tr::lng_chat_status_subscribers(
+						tr::now,
+						lt_count_decimal,
+						count));
 			}
 			return text;
 		});
@@ -2653,7 +2654,7 @@ void ActionsFiller::addBotCommandActions(not_null<UserData*> user) {
 		tr::lng_profile_bot_privacy(),
 		rpl::single(true),
 		openPrivacyPolicy,
-		nullptr);
+		&st::infoIconPrivacyPolicy);
 }
 
 void ActionsFiller::addReportAction() {
@@ -3098,33 +3099,6 @@ object_ptr<Ui::RpWidget> SetupChannelMembersAndManage(
 
 	result->entity()->add(CreateSkipWidget(result));
 
-	return result;
-}
-
-Cover *AddCover(
-		not_null<Ui::VerticalLayout*> container,
-		not_null<Controller*> controller,
-		not_null<PeerData*> peer,
-		Data::ForumTopic *topic,
-		Data::SavedSublist *sublist) {
-	const auto shown = sublist ? sublist->sublistPeer() : peer;
-	const auto result = topic
-		? container->add(object_ptr<Cover>(
-			container,
-			controller->parentController(),
-			topic))
-		: container->add(object_ptr<Cover>(
-			container,
-			controller->parentController(),
-			shown,
-			[=] { return controller->wrapWidget(); }));
-	result->showSection(
-	) | rpl::on_next([=](Section section) {
-		controller->showSection(topic
-			? std::make_shared<Info::Memento>(topic, section)
-			: std::make_shared<Info::Memento>(shown, section));
-	}, result->lifetime());
-	result->setOnlineCount(rpl::single(0));
 	return result;
 }
 

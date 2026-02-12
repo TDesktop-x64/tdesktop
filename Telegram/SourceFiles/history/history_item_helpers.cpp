@@ -736,9 +736,10 @@ ClickHandlerPtr JumpToMessageClickHandler(
 			: peer->session().tryResolveWindow(peer);
 		if (controller) {
 			auto params = Window::SectionShow{
-				Window::SectionShow::Way::Forward
+				Window::SectionShow::Way::Forward,
 			};
 			params.highlight = highlight;
+			params.allowDuplicateInStack = true;
 			params.origin = Window::SectionShow::OriginMessage{
 				returnToId
 			};

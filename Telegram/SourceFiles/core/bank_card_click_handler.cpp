@@ -214,7 +214,7 @@ void BankCardClickHandler::onClick(ClickContext context) const {
 			st::historyHasCustomEmoji,
 			st::historyBankCardMenuMultilinePosition,
 			TextWithEntities{ name });
-		button->setClickedCallback(copy);
+		button->setActionTriggered(copy);
 		menu->addAction(std::move(button));
 	};
 

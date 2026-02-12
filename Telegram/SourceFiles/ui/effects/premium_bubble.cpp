@@ -240,7 +240,6 @@ void Bubble::paintBubble(QPainter &p, const QRect &r, const QBrush &brush) {
 		p.drawPath(bubblePath(r));
 	}
 	p.setPen(st::activeButtonFg);
-	p.setFont(_st.font);
 	const auto withSubtext = !_subtext.isEmpty();
 	const auto height = withSubtext
 		? (_st.font->height

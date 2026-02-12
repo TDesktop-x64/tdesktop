@@ -83,6 +83,7 @@ struct CreditsHistoryEntry final {
 	Fn<std::vector<CreditsHistoryEntry>()> pinnedSavedGifts;
 	uint64 nextToUpgradeStickerId = 0;
 	Fn<void()> nextToUpgradeShow;
+	Fn<void()> craftAnotherCallback;
 	CreditsAmount starrefAmount;
 	int starrefCommission = 0;
 	uint64 starrefRecipientId = 0;

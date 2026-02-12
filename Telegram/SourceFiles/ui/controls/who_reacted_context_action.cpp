@@ -207,7 +207,6 @@ Action::Action(
 , _height(st::defaultWhoRead.itemPadding.top()
 		+ _st.itemStyle.font->height
 		+ st::defaultWhoRead.itemPadding.bottom()) {
-	const auto parent = parentMenu->menu();
 	const auto delay = anim::Disabled() ? 0 : parentMenu->st().duration;
 	const auto checkAppeared = [=, now = crl::now()](bool force = false) {
 		_appeared = force || ((crl::now() - now) >= delay);
@@ -516,8 +515,6 @@ WhenAction::WhenAction(
 , _height(st::whenReadPadding.top()
 		+ st::whenReadStyle.font->height
 		+ st::whenReadPadding.bottom()) {
-	const auto parent = parentMenu->menu();
-
 	setAcceptBoth(true);
 	fitToMenuWidth();
 
@@ -759,7 +756,7 @@ int WhoReactedEntryAction::contentHeight() const {
 }
 
 void WhoReactedEntryAction::setData(Data &&data) {
-	setClickedCallback(std::move(data.callback));
+	setActionTriggered(std::move(data.callback));
 	_userpic = std::move(data.userpic);
 	_text.setMarkedText(_st.itemStyle, { data.text }, MenuTextOptions);
 	if (data.date.isEmpty()) {

@@ -38,7 +38,7 @@ BaseTranslator::Result GoogleAppTranslator::translateImpl(const QString& query, 
 
     QString queryParams =
         QString("query.source_language=%1&query.target_language=%2&query.display_language=%2")
-            .arg(fromLang, tl) +
+        .arg(fromLang, tl) +
         "&params.client=at"
         "&data_types=16&data_types=1&data_types=10&data_types=21"
         "&data_types=6&data_types=7&data_types=5&data_types=17"
@@ -50,7 +50,7 @@ BaseTranslator::Result GoogleAppTranslator::translateImpl(const QString& query, 
     QString queryText = "query.text=" + URLEncode(query);
 
     QString fullUrl = "https://translate-pa.googleapis.com/v1/translate?" +
-                      (usePost ? queryParams : queryText + "&" + queryParams);
+        (usePost ? queryParams : queryText + "&" + queryParams);
 
     Http http = Http::url(fullUrl)
         .header("User-Agent", "GoogleTranslate/9.10.70.766168802.3-release (Linux; U; Android 15; Pixel 8 Pro)")
@@ -63,24 +63,24 @@ BaseTranslator::Result GoogleAppTranslator::translateImpl(const QString& query, 
             .data(queryText);
     }
 
-    QString response = http.request();
-    return getResult(response);
-}
+    QNetworkReply* reply = http.request();
 
-BaseTranslator::Result GoogleAppTranslator::getResult(const QString& jsonData) const {
-    QJsonDocument doc = QJsonDocument::fromJson(jsonData.toUtf8());
-    QJsonObject obj = doc.object();
+    QByteArray data = reply->readAll();
+    reply->deleteLater();
 
-    if (obj.contains("translation")) {
-        return { obj["translation"].toString(), obj["sourceLanguage"].toString() };
-    }
+	QJsonDocument doc = QJsonDocument::fromJson(QString::fromUtf8(data).toUtf8());
+	QJsonObject obj = doc.object();
 
-    if (obj.contains("error")) {
-        QJsonObject errorObj = obj["error"].toObject();
-        throw std::runtime_error(errorObj["message"].toString().toStdString());
-    }
+	if (obj.contains("translation")) {
+		return Result{ .translation = obj["translation"].toString(), .sourceLanguage = obj["sourceLanguage"].toString() };
+	}
 
-    throw std::runtime_error("Unexpected response: " + jsonData.toStdString());
+	if (obj.contains("error")) {
+		QJsonObject errorObj = obj["error"].toObject();
+		return { true, errorObj["message"].toString() };
+	}
+
+    return { true, "Unexpected response" };
 }
 
 QString GoogleAppTranslator::sign(const QString& str) {

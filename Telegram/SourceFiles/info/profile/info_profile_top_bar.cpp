@@ -63,8 +63,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "menu/menu_mute.h"
 #include "settings/settings_credits_graphics.h"
-#include "settings/settings_information.h"
-#include "settings/settings_premium.h"
+#include "settings/sections/settings_information.h"
+#include "settings/sections/settings_premium.h"
 #include "ui/boxes/show_or_premium_box.h"
 #include "ui/color_contrast.h"
 #include "ui/controls/stars_rating.h"
@@ -783,7 +783,8 @@ void TopBar::setupActions(not_null<Window::SessionController*> controller) {
 		buttons.push_back(message);
 		_actions->add(message);
 	}
-	if (!topic && channel && !channel->amIn()) {
+	const auto canJoin = (!sublist && !topic && channel && !channel->amIn());
+	if (canJoin) {
 		const auto join = Ui::CreateChild<TopBarActionButton>(
 			this,
 			tr::lng_profile_action_short_join(tr::now),
@@ -806,7 +807,7 @@ void TopBar::setupActions(not_null<Window::SessionController*> controller) {
 		buttons.push_back(message);
 		_actions->add(message);
 	}
-	{
+	if (!peer->isSelf()) {
 		const auto notifications = Ui::CreateChild<TopBarActionButton>(
 			this,
 			tr::lng_profile_action_short_mute(tr::now),
@@ -889,7 +890,7 @@ void TopBar::setupActions(not_null<Window::SessionController*> controller) {
 			tr::lng_profile_action_short_call(tr::now),
 			st::infoProfileTopBarActionCall);
 		call->setClickedCallback([=] {
-			Core::App().calls().startOutgoingCall(user, false);
+			Core::App().calls().startOutgoingCall(user, {});
 		});
 		buttons.push_back(call);
 		_actions->add(call);
@@ -919,7 +920,7 @@ void TopBar::setupActions(not_null<Window::SessionController*> controller) {
 	if (chechMax()) {
 		return;
 	}
-	if ((topic && topic->canEdit()) || EditPeerInfoBox::Available(peer)) {
+	if (topic ? topic->canEdit() : EditPeerInfoBox::Available(peer)) {
 		const auto manage = Ui::CreateChild<TopBarActionButton>(
 			this,
 			tr::lng_profile_action_short_manage(tr::now),
@@ -971,6 +972,7 @@ void TopBar::setupActions(not_null<Window::SessionController*> controller) {
 		return;
 	}
 	if (!topic
+		&& canJoin
 		&& ((chat && !chat->amCreator() && !chat->hasAdminRights())
 			|| (channel
 				&& !channel->amCreator()
@@ -989,16 +991,13 @@ void TopBar::setupActions(not_null<Window::SessionController*> controller) {
 	if (chechMax()) {
 		return;
 	}
-	if (!topic && !sublist && channel && channel->amIn()) {
+	if (!canJoin && !topic && !sublist && (chat || channel)) {
 		const auto leaveButton = Ui::CreateChild<TopBarActionButton>(
 			this,
 			tr::lng_profile_action_short_leave(tr::now),
 			st::infoProfileTopBarActionLeave);
-		leaveButton->setClickedCallback([=] {
-			if (!controller->showFrozenError()) {
-				controller->show(Box(DeleteChatBox, peer));
-			}
-		});
+		leaveButton->setClickedCallback(
+			Window::DeleteAndLeaveHandler(controller, peer));
 		_actions->add(leaveButton);
 		buttons.push_back(leaveButton);
 	}
@@ -1353,9 +1352,8 @@ void TopBar::setupUniqueBadgeTooltip() {
 		if (!collectible || _localCollectible) {
 			return;
 		}
-		const auto parent = window();
 		_badgeTooltip = std::make_unique<BadgeTooltip>(
-			parent,
+			this,
 			collectible,
 			widget);
 		const auto raw = _badgeTooltip.get();
@@ -1430,11 +1428,7 @@ void TopBar::setPatternEmojiId(std::optional<DocumentId> patternEmojiId) {
 
 void TopBar::setLocalEmojiStatusId(EmojiStatusId emojiStatusId) {
 	_localCollectible = emojiStatusId.collectible;
-	if (!emojiStatusId.collectible) {
-		_badgeContent = Badge::Content{ BadgeType::Premium, emojiStatusId };
-	} else {
-		_badgeContent = BadgeContentForPeer(_peer);
-	}
+	_badgeContent = Badge::Content{ BadgeType::Premium, emojiStatusId };
 	updateCollectibleStatus();
 }
 
@@ -1968,7 +1962,7 @@ void TopBar::addTopBarEditButton(
 				: st::infoTopBarBlackEdit)));
 	_topBarButton->show();
 	_topBarButton->addClickHandler([=] {
-		controller->showSettings(::Settings::Information::Id());
+		controller->showSettings(::Settings::InformationId());
 	});
 
 	widthValue() | rpl::on_next([=] {
@@ -2009,10 +2003,11 @@ void TopBar::showTopBarMenu(
 	}
 	_peerMenu->setForcedOrigin(Ui::PanelAnimation::Origin::TopRight);
 	_peerMenu->popup(_actionMore
-		? _actionMore->mapToGlobal(
-			QPoint(
-				_actionMore->width(),
-				_actionMore->height() + st::infoProfileTopBarActionMenuSkip))
+		? Ui::PopupMenu::ConstrainToParentScreen(
+			_peerMenu,
+			_actionMore->mapToGlobal(QPoint(
+				_actionMore->width() + _peerMenu->st().shadow.extend.right(),
+				_actionMore->height() + st::infoProfileTopBarActionMenuSkip)))
 		: QCursor::pos());
 }
 

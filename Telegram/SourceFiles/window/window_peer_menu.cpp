@@ -33,6 +33,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/delete_messages_box.h"
 #include "boxes/max_invite_box.h"
 #include "boxes/moderate_messages_box.h"
+#include "boxes/select_future_owner_box.h"
 #include "boxes/choose_filter_box.h"
 #include "boxes/create_poll_box.h"
 #include "boxes/edit_todo_list_box.h"
@@ -84,7 +85,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_separate_id.h"
 #include "window/window_session_controller.h"
 #include "window/window_controller.h"
-#include "settings/settings_advanced.h"
+#include "settings/sections/settings_advanced.h"
 #include "support/support_helper.h"
 #include "info/info_controller.h"
 #include "info/info_memento.h"
@@ -1506,12 +1507,30 @@ void Filler::addViewAsMessages() {
 		controller->showPeerHistory(peer->id);
 	};
 	auto to_instant = rpl::map_to(anim::type::instant);
+	auto make = [=](not_null<Ui::PopupMenu*> popupMenu) {
+		auto owned = base::make_unique_q<Ui::Menu::Action>(
+			popupMenu->menu(),
+			popupMenu->menu()->st(),
+			Ui::Menu::CreateAction(
+				popupMenu->menu(),
+				tr::lng_forum_view_as_messages(tr::now),
+				[=, weak = base::make_weak(popupMenu)] {
+					if (filterOutChatPreview()) {
+					} else {
+						open();
+						if (const auto strong = weak.get()) {
+							strong->hideMenu(false);
+						}
+					}
+				}),
+			&st::menuIconAsMessages,
+			&st::menuIconAsMessages);
+		owned->setPreventClose(true);
+		return owned;
+	};
 	_addAction({
-		.text = tr::lng_forum_view_as_messages(tr::now),
-		.handler = open,
-		.icon = &st::menuIconAsMessages,
-		.triggerFilter = filterOutChatPreview,
-		.hideRequests = parentHideRequests->events() | to_instant
+		.make = std::move(make),
+		.hideRequests = parentHideRequests->events() | to_instant,
 	});
 }
 
@@ -3792,6 +3811,26 @@ Fn<void()> ClearHistoryHandler(
 Fn<void()> DeleteAndLeaveHandler(
 		not_null<Window::SessionController*> controller,
 		not_null<PeerData*> peer) {
+	if (const auto channel = peer->asChannel();
+			channel && channel->amCreator()) {
+		const auto requestId = std::make_shared<mtpRequestId>(0);
+		return [=] {
+			if (controller->showFrozenError() || (*requestId > 0)) {
+				return;
+			}
+			*requestId = peer->session().api().request(
+				MTPchannels_GetFutureCreatorAfterLeave(
+					channel->inputChannel()
+			)).done([=](const MTPUser &result) {
+				*requestId = 0;
+				const auto user = peer->owner().processUser(result);
+				controller->show(Box(SelectFutureOwnerbox, channel, user));
+			}).fail([=](const MTP::Error &error) {
+				*requestId = 0;
+				controller->show(Box(DeleteChatBox, peer));
+			}).send();
+		};
+	}
 	return [=] {
 		if (!controller->showFrozenError()) {
 			controller->show(Box(DeleteChatBox, peer));

@@ -194,6 +194,35 @@ private:
 
 };
 
+class LambdaGenericPart final : public MediaGenericPart {
+public:
+	LambdaGenericPart(
+		QSize size,
+		Fn<void(
+			Painter &p,
+			not_null<const MediaGeneric*> owner,
+			const PaintContext &context,
+			int outerWidth)> draw);
+
+	void draw(
+		Painter &p,
+		not_null<const MediaGeneric*> owner,
+		const PaintContext &context,
+		int outerWidth) const override;
+
+	QSize countOptimalSize() override;
+	QSize countCurrentSize(int newWidth) override;
+
+private:
+	QSize _size;
+	Fn<void(
+		Painter &p,
+		not_null<const MediaGeneric*> owner,
+		const PaintContext &context,
+		int outerWidth)> _draw;
+
+};
+
 class StickerInBubblePart final : public MediaGenericPart {
 public:
 	struct Data {

@@ -771,6 +771,8 @@ not_null<UserData*> Session::processUser(const MTPUser &data) {
 				result->botInfo->canEditInformation = data.is_bot_can_edit();
 				result->botInfo->activeUsers = data.vbot_active_users().value_or_empty();
 				result->botInfo->hasMainApp = data.is_bot_has_main_app();
+				result->botInfo->canManageTopics
+					= data.is_bot_forum_can_manage_topics();
 			} else {
 				result->setBotInfoVersion(-1);
 			}
@@ -1131,9 +1133,11 @@ not_null<PeerData*> Session::processChat(const MTPChat &data) {
 		using Flag = ChannelDataFlag;
 		const auto flagsMask = Flag::Broadcast
 			| Flag::Megagroup
-			| Flag::Forbidden;
+			| Flag::Forbidden
+			| Flag::Monoforum;
 		const auto flagsSet = (data.is_broadcast() ? Flag::Broadcast : Flag())
 			| (data.is_megagroup() ? Flag::Megagroup : Flag())
+			| (data.is_monoforum() ? Flag::Monoforum : Flag())
 			| Flag::Forbidden;
 		channel->setFlags((channel->flags() & ~flagsMask) | flagsSet);
 

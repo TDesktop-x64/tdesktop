@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "boxes/star_gift_cover_box.h"
 #include "data/data_star_gift.h"
 
 namespace Api {
@@ -65,31 +66,6 @@ void ShowStarGiftBox(
 	not_null<Window::SessionController*> controller,
 	not_null<PeerData*> peer);
 
-struct UniqueGiftCoverArgs {
-	rpl::producer<QString> pretitle;
-	rpl::producer<TextWithEntities> subtitle;
-	Fn<void()> subtitleClick;
-	bool subtitleLinkColored = false;
-	bool subtitleOutlined = false;
-	rpl::producer<CreditsAmount> resalePrice;
-	Fn<void()> resaleClick;
-	bool attributesInfo = false;
-	Fn<void(
-		std::optional<Data::UniqueGift> now,
-		std::optional<Data::UniqueGift> next,
-		float64 progress)> repaintedHook;
-	std::shared_ptr<Data::GiftUpgradeSpinner> upgradeSpinner;
-};
-struct UniqueGiftCover {
-	Data::UniqueGift values;
-	bool spinner = false;
-	bool force = false;
-};
-
-void AddUniqueGiftCover(
-	not_null<VerticalLayout*> container,
-	rpl::producer<UniqueGiftCover> data,
-	UniqueGiftCoverArgs &&args);
 void AddWearGiftCover(
 	not_null<VerticalLayout*> container,
 	const Data::UniqueGift &data,
@@ -123,8 +99,6 @@ void ShowUniqueGiftSellBox(
 void ShowOfferBuyBox(
 	std::shared_ptr<ChatHelpers::Show> show,
 	std::shared_ptr<Data::UniqueGift> unique);
-
-void GiftReleasedByHandler(not_null<PeerData*> peer);
 
 struct StarGiftUpgradeArgs {
 	not_null<Window::SessionController*> controller;
@@ -182,11 +156,21 @@ struct GiftsDescriptor {
 	std::vector<Info::PeerGifts::GiftDescriptor> list;
 	std::shared_ptr<Api::PremiumGiftCodeOptions> api;
 };
-[[nodiscard]] object_ptr<RpWidget> MakeGiftsSendList(
-	not_null<Window::SessionController*> window,
-	not_null<PeerData*> peer,
-	rpl::producer<GiftsDescriptor> gifts,
-	Fn<void()> loadMore);
+enum class GiftsListMode {
+	Send,
+	Craft,
+	CraftResale,
+};
+struct GiftsListArgs {
+	not_null<Window::SessionController*> window;
+	GiftsListMode mode = GiftsListMode::Send;
+	not_null<PeerData*> peer;
+	rpl::producer<GiftsDescriptor> gifts;
+	std::vector<std::shared_ptr<Data::UniqueGift>> selected;
+	Fn<void()> loadMore;
+	Fn<void(Info::PeerGifts::GiftDescriptor)> handler;
+};
+[[nodiscard]] object_ptr<RpWidget> MakeGiftsList(GiftsListArgs &&args);
 
 void SendGiftBox(
 	not_null<GenericBox*> box,
@@ -195,5 +179,15 @@ void SendGiftBox(
 	std::shared_ptr<Api::PremiumGiftCodeOptions> api,
 	const Info::PeerGifts::GiftDescriptor &descriptor,
 	rpl::producer<Data::GiftAuctionState> auctionState);
+
+[[nodiscard]] Data::CreditsHistoryEntry EntryForUpgradedGift(
+	const std::shared_ptr<Data::GiftUpgradeResult> &gift,
+	uint64 nextToUpgradeStickerId = 0,
+	Fn<void()> nextToUpgradeShow = nullptr,
+	Fn<void()> craftAnother = nullptr);
+
+[[nodiscard]] std::shared_ptr<Data::GiftUpgradeResult> FindUniqueGift(
+	not_null<Main::Session*> session,
+	const MTPUpdates &updates);
 
 } // namespace Ui

@@ -809,6 +809,18 @@ backgroundConfirmCancel: RoundButton(backgroundConfirm) {
 urlAuthCheckbox: Checkbox(defaultBoxCheckbox) {
 	width: 240px;
 }
+urlAuthCheckboxAbout: FlatLabel(defaultPeerListAbout) {
+	style: TextStyle(boxTextStyle) {
+		font: font(12px);
+	}
+}
+urlAuthBoxRowTopLabel: FlatLabel(boxLabel) {
+	maxHeight: 30px;
+}
+urlAuthBoxRowBottomLabel: FlatLabel(defaultFlatLabel) {
+	textFg: windowSubTextFg;
+	maxHeight: 30px;
+}
 
 addContactFieldMargin: margins(19px, 0px, 19px, 10px);
 addContactWarningMargin: margins(19px, 10px, 19px, 5px);
@@ -1187,3 +1199,9 @@ moderateCommonGroupsCheckbox: RoundImageCheckbox(defaultPeerListCheckbox) {
 		}};
 	}
 }
+
+futureOwnerBox: Box(defaultBox) {
+	buttonPadding: margins(0px, 0px, 0px, 14px);
+	buttonHeight: 0px;
+}
+futureOwnerBoxSelect: collectibleBox;

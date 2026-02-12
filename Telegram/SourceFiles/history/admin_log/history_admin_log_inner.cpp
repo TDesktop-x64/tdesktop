@@ -725,14 +725,7 @@ bool InnerWidget::elementAnimationsPaused() {
 }
 
 bool InnerWidget::elementHideReply(not_null<const Element*> view) {
-	if (const auto item = view->data()) {
-		if (const auto quote = item->Get<HistoryMessageReply>()) {
-			if (quote->manualQuote()) {
-				return false;
-			}
-		}
-	}
-	return true;
+	return false;
 }
 
 bool InnerWidget::elementShownUnread(not_null<const Element*> view) {

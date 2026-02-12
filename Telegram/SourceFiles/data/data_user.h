@@ -98,6 +98,7 @@ struct BotInfo {
 	bool canManageEmojiStatus : 1 = false;
 	bool supportsBusiness : 1 = false;
 	bool hasMainApp : 1 = false;
+	bool canManageTopics : 1 = false;
 
 private:
 	std::unique_ptr<Data::Forum> _forum;

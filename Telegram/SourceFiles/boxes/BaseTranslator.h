@@ -15,6 +15,8 @@ class BaseTranslator : public QObject {
 
 public:
     struct Result {
+        int isError;
+        QString errorText;
         QString translation;
         QString sourceLanguage;
     };
@@ -31,7 +33,7 @@ public:
             ? QString()
             : convertLanguageCode(result.sourceLanguage, true);
 
-        return Result{ result.translation, resolvedSource };
+        return Result{ result.isError, result.errorText, result.translation, resolvedSource };
     }
 
     bool supportLanguage(const QString& language) const {
@@ -77,38 +79,33 @@ protected:
             return *this;
         }
 
-        QString request() {
-            QNetworkAccessManager manager;
+        QNetworkReply* request() {
             QEventLoop loop;
 
-            QNetworkReply* reply = nullptr;
+            QNetworkReply* reply;
             if (isPost) {
                 netRequest.setHeader(QNetworkRequest::ContentTypeHeader, mediaType);
-                reply = manager.post(netRequest, postData);
+                reply = manager->post(netRequest, postData);
             } else {
-                reply = manager.get(netRequest);
+                reply = manager->get(netRequest);
             }
 
             QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
             loop.exec();
 
-            QByteArray response = reply->readAll();
-            int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-            reply->deleteLater();
-
-            if (statusCode == 429) {
-                throw std::runtime_error("HTTP 429 Too Many Requests");
-            }
-
-            return QString::fromUtf8(response);
+            return reply;
         }
 
     private:
-    explicit Http(const QString& url) : netRequest(QUrl(url)), isPost(false) {}
+	    explicit Http(const QString& url) : netRequest(QUrl(url)), isPost(false)
+	    {
+            manager = new QNetworkAccessManager();
+	    }
 
-    QNetworkRequest netRequest;
-    QByteArray postData;
-    QString mediaType;
-    bool isPost;
+	    QNetworkAccessManager* manager;
+	    QNetworkRequest netRequest;
+	    QByteArray postData;
+	    QString mediaType;
+	    bool isPost;
     };
 };

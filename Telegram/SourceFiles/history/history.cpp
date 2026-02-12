@@ -1333,9 +1333,7 @@ void History::applyServiceChanges(
 					.text = tr::lng_payments_success(
 						tr::now,
 						lt_amount,
-						Ui::Text::Wrapped(
-							payment->amount,
-							EntityType::Bold),
+						Ui::Text::Wrapped(payment->amount, EntityType::Bold),
 						lt_title,
 						tr::bold(paid->title),
 						tr::marked),
@@ -4026,6 +4024,11 @@ void History::clear(ClearType type, bool markEmpty) {
 		chat->markupSenders.clear();
 	} else if (const auto channel = peer->asMegagroup()) {
 		channel->mgInfo->markupSenders.clear();
+	}
+	if (const auto forum = peer->forum()) {
+		forum->enumerateTopics([&](not_null<Data::ForumTopic*> topic) {
+			destroyMessagesByTopic(topic->rootId());
+		});
 	}
 
 	owner().notifyHistoryChangeDelayed(this);

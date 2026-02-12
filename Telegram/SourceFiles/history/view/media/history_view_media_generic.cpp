@@ -391,6 +391,35 @@ QSize TextDelimeterPart::countCurrentSize(int newWidth) {
 	return { newWidth, minHeight() };
 }
 
+LambdaGenericPart::LambdaGenericPart(
+	QSize size,
+	Fn<void(
+		Painter &p,
+		not_null<const MediaGeneric*> owner,
+		const PaintContext &context,
+		int outerWidth)> draw)
+: _size(size)
+, _draw(std::move(draw)) {
+}
+
+void LambdaGenericPart::draw(
+		Painter &p,
+		not_null<const MediaGeneric*> owner,
+		const PaintContext &context,
+		int outerWidth) const {
+	if (_draw) {
+		_draw(p, owner, context, outerWidth);
+	}
+}
+
+QSize LambdaGenericPart::countOptimalSize() {
+	return _size;
+}
+
+QSize LambdaGenericPart::countCurrentSize(int newWidth) {
+	return { newWidth, _size.height() };
+}
+
 StickerInBubblePart::StickerInBubblePart(
 	not_null<Element*> parent,
 	Element *replacing,

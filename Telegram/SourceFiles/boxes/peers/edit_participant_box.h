@@ -22,11 +22,7 @@ template <typename Widget>
 class SlideWrap;
 } // namespace Ui
 
-namespace Core {
-struct CloudPasswordResult;
-} // namespace Core
-
-class PasscodeBox;
+class ChannelOwnershipTransfer;
 
 class EditParticipantBox : public Ui::BoxContent {
 public:
@@ -100,13 +96,6 @@ private:
 	not_null<Ui::InputField*> addRankInput(
 		not_null<Ui::VerticalLayout*> container);
 	void transferOwnership();
-	void transferOwnershipChecked();
-	bool handleTransferPasswordError(const QString &error);
-	void requestTransferPassword(not_null<ChannelData*> channel);
-	void sendTransferRequestFrom(
-		base::weak_qptr<PasscodeBox> box,
-		not_null<ChannelData*> channel,
-		const Core::CloudPasswordResult &result);
 	bool canSave() const {
 		return _saveCallback != nullptr;
 	}
@@ -128,13 +117,14 @@ private:
 	Ui::Checkbox *_addAsAdmin = nullptr;
 	Ui::SlideWrap<Ui::VerticalLayout> *_adminControlsWrap = nullptr;
 	Ui::InputField *_rank = nullptr;
-	mtpRequestId _checkTransferRequestId = 0;
-	mtpRequestId _transferRequestId = 0;
+
 	Fn<void()> _save, _finishSave;
 
 	TimeId _promotedSince = 0;
 	UserData *_by = nullptr;
 	std::optional<EditAdminBotFields> _addingBot;
+
+	std::unique_ptr<ChannelOwnershipTransfer> _ownershipTransfer;
 
 };
 

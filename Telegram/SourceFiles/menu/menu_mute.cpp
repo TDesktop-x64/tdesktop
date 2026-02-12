@@ -113,7 +113,7 @@ MuteItem::MuteItem(
 	}, lifetime());
 	_animation.stop();
 
-	setClickedCallback([=] {
+	setActionTriggered([=] {
 		descriptor.updateMutePeriod(_isMuted ? 0 : kMuteForeverValue);
 	});
 }

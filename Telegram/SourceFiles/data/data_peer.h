@@ -680,6 +680,8 @@ void SetTopPinnedMessageId(
 	PeerData *migrated = nullptr);
 
 [[nodiscard]] uint64 BackgroundEmojiIdFromColor(const MTPPeerColor *color);
-[[nodiscard]] uint8 ColorIndexFromColor(const MTPPeerColor *color);
+[[nodiscard]] std::optional<uint8> ColorIndexFromColor(const MTPPeerColor *);
+
+[[nodiscard]] bool IsBotCanManageTopics(not_null<PeerData*>);
 
 } // namespace Data

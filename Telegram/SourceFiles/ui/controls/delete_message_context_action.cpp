@@ -84,7 +84,7 @@ ActionWithTimer::ActionWithTimer(
 		+ st::ttlItemPadding.bottom()) {
 	setAcceptBoth(true);
 	fitToMenuWidth();
-	setClickedCallback(std::move(callback));
+	setActionTriggered(std::move(callback));
 
 	paintRequest(
 	) | rpl::on_next([=] {

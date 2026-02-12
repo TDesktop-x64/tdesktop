@@ -203,6 +203,7 @@ struct GiftCode {
 	bool refunded : 1 = false;
 	bool upgrade : 1 = false;
 	bool saved : 1 = false;
+	bool craft : 1 = false;
 };
 
 class Media {

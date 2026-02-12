@@ -85,18 +85,24 @@ const auto kBadPrefix = u"http://"_q;
 		QVariant context) {
 	auto &account = Core::App().activeAccount();
 	const auto &config = account.appConfig();
+	const auto my = context.value<ClickHandlerContext>();
+	const auto window = my.sessionWindow.get();
+	const auto show = window
+		? window->uiShow()
+		: my.show;
 	const auto domains = config.get<std::vector<QString>>(
 		"url_auth_domains",
 		{});
 	if (!account.sessionExists()
 		|| domain.isEmpty()
+		|| !show
 		|| !ranges::contains(domains, domain)) {
 		return false;
 	}
 	const auto good = url.startsWith(kBadPrefix, Qt::CaseInsensitive)
 		? (kGoodPrefix + url.mid(kBadPrefix.size()))
 		: url;
-	UrlAuthBox::Activate(&account.session(), good, context);
+	UrlAuthBox::ActivateUrl(show, &account.session(), good, context);
 	return true;
 }
 

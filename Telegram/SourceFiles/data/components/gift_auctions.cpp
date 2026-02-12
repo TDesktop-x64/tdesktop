@@ -238,11 +238,11 @@ void GiftAuctions::requestAttributes(uint64 giftId, Fn<void()> ready) {
 			});
 		}
 		for (const auto &ready : base::take(entry.waiters)) {
-			ready();
+			if (ready) ready();
 		}
 	}).fail([=] {
 		for (const auto &ready : base::take(_attributes[giftId].waiters)) {
-			ready();
+			if (ready) ready();
 		}
 	}).send();
 }

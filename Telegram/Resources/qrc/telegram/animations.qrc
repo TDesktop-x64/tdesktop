@@ -17,6 +17,8 @@
     <file alias="stats_earn.tgs">../../animations/stats_earn.tgs</file>
     <file alias="voice_ttl_idle.tgs">../../animations/voice_ttl_idle.tgs</file>
     <file alias="voice_ttl_start.tgs">../../animations/voice_ttl_start.tgs</file>
+    <file alias="chat/voice_to_video.tgs">../../animations/chat/voice_to_video.tgs</file>
+    <file alias="chat/video_to_voice.tgs">../../animations/chat/video_to_voice.tgs</file>
     <file alias="palette.tgs">../../animations/palette.tgs</file>
     <file alias="sleep.tgs">../../animations/sleep.tgs</file>
     <file alias="greeting.tgs">../../animations/greeting.tgs</file>
@@ -53,6 +55,7 @@
     <file alias="passkeys.tgs">../../animations/passkeys.tgs</file>
     <file alias="ban.tgs">../../animations/ban.tgs</file>
     <file alias="cocoon.tgs">../../animations/cocoon.tgs</file>
+    <file alias="craft_failed.tgs">../../animations/craft_failed.tgs</file>
 
     <file alias="profile_muting.tgs">../../animations/profile/profile_muting.tgs</file>
     <file alias="profile_unmuting.tgs">../../animations/profile/profile_unmuting.tgs</file>
@@ -87,5 +90,6 @@
     <file alias="swipe_unpin.tgs">../../animations/swipe_action/unpin.tgs</file>
     <file alias="swipe_read.tgs">../../animations/swipe_action/read.tgs</file>
     <file alias="swipe_unread.tgs">../../animations/swipe_action/unread.tgs</file>
+    <file alias="craft_progress.tgs">../../animations/craft_progress.tgs</file>
   </qresource>
 </RCC>

@@ -63,6 +63,9 @@ PRIVATE
     boxes/peers/toggle_topics_box.cpp
     boxes/peers/toggle_topics_box.h
 
+    boxes/url_auth_box_content.cpp
+    boxes/url_auth_box_content.h
+
     calls/group/ui/calls_group_recording_box.cpp
     calls/group/ui/calls_group_recording_box.h
     calls/group/ui/calls_group_scheduled_labels.cpp
@@ -403,6 +406,8 @@ PRIVATE
     ui/controls/delete_message_context_action.h
     ui/controls/download_bar.cpp
     ui/controls/download_bar.h
+    ui/controls/dynamic_images_strip.cpp
+    ui/controls/dynamic_images_strip.h
     ui/controls/emoji_button.cpp
     ui/controls/emoji_button.h
     ui/controls/feature_list.cpp
@@ -417,6 +422,8 @@ PRIVATE
     ui/controls/invite_link_label.h
     ui/controls/peer_list_dummy.cpp
     ui/controls/peer_list_dummy.h
+    ui/controls/popup_selector.cpp
+    ui/controls/popup_selector.h
     ui/controls/round_video_recorder_data.h
     ui/controls/round_video_recorder.cpp
     ui/controls/round_video_recorder.h

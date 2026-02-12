@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "core/local_url_handlers.h"
 
+#include "core/deep_links/deep_links_router.h"
 #include "api/api_authorizations.h"
 #include "api/api_cloud_password.h"
 #include "api/api_confirm_phone.h"
@@ -35,6 +36,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/sticker_set_box.h"
 #include "boxes/star_gift_box.h"
 #include "boxes/language_box.h"
+#include "boxes/url_auth_box.h"
 #include "passport/passport_form_controller.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
@@ -54,17 +56,17 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/themes/window_theme_editor_box.h" // GenerateSlug.
 #include "payments/payments_checkout_process.h"
 #include "settings/cloud_password/settings_cloud_password_login_email.h"
-#include "settings/settings_active_sessions.h"
-#include "settings/settings_credits.h"
+#include "settings/sections/settings_active_sessions.h"
+#include "settings/sections/settings_credits.h"
 #include "settings/settings_credits_graphics.h"
-#include "settings/settings_information.h"
-#include "settings/settings_global_ttl.h"
-#include "settings/settings_folders.h"
-#include "settings/settings_main.h"
+#include "settings/sections/settings_information.h"
+#include "settings/sections/settings_global_ttl.h"
+#include "settings/sections/settings_folders.h"
+#include "settings/sections/settings_main.h"
 #include "settings/settings_privacy_controllers.h"
-#include "settings/settings_privacy_security.h"
-#include "settings/settings_chat.h"
-#include "settings/settings_premium.h"
+#include "settings/sections/settings_privacy_security.h"
+#include "settings/sections/settings_chat.h"
+#include "settings/sections/settings_premium.h"
 #include "storage/storage_account.h"
 #include "mainwidget.h"
 #include "main/main_account.h"
@@ -613,6 +615,17 @@ bool ResolveUsernameOrPhone(
 		ResolveGiftCode(controller, appnameParam, fromId, toId);
 		return true;
 	}
+	if (domainParam == u"oauth"_q) {
+		const auto token = params.value(u"startapp"_q);
+		if (!token.isEmpty()) {
+			UrlAuthBox::ActivateUrl(
+				controller->uiShow(),
+				&controller->session(),
+				u"tg://resolve?domain=oauth&startapp="_q + token,
+				context);
+			return true;
+		}
+	}
 
 	// Fix t.me/s/username links.
 	const auto webChannelPreviewLink = (domainParam == u"s"_q)
@@ -824,13 +837,13 @@ bool ResolveSettings(
 			ShowPhonePrivacyBox(controller);
 			return {};
 		} else if (section == u"devices"_q) {
-			return ::Settings::Sessions::Id();
+			return ::Settings::SessionsId();
 		} else if (section == u"folders"_q) {
-			return ::Settings::Folders::Id();
+			return ::Settings::FoldersId();
 		} else if (section == u"privacy"_q) {
-			return ::Settings::PrivacySecurity::Id();
+			return ::Settings::PrivacySecurityId();
 		} else if (section == u"themes"_q) {
-			return ::Settings::Chat::Id();
+			return ::Settings::ChatId();
 		} else if (section == u"change_number"_q) {
 			controller->show(
 				Ui::MakeInformBox(tr::lng_change_phone_error()));
@@ -838,18 +851,18 @@ bool ResolveSettings(
 		} else if (section == u"auto_delete"_q) {
 			return ::Settings::GlobalTTLId();
 		} else if (section == u"information"_q) {
-			return ::Settings::Information::Id();
+			return ::Settings::InformationId();
 		} else if (section == u"login_email"_q) {
 			ShowLoginEmailSettings(controller);
 			return {};
 		}
-		return ::Settings::Main::Id();
+		return ::Settings::MainId();
 	}();
 
 	if (type.has_value()) {
 		if (!controller) {
 			return false;
-		} else if (*type == ::Settings::Sessions::Id()) {
+		} else if (*type == ::Settings::SessionsId()) {
 			controller->session().api().authorizations().reload();
 		}
 		controller->showSettings(*type);
@@ -1333,7 +1346,7 @@ bool EditPaidMessagesFee(
 			ShowEditChatPermissions(controller, channel);
 		}
 	} else {
-		controller->show(Box(EditMessagesPrivacyBox, controller));
+		controller->show(Box(EditMessagesPrivacyBox, controller, QString()));
 	}
 	return true;
 }
@@ -1764,7 +1777,35 @@ bool ResolveTonSettings(
 	return true;
 }
 
+bool ResolveOAuth(
+		Window::SessionController *controller,
+		const Match &match,
+		const QVariant &context) {
+	if (!controller) {
+		return false;
+	}
+	const auto params = url_parse_params(
+		match->captured(1),
+		qthelp::UrlParamNameTransform::ToLower);
+	const auto token = params.value(u"token"_q);
+	if (token.isEmpty()) {
+		return false;
+	}
+	UrlAuthBox::ActivateUrl(
+		controller->uiShow(),
+		&controller->session(),
+		u"tg://oauth?token="_q + token,
+		context);
+	return true;
+}
+
 } // namespace
+
+bool TryRouterForLocalUrl(
+		Window::SessionController *controller,
+		const QString &command) {
+	return DeepLinks::Router::Instance().tryHandle(controller, command);
+}
 
 const std::vector<LocalUrlHandler> &LocalUrlHandlers() {
 	static auto Result = std::vector<LocalUrlHandler>{
@@ -1883,6 +1924,10 @@ const std::vector<LocalUrlHandler> &LocalUrlHandlers() {
 		{
 			u"^ton/?(^\\?.*)?(#|$)"_q,
 			ResolveTonSettings
+		},
+		{
+			u"^oauth/?\\?(.+)(#|$)"_q,
+			ResolveOAuth
 		},
 		{
 			u"^([^\\?]+)(\\?|#|$)"_q,
@@ -2181,6 +2226,8 @@ void ResolveAndShowUniqueGift(
 		const auto &data = result.data();
 		session->data().processUsers(data.vusers());
 		if (const auto gift = Api::FromTL(session, data.vgift())) {
+			Core::App().hideMediaView();
+
 			using namespace ::Settings;
 			show->show(Box(
 				GlobalStarGiftBox,
@@ -2188,6 +2235,7 @@ void ResolveAndShowUniqueGift(
 				*gift,
 				StarGiftResaleInfo(),
 				st));
+			show->activate();
 		}
 	}).fail([=](const MTP::Error &error) {
 		clear();

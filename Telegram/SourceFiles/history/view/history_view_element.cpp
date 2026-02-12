@@ -79,9 +79,6 @@ public:
 		Ui::BubbleRounding outer,
 		RectParts sides) const override;
 
-	void startPaint(
-		QPainter &p,
-		const Ui::ChatStyle *st) const override;
 	const style::TextStyle &textStyle() const override;
 	void repaint(not_null<const HistoryItem*> item) const override;
 
@@ -90,8 +87,13 @@ protected:
 		QPainter &p,
 		const Ui::ChatStyle *st,
 		const QRect &rect,
+		HistoryMessageMarkupButton::Color color,
 		Ui::BubbleRounding rounding,
 		float64 howMuchOver) const override;
+	void paintButtonStart(
+		QPainter &p,
+		const Ui::ChatStyle *st,
+		HistoryMessageMarkupButton::Color color) const override;
 	void paintButtonIcon(
 		QPainter &p,
 		const Ui::ChatStyle *st,
@@ -102,6 +104,7 @@ protected:
 		QPainter &p,
 		const Ui::ChatStyle *st,
 		const QRect &rect,
+		HistoryMessageMarkupButton::Color color,
 		int outerWidth,
 		Ui::BubbleRounding rounding) const override;
 	int minButtonWidth(HistoryMessageMarkupButton::Type type) const override;
@@ -112,7 +115,18 @@ private:
 		QColor color;
 	};
 	using BubbleRoundingKey = uchar;
-	mutable base::flat_map<BubbleRoundingKey, CachedBg> _cachedBg;
+	struct CacheKey {
+		BubbleRoundingKey rounding;
+		HistoryMessageMarkupButton::Color color;
+
+		friend inline constexpr auto operator<=>(
+			CacheKey,
+			CacheKey) = default;
+		friend inline constexpr bool operator==(
+			CacheKey,
+			CacheKey) = default;
+	};
+	mutable base::flat_map<CacheKey, CachedBg> _cachedBg;
 	mutable base::flat_map<BubbleRoundingKey, QPainterPath> _cachedOutline;
 	mutable std::unique_ptr<Ui::GlareEffect> _glare;
 	Fn<void()> _repaint;
@@ -126,12 +140,14 @@ KeyboardStyle::KeyboardStyle(
 , _repaint(std::move(repaint)) {
 }
 
-void KeyboardStyle::startPaint(
+void KeyboardStyle::paintButtonStart(
 		QPainter &p,
-		const Ui::ChatStyle *st) const {
+		const Ui::ChatStyle *st,
+		HistoryMessageMarkupButton::Color color) const {
+	using Color = HistoryMessageMarkupButton::Color;
 	Expects(st != nullptr);
 
-	p.setPen(st->msgServiceFg());
+	p.setPen((color == Color::Normal) ? st->msgServiceFg() : st::white);
 }
 
 const style::TextStyle &KeyboardStyle::textStyle() const {
@@ -167,12 +183,13 @@ void KeyboardStyle::paintButtonBg(
 		QPainter &p,
 		const Ui::ChatStyle *st,
 		const QRect &rect,
+		HistoryMessageMarkupButton::Color color,
 		Ui::BubbleRounding rounding,
 		float64 howMuchOver) const {
 	Expects(st != nullptr);
 
 	using Corner = Ui::BubbleCornerRounding;
-	auto &cachedBg = _cachedBg[rounding.key()];
+	auto &cachedBg = _cachedBg[CacheKey{ rounding.key(), color }];
 
 	const auto sti = &st->imageStyle(false);
 	const auto ratio = style::DevicePixelRatio();
@@ -188,13 +205,34 @@ void KeyboardStyle::paintButtonBg(
 		{
 			auto painter = QPainter(&cachedBg.image);
 
-			const auto &small = sti->msgServiceBgCornersSmall;
-			const auto &large = sti->msgServiceBgCornersLarge;
+			using Color = HistoryMessageMarkupButton::Color;
+			const auto normal = (color == Color::Normal);
+			const auto colored = style::owned_color((color == Color::Primary)
+				? QColor(0x37, 0x8e, 0xae)
+				: (color == Color::Danger)
+				? QColor(0xc9, 0x54, 0x3e)
+				: QColor(0x48, 0x9d, 0x38));
+			const auto smallColored = normal
+				? Ui::CornersPixmaps()
+				: Ui::PrepareCornerPixmaps(
+					Ui::BubbleRadiusSmall(),
+					colored.color());
+			const auto largeColored = normal
+				? Ui::CornersPixmaps()
+				: Ui::PrepareCornerPixmaps(
+					Ui::BubbleRadiusLarge(),
+					colored.color());
+			const auto small = normal
+				? &sti->msgServiceBgCornersSmall
+				: &smallColored;
+			const auto large = normal
+				? &sti->msgServiceBgCornersLarge
+				: &largeColored;
 			auto corners = Ui::CornersPixmaps();
 			int radiuses[4];
 			for (auto i = 0; i != 4; ++i) {
 				const auto isLarge = (rounding[i] == Corner::Large);
-				corners.p[i] = (isLarge ? large : small).p[i];
+				corners.p[i] = (isLarge ? large : small)->p[i];
 				radiuses[i] = Ui::CachedCornerRadiusValue(isLarge
 					? Ui::CachedCornerRadius::BubbleLarge
 					: Ui::CachedCornerRadius::BubbleSmall);
@@ -206,7 +244,11 @@ void KeyboardStyle::paintButtonBg(
 				radiuses[1],
 				radiuses[2],
 				radiuses[3]);
-			Ui::FillRoundRect(painter, r, sti->msgServiceBg, corners);
+			Ui::FillRoundRect(
+				painter,
+				r,
+				normal ? sti->msgServiceBg : colored.color(),
+				corners);
 		}
 	}
 	p.drawImage(rect.topLeft(), cachedBg.image);
@@ -255,6 +297,7 @@ void KeyboardStyle::paintButtonLoading(
 		QPainter &p,
 		const Ui::ChatStyle *st,
 		const QRect &rect,
+		HistoryMessageMarkupButton::Color color,
 		int outerWidth,
 		Ui::BubbleRounding rounding) const {
 	Expects(st != nullptr);
@@ -270,7 +313,7 @@ void KeyboardStyle::paintButtonLoading(
 	}
 
 	const auto cacheKey = rounding.key();
-	auto &cachedBg = _cachedBg[cacheKey];
+	auto &cachedBg = _cachedBg[CacheKey{ cacheKey, color }];
 	if (!cachedBg.image.isNull()) {
 		if (_glare && _glare->glare.birthTime) {
 			const auto progress = _glare->progress(crl::now());
@@ -1250,8 +1293,8 @@ void Element::prepareCustomEmojiPaint(
 	}
 }
 
-void Element::repaint() const {
-	history()->owner().requestViewRepaint(this);
+void Element::repaint(QRect r) const {
+	history()->owner().requestViewRepaint(this, r);
 }
 
 void Element::paintHighlight(

@@ -899,11 +899,17 @@ void DraftOptionsBox(
 			const auto small = state->webpage.forceSmallMedia
 				|| (!state->webpage.forceLargeMedia
 					&& state->preview->computeDefaultSmallMedia());
+			const auto hasVideo = state->preview->document
+				&& state->preview->document->isVideoFile();
 			Settings::AddButtonWithIcon(
 				bottom,
 				(small
-					? tr::lng_link_enlarge_photo()
-					: tr::lng_link_shrink_photo()),
+					? (hasVideo
+						? tr::lng_link_enlarge_video()
+						: tr::lng_link_enlarge_photo())
+					: (hasVideo
+						? tr::lng_link_shrink_video()
+						: tr::lng_link_shrink_photo())),
 				st::settingsButton,
 				{ small ? &st::menuIconEnlarge : &st::menuIconShrink }
 			)->setClickedCallback([=] {

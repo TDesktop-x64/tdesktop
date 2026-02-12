@@ -70,7 +70,7 @@ Action::Action(
 	+ st::ttlItemPadding.bottom()) {
 	setAcceptBoth(true);
 	fitToMenuWidth();
-	setClickedCallback([=] {
+	setActionTriggered([=] {
 		if (isEnabled()) {
 			callback(DownloadsAction::Open);
 		}

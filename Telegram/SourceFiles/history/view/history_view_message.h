@@ -291,6 +291,7 @@ private:
 	[[nodiscard]] bool displayFastForward() const;
 
 	[[nodiscard]] bool isPinnedContext() const;
+	[[nodiscard]] bool isCommentsRootView() const;
 
 	[[nodiscard]] bool displayFastShare() const;
 	[[nodiscard]] bool displayGoToOriginal() const;

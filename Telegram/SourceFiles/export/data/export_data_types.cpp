@@ -1224,6 +1224,7 @@ Chat ParseChat(const MTPChat &data) {
 		result.bareId = data.vid().v;
 		result.isBroadcast = data.is_broadcast();
 		result.isSupergroup = data.is_megagroup();
+		result.isMonoforum = data.is_monoforum();
 		result.title = ParseString(data.vtitle());
 		result.input = MTP_inputPeerChannel(
 			MTP_long(result.bareId),
@@ -1850,6 +1851,14 @@ ServiceAction ParseServiceAction(
 		content.offerDeclined = true;
 		content.offerExpired = data.is_expired();
 		content.offerPrice = CreditsAmountFromTL(data.vprice());
+		result.content = content;
+	}, [&](const MTPDmessageActionNewCreatorPending &data) {
+		auto content = ActionNewCreatorPending();
+		content.newCreatorId = data.vnew_creator_id().v;
+		result.content = content;
+	}, [&](const MTPDmessageActionChangeCreator &data) {
+		auto content = ActionChangeCreator();
+		content.newCreatorId = data.vnew_creator_id().v;
 		result.content = content;
 	}, [](const MTPDmessageActionEmpty &data) {});
 	return result;

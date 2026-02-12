@@ -85,7 +85,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/click_handler_types.h"
 #include "base/platform/base_platform_info.h"
 #include "base/call_delayed.h"
-#include "settings/settings_premium.h"
+#include "settings/sections/settings_premium.h"
 #include "window/window_peer_menu.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
@@ -2315,7 +2315,7 @@ void AddEmojiPacksAction(
 		st::historyHasCustomEmojiPosition,
 		std::move(text));
 	const auto weak = base::make_weak(controller);
-	button->setClickedCallback([=] {
+	button->setActionTriggered([=] {
 		const auto strong = weak.get();
 		if (!strong) {
 			return;

@@ -87,7 +87,7 @@ std::optional<MTPMessageReplyHeader> PrepareLogReply(
 	}
 	return header->match([&](const MTPDmessageReplyHeader &data)
 	-> std::optional<MTPMessageReplyHeader> {
-		if (data.vreply_to_peer_id()) {
+		if (data.vreply_to_peer_id() || data.vreply_to_msg_id()) {
 			return *header;
 		} else if (data.is_forum_topic()) {
 			const auto topId = data.vreply_to_top_id().value_or(
@@ -354,18 +354,24 @@ TextWithEntities GeneratePermissionsChangeText(
 	const auto prevFlags = prevRights.flags;
 	const auto indefinitely = ChannelData::IsRestrictedForever(newUntil);
 	if (newFlags & Flag::ViewMessages) {
-		auto bannedText = tr::lng_admin_log_banned(
+		if (indefinitely) {
+			return tr::lng_admin_log_banned(
+				tr::now,
+				lt_user,
+				user,
+				tr::marked);
+		}
+		return tr::lng_admin_log_banned_until(
 			tr::now,
 			lt_user,
 			user,
-			tr::marked);
-		if (!indefinitely) {
-			bannedText.text.append(' ' + tr::lng_admin_log_banned_until(
+			lt_until,
+			tr::lng_admin_log_restricted_until(
 				tr::now,
 				lt_date,
-				langDateTime(base::unixtime::parse(newUntil))));
-		}
-		return bannedText;
+				{ langDateTime(base::unixtime::parse(newUntil)) },
+				tr::marked),
+			tr::marked);
 	} else if (newFlags == 0
 		&& (prevFlags & Flag::ViewMessages)
 		&& !peerIsUser(participantId)) {

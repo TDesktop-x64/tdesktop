@@ -2262,11 +2262,6 @@ void Stories::togglePinnedList(
 	auto &saved = _saved[peerId];
 	auto list = QVector<MTPint>();
 	list.reserve(maxPinnedCount());
-	for (const auto &id : saved.ids.pinnedToTop) {
-		if (pin || !ranges::contains(ids, FullStoryId{ peerId, id })) {
-			list.push_back(MTP_int(id));
-		}
-	}
 	if (pin) {
 		auto copy = ids;
 		ranges::sort(copy, ranges::greater());
@@ -2275,6 +2270,11 @@ void Stories::togglePinnedList(
 				&& !ranges::contains(saved.ids.pinnedToTop, id.story)) {
 				list.push_back(MTP_int(id.story));
 			}
+		}
+	}
+	for (const auto &id : saved.ids.pinnedToTop) {
+		if (pin || !ranges::contains(ids, FullStoryId{ peerId, id })) {
+			list.push_back(MTP_int(id));
 		}
 	}
 	const auto api = &_owner->session().api();

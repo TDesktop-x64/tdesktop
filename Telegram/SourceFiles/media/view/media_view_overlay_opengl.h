@@ -50,7 +50,8 @@ private:
 	void paintTransformedContent(
 		not_null<QOpenGLShaderProgram*> program,
 		ContentGeometry geometry,
-		bool fillTransparentBackground);
+		bool fillTransparentBackground,
+		QRectF textureRect = QRectF(0., 0., 1., 1.));
 	void paintRadialLoading(
 		QRect inner,
 		bool radial,

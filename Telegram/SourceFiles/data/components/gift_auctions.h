@@ -92,7 +92,7 @@ public:
 
 	[[nodiscard]] std::optional<Data::UniqueGiftAttributes> attributes(
 		uint64 giftId) const;
-	void requestAttributes(uint64 giftId, Fn<void()> ready);
+	void requestAttributes(uint64 giftId, Fn<void()> ready = nullptr);
 
 	[[nodiscard]] rpl::producer<ActiveAuctions> active() const;
 	[[nodiscard]] rpl::producer<bool> hasActiveChanges() const;

@@ -10,10 +10,10 @@ https://github.com/nicennnnnnnlee/nicennnnnnnlee.github.io/blob/master/LICENSE
 
 namespace PanguSpacing {
 
-// Apply pangu spacing to plain text (insert spaces between CJK and half-width characters).
+// Apply pangu spacing to plain text (insert spaces between CJK and ASCII alphanumeric characters [A-Za-z0-9]).
 [[nodiscard]] QString SpacingText(const QString &text);
 
-// Apply pangu spacing to TextWithEntities, adjusting entity offsets accordingly.
+// Apply pangu spacing to TextWithEntities (CJK vs. ASCII alphanumerics), adjusting entity offsets accordingly.
 [[nodiscard]] TextWithEntities SpacingTextWithEntities(const TextWithEntities &textWithEntities);
 
 } // namespace PanguSpacing

@@ -1,0 +1,184 @@
+name: Build 64Gram
+
+on:
+  push:
+    branches: [ dev, master ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ dev, master ]
+  workflow_dispatch:
+
+env:
+  CACHE_VERSION: v1
+
+jobs:
+  build-windows:
+    name: Windows x64
+    runs-on: windows-2022
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+    
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
+    
+    - name: Cache Libraries
+      id: cache-libs
+      uses: actions/cache@v4
+      with:
+        path: |
+          ../Libraries
+          ../win64/Libraries
+          ../ThirdParty
+        key: ${{ runner.os }}-libs-${{ env.CACHE_VERSION }}-${{ hashFiles('Telegram/build/prepare/prepare.py') }}
+        restore-keys: |
+          ${{ runner.os }}-libs-${{ env.CACHE_VERSION }}-
+    
+    - name: Prepare Libraries
+      if: steps.cache-libs.outputs.cache-hit != 'true'
+      shell: cmd
+      run: |
+        cd ..
+        mkdir Libraries
+        mkdir ThirdParty
+        cd tdesktop
+        Telegram\build\prepare\win.bat
+    
+    - name: Configure
+      shell: cmd
+      run: |
+        cd Telegram
+        configure.bat x64 ^
+          -DTDESKTOP_API_ID=${{ secrets.API_ID }} ^
+          -DTDESKTOP_API_HASH=${{ secrets.API_HASH }}
+    
+    - name: Build
+      shell: cmd
+      run: |
+        cmake --build out --config Release --target Telegram
+    
+    - name: Package
+      shell: powershell
+      run: |
+        $version = (Get-Content Telegram\build\version | Select-String "AppVersionStr").ToString().Split()[-1]
+        $output = "64Gram-$version-win64"
+        
+        New-Item -ItemType Directory -Path $output
+        Copy-Item out\Release\Telegram.exe $output\
+        Copy-Item out\Release\Updater.exe $output\ -ErrorAction SilentlyContinue
+        
+        Compress-Archive -Path $output -DestinationPath "$output.zip"
+    
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: 64Gram-Windows-x64
+        path: 64Gram-*.zip
+
+  build-macos:
+    name: macOS Universal
+    runs-on: macos-13
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+    
+    - name: Setup Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: '15.0'
+    
+    - name: Install Dependencies
+      run: |
+        brew install git automake cmake wget pkg-config gnu-tar ninja nasm meson
+        sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+    
+    - name: Cache Libraries
+      id: cache-libs
+      uses: actions/cache@v4
+      with:
+        path: |
+          ../Libraries
+          ../ThirdParty
+        key: ${{ runner.os }}-libs-${{ env.CACHE_VERSION }}-${{ hashFiles('Telegram/build/prepare/prepare.py') }}
+        restore-keys: |
+          ${{ runner.os }}-libs-${{ env.CACHE_VERSION }}-
+    
+    - name: Prepare Libraries
+      if: steps.cache-libs.outputs.cache-hit != 'true'
+      run: |
+        cd ..
+        mkdir -p Libraries
+        mkdir -p ThirdParty
+        cd tdesktop
+        ./Telegram/build/prepare/mac.sh
+    
+    - name: Configure
+      run: |
+        cd Telegram
+        ./configure.sh \
+          -DTDESKTOP_API_ID=${{ secrets.API_ID }} \
+          -DTDESKTOP_API_HASH=${{ secrets.API_HASH }}
+    
+    - name: Build
+      run: |
+        cd out
+        xcodebuild -project Telegram.xcodeproj \
+          -scheme Telegram \
+          -configuration Release \
+          -destination 'generic/platform=macOS' \
+          build
+    
+    - name: Package
+      run: |
+        version=$(grep AppVersionStr Telegram/build/version | awk '{print $2}')
+        output="64Gram-$version-macOS"
+        
+        mkdir -p $output
+        cp -R out/Release/Telegram.app $output/
+        
+        cd $output
+        zip -r ../$output.zip Telegram.app
+        cd ..
+    
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: 64Gram-macOS-Universal
+        path: 64Gram-*.zip
+
+  release:
+    name: Create Release
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Download Artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: artifacts/**/*.zip
+        draft: true
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -89,7 +89,7 @@ jobs:
 
   build-macos:
     name: macOS Universal
-    runs-on: macos-13
+    runs-on: macos-latest
     
     steps:
     - name: Checkout
@@ -101,7 +101,7 @@ jobs:
     - name: Setup Xcode
       uses: maxim-lobanov/setup-xcode@v1
       with:
-        xcode-version: '15.0'
+        xcode-version: latest-stable
     
     - name: Install Dependencies
       run: |

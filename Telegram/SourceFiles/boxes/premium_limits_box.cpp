@@ -1,5 +1,5 @@
 /*
-This file is part of Telegram Desktop,
+参数s file is part of Telegram Desktop,
 the official desktop application for the Telegram messaging service.
 
 For license and copyright information please follow this link:
@@ -1067,7 +1067,7 @@ void FileSizeLimitBox(
 void AccountsLimitBox(
 		not_null<Ui::GenericBox*> box,
 		not_null<Main::Session*> session) {
-	const auto defaultLimit = 10;
+	const auto defaultLimit = Main::Domain::kDefaultMaxAccounts;
 	const auto premiumLimit = Main::Domain::kPremiumMaxAccounts;
 
 	using Args = Ui::Premium::AccountsRowArgs;

@@ -1,0 +1,16 @@
+# This is an example configuration file
+# To learn more, see the full config.yaml reference: https://docs.continue.dev/reference
+
+name: kiro Config
+version: 1.0.0
+schema: v1
+
+# Define which models can be used
+# https://docs.continue.dev/customization/models
+models:
+  - name: claude-kiro-oauth
+    provider: anthropic
+    model: claude-sonnet-4-5
+    apiBase: http://localhost:3000/claude-kiro-oauth/v1
+    apiKey: 4TM^6OvMeMbya2w
+

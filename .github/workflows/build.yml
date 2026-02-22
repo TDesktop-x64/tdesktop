@@ -147,7 +147,7 @@ jobs:
     
     - name: Package
       run: |
-        version=$(grep AppVersionStr Telegram/build/version | awk '{print $2}')
+        version=$(awk '/^AppVersionStr[^a-zA-Z]/ {print $2}' Telegram/build/version)
         output="64Gram-$version-macOS"
         
         mkdir -p $output

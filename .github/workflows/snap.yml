@@ -40,6 +40,7 @@ jobs:
 
   snap:
     name: Ubuntu
+    if: "!contains(github.event.head_commit.message, '[skip snap]')"
     runs-on: ubuntu-latest
 
     env:

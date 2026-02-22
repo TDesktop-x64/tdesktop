@@ -51,9 +51,9 @@ jobs:
       shell: cmd
       run: |
         cd ..
-        mkdir Libraries
-        mkdir ThirdParty
-        cd tdesktop
+        if not exist "win64\Libraries" mkdir win64\Libraries
+        if not exist ThirdParty mkdir ThirdParty
+        cd 64gramplus
         Telegram\build\prepare\win.bat
     
     - name: Configure
@@ -125,11 +125,12 @@ jobs:
         cd ..
         mkdir -p Libraries
         mkdir -p ThirdParty
-        cd tdesktop
+        cd 64gramplus
         ./Telegram/build/prepare/mac.sh
     
     - name: Configure
       run: |
+        export QT=6.8
         cd Telegram
         ./configure.sh \
           -DTDESKTOP_API_ID=${{ secrets.API_ID }} \

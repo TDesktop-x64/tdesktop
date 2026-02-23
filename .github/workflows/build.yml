@@ -72,7 +72,9 @@ jobs:
     - name: Package
       shell: powershell
       run: |
-        $version = (Get-Content Telegram\build\version | Select-String "AppVersionStr").ToString().Split()[-1]
+        $content = Get-Content Telegram\build\version
+        $versionLine = $content | Where-Object { $_ -match '^AppVersionStr\s+' }
+        $version = ($versionLine -split '\s+')[1]
         $output = "64Gram-$version-win64"
         
         New-Item -ItemType Directory -Path $output

@@ -277,7 +277,7 @@ int AppConfig::passkeysAccountPasskeysMax() const {
 }
 
 bool AppConfig::settingsDisplayPasskeys() const {
-	return get<bool>(u"settings_display_passkeys"_q, false);
+	return get<bool>(u"settings_display_passkeys"_q, true);
 }
 
 int64 AppConfig::stakeDiceNanoTonMin() const {

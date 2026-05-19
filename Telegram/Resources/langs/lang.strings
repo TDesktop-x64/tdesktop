@@ -8165,6 +8165,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_translate_to_tc" = "使用正體中文翻譯訊息";
 "lng_settings_screen_shot_mode" = "Screenshot Mode";
 "lng_settings_restart_hint" = "WARNING: Changing options that are colored in red will take effect only after the app restarts.";
+"lng_settings_pangu_spacing_send" = "Auto-space CJK when sending";
+"lng_settings_pangu_spacing_receive" = "Auto-space CJK when displaying";
 
 "lng_settings_skip_message" = "Skip to next unread chat";
 "lng_settings_skip_message_desc" = "Note: Allow ALT+↑/↓ shortcut to skip to next unread chat";

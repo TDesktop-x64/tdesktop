@@ -62,6 +62,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_history_messages.h"
 #include "core/core_cloud_password.h"
 #include "core/application.h"
+#include "core/pangu_spacing.h"
 #include "base/unixtime.h"
 #include "base/random.h"
 #include "base/call_delayed.h"
@@ -4130,6 +4131,9 @@ void ApiWrap::sendMessage(
 		textWithTags.text,
 		TextUtilities::ConvertTextTagsToEntities(textWithTags.tags)
 	};
+	if (GetEnhancedBool("pangu_spacing_send")) {
+		left = PanguSpacing::SpacingTextWithEntities(left);
+	}
 	auto prepareFlags = Ui::ItemTextOptions(
 		history,
 		_session->user()).flags;

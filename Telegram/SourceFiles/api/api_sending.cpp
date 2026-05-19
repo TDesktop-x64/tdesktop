@@ -33,7 +33,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/file_upload.h"
 #include "mainwidget.h"
 #include "apiwrap.h"
-
+#include "core/pangu_spacing.h"
+#include "settings.h"
 namespace Api {
 namespace {
 
@@ -196,6 +197,9 @@ void SendExistingMedia(
 		message.textWithTags.text,
 		TextUtilities::ConvertTextTagsToEntities(message.textWithTags.tags)
 	};
+	if (GetEnhancedBool("pangu_spacing_send")) {
+		caption = PanguSpacing::SpacingTextWithEntities(caption);
+	}
 	TextUtilities::Trim(caption);
 	auto sentEntities = EntitiesToMTP(
 		session,
@@ -577,6 +581,9 @@ void SendConfirmedFile(
 		file->caption.text,
 		TextUtilities::ConvertTextTagsToEntities(file->caption.tags)
 	};
+	if (GetEnhancedBool("pangu_spacing_send")) {
+		caption = PanguSpacing::SpacingTextWithEntities(caption);
+	}
 	const auto prepareFlags = Ui::ItemTextOptions(
 		history,
 		session->user()).flags;

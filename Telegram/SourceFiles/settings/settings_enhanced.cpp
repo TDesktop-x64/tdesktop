@@ -213,6 +213,34 @@ namespace Settings {
 			EnhancedSettings::Write();
 		}, container->lifetime());
 
+		AddButtonWithIcon(
+				inner,
+				tr::lng_settings_pangu_spacing_send(),
+				st::settingsButtonNoIcon
+		)->toggleOn(
+				rpl::single(GetEnhancedBool("pangu_spacing_send"))
+		)->toggledChanges(
+		) | rpl::filter([=](bool toggled) {
+			return (toggled != GetEnhancedBool("pangu_spacing_send"));
+		}) | rpl::on_next([=](bool toggled) {
+			SetEnhancedValue("pangu_spacing_send", toggled);
+			EnhancedSettings::Write();
+		}, container->lifetime());
+
+		AddButtonWithIcon(
+				inner,
+				tr::lng_settings_pangu_spacing_receive(),
+				st::settingsButtonNoIcon
+		)->toggleOn(
+				rpl::single(GetEnhancedBool("pangu_spacing_receive"))
+		)->toggledChanges(
+		) | rpl::filter([=](bool toggled) {
+			return (toggled != GetEnhancedBool("pangu_spacing_receive"));
+		}) | rpl::on_next([=](bool toggled) {
+			SetEnhancedValue("pangu_spacing_receive", toggled);
+			EnhancedSettings::Write();
+		}, container->lifetime());
+
 		AddSkip(container);
 
 		AddButtonWithIcon(
@@ -598,4 +626,3 @@ namespace Settings {
 		Ui::ResizeFitChild(this, content);
 	}
 } // namespace Settings
-

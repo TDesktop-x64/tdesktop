@@ -35,6 +35,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "apiwrap.h"
 #include "media/audio/media_audio.h"
 #include "core/application.h"
+#include "core/pangu_spacing.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
 #include "core/click_handler_types.h"
@@ -512,6 +513,10 @@ HistoryItem::HistoryItem(
 			};
 		}
 
+		if (GetEnhancedBool("pangu_spacing_receive")) {
+			textWithEntities =
+					PanguSpacing::SpacingTextWithEntities(textWithEntities);
+		}
 		setText(_media ? textWithEntities : EnsureNonEmpty(textWithEntities));
 		if (const auto groupedId = data.vgrouped_id()) {
 			setGroupId(

@@ -545,6 +545,8 @@ PRIVATE
     core/deadlock_detector.h
     core/enhanced_settings.cpp
     core/enhanced_settings.h
+    core/pangu_spacing.cpp
+    core/pangu_spacing.h
     core/deep_links/deep_links_chats.cpp
     core/deep_links/deep_links_chats.h
     core/deep_links/deep_links_contacts.cpp

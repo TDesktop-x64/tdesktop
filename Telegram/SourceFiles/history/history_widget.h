@@ -570,6 +570,9 @@ private:
 	void cancelReplyAfterMediaSend(bool lastKeyboardUsed);
 	bool replyToPreviousMessage();
 	bool replyToNextMessage();
+	bool editPreviousMessage();
+	bool editNextMessage();
+	void confirmDiscardEdit(Fn<void()> proceed);
 	[[nodiscard]] bool showSlowmodeError();
 
 	void hideChildWidgets();

@@ -160,7 +160,7 @@ elif [ "$BuildTarget" == "mac" ] ; then
   fi
   ProjectPath="$HomePath/../out"
   ReleasePath="$ProjectPath/Release"
-  BinaryName="Telegram"
+  BinaryName="64Gram"
   if [ "$MacArch" != "" ]; then
     BundleName="$BinaryName.$MacArch.app"
     SetupFile="tsetup.$MacArch.$AppVersionStrFull.dmg"
@@ -186,7 +186,7 @@ elif [ "$BuildTarget" == "macstore" ]; then
   echo "Building version $AppVersionStrFull for Mac App Store.."
   ProjectPath="$HomePath/../out"
   ReleasePath="$ProjectPath/Release"
-  BinaryName="Telegram Lite"
+  BinaryName="64Gram"
   BundleName="$BinaryName.app"
 else
   Error "Invalid target!"

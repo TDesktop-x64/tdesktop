@@ -2364,30 +2364,32 @@ else()
     generate_dbus(Telegram org.freedesktop. XdgNotifications ${src_loc}/platform/linux/org.freedesktop.Notifications.xml)
 endif()
 
-if (build_macstore)
-    set(bundle_identifier "io.github.tdesktop_x64.TDesktop")
-    set(bundle_entitlements "Telegram Lite.entitlements")
-    set(output_name "Telegram Lite")
-    target_link_options(Telegram
-    PRIVATE
-        -F${libs_loc}/breakpad/src/client/mac/build/Release
-    )
-    target_link_frameworks(Telegram PRIVATE Breakpad)
-    add_custom_command(TARGET Telegram
-    PRE_LINK
-        COMMAND rm -rf $<TARGET_FILE_DIR:Telegram>/../Frameworks
-        COMMAND mkdir -p $<TARGET_FILE_DIR:Telegram>/../Frameworks
-        COMMAND cp -a ${libs_loc}/breakpad/src/client/mac/build/Release/Breakpad.framework $<TARGET_FILE_DIR:Telegram>/../Frameworks/Breakpad.framework
-        COMMAND rm -rf $<TARGET_FILE_DIR:Telegram>/../Frameworks/Breakpad.framework/Resources/crash_report_sender.app
-        COMMAND rm -rf $<TARGET_FILE_DIR:Telegram>/../Frameworks/Breakpad.framework/Resources/Inspector
-    )
-else()
-    if (CMAKE_GENERATOR STREQUAL Xcode)
-        set(bundle_identifier "com.tdesktop.Telegram$<$<CONFIG:Debug>:Debug>")
+if (APPLE)
+    if (build_macstore)
+        set(bundle_identifier "io.github.tdesktop_x64.TDesktop")
+        set(bundle_entitlements "Telegram Lite.entitlements")
+        set(output_name "64Gram")
+        target_link_options(Telegram
+        PRIVATE
+            -F${libs_loc}/breakpad/src/client/mac/build/Release
+        )
+        target_link_frameworks(Telegram PRIVATE Breakpad)
+        add_custom_command(TARGET Telegram
+        PRE_LINK
+            COMMAND rm -rf $<TARGET_FILE_DIR:Telegram>/../Frameworks
+            COMMAND mkdir -p $<TARGET_FILE_DIR:Telegram>/../Frameworks
+            COMMAND cp -a ${libs_loc}/breakpad/src/client/mac/build/Release/Breakpad.framework $<TARGET_FILE_DIR:Telegram>/../Frameworks/Breakpad.framework
+            COMMAND rm -rf $<TARGET_FILE_DIR:Telegram>/../Frameworks/Breakpad.framework/Resources/crash_report_sender.app
+            COMMAND rm -rf $<TARGET_FILE_DIR:Telegram>/../Frameworks/Breakpad.framework/Resources/Inspector
+        )
     else()
-        set(bundle_identifier "com.tdesktop.Telegram")
+        set(bundle_identifier "io.github.tdesktop_x64.TDesktop")
+        set(bundle_entitlements "Telegram.entitlements")
+        set(output_name "64Gram")
     endif()
-    set(bundle_entitlements "Telegram.entitlements")
+else()
+    set(bundle_identifier "")
+    set(bundle_entitlements "")
     set(output_name "Telegram")
 endif()
 

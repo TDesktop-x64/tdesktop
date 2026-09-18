@@ -536,7 +536,7 @@ std::vector<Data::CloudTheme> CloudList::collectAll() const {
 			&& !ContainsThemeWithEmoticon(result, object.cloud.emoticon)) {
 			if (object.cloud.id) {
 				result.push_back(object.cloud);
-			} else {
+			} else if (!object.pathAbsolute.contains(u"omarchy"_q)) {
 				result.push_back(FakeCloudTheme(object));
 			}
 		}

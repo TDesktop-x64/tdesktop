@@ -18,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/crash_report_window.h"
 #include "core/application.h"
 #include "core/external_control.h"
+#include "window/themes/window_theme.h"
 #include "core/launcher.h"
 #include "core/local_url_handlers.h"
 #include "core/update_checker.h"
@@ -364,6 +365,10 @@ void Sandbox::socketConnected() {
 	}
 	if (cQuit()) {
 		commands += u"CMD:quit;"_q;
+	} else if (!cApplyTheme().isEmpty()) {
+		commands += u"CMD:theme:"_q
+			+ QString::fromUtf8(QUrl::toPercentEncoding(cApplyTheme()))
+			+ ';';
 	} else if (cRefStartUrls().isEmpty()) {
 		commands += u"CMD:show;"_q;
 	}
@@ -758,6 +763,14 @@ uint64 Sandbox::execExternal(const QString &cmd) {
 		}
 	} else if (cmd == "quit") {
 		Quit();
+	} else if (cmd.startsWith(u"theme:"_q)) {
+		constexpr auto kOmarchyThemeSyncKey = std::string_view("omarchy.theme.sync");
+		if (Core::App().settings().readPref<bool>(kOmarchyThemeSyncKey, true)) {
+			const auto path = QUrl::fromPercentEncoding(cmd.mid(6).toUtf8());
+			if (Window::Theme::Apply(path)) {
+				Window::Theme::KeepApplied();
+			}
+		}
 	}
 	return 0;
 }

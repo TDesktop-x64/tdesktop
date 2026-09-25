@@ -265,11 +265,11 @@ void Cover::initViewers() {
 		_user
 	) | rpl::on_next([=](const TextWithEntities &value) {
 		if (GetEnhancedBool("show_phone_number")) {
-			_phone->setText(value.text);
+			_phoneText = value.text;
 		} else {
-			_phone->setText(tr::lng_info_mobile_hidden(tr::now));
+			_phoneText = tr::lng_info_mobile_hidden(tr::now);
 		}
-		refreshPhoneGeometry(width());
+		updatePhoneText();
 	}, lifetime());
 
 	_user->session().settings().phoneNumberHiddenValue(

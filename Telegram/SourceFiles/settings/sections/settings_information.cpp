@@ -620,10 +620,17 @@ void SetupRows(
 		const auto phoneButton = AddRow(
 			container,
 			tr::lng_settings_phone_label(),
-			Info::Profile::PhoneValue(self),
+			Info::Profile::PhoneWithSpoilerValue(
+				self,
+				Info::Profile::PhoneValue(self)),
 			tr::lng_profile_copy_phone(tr::now),
 			showChangePhone,
-			{ &st::menuIconPhone });
+			{ &st::menuIconPhone },
+			true,
+			[=](not_null<Ui::PopupMenu*> menu) {
+				Info::Profile::AddPhoneSpoilerMenu(menu, self);
+			},
+			&st::menuIconCopy);
 		if (targets) {
 			targets->phone = phoneButton;
 		}

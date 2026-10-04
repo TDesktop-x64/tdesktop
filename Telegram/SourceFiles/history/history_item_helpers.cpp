@@ -33,6 +33,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_components.h"
+#include "iv/iv_rich_page.h"
 #include "main/main_account.h"
 #include "main/main_domain.h"
 #include "main/main_session.h"
@@ -159,6 +160,9 @@ Data::SendError GetErrorForSending(
 			return tr::lng_slowmode_no_many(tr::now);
 		} else if (count > 1) {
 			const auto albumForward = [&] {
+				if (!request.forward || request.forward->empty()) {
+					return false;
+				}
 				const auto first = request.forward->front();
 				if (const auto groupId = first->groupId()) {
 					for (const auto &item : *request.forward) {
@@ -815,6 +819,14 @@ HistoryItem *MessageByGlobalId(GlobalMsgId globalId) {
 		return session->data().message(globalId.itemId);
 	}
 	return nullptr;
+}
+
+std::vector<not_null<DocumentData*>> ItemRichPageAudio(
+		not_null<const HistoryItem*> item) {
+	const auto page = item->richPage();
+	return page
+		? Iv::CollectRichPageAudio(*page)
+		: std::vector<not_null<DocumentData*>>();
 }
 
 QDateTime ItemDateTime(not_null<const HistoryItem*> item) {

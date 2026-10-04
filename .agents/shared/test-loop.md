@@ -5,6 +5,11 @@ own repository setup, commit boundaries, account safety, and host-specific
 drivers. This protocol owns task-derived evidence selection, execution,
 assessment, recovery, and reporting.
 
+Apply [phase effort](phase-effort.md) when assigning this loop's work.
+Running specified checks may use `medium`; evidence design, authoring,
+verdicts, diagnosis, and repairs favor `xhigh`, with `high` only when the
+parent is sure the particular phase contains nothing complex.
+
 ## Vocabulary
 
 - task-runner — the stateful owner of one task and its evidence loop;
@@ -87,6 +92,10 @@ additions, exit code and complete local log. Direct by-products to the ignored
 run directory or an existing ignored build tree. For every artifact or absence
 claim, quote literal readings and include a known-present control when a typo
 could otherwise pass.
+
+For Linux Debug execution copies, use the shared [bounded ELF identity
+guide](evidence/elf-copies.md) for exact digests, strip-debug equivalence and
+independent positive/negative controls.
 
 Use Telegram only when it adds causal coverage. App behavior that lives in the
 client normally requires the Debug binary and instrumented execution. Visible

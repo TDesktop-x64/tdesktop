@@ -11,6 +11,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 
 
@@ -33,7 +34,8 @@ MODEL_PATTERN = re.compile(r"[a-z0-9][a-z0-9.-]{0,39}")
 CONSOLIDATION_PENDING = "work/consolidation-pending.md"
 CONSOLIDATION_COMPLETE = "work/consolidation-complete.md"
 COMMIT_HASH_PATTERN = re.compile(
-	r"(?i)\b(?:commit|revision|sha(?:-1)?)\b[^\r\n]{0,32}(?<!#)\b[0-9a-f]{7,64}\b"
+	r"(?i)\b(?:commit(?:[ \t]+(?:hash|id|sha(?:-1)?))?|revision|sha(?:-1)?)\b"
+	r"(?!-[0-9])[ \t:=`\"'\\*()\[\]-]*\b[0-9a-f]{7,64}\b"
 )
 LEGACY_COMMIT_FIELDS = ("Task-Base-SHA:", "Implementation-SHA:")
 PROJECT_ARCHIVE_DIR = "archive"
@@ -555,6 +557,189 @@ def changed_paths(path):
 			if value:
 				result.add(value)
 	return sorted(result)
+
+
+def is_linked_worktree(source, path):
+	if not path.endswith("/"):
+		return False
+	candidate = Path(source).resolve() / path
+	marker = candidate / ".git"
+	if (
+		not candidate.is_dir()
+		or candidate.resolve() != candidate
+		or not marker.is_file()
+		or marker.is_symlink()
+	):
+		return False
+	try:
+		git_dir = run_git_binary(
+			candidate, "rev-parse", "--path-format=absolute", "--git-dir"
+		)
+		common_dir = run_git_binary(
+			candidate, "rev-parse", "--path-format=absolute", "--git-common-dir"
+		)
+		if git_dir == common_dir:
+			return False
+		entries = os.fsdecode(run_git_binary(
+			candidate, "worktree", "list", "--porcelain", "-z"
+		)).split("\0")
+	except WorkspaceError:
+		return False
+	return any(
+		entry.startswith("worktree ")
+		and Path(entry[len("worktree "):]) == candidate
+		for entry in entries
+	)
+
+
+def indexed_gitlinks(source):
+	result = {}
+	for entry in literal_paths(source, "ls-files", "--stage"):
+		metadata, path = entry.split("\t", 1)
+		mode, revision, stage = metadata.split()
+		if mode == "160000" and stage == "0":
+			result[path] = revision
+	return result
+
+
+def source_changed_paths(source):
+	source = Path(source).resolve()
+	tracked = set()
+	for arguments in (("diff",), ("diff", "--cached")):
+		tracked.update(literal_paths(
+			source, *arguments, "--name-only", "--ignore-submodules=dirty"
+		))
+	dirty = tracked | {
+		path for path in literal_paths(
+			source, "ls-files", "--others", "--exclude-standard"
+		)
+		if not is_linked_worktree(source, path)
+	}
+	for path in indexed_gitlinks(source):
+		module = source / path
+		if module.resolve() != module or is_linked_worktree(source, path + "/"):
+			dirty.add(path)
+		elif (module / ".git").exists() and source_changed_paths(module):
+			dirty.add(path)
+	return sorted(dirty)
+
+
+def source_local_changes(source):
+	source = Path(source).resolve()
+	gitlinks = indexed_gitlinks(source)
+	dirty = set(source_changed_paths(source)) - gitlinks.keys()
+	dirty.update(literal_paths(
+		source, "diff", "--cached", "--name-only", "--ignore-submodules=none"
+	))
+	for path in gitlinks:
+		module = Path(source) / path
+		if module.resolve() != module or is_linked_worktree(source, path + "/"):
+			dirty.add(path)
+		elif (module / ".git").exists():
+			dirty.update(
+				f"{path}/{value}" for value in source_local_changes(module)
+			)
+	return sorted(dirty)
+
+
+def mismatched_submodules(source):
+	return [
+		line.strip() for line in run_git(
+			source, "submodule", "status", "--recursive"
+		).stdout.splitlines()
+		if line and line[0] in "+-U"
+	]
+
+
+def ensure_source_clean(source):
+	dirty = source_changed_paths(source)
+	mismatched = mismatched_submodules(source)
+	if dirty or mismatched:
+		raise WorkspaceError(
+			"Telegram source checkout is not clean:\n"
+			+ "\n".join(dirty + mismatched)
+		)
+
+
+def registered_nested_worktrees(source):
+	source = Path(source).resolve()
+	result = [
+		path.rstrip("/") for path in literal_paths(
+			source, "ls-files", "--others"
+		)
+		if is_linked_worktree(source, path)
+	]
+	for path in indexed_gitlinks(source):
+		module = source / path
+		if module.resolve() != module:
+			raise WorkspaceError("Submodule path is a symlink: " + str(module))
+		if is_linked_worktree(source, path + "/"):
+			result.append(path)
+		elif (module / ".git").exists():
+			result.extend(
+				f"{path}/{value}" for value in registered_nested_worktrees(module)
+			)
+	return result
+
+
+def protect_worktrees_from_submodule_target(module, revision):
+	worktrees = registered_nested_worktrees(module)
+	if not worktrees:
+		return
+	if run_git(module, "cat-file", "-e", revision + "^{commit}", check=False).returncode:
+		run_git(module, "fetch")
+	for entry in literal_paths(module, "ls-tree", "-r", revision):
+		metadata, path = entry.split("\t", 1)
+		mode = metadata.split()[0]
+		for worktree in worktrees:
+			if (
+				path == worktree
+				or path.startswith(worktree + "/")
+				or (mode != "160000" and worktree.startswith(path + "/"))
+			):
+				raise WorkspaceError(
+					"Submodule target overlaps a registered linked worktree: "
+					+ str(Path(module) / worktree)
+				)
+
+
+def update_source_submodules(source):
+	for path, revision in indexed_gitlinks(source).items():
+		module = Path(source) / path
+		if module.resolve() != module or is_linked_worktree(source, path + "/"):
+			raise WorkspaceError("Submodule checkout is owned by another path: " + str(module))
+		if (module / ".git").exists() and resolved_ref(module, "HEAD") != revision:
+			protect_worktrees_from_submodule_target(module, revision)
+		run_git(
+			source, "--literal-pathspecs", "-c", "submodule.recurse=false",
+			"submodule", "update", "--init", "--checkout", "--", path,
+		)
+		update_source_submodules(module)
+
+
+def prepare_source(source):
+	source = Path(source).resolve()
+	dirty = source_local_changes(source)
+	if dirty:
+		raise WorkspaceError(
+			"Source preparation preserves local changes; resolve these paths "
+			"before updating submodules:\n" + "\n".join(dirty)
+		)
+	update = bool(mismatched_submodules(source))
+	if update:
+		update_source_submodules(source)
+	ensure_source_clean(source)
+	return update
+
+
+def command_source_prepare(args):
+	source = source_root(args.source_root)
+	updated = prepare_source(source)
+	print(json.dumps({
+		"source_root": str(source),
+		"source_clean": True,
+		"submodules_updated": updated,
+	}, indent=2, sort_keys=True))
 
 
 def path_is_stageable(root, path):
@@ -1703,7 +1888,7 @@ def command_source_begin(args):
 			run_git(source, "update-ref", green, series_green)
 			state = "reconciled" if base_value is not None else "recovered"
 		else:
-			ensure_clean(source, "Telegram source checkout")
+			prepare_source(source)
 			run_git(source, "update-ref", base, "HEAD")
 			if green_value is not None:
 				run_git(source, "update-ref", "-d", green)
@@ -1720,7 +1905,7 @@ def command_source_begin(args):
 
 def mark_source_green(config, task_id):
 	source = Path(config["source_root"])
-	ensure_clean(source, "Telegram source checkout")
+	ensure_source_clean(source)
 	base = source_task_ref(task_id, "base")
 	if resolved_ref(source, base) is None:
 		raise WorkspaceError("The local task baseline ref is missing")
@@ -2532,16 +2717,20 @@ def read_overlay_paths(work):
 
 
 def initialized_submodule_paths(source):
-	lines = run_git(
-		source, "submodule", "status", "--recursive"
-	).stdout.splitlines()
+	source = Path(source).resolve()
 	result = []
-	for line in lines:
-		if not line or line[0] == "-":
+	for path in indexed_gitlinks(source):
+		module = Path(source) / path
+		if module.resolve() != module or is_linked_worktree(source, path + "/"):
+			raise WorkspaceError(
+				"Submodule path is a symlink or registered linked worktree: " + path
+			)
+		if not (module / ".git").exists():
 			continue
-		parts = line[1:].split()
-		if len(parts) >= 2:
-			result.append(parts[1])
+		result.append(path)
+		result.extend(
+			f"{path}/{value}" for value in initialized_submodule_paths(module)
+		)
 	return sorted(result, key=lambda path: (-path.count("/"), path))
 
 
@@ -2599,7 +2788,7 @@ def overlay_outside_inventory(source, inventory, submodules):
 	for repository_path in [""] + submodules:
 		repository = source / repository_path if repository_path else source
 		coverage = overlay_coverage(inventory, repository_path)
-		dirty = changed_paths(repository)
+		dirty = source_changed_paths(repository)
 		gitlinks = set(gitlink_paths(repository, dirty))
 		for path in dirty:
 			covered = path_is_covered(path, coverage)
@@ -2673,13 +2862,52 @@ def command_overlay_save(args):
 			"Dirty source paths are outside the overlay inventory: "
 			+ ", ".join(outside)
 		)
-	clear_overlay_submodule_bundle(work)
 	root_paths = groups.get("", [])
 	patch = (
 		run_git_binary(source, "diff", "--binary", "HEAD", "--", *root_paths)
 		if root_paths
 		else b""
 	)
+	submodule_candidates = []
+	for repository_path, paths in groups.items():
+		if not repository_path:
+			continue
+		repository_patch = run_git_binary(
+			source / repository_path, "diff", "--binary", "HEAD", "--", *paths
+		)
+		if not repository_patch.strip():
+			continue
+		name = hashlib.sha256(repository_path.encode("utf-8")).hexdigest()[:16]
+		submodule_candidates.append((repository_path, name, repository_patch))
+	if not patch.strip() and not submodule_candidates:
+		raise WorkspaceError("The overlay diff is empty; nothing to save")
+	with tempfile.TemporaryDirectory() as staging_dir:
+		staging = Path(staging_dir)
+		checks = []
+		if patch.strip():
+			staged = staging / "root.patch"
+			staged.write_bytes(patch)
+			checks.append((source, staged))
+		for repository_path, name, repository_patch in submodule_candidates:
+			staged = staging / f"{name}.patch"
+			staged.write_bytes(repository_patch)
+			checks.append((source / repository_path, staged))
+		for repository, saved_patch in checks:
+			check = subprocess.run(
+				[
+					"git", "-C", str(repository), "apply", "--check",
+					"--reverse", str(saved_patch),
+				],
+				stdout=subprocess.PIPE,
+				stderr=subprocess.PIPE,
+				text=True,
+			)
+			if check.returncode:
+				raise WorkspaceError(
+					"The saved overlay patch does not verify: "
+					+ check.stderr.strip()
+				)
+	clear_overlay_submodule_bundle(work)
 	patch_path = work / OVERLAY_PATCH_FILE
 	if patch.strip():
 		patch_path.write_bytes(patch)
@@ -2687,20 +2915,10 @@ def command_overlay_save(args):
 		patch_path.unlink(missing_ok=True)
 	submodule_entries = []
 	patches_dir = work / OVERLAY_SUBMODULES_DIR
-	for repository_path, paths in groups.items():
-		if not repository_path:
-			continue
-		repository = source / repository_path
-		repository_patch = run_git_binary(
-			repository, "diff", "--binary", "HEAD", "--", *paths
-		)
-		if not repository_patch.strip():
-			continue
+	for repository_path, name, repository_patch in submodule_candidates:
 		patches_dir.mkdir(parents=True, exist_ok=True)
-		name = hashlib.sha256(repository_path.encode("utf-8")).hexdigest()[:16]
 		relative_patch = f"{OVERLAY_SUBMODULES_DIR}/{name}.patch"
-		submodule_patch_path = work / relative_patch
-		submodule_patch_path.write_bytes(repository_patch)
+		(work / relative_patch).write_bytes(repository_patch)
 		submodule_entries.append({
 			"patch": relative_patch,
 			"path": repository_path,
@@ -2713,30 +2931,6 @@ def command_overlay_save(args):
 			}, indent=2, sort_keys=True) + "\n",
 			encoding="utf-8",
 		)
-	if not patch.strip() and not submodule_entries:
-		raise WorkspaceError("The overlay diff is empty; nothing to save")
-	checks = []
-	if patch.strip():
-		checks.append((source, patch_path))
-	checks.extend(
-		(source / entry["path"], work / entry["patch"])
-		for entry in submodule_entries
-	)
-	for repository, saved_patch in checks:
-		check = subprocess.run(
-			[
-				"git", "-C", str(repository), "apply", "--check",
-				"--reverse", str(saved_patch),
-			],
-			stdout=subprocess.PIPE,
-			stderr=subprocess.PIPE,
-			text=True,
-		)
-		if check.returncode:
-			raise WorkspaceError(
-				"The saved overlay patch does not verify: "
-				+ check.stderr.strip()
-			)
 	restored = []
 	if args.restore != "none":
 		ref = source_task_ref(args.task, args.restore)
@@ -2759,7 +2953,7 @@ def command_overlay_save(args):
 					f"{repository_path}/{path}"
 					if repository_path else path
 				)
-				for path in changed_paths(repository)
+				for path in source_changed_paths(repository)
 				if path_is_covered(path, paths)
 			)
 		if remaining:
@@ -2876,7 +3070,7 @@ def command_source_commit(args):
 	allowed = owned + [source_note]
 	if carried_from is not None:
 		allowed.append(f"tasks/{carried_from}.md")
-	dirty = changed_paths(source)
+	dirty = source_changed_paths(source)
 	if not dirty:
 		raise WorkspaceError("The source checkout has no changes to commit")
 	outside = [
@@ -2995,14 +3189,8 @@ def command_fence_check(args):
 def command_source_preflight(args):
 	config, slot = task_action_config(args)
 	source = Path(config["source_root"])
-	dirty = changed_paths(source)
-	submodule_lines = run_git(
-		source, "submodule", "status", "--recursive"
-	).stdout.splitlines()
-	submodules_dirty = [
-		line.strip() for line in submodule_lines
-		if line and line[0] in "+-U"
-	]
+	dirty = source_changed_paths(source)
+	submodules_dirty = mismatched_submodules(source)
 	work = slot / task_relative_dir(args.task) / "work"
 	owned_file = work / "owned-paths.txt"
 	owned = [
@@ -3142,7 +3330,7 @@ def owned_source_paths(slot, task_id):
 def source_worktree_snapshot(config, slot, task_id):
 	source = Path(config["source_root"])
 	owned = owned_source_paths(slot, task_id)
-	dirty = changed_paths(source)
+	dirty = source_changed_paths(source)
 	allowed = owned + [f"tasks/{task_id}.md"]
 	gitlinks = set(gitlink_paths(source, dirty))
 	nested_owned = {}
@@ -3155,7 +3343,7 @@ def source_worktree_snapshot(config, slot, task_id):
 		]
 		if not nested_allowed:
 			continue
-		nested_dirty = changed_paths(source / path)
+		nested_dirty = source_changed_paths(source / path)
 		if all(path_is_covered(value, nested_allowed) for value in nested_dirty):
 			nested_owned[path] = (nested_allowed, nested_dirty)
 	owned_dirty = [
@@ -3339,7 +3527,7 @@ def command_finish(args):
 	result = result_path.read_text(encoding="utf-8-sig")
 	lines = result.splitlines()
 	if not split_required:
-		ensure_clean(Path(config["source_root"]), "Telegram source checkout")
+		ensure_source_clean(Path(config["source_root"]))
 		expected = "STATUS: DONE" if approved else "STATUS: BLOCKED"
 		if expected not in lines:
 			raise WorkspaceError(
@@ -4718,6 +4906,10 @@ def parse_args():
 	source_verify_commit.add_argument("--task", required=True)
 	source_verify_commit.add_argument("--ref", default="HEAD")
 	source_verify_commit.set_defaults(handler=command_source_verify_commit)
+
+	source_prepare = subparsers.add_parser("source-prepare")
+	source_prepare.add_argument("--source-root")
+	source_prepare.set_defaults(handler=command_source_prepare)
 
 	source_preflight = subparsers.add_parser("source-preflight")
 	add_common_arguments(source_preflight)

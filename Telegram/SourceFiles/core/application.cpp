@@ -1212,8 +1212,12 @@ void Application::checkStartUrls() {
 		return;
 	}
 	if (!Core::App().passcodeLocked()) {
-		cRefStartUrls() = ranges::views::all(
-			cRefStartUrls()
+		// WHY: tg://resolve?acc= switches the account, which shows the
+		// new main widget and re-enters here while we still iterate,
+		// so take the list out and merge whatever was added meanwhile.
+		const auto urls = base::take(cRefStartUrls());
+		auto left = ranges::views::all(
+			urls
 		) | ranges::views::filter([&](const QUrl &url) {
 			if (url.scheme() == u"tonsite"_q) {
 				iv().showTonSite(url.toString(), {});
@@ -1224,6 +1228,8 @@ void Application::checkStartUrls() {
 			}
 			return true;
 		}) | ranges::to<QList<QUrl>>;
+		left.append(base::take(cRefStartUrls()));
+		cRefStartUrls() = std::move(left);
 	}
 	if (!cRefStartUrls().isEmpty()
 		&& _lastActivePrimaryWindow

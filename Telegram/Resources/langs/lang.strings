@@ -5201,6 +5201,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 "lng_open_this_link" = "Open this link?";
 "lng_open_link" = "Open";
+"lng_open_link_suspicious_chars" = "Highlighted characters are from a different alphabet than the rest of the address.";
 "lng_allow_bot_pass" = "Allow {bot_name} to pass your Telegram name and ID (not your phone number) to the web pages you open via this bot?";
 "lng_allow_bot" = "Allow";
 "lng_allow_bot_webview_details" = "More about this bot {emoji}";
@@ -8423,6 +8424,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_channel_earn_currency_history" = "TON Transactions";
 "lng_channel_earn_credits_history" = "Stars Transactions";
 "lng_channel_earn_out_check_password_about" = "You can withdraw only if you have:";
+"lng_channel_earn_out_amount_too_small" = "The amount is too small to withdraw.";
 
 "lng_bot_earn_title" = "Stars Balance";
 "lng_bot_earn_chart_revenue" = "Revenue";

@@ -56,8 +56,11 @@ endif()
 include(cmake/generate_update_keys.cmake)
 generate_update_keys(Telegram ${res_loc}/update)
 
-if (DESKTOP_APP_TEST_APPS OR DESKTOP_APP_SPECIAL_TARGET)
+if (DESKTOP_APP_TEST_APPS OR TDESKTOP_BUILD_UPDATE_TESTS)
     include(cmake/test_update_verify.cmake)
+    if (NOT DESKTOP_APP_DISABLE_AUTOUPDATE)
+        include(cmake/test_update_unpack.cmake)
+    endif()
 endif()
 
 set_target_properties(Telegram PROPERTIES AUTOMOC ON)
@@ -87,6 +90,7 @@ PRIVATE
     desktop-app::lib_webview
     desktop-app::lib_ffmpeg
     desktop-app::lib_stripe
+    desktop-app::external_ada
     desktop-app::external_zlib
     desktop-app::external_minizip
     desktop-app::external_kcoreaddons
@@ -608,6 +612,8 @@ PRIVATE
     core/update_checker.h
     core/update_keys.cpp
     core/update_keys.h
+    core/update_unpack.cpp
+    core/update_unpack.h
     core/update_verify.cpp
     core/update_verify.h
     core/utils.cpp
@@ -1707,6 +1713,8 @@ PRIVATE
     platform/linux/translate_provider_linux.h
     platform/linux/tray_linux.cpp
     platform/linux/tray_linux.h
+    platform/linux/update_install_linux.cpp
+    platform/linux/update_install_linux.h
     platform/linux/webauthn_linux.cpp
     platform/mac/file_utilities_mac.mm
     platform/mac/file_utilities_mac.h
@@ -1985,6 +1993,8 @@ PRIVATE
     test/test_hover.h
     test/test_ink.cpp
     test/test_ink.h
+    test/test_lang_pack.cpp
+    test/test_lang_pack.h
     test/test_launch_fuse.cpp
     test/test_launch_fuse.h
     test/test_layer_root.cpp
@@ -1993,6 +2003,10 @@ PRIVATE
     test/test_log.h
     test/test_log_lines.cpp
     test/test_log_lines.h
+    test/test_mapped_target.cpp
+    test/test_mapped_target.h
+    test/test_marking_read.cpp
+    test/test_marking_read.h
     test/test_menu.cpp
     test/test_menu.h
     test/test_messages.cpp
@@ -2003,6 +2017,8 @@ PRIVATE
     test/test_panel.h
     test/test_probe.cpp
     test/test_probe.h
+    test/test_rpc_fixture.cpp
+    test/test_rpc_fixture.h
     test/test_rpc_retry.cpp
     test/test_rpc_retry.h
     test/test_runner.cpp
@@ -2012,10 +2028,14 @@ PRIVATE
     test/test_style.h
     test/test_text_reads.cpp
     test/test_text_reads.h
+    test/test_toast_capture.cpp
+    test/test_toast_capture.h
     test/test_transfer.cpp
     test/test_transfer.h
     test/test_via_window.cpp
     test/test_via_window.h
+    test/test_wheel.cpp
+    test/test_wheel.h
     test/test_widgets.cpp
     test/test_widgets.h
     ui/boxes/edit_invite_link_session.cpp
@@ -2576,6 +2596,8 @@ if (NOT DESKTOP_APP_DISABLE_AUTOUPDATE AND NOT build_macstore AND NOT build_wins
             target_link_options(Updater PRIVATE -municode)
         endif()
     elseif (APPLE)
+        # Keep the launch API available to macOS 10.13 release builds.
+        target_compile_options(Updater PRIVATE -Wno-error=deprecated-declarations)
         add_custom_command(TARGET Updater
         POST_BUILD
             COMMAND mkdir -p $<TARGET_FILE_DIR:Telegram>/../Frameworks

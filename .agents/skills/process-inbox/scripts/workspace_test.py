@@ -18,6 +18,51 @@ import workspace
 TASK_ID = "2026/07/19/correct-recent-search-peer-actions"
 
 
+class CommitHashArtifactTests(unittest.TestCase):
+	def test_rejects_explicit_commit_references(self):
+		values = (
+			"Commit: abcdef1",
+			"commit hash = `abcdef1234567890abcdef1234567890abcdef1234`",
+			"commit id: 1234567",
+			"Commit SHA-1: abcdef1",
+			"**Revision:** `abcdef1`",
+			'{"revision": "abcdef1"}',
+			json.dumps({"log": '{"revision": "abcdef1"}'}),
+			"SHA-1: abcdef1",
+			"sha: " + "a" * 64,
+			"Task-Base-SHA: none",
+			"Implementation-SHA: none",
+		)
+		with tempfile.TemporaryDirectory() as temporary:
+			root = Path(temporary)
+			path = root / "result.md"
+			for value in values:
+				with self.subTest(value=value):
+					path.write_text(value, encoding="utf-8")
+					with self.assertRaises(workspace.WorkspaceError):
+						workspace.ensure_no_persisted_commit_hashes(root)
+
+	def test_preserves_runtime_values_and_content_digests(self):
+		values = (
+			'{"revision":3,"amount":1430000000}',
+			json.dumps({"log": '{"revision":3,"amount":1430000000}'}),
+			json.dumps({"log": '{"revision":3},{"amount":1430000000}'}),
+			'revision and box generation - {"amount":2460000000',
+			"revision-and-box-generation amount2460000000",
+			"SHA-256 (not a commit reference): " + "a" * 64,
+			"source-content SHA-256: " + "b" * 64,
+			"commit #1234567",
+			"revision3 amount1430000000",
+		)
+		with tempfile.TemporaryDirectory() as temporary:
+			root = Path(temporary)
+			path = root / "raw.log"
+			for value in values:
+				with self.subTest(value=value):
+					path.write_text(value, encoding="utf-8")
+					workspace.ensure_no_persisted_commit_hashes(root)
+
+
 class FrozenDate(datetime.date):
 	@classmethod
 	def today(cls):
@@ -1307,7 +1352,7 @@ Checkout: clean-buildable
 					"task_action_config",
 					return_value=(config, slot),
 				),
-				mock.patch.object(workspace, "ensure_clean"),
+				mock.patch.object(workspace, "ensure_source_clean"),
 				mock.patch.object(workspace, "validate_source_state"),
 				mock.patch.object(workspace, "delete_source_refs"),
 				mock.patch.object(workspace, "commit_paths", side_effect=record_commit),
@@ -1636,6 +1681,46 @@ inbox_receipt: receipts/2026/07/19/test.md
 	return source, slot, work, config
 
 
+def overlay_bundle_bytes(work):
+	result = {}
+	for relative in (
+		workspace.OVERLAY_PATCH_FILE,
+		workspace.OVERLAY_SUBMODULES_FILE,
+	):
+		path = work / relative
+		if path.is_file():
+			result[relative] = path.read_bytes()
+	patches = work / workspace.OVERLAY_SUBMODULES_DIR
+	if patches.is_dir():
+		for path in sorted(patches.rglob("*")):
+			if path.is_file():
+				result[path.relative_to(work).as_posix()] = path.read_bytes()
+	return result
+
+
+def overlay_repo_with_nested_module(root):
+	root = Path(root)
+	source, slot, work, config = source_repo_with_task(root)
+	dependency = root.resolve() / "dependency"
+	git_repo(dependency)
+	(dependency / "tracked.txt").write_text("module-base\n", encoding="utf-8")
+	git(dependency, "add", "tracked.txt")
+	git(dependency, "commit", "-m", "Create module")
+	git(
+		source, "-c", "protocol.file.allow=always", "submodule", "add",
+		str(dependency), "dep",
+	)
+	git(source, "commit", "-am", "Record dependency")
+	git(
+		source, "update-ref",
+		workspace.source_task_ref(TASK_ID, "run"), "HEAD",
+	)
+	(work / workspace.OVERLAY_PATHS_FILE).write_text(
+		"tracked.txt\ndep/tracked.txt\n", encoding="utf-8",
+	)
+	return source, slot, work, config, source / "dep"
+
+
 def run_command(handler, **kwargs):
 	out = io.StringIO()
 	with contextlib.redirect_stdout(out):
@@ -1655,6 +1740,268 @@ def run_test_run(exe, run_dir, **overrides):
 	}
 	arguments.update(overrides)
 	return run_command(workspace.command_test_run, **arguments)
+
+
+class SourcePreparationTest(unittest.TestCase):
+	def make_repo(self, path):
+		git_repo(path)
+		(path / "tracked.txt").write_text("base\n", encoding="utf-8")
+		git(path, "add", "tracked.txt")
+		git(path, "commit", "-m", "Create fixture")
+		return path
+
+	def add_module(self, source, dependency, name="dep space"):
+		git(
+			source, "-c", "protocol.file.allow=always", "submodule", "add",
+			str(dependency), name,
+		)
+		git(source, "commit", "-am", "Record dependency")
+		return source / name
+
+	def test_linked_worktrees_are_ignored_only_by_source_checks(self):
+		with tempfile.TemporaryDirectory() as temporary:
+			root = Path(temporary).resolve()
+			source = self.make_repo(root / "source")
+			other = self.make_repo(root / "other")
+			name = "nested space" if os.name == "nt" else "nested 'quote'\nleaf"
+			for owner, name in ((source, name), (other, "other-linked")):
+				linked = source / name
+				git(owner, "worktree", "add", "--detach", str(linked))
+				(linked / "tracked.txt").write_text("elsewhere\n", encoding="utf-8")
+				(linked / "new.txt").write_text("preserve\n", encoding="utf-8")
+				git(linked, "add", "tracked.txt")
+			self.assertEqual(workspace.source_changed_paths(source), [])
+			self.assertFalse(workspace.prepare_source(source))
+			with self.assertRaises(workspace.WorkspaceError):
+				workspace.ensure_clean(source, "AI workspace")
+			(source / "ordinary.txt").write_text("stray\n", encoding="utf-8")
+			(source / "tracked.txt").write_text("local\n", encoding="utf-8")
+			self.assertEqual(
+				workspace.source_changed_paths(source), ["ordinary.txt", "tracked.txt"],
+			)
+			with self.assertRaises(workspace.WorkspaceError):
+				workspace.prepare_source(source)
+			self.assertEqual((linked / "new.txt").read_text(), "preserve\n")
+			self.assertEqual(git(linked, "diff", "--cached", "--name-only"), "tracked.txt")
+
+	def test_unregistered_repositories_and_moved_worktrees_still_block(self):
+		with tempfile.TemporaryDirectory() as temporary:
+			root = Path(temporary).resolve()
+			source = self.make_repo(root / "source")
+			self.make_repo(source / "ordinary-repo")
+			git(source, "worktree", "add", "--detach", str(source / "registered"))
+			(source / "registered").rename(source / "moved")
+			(source / "registered").mkdir()
+			(source / "registered/file.txt").write_text("unregistered\n", encoding="utf-8")
+			self.assertEqual(workspace.source_changed_paths(source), [
+				"moved/", "ordinary-repo/", "registered/file.txt",
+			])
+			with self.assertRaises(workspace.WorkspaceError):
+				workspace.prepare_source(source)
+
+	@unittest.skipIf(os.name == "nt", "Requires unprivileged directory symlinks")
+	def test_symlink_to_linked_worktree_is_not_ignored(self):
+		with tempfile.TemporaryDirectory() as temporary:
+			root = Path(temporary).resolve()
+			source = self.make_repo(root / "source")
+			linked = root / "linked"
+			git(source, "worktree", "add", "--detach", str(linked))
+			(source / "shortcut").symlink_to(linked, target_is_directory=True)
+			self.assertEqual(workspace.source_changed_paths(source), ["shortcut"])
+
+	def test_nested_module_worktree_does_not_make_parent_dirty(self):
+		with tempfile.TemporaryDirectory() as temporary:
+			root = Path(temporary).resolve()
+			source = self.make_repo(root / "source")
+			module = self.add_module(source, self.make_repo(root / "dependency"))
+			linked = module / "nested worktree"
+			git(module, "worktree", "add", "--detach", str(linked))
+			(linked / "tracked.txt").write_text("elsewhere\n", encoding="utf-8")
+			self.assertIn("dep space", workspace.literal_paths(
+				source, "diff", "--name-only", "--ignore-submodules=none"
+			))
+			self.assertEqual(workspace.source_changed_paths(source), [])
+			self.assertEqual(workspace.initialized_submodule_paths(source), ["dep space"])
+			self.assertFalse(workspace.prepare_source(source))
+			(module / "tracked.txt").write_text("owned overlay\n", encoding="utf-8")
+			self.assertEqual(workspace.source_changed_paths(source), ["dep space"])
+			with self.assertRaises(workspace.WorkspaceError):
+				workspace.prepare_source(source)
+			self.assertEqual((module / "tracked.txt").read_text(), "owned overlay\n")
+
+	def test_preparation_updates_recursive_recorded_pins_without_following_remote(self):
+		with tempfile.TemporaryDirectory() as temporary:
+			root = Path(temporary).resolve()
+			leaf = self.make_repo(root / "leaf")
+			old_leaf = git(leaf, "rev-parse", "HEAD")
+			(leaf / "tracked.txt").write_text("recorded\n", encoding="utf-8")
+			git(leaf, "commit", "-am", "Recorded version")
+			pinned_leaf = git(leaf, "rev-parse", "HEAD")
+			dependency = self.make_repo(root / "dependency")
+			old_dependency = git(dependency, "rev-parse", "HEAD")
+			self.add_module(dependency, leaf, "nested leaf")
+			pinned_dependency = git(dependency, "rev-parse", "HEAD")
+			source = self.make_repo(root / "source")
+			module = self.add_module(source, dependency)
+			git(module, "checkout", "--detach", old_dependency)
+			(source / "Telegram/build").mkdir(parents=True)
+			git(leaf, "worktree", "add", "--detach", str(module / "scratch"), old_leaf)
+			(leaf / "tracked.txt").write_text("remote tip\n", encoding="utf-8")
+			git(leaf, "commit", "-am", "Newer remote version")
+			source_tip = git(source, "rev-parse", "HEAD")
+			with mock.patch.dict(os.environ, {"GIT_ALLOW_PROTOCOL": "file"}):
+				result = run_command(
+					workspace.command_source_prepare, source_root=str(source),
+				)
+				self.assertTrue(result["source_clean"])
+				self.assertTrue(result["submodules_updated"])
+				self.assertEqual(git(module, "rev-parse", "HEAD"), pinned_dependency)
+				self.assertEqual(git(module / "nested leaf", "rev-parse", "HEAD"), pinned_leaf)
+				git(module / "nested leaf", "checkout", "--detach", old_leaf)
+				self.assertTrue(workspace.prepare_source(source))
+				self.assertEqual(git(module / "nested leaf", "rev-parse", "HEAD"), pinned_leaf)
+				self.assertFalse(workspace.prepare_source(source))
+			self.assertEqual(git(source, "rev-parse", "HEAD"), source_tip)
+			self.assertEqual((module / "scratch/tracked.txt").read_text(), "base\n")
+			self.assertEqual(workspace.source_changed_paths(source), [])
+			self.assertEqual(workspace.mismatched_submodules(source), [])
+
+	def test_preparation_preserves_local_and_staged_changes_before_any_update(self):
+		for kind in ("tracked", "untracked", "staged-module", "staged-gitlink", "staged-source"):
+			with self.subTest(kind=kind), tempfile.TemporaryDirectory() as temporary:
+				root = Path(temporary).resolve()
+				dependency = self.make_repo(root / "dependency")
+				old = git(dependency, "rev-parse", "HEAD")
+				(dependency / "tracked.txt").write_text("new version\n", encoding="utf-8")
+				git(dependency, "commit", "-am", "Advance dependency")
+				source = self.make_repo(root / "source")
+				module = self.add_module(source, dependency)
+				git(module, "checkout", "--detach", old)
+				if kind == "staged-gitlink":
+					git(source, "add", "dep space")
+				elif kind == "staged-source":
+					(source / "tracked.txt").write_text("staged\n", encoding="utf-8")
+					git(source, "add", "tracked.txt")
+				else:
+					name = "new.txt" if kind == "untracked" else "tracked.txt"
+					(module / name).write_text("local edit\n", encoding="utf-8")
+					if kind == "staged-module":
+						git(module, "add", name)
+				before = [git_bytes(p, "diff", "--binary", "HEAD") for p in (source, module)]
+				indexes = [git_bytes(p, "ls-files", "--stage", "-z") for p in (source, module)]
+				with self.assertRaises(workspace.WorkspaceError):
+					workspace.prepare_source(source)
+				self.assertEqual(git(module, "rev-parse", "HEAD"), old)
+				self.assertEqual(before, [git_bytes(p, "diff", "--binary", "HEAD") for p in (source, module)])
+				self.assertEqual(indexes, [git_bytes(p, "ls-files", "--stage", "-z") for p in (source, module)])
+				if kind == "untracked":
+					self.assertEqual((module / "new.txt").read_text(), "local edit\n")
+
+	def test_registered_worktree_at_gitlink_path_is_never_updated(self):
+		with tempfile.TemporaryDirectory() as temporary:
+			root = Path(temporary).resolve()
+			dependency = self.make_repo(root / "dependency")
+			old = git(dependency, "rev-parse", "HEAD")
+			(dependency / "tracked.txt").write_text("new version\n", encoding="utf-8")
+			git(dependency, "commit", "-am", "Advance dependency")
+			source = self.make_repo(root / "source")
+			module = self.add_module(source, dependency)
+			git(source, "submodule", "deinit", "-f", "--", "dep space")
+			module.rmdir()
+			git(dependency, "worktree", "add", "--detach", str(module), old)
+			before = git_bytes(module, "ls-files", "--stage", "-z")
+			self.assertTrue(workspace.is_linked_worktree(source, "dep space/"))
+			with self.assertRaises(workspace.WorkspaceError):
+				workspace.prepare_source(source)
+			with self.assertRaises(workspace.WorkspaceError):
+				workspace.initialized_submodule_paths(source)
+			self.assertEqual(git(module, "rev-parse", "HEAD"), old)
+			self.assertEqual(before, git_bytes(module, "ls-files", "--stage", "-z"))
+			self.assertEqual((module / "tracked.txt").read_text(), "base\n")
+
+	def test_submodule_target_cannot_enter_an_existing_linked_worktree(self):
+		for kind in ("gitlink", "file", "ignored-file"):
+			with self.subTest(kind=kind), tempfile.TemporaryDirectory() as temporary:
+				root = Path(temporary).resolve()
+				child = self.make_repo(root / "child")
+				parent = self.make_repo(root / "parent")
+				if kind == "ignored-file":
+					(parent / ".gitignore").write_text("nested/\n", encoding="utf-8")
+					git(parent, "add", ".gitignore")
+					git(parent, "commit", "-m", "Ignore nested directory")
+				old_parent = git(parent, "rev-parse", "HEAD")
+				if kind == "gitlink":
+					self.add_module(parent, child, "nested")
+				else:
+					(parent / "nested").mkdir()
+					name = "tracked.txt" if kind == "ignored-file" else "addition.txt"
+					(parent / "nested" / name).write_text("parent target\n", encoding="utf-8")
+					git(parent, "add", "-f", "nested")
+					git(parent, "commit", "-m", "Add target path")
+				source = self.make_repo(root / "source")
+				module = self.add_module(source, parent)
+				git(module, "checkout", "--detach", old_parent)
+				linked = module / "nested"
+				if linked.exists():
+					linked.rmdir()
+				git(child, "worktree", "add", "--detach", str(linked))
+				(linked / "tracked.txt").write_text("other owner's edit\n", encoding="utf-8")
+				before = git_bytes(linked, "ls-files", "--stage", "-z")
+				with self.assertRaises(workspace.WorkspaceError):
+					workspace.prepare_source(source)
+				self.assertEqual(git(module, "rev-parse", "HEAD"), old_parent)
+				self.assertEqual(before, git_bytes(linked, "ls-files", "--stage", "-z"))
+				self.assertEqual((linked / "tracked.txt").read_text(), "other owner's edit\n")
+				self.assertFalse((linked / "addition.txt").exists())
+
+	def test_preflight_is_read_only_and_fresh_baseline_updates_modules(self):
+		with tempfile.TemporaryDirectory() as temporary:
+			root = Path(temporary).resolve()
+			source, slot, _, config = source_repo_with_task(root)
+			dependency = self.make_repo(root / "dependency")
+			old = git(dependency, "rev-parse", "HEAD")
+			(dependency / "tracked.txt").write_text("new\n", encoding="utf-8")
+			git(dependency, "commit", "-am", "Advance dependency")
+			pinned = git(dependency, "rev-parse", "HEAD")
+			module = self.add_module(source, dependency)
+			git(module, "checkout", "--detach", old)
+			with mock.patch.object(workspace, "task_action_config", return_value=(config, slot)):
+				result = run_command(workspace.command_source_preflight, task=TASK_ID, exe=None)
+				self.assertFalse(result["source_clean"])
+				self.assertTrue(result["submodules_dirty"])
+				self.assertEqual(git(module, "rev-parse", "HEAD"), old)
+				run_command(workspace.command_source_begin, task=TASK_ID)
+				self.assertEqual(git(module, "rev-parse", "HEAD"), pinned)
+
+	def test_source_lifecycle_overlay_and_carry_checks_ignore_linked_worktree(self):
+		with tempfile.TemporaryDirectory() as temporary:
+			root = Path(temporary).resolve()
+			source, slot, work, config = source_repo_with_task(root)
+			linked = source / "tmp"
+			git(source, "worktree", "add", "--detach", str(linked))
+			(linked / "tracked.txt").write_text("other owner\n", encoding="utf-8")
+			(work / "owned-paths.txt").write_text("tracked.txt\n", encoding="utf-8")
+			with mock.patch.object(workspace, "task_action_config", return_value=(config, slot)):
+				run_command(workspace.command_source_begin, task=TASK_ID)
+				(source / "tracked.txt").write_text("retained\n", encoding="utf-8")
+				preflight = run_command(workspace.command_source_preflight, task=TASK_ID, exe=None)
+				self.assertEqual(preflight["dirty"], ["tracked.txt"])
+				self.assertEqual(preflight["dirty_outside_owned"], [])
+				run_command(
+					workspace.command_source_commit, task=TASK_ID,
+					subject="Correct recent search", mark_green=True,
+				)
+				self.assertNotIn("tmp", git(source, "ls-files").splitlines())
+				(source / "tracked.txt").write_text("overlay\n", encoding="utf-8")
+				(work / "test-overlay.paths").write_text("tracked.txt\n", encoding="utf-8")
+				snapshot = workspace.source_worktree_snapshot(config, slot, TASK_ID)
+				self.assertEqual(snapshot["owned_dirty_paths"], ["tracked.txt"])
+				self.assertEqual(snapshot["outside_owned_paths"], [])
+				run_command(workspace.command_overlay_save, task=TASK_ID, restore="run")
+				run_command(workspace.command_overlay_apply, task=TASK_ID)
+				run_command(workspace.command_overlay_save, task=TASK_ID, restore="run")
+			workspace.ensure_source_clean(source)
+			self.assertEqual((linked / "tracked.txt").read_text(), "other owner\n")
 
 
 class MechanicsTest(unittest.TestCase):
@@ -2602,6 +2949,343 @@ class MechanicsTest(unittest.TestCase):
 						task=TASK_ID,
 						restore="run",
 					)
+
+	def test_overlay_save_preserves_bundle_when_repeat_save_is_empty(self):
+		with tempfile.TemporaryDirectory() as temporary:
+			source, slot, work, config, module = overlay_repo_with_nested_module(
+				temporary,
+			)
+			(source / "tracked.txt").write_text(
+				"base\nroot-overlay\n", encoding="utf-8",
+			)
+			(module / "tracked.txt").write_text(
+				"module-base\nnested-overlay\n", encoding="utf-8",
+			)
+			with mock.patch.object(
+				workspace, "task_action_config", return_value=(config, slot),
+			):
+				saved = run_command(
+					workspace.command_overlay_save,
+					task=TASK_ID,
+					restore="run",
+				)
+			self.assertGreater(saved["patch_bytes"], 0)
+			self.assertEqual(saved["submodules"], ["dep"])
+			self.assertEqual(
+				(source / "tracked.txt").read_text(encoding="utf-8"),
+				"base\n",
+			)
+			self.assertEqual(
+				(module / "tracked.txt").read_text(encoding="utf-8"),
+				"module-base\n",
+			)
+			snapshot = overlay_bundle_bytes(work)
+			self.assertIn(workspace.OVERLAY_PATCH_FILE, snapshot)
+			self.assertIn(workspace.OVERLAY_SUBMODULES_FILE, snapshot)
+			self.assertTrue(any(
+				path.startswith(workspace.OVERLAY_SUBMODULES_DIR + "/")
+				for path in snapshot
+			))
+			with mock.patch.object(
+				workspace, "task_action_config", return_value=(config, slot),
+			):
+				with self.assertRaisesRegex(
+					workspace.WorkspaceError,
+					r"The overlay diff is empty; nothing to save",
+				):
+					run_command(
+						workspace.command_overlay_save,
+						task=TASK_ID,
+						restore="run",
+					)
+			self.assertEqual(overlay_bundle_bytes(work), snapshot)
+			self.assertEqual(
+				(source / "tracked.txt").read_text(encoding="utf-8"),
+				"base\n",
+			)
+			self.assertEqual(
+				(module / "tracked.txt").read_text(encoding="utf-8"),
+				"module-base\n",
+			)
+
+	def test_overlay_save_preserves_bundle_when_candidate_collection_fails(self):
+		with tempfile.TemporaryDirectory() as temporary:
+			source, slot, work, config, module = overlay_repo_with_nested_module(
+				temporary,
+			)
+			(source / "tracked.txt").write_text(
+				"base\nroot-overlay\n", encoding="utf-8",
+			)
+			(module / "tracked.txt").write_text(
+				"module-base\nnested-overlay\n", encoding="utf-8",
+			)
+			with mock.patch.object(
+				workspace, "task_action_config", return_value=(config, slot),
+			):
+				run_command(
+					workspace.command_overlay_save,
+					task=TASK_ID,
+					restore="run",
+				)
+			snapshot = overlay_bundle_bytes(work)
+			(source / "tracked.txt").write_text(
+				"base\nroot-overlay\n", encoding="utf-8",
+			)
+			(module / "tracked.txt").write_text(
+				"module-base\nnested-overlay\n", encoding="utf-8",
+			)
+			real = workspace.run_git_binary
+
+			def fail_binary_diff(path, *args):
+				if len(args) >= 2 and args[0] == "diff" and args[1] == "--binary":
+					raise workspace.WorkspaceError("git failed")
+				return real(path, *args)
+
+			with mock.patch.object(
+				workspace, "task_action_config", return_value=(config, slot),
+			), mock.patch.object(
+				workspace, "run_git_binary", side_effect=fail_binary_diff,
+			):
+				with self.assertRaisesRegex(workspace.WorkspaceError, "git failed"):
+					run_command(
+						workspace.command_overlay_save,
+						task=TASK_ID,
+						restore="run",
+					)
+			self.assertEqual(overlay_bundle_bytes(work), snapshot)
+			self.assertEqual(
+				(source / "tracked.txt").read_text(encoding="utf-8"),
+				"base\nroot-overlay\n",
+			)
+			self.assertEqual(
+				(module / "tracked.txt").read_text(encoding="utf-8"),
+				"module-base\nnested-overlay\n",
+			)
+
+	def test_overlay_save_preserves_bundle_when_patch_does_not_verify(self):
+		with tempfile.TemporaryDirectory() as temporary:
+			source, slot, work, config, module = overlay_repo_with_nested_module(
+				temporary,
+			)
+			(source / "tracked.txt").write_text(
+				"base\nroot-overlay\n", encoding="utf-8",
+			)
+			(module / "tracked.txt").write_text(
+				"module-base\nnested-overlay\n", encoding="utf-8",
+			)
+			with mock.patch.object(
+				workspace, "task_action_config", return_value=(config, slot),
+			):
+				run_command(
+					workspace.command_overlay_save,
+					task=TASK_ID,
+					restore="run",
+				)
+			snapshot = overlay_bundle_bytes(work)
+			(source / "tracked.txt").write_text(
+				"base\nroot-overlay\n", encoding="utf-8",
+			)
+			(module / "tracked.txt").write_text(
+				"module-base\nnested-overlay\n", encoding="utf-8",
+			)
+			real_run = subprocess.run
+
+			def fail_reverse_check(args, **kwargs):
+				if (
+					isinstance(args, (list, tuple))
+					and "apply" in args
+					and "--check" in args
+					and "--reverse" in args
+				):
+					return subprocess.CompletedProcess(
+						args, 1, stdout="", stderr="patch failed\n",
+					)
+				return real_run(args, **kwargs)
+
+			with mock.patch.object(
+				workspace, "task_action_config", return_value=(config, slot),
+			), mock.patch.object(
+				workspace.subprocess, "run", side_effect=fail_reverse_check,
+			):
+				with self.assertRaisesRegex(
+					workspace.WorkspaceError,
+					r"The saved overlay patch does not verify",
+				):
+					run_command(
+						workspace.command_overlay_save,
+						task=TASK_ID,
+						restore="run",
+					)
+			self.assertEqual(overlay_bundle_bytes(work), snapshot)
+			self.assertEqual(
+				(source / "tracked.txt").read_text(encoding="utf-8"),
+				"base\nroot-overlay\n",
+			)
+			self.assertEqual(
+				(module / "tracked.txt").read_text(encoding="utf-8"),
+				"module-base\nnested-overlay\n",
+			)
+
+	def test_overlay_save_replacement_removes_obsolete_nested_entries(self):
+		with tempfile.TemporaryDirectory() as temporary:
+			source, slot, work, config, module = overlay_repo_with_nested_module(
+				temporary,
+			)
+			(source / "tracked.txt").write_text(
+				"base\nroot-overlay\n", encoding="utf-8",
+			)
+			(module / "tracked.txt").write_text(
+				"module-base\nnested-overlay\n", encoding="utf-8",
+			)
+			with mock.patch.object(
+				workspace, "task_action_config", return_value=(config, slot),
+			):
+				first = run_command(
+					workspace.command_overlay_save,
+					task=TASK_ID,
+					restore="run",
+				)
+			previous = overlay_bundle_bytes(work)
+			self.assertEqual(first["submodules"], ["dep"])
+			(source / "tracked.txt").write_text(
+				"base\nroot-overlay-v2\n", encoding="utf-8",
+			)
+			with mock.patch.object(
+				workspace, "task_action_config", return_value=(config, slot),
+			):
+				replaced = run_command(
+					workspace.command_overlay_save,
+					task=TASK_ID,
+					restore="run",
+				)
+			self.assertGreater(replaced["patch_bytes"], 0)
+			self.assertEqual(replaced["submodules"], [])
+			self.assertIsNotNone(replaced["patch"])
+			self.assertFalse((work / workspace.OVERLAY_SUBMODULES_FILE).exists())
+			self.assertFalse((work / workspace.OVERLAY_SUBMODULES_DIR).exists())
+			self.assertNotEqual(
+				overlay_bundle_bytes(work)[workspace.OVERLAY_PATCH_FILE],
+				previous[workspace.OVERLAY_PATCH_FILE],
+			)
+			self.assertEqual(
+				(module / "tracked.txt").read_text(encoding="utf-8"),
+				"module-base\n",
+			)
+			with mock.patch.object(
+				workspace, "task_action_config", return_value=(config, slot),
+			):
+				applied = run_command(
+					workspace.command_overlay_apply,
+					task=TASK_ID,
+				)
+			self.assertTrue(applied["applied"])
+			self.assertEqual(
+				(source / "tracked.txt").read_text(encoding="utf-8"),
+				"base\nroot-overlay-v2\n",
+			)
+			self.assertEqual(
+				(module / "tracked.txt").read_text(encoding="utf-8"),
+				"module-base\n",
+			)
+
+	def test_overlay_save_nested_only_replacement_unlinks_root_patch(self):
+		with tempfile.TemporaryDirectory() as temporary:
+			source, slot, work, config, module = overlay_repo_with_nested_module(
+				temporary,
+			)
+			(source / "tracked.txt").write_text(
+				"base\nroot-overlay\n", encoding="utf-8",
+			)
+			(module / "tracked.txt").write_text(
+				"module-base\nnested-overlay\n", encoding="utf-8",
+			)
+			with mock.patch.object(
+				workspace, "task_action_config", return_value=(config, slot),
+			):
+				run_command(
+					workspace.command_overlay_save,
+					task=TASK_ID,
+					restore="run",
+				)
+			self.assertTrue((work / workspace.OVERLAY_PATCH_FILE).is_file())
+			(module / "tracked.txt").write_text(
+				"module-base\nnested-overlay-v2\n", encoding="utf-8",
+			)
+			with mock.patch.object(
+				workspace, "task_action_config", return_value=(config, slot),
+			):
+				replaced = run_command(
+					workspace.command_overlay_save,
+					task=TASK_ID,
+					restore="run",
+				)
+			self.assertIsNone(replaced["patch"])
+			self.assertEqual(replaced["submodules"], ["dep"])
+			self.assertFalse((work / workspace.OVERLAY_PATCH_FILE).exists())
+			self.assertTrue((work / workspace.OVERLAY_SUBMODULES_FILE).is_file())
+			self.assertEqual(
+				(source / "tracked.txt").read_text(encoding="utf-8"),
+				"base\n",
+			)
+			with mock.patch.object(
+				workspace, "task_action_config", return_value=(config, slot),
+			):
+				applied = run_command(
+					workspace.command_overlay_apply,
+					task=TASK_ID,
+				)
+			self.assertTrue(applied["applied"])
+			self.assertEqual(
+				(source / "tracked.txt").read_text(encoding="utf-8"),
+				"base\n",
+			)
+			self.assertEqual(
+				(module / "tracked.txt").read_text(encoding="utf-8"),
+				"module-base\nnested-overlay-v2\n",
+			)
+
+	def test_overlay_save_inventory_refusal_preserves_existing_bundle(self):
+		with tempfile.TemporaryDirectory() as temporary:
+			source, slot, work, config, module = overlay_repo_with_nested_module(
+				temporary,
+			)
+			(source / "tracked.txt").write_text(
+				"base\nroot-overlay\n", encoding="utf-8",
+			)
+			(module / "tracked.txt").write_text(
+				"module-base\nnested-overlay\n", encoding="utf-8",
+			)
+			with mock.patch.object(
+				workspace, "task_action_config", return_value=(config, slot),
+			):
+				run_command(
+					workspace.command_overlay_save,
+					task=TASK_ID,
+					restore="run",
+				)
+			snapshot = overlay_bundle_bytes(work)
+			(source / "stray.txt").write_text("stray\n", encoding="utf-8")
+			with mock.patch.object(
+				workspace, "task_action_config", return_value=(config, slot),
+			):
+				with self.assertRaisesRegex(
+					workspace.WorkspaceError,
+					r"outside the overlay inventory: stray\.txt",
+				):
+					run_command(
+						workspace.command_overlay_save,
+						task=TASK_ID,
+						restore="run",
+					)
+			self.assertEqual(overlay_bundle_bytes(work), snapshot)
+			self.assertEqual(
+				(source / "tracked.txt").read_text(encoding="utf-8"),
+				"base\n",
+			)
+			self.assertEqual(
+				(module / "tracked.txt").read_text(encoding="utf-8"),
+				"module-base\n",
+			)
 
 	def test_source_commit_stages_owned_paths_and_marks_green(self):
 		with tempfile.TemporaryDirectory() as temporary:

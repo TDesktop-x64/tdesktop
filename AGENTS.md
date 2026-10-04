@@ -46,12 +46,21 @@ done | sort
 - Browsing is read-only. Listing, summarizing, comparing, or recommending tasks
   never edits `state.yaml`, publishes a lifecycle commit, or starts
   implementation, no matter how small the task looks.
-- Acting on tasks goes through the workflow skills instead of by hand:
-  `perform-task <slug or full id>` starts or resumes and performs exactly one
-  known task, `continue` processes the inbox and drains eligible shared work,
-  and new requests are written to the ignored `../ai-tdesktop/inbox/inbox.md`
-  and routed by `process-inbox`. Source commits owned by a task use the
-  three-line form described under `## Commits`.
+- Acting on an existing queue task goes through the workflow skills instead of
+  by hand: `perform-task <slug or full id>` starts or resumes and performs
+  exactly one known task, and `continue` drains eligible shared work. Source
+  commits owned by a task use the three-line form described under `## Commits`.
+- A request the user makes in conversation is ordinary work: do it directly in
+  this checkout. Do not write it to the ignored `../ai-tdesktop/inbox/inbox.md`,
+  and do not run `process-inbox` or `continue` over it, unless the user asks for
+  that. The queue's planning, review and evidence campaign costs hours, so
+  spending it on a request the user expected you to just do is a real error, not
+  thoroughness.
+- You may *offer* the queue when the work genuinely earns it: a large or
+  ambiguous change, one whose correctness needs a real testing campaign, or one
+  that is safety-, security- or data-safety-critical. Make the offer in one
+  line, say why, and route it only after the user approves. Absent approval,
+  implement it directly and say what you skipped.
 - Never guess between similarly named tasks. Report the matching full ids and
   let the user choose.
 
@@ -846,3 +855,30 @@ The `Error` template parameter defaults to `rpl::no_error`: `rpl::producer<Type,
 - Pass `rpl::lifetime` to `on_...` methods or store returned lifetime
 - Use `rpl::duplicate(producer)` to reuse a producer multiple times
 - Combined producers automatically unpack tuples in lambdas (works with `rpl::map`, `rpl::filter`, and `rpl::on_next`)
+
+### Per-subscription state
+
+`rpl::on_next` stores the handler by value. Each emission invokes a *copy* of that stored handler, so a nested emit does not re-enter the running callable. Writes a `mutable` lambda makes to its own captures land on the copy and are discarded, so they never become per-subscription state.
+
+```cpp
+// BAD - compiles, runs, and grew is just value > 0 every time:
+events | rpl::on_next([last = 0](int value) mutable {
+    const auto grew = (value > last);
+    last = value;
+    if (grew) {
+        // ...
+    }
+}, lifetime);
+
+// GOOD - state lives beside the handler:
+const auto last = lifetime.make_state<int>(0);
+events | rpl::on_next([=](int value) {
+    const auto grew = (value > *last);
+    *last = value;
+    if (grew) {
+        // ...
+    }
+}, lifetime);
+```
+
+Keep per-subscription state in `lifetime.make_state<T>()`, behind a `shared_ptr`, or on the object that owns the subscription. A `mutable` lambda that is one-shot — `rpl::take(1)`, a self-destroying subscription, a `crl::on_main` or `crl::async` callback, a `done` or `error` callback — is not this trap.

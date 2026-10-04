@@ -99,6 +99,7 @@ struct ChosenRow {
 	PeerId sublistJumpPeerId;
 	QByteArray sponsoredRandomId;
 	bool userpicClick : 1 = false;
+	bool communityBadgeClick : 1 = false;
 	bool filteredRow : 1 = false;
 	bool newWindow : 1 = false;
 };
@@ -172,6 +173,7 @@ public:
 
 	[[nodiscard]] bool isUserpicPress() const;
 	[[nodiscard]] bool isUserpicPressOnWide() const;
+	[[nodiscard]] bool isCommunityBadgePressOnNarrow() const;
 	void cancelChatPreview();
 	bool scheduleChatPreview(QPoint positionOverride);
 	bool showChatPreview();
@@ -244,7 +246,7 @@ public:
 		int64 key,
 		std::optional<Ui::Controls::SwipeContextData> data);
 	[[nodiscard]] int64 calcSwipeKey(int top);
-	void prepareQuickAction(int64 key, Dialogs::Ui::QuickDialogAction);
+	bool prepareQuickAction(int64 key, Dialogs::Ui::QuickDialogAction);
 	void clearQuickActions();
 
 	Qt::FocusPolicy accessibilityFocusPolicy() override {
@@ -610,6 +612,8 @@ private:
 	void dragPinnedFromTouch();
 	[[nodiscard]] bool hasChatTypeFilter() const;
 
+	void restoreScrollShowingCommunity(
+		not_null<Data::CommunityInfo*> community);
 	void saveChatsFilterScrollState(FilterId filterId);
 	bool restoreChatsFilterScrollState(FilterId filterId);
 
@@ -777,6 +781,7 @@ private:
 		std::unique_ptr<Ui::VideoUserpic>> _videoUserpics;
 
 	base::flat_map<FilterId, int> _chatsFilterScrollStates;
+	int _communityScrollTop = 0;
 
 	std::unordered_map<ChatsFilterTagsKey, TagCache> _chatsFilterTags;
 	bool _waitingAllChatListEntryRefreshesForTags = false;

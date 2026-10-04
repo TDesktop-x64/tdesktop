@@ -5809,6 +5809,10 @@ void ListWidget::itemRemoved(not_null<const HistoryItem*> item) {
 	if (_selectedTextItem == item) {
 		clearTextSelection();
 	}
+	const auto selected = _selected.find(item->fullId());
+	if (selected != end(_selected)) {
+		removeItemSelection(selected);
+	}
 	if (_overItemExact == item) {
 		_overItemExact = nullptr;
 	}
@@ -6162,7 +6166,7 @@ void ListWidget::changeAccessibilitySelection(
 	clearTextSelection();
 	repaintItem(view);
 	pushSelectedItems();
-	accessibilityChildStateChanged(index, { .selected = true });
+	accessibilityChildSelectionChanged(index);
 	accessibilityChildNameChanged(index);
 }
 
@@ -6312,6 +6316,16 @@ QAccessible::State ListWidget::accessibilityChildState(int index) const {
 
 QAccessible::Role ListWidget::accessibilityChildRole() const {
 	return QAccessible::Role::ListItem;
+}
+
+QAccessible::Role ListWidget::accessibilityChildRoleAt(int index) const {
+	// The unread bar divides the read messages from the unread ones, it
+	// is not a message itself - a separator to a screen reader, which also
+	// keeps it out of the selection and the item count.
+	const auto barIndex = accessibilityUnreadBarIndex();
+	return (barIndex >= 0 && index == barIndex)
+		? QAccessible::Role::Separator
+		: accessibilityChildRole();
 }
 
 QRect ListWidget::accessibilityChildRect(int index) const {

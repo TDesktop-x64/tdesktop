@@ -131,6 +131,7 @@ private:
 	void applyInitialWorkMode();
 	void ensureLayerCreated();
 	void destroyLayer();
+	void raiseMediaPreview();
 
 	void themeUpdated(const Window::Theme::BackgroundUpdate &data);
 

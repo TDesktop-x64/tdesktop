@@ -46,6 +46,7 @@ enum class ElementChatMode : char;
 class ElementOverlayHost;
 class EmptyPainter;
 class Element;
+class GramReadLine;
 class TranslateTracker;
 class ReadMetricsTracker;
 struct PinnedId;
@@ -240,6 +241,7 @@ public:
 	void elementStartEffect(
 		not_null<const Element*> view,
 		Element *replacing);
+	HistoryView::GramReadLine *elementGramReadLine();
 
 	void startEffectOnRead(not_null<HistoryItem*> item);
 	void updateBotInfo(bool recount = true);
@@ -636,6 +638,7 @@ private:
 	std::optional<Data::ReportInput> _chooseForReportReason;
 
 	const std::unique_ptr<Ui::PathShiftGradient> _pathGradient;
+	std::unique_ptr<HistoryView::GramReadLine> _gramReadLine;
 	QPainterPath _highlightPathCache;
 	bool _isChatWide = false;
 	bool _removeFromUserpics = false;

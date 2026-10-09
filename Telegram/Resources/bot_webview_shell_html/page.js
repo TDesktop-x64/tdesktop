@@ -5,15 +5,13 @@
 	const header = document.getElementById('header');
 	const frameShell = document.getElementById('frame-shell');
 	const frameWrap = document.getElementById('frame-wrap');
-	const disclosure = document.getElementById('disclosure');
 	const footer = document.getElementById('footer');
 	const buttonsWrap = document.getElementById('buttons-wrap');
 	const buttons = document.getElementById('buttons');
 	const badge = document.getElementById('badge');
-	const menuBackdrop = document.getElementById('menu-backdrop');
+	const pointerShield = document.getElementById('pointer-shield');
 	const menu = document.getElementById('menu');
 	const menuList = document.getElementById('menu-list');
-	const blocker = document.getElementById('blocker');
 	const title = document.getElementById('title');
 	const controls = {
 		back: document.getElementById('back'),
@@ -23,11 +21,8 @@
 	};
 	const shellState = {
 		backVisible: false,
-		menuVisible: false,
 		badgeVisible: false,
-		bottomText: '',
 		isFullscreen: false,
-		blocked: false,
 		menuOpen: false,
 		menuItems: [],
 		buttons: {
@@ -64,6 +59,7 @@
 	let reloadSupported = false;
 	let reloadTimeout = null;
 	let viewportScheduled = false;
+	let sentViewportHeight = -1;
 	let dragRegionsScheduled = false;
 	let sentDragRegions = '';
 	let resizeObserver = null;
@@ -217,6 +213,10 @@
 		const height = Math.max(
 			0,
 			Math.round(frameShell.getBoundingClientRect().height));
+		if (height === sentViewportHeight) {
+			return;
+		}
+		sentViewportHeight = height;
 		postToFrame('viewport_changed', {
 			height: height,
 			is_state_stable: true,
@@ -267,71 +267,11 @@
 		setMetric('--button-height', data.buttonHeight);
 		setMetric('--button-gap-x', data.buttonGapX);
 		setMetric('--button-gap-y', data.buttonGapY);
-		setMetric('--disclosure-skip', data.disclosureSkip);
-		setMetric('--footer-button-skip', data.footerButtonSkip);
 		setMetric('--fullscreen-control-width', data.fullscreenControlWidth);
 		setMetric('--fullscreen-control-height', data.fullscreenControlHeight);
 		setMetric('--fullscreen-control-top', data.fullscreenControlTop);
 		setMetric('--fullscreen-control-right', data.fullscreenControlRight);
 		setMetric('--fullscreen-control-gap', data.fullscreenControlGap);
-	}
-
-	function colorForBackground(value) {
-		if (!/^#[0-9a-f]{6}$/i.test(value || '')) {
-			return null;
-		}
-		const red = parseInt(value.slice(1, 3), 16) / 255;
-		const green = parseInt(value.slice(3, 5), 16) / 255;
-		const blue = parseInt(value.slice(5, 7), 16) / 255;
-		const luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
-		return luminance > 0.5 ? '#000000' : '#ffffff';
-	}
-
-	function footerColorForBackground(value) {
-		if (!/^#[0-9a-f]{6}$/i.test(value || '')) {
-			return null;
-		}
-		const red = parseInt(value.slice(1, 3), 16) / 255;
-		const green = parseInt(value.slice(3, 5), 16) / 255;
-		const blue = parseInt(value.slice(5, 7), 16) / 255;
-		const luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
-		const contrast = 2.5;
-		const textLuminance = (luminance > 0.5) ? 0 : 1;
-		const adaptiveOpacity = (luminance - textLuminance + contrast) / contrast;
-		const opacity = Math.max(0.5, Math.min(0.64, adaptiveOpacity));
-		const channel = (luminance > 0.5) ? 0 : 255;
-		return 'rgba('
-			+ String(channel) + ', '
-			+ String(channel) + ', '
-			+ String(channel) + ', '
-			+ String(opacity) + ')';
-	}
-
-	function titleControlColorsForBackground(value) {
-		if (!/^#[0-9a-f]{6}$/i.test(value || '')) {
-			return null;
-		}
-		const red = parseInt(value.slice(1, 3), 16) / 255;
-		const green = parseInt(value.slice(3, 5), 16) / 255;
-		const blue = parseInt(value.slice(5, 7), 16) / 255;
-		const luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
-		const contrast = 2.5;
-		const textLuminance = (luminance > 0.5) ? 0 : 1;
-		const adaptiveOpacity = (luminance - textLuminance + contrast) / contrast;
-		const opacity = Math.max(0.5, Math.min(0.64, adaptiveOpacity));
-		const channel = (luminance > 0.5) ? 0 : 255;
-		return {
-			fg: 'rgba('
-				+ String(channel) + ', '
-				+ String(channel) + ', '
-				+ String(channel) + ', '
-				+ String(opacity) + ')',
-			ripple: 'rgba('
-				+ String(channel) + ', '
-				+ String(channel) + ', '
-				+ String(channel) + ', '
-				+ String(opacity * 0.1) + ')'
-		};
 	}
 
 	function hexByte(value) {
@@ -402,29 +342,18 @@
 		if (!next || typeof next !== 'object') {
 			return;
 		}
-		if (next.bodyBg) {
-			root.style.setProperty('--body-bg', next.bodyBg);
-			const footerFg = footerColorForBackground(next.bodyBg);
-			if (footerFg) {
-				root.style.setProperty('--footer-fg', footerFg);
+		const properties = {
+			bodyBg: '--body-bg',
+			titleBg: '--title-bg',
+			titleFg: '--title-fg',
+			titleControlFg: '--title-control-fg',
+			titleControlRipple: '--title-control-ripple',
+			bottomBg: '--bottom-bg'
+		};
+		for (const key in properties) {
+			if (next[key]) {
+				root.style.setProperty(properties[key], next[key]);
 			}
-		}
-		if (next.titleBg) {
-			root.style.setProperty('--title-bg', next.titleBg);
-			const titleFg = colorForBackground(next.titleBg);
-			if (titleFg) {
-				root.style.setProperty('--title-fg', titleFg);
-			}
-			const titleControl = titleControlColorsForBackground(next.titleBg);
-			if (titleControl) {
-				root.style.setProperty('--title-control-fg', titleControl.fg);
-				root.style.setProperty(
-					'--title-control-ripple',
-					titleControl.ripple);
-			}
-		}
-		if (next.bottomBg) {
-			root.style.setProperty('--bottom-bg', next.bottomBg);
 		}
 	}
 
@@ -509,16 +438,11 @@
 		if (Object.prototype.hasOwnProperty.call(data, 'backVisible')) {
 			shellState.backVisible = !!data.backVisible;
 		}
-		if (Object.prototype.hasOwnProperty.call(data, 'menuVisible')) {
-			shellState.menuVisible = !!data.menuVisible;
-		}
 		if (Object.prototype.hasOwnProperty.call(data, 'badgeVisible')) {
 			shellState.badgeVisible = !!data.badgeVisible;
 		}
 		controls.back.classList.toggle('hidden', !shellState.backVisible);
-		controls.menu.classList.toggle('hidden', !shellState.menuVisible);
-		controls.menu.disabled = !shellState.menuVisible
-			|| !shellState.menuItems.length;
+		controls.menu.disabled = !shellState.menuItems.length;
 		badge.classList.toggle(
 			'hidden',
 			!shellState.badgeVisible
@@ -584,17 +508,8 @@
 	function updateFooter() {
 		const visible = visibleButtons();
 		const hasButtons = !!visible.buttons.length;
-		disclosure.textContent = '';
-		disclosure.classList.remove('visible');
 		buttonsWrap.classList.toggle('visible', hasButtons);
 		footer.classList.toggle('visible', hasButtons);
-		root.style.setProperty(
-			'--footer-gap',
-			shellState.isFullscreen
-				? '0px'
-				: hasButtons
-				? 'var(--footer-button-skip)'
-				: 'var(--disclosure-skip)');
 		scheduleViewport();
 	}
 
@@ -656,7 +571,7 @@
 	}
 
 	function createMenuNode(item, className) {
-		const clickable = !!item.id && item.enabled !== false;
+		const clickable = !!item.id;
 		const node = document.createElement(clickable ? 'button' : 'div');
 		node.className = className
 			+ (item.attention ? ' attention' : '')
@@ -665,7 +580,7 @@
 			node.type = 'button';
 			setupRipple(node);
 			node.addEventListener('click', function(event) {
-				if (!shellState.blocked && event.isTrusted) {
+				if (event.isTrusted) {
 					invokeShell('shell_menu_action', { id: item.id });
 					closeMenu();
 				}
@@ -753,10 +668,8 @@
 		}
 		menu.classList.toggle(
 			'visible',
-			shellState.menuOpen
-				&& shellState.menuVisible
-				&& !!shellState.menuItems.length);
-		menuBackdrop.classList.toggle(
+			shellState.menuOpen && !!shellState.menuItems.length);
+		pointerShield.classList.toggle(
 			'visible',
 			menu.classList.contains('visible'));
 		controls.menu.classList.toggle(
@@ -770,13 +683,11 @@
 		}
 		shellState.menuOpen = false;
 		renderMenu();
+		releaseRipple(controls.menu);
 	}
 
 	function toggleMenu(event) {
 		if (event && !event.isTrusted) {
-			return;
-		}
-		if (shellState.blocked) {
 			return;
 		}
 		if (shellState.menuOpen) {
@@ -786,6 +697,7 @@
 		invokeShell('shell_menu_request', {});
 		shellState.menuOpen = true;
 		renderMenu();
+		holdRipple(controls.menu);
 	}
 
 	function parseFrameMessage(data) {
@@ -826,10 +738,29 @@
 			button.querySelectorAll('.ripple:not(.hiding)'));
 		for (const ripple of ripples) {
 			ripple.classList.add('hiding');
-			window.setTimeout(function() {
+			ripple.removeTimeout = window.setTimeout(function() {
 				ripple.remove();
 			}, 200);
 		}
+	}
+
+	// Like RippleButton::setForceRippled in the native panel.
+	function holdRipple(button) {
+		button.rippleHeld = true;
+		const ripples = button.querySelectorAll('.ripple');
+		const last = ripples.length ? ripples[ripples.length - 1] : null;
+		if (last) {
+			window.clearTimeout(last.removeTimeout);
+			last.classList.remove('hiding');
+		} else {
+			const rect = button.getBoundingClientRect();
+			addRipple(button, rect.width / 2, rect.height / 2);
+		}
+	}
+
+	function releaseRipple(button) {
+		button.rippleHeld = false;
+		stopRipples(button);
 	}
 
 	function setupRipple(button) {
@@ -839,12 +770,23 @@
 			}
 			const rect = button.getBoundingClientRect();
 			addRipple(button, event.clientX - rect.left, event.clientY - rect.top);
-		});
-		button.addEventListener('mouseup', function() {
-			stopRipples(button);
-		});
-		button.addEventListener('mouseleave', function() {
-			stopRipples(button);
+			// The shield keeps the release over the frame in this document.
+			button.classList.add('pressed');
+			pointerShield.classList.add('held');
+			const release = function(event) {
+				if (event.type === 'mouseup' && event.button !== 0) {
+					return;
+				}
+				window.removeEventListener('mouseup', release, true);
+				window.removeEventListener('blur', release);
+				button.classList.remove('pressed');
+				pointerShield.classList.remove('held');
+				if (!button.rippleHeld) {
+					stopRipples(button);
+				}
+			};
+			window.addEventListener('mouseup', release, true);
+			window.addEventListener('blur', release);
 		});
 	}
 
@@ -869,21 +811,14 @@
 				window.clearTimeout(reloadTimeout);
 				reloadTimeout = null;
 			}
-			frameLoaded = false;
+			setFrameLoaded(false);
 			return;
 		}
 		invokeWebApp(message.eventType, message.eventData, event.origin);
 	});
 
-	menuBackdrop.addEventListener('mousedown', closeMenu);
-	blocker.addEventListener('click', function(event) {
-		if (!event.isTrusted || !shellState.blocked) {
-			return;
-		}
-		invokeShell('shell_close_layer', {});
-		event.preventDefault();
-		event.stopPropagation();
-	});
+	pointerShield.addEventListener('mousedown', closeMenu);
+	window.addEventListener('blur', closeMenu);
 
 	document.addEventListener('mousedown', function(event) {
 		if (!shellState.menuOpen) {
@@ -892,7 +827,7 @@
 		const target = event.target;
 		if (menu.contains(target)
 			|| controls.menu.contains(target)
-			|| menuBackdrop.contains(target)) {
+			|| pointerShield.contains(target)) {
 			return;
 		}
 		closeMenu();
@@ -927,6 +862,14 @@
 	header.addEventListener('selectstart', function(event) {
 		event.preventDefault();
 	});
+	document.addEventListener('contextmenu', function(event) {
+		event.preventDefault();
+	});
+
+	function setFrameLoaded(loaded) {
+		frameLoaded = loaded;
+		root.classList.toggle('loading', !loaded);
+	}
 
 	function createIframe(url) {
 		closeMenu();
@@ -938,17 +881,25 @@
 		pendingEvents.splice(0);
 		const next = document.createElement('iframe');
 		next.setAttribute('sandbox', frameSandbox);
-		next.setAttribute('allow', 'clipboard-read; clipboard-write; fullscreen');
+		next.setAttribute('allow', [
+			'clipboard-read',
+			'clipboard-write',
+			'fullscreen',
+			'camera',
+			'microphone',
+			'geolocation'
+		].join('; '));
 		next.referrerPolicy = 'no-referrer';
 		next.addEventListener('load', function() {
 			if (iframe !== next || generation !== frameGeneration) {
 				return;
 			}
-			frameLoaded = true;
+			setFrameLoaded(true);
 			flushPendingEvents();
+			sentViewportHeight = -1;
 			scheduleViewport();
 		});
-		frameLoaded = false;
+		setFrameLoaded(false);
 		reloadSupported = false;
 		if (iframe) {
 			iframe.remove();
@@ -992,9 +943,8 @@
 			applyMetrics(data && data.metrics);
 			applyColors(data && data.colors);
 			applyChrome(data || {});
-			shellState.bottomText = '';
 			title.textContent = (data && data.title) || '';
-			document.title = (data && data.title) || 'Telegram';
+			document.title = (data && data.windowTitle) || 'Telegram';
 			sameOrigin = !!(data && data.sameOrigin);
 			frameUrl = (data && data.url) || 'about:blank';
 			frameOrigin = sameOrigin ? originFromUrl(frameUrl) : '';
@@ -1019,7 +969,7 @@
 				return;
 			}
 			title.textContent = (data && data.title) || '';
-			document.title = (data && data.title) || 'Telegram';
+			document.title = (data && data.windowTitle) || 'Telegram';
 		},
 		setChrome: function(data, token) {
 			if (!isNativeToken(token)) {
@@ -1048,13 +998,6 @@
 				: [];
 			applyChrome({});
 			renderMenu();
-		},
-		setBottomText: function(data, token) {
-			if (!isNativeToken(token)) {
-				return;
-			}
-			shellState.bottomText = '';
-			updateFooter();
 		},
 		setButton: function(data, token) {
 			if (!isNativeToken(token)) {
@@ -1098,22 +1041,6 @@
 			state.iconUrl = (icon && icon.url) ? icon.url : '';
 			renderButtons();
 		},
-		setBlocked: function(data, token) {
-			if (!isNativeToken(token)) {
-				return;
-			}
-			shellState.blocked = !!(data && data.blocked);
-			root.classList.toggle('blocked', shellState.blocked);
-			if (shellState.blocked) {
-				closeMenu();
-			}
-		},
-		setProgress: function(data, token) {
-			if (!isNativeToken(token)) {
-				return;
-			}
-			root.classList.toggle('loading', !!(data && data.shown));
-		},
 		reloadFrame: function(data, token) {
 			if (!isNativeToken(token)) {
 				return;
@@ -1124,6 +1051,7 @@
 			if (!isNativeToken(token)) {
 				return;
 			}
+			sentViewportHeight = -1;
 			scheduleViewport();
 		}
 	};

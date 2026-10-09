@@ -76,7 +76,7 @@ const auto CommandByName = base::flat_map<QString, Command>{
 	{ u"lock_telegram"_q                 , Command::Lock },
 	{ u"minimize_telegram"_q             , Command::Minimize },
 	{ u"quit_telegram"_q                 , Command::Quit },
-	{ u"global_search"_q     , Command::GlobalSearch },
+	{ u"global_search"_q                 , Command::GlobalSearch },
 	{ u"reopen_closed_window"_q          , Command::ReopenClosedWindow },
 	{ u"close_other_windows"_q           , Command::CloseOtherWindows },
 
@@ -131,6 +131,7 @@ const auto CommandByName = base::flat_map<QString, Command>{
 	{ u"show_chat_preview"_q             , Command::ShowChatPreview },
 
 	{ u"record_voice"_q                  , Command::RecordVoice },
+	{ u"stash_message"_q                 , Command::StashMessage },
 
 	// Shortcuts that have no default values.
 	{ u"message"_q                       , Command::JustSendMessage },
@@ -145,8 +146,8 @@ const auto CommandByName = base::flat_map<QString, Command>{
 	{ u"record_round"_q                  , Command::RecordRound },
 	{ u"show_admin_log"_q                , Command::ShowAdminLog },
 	//
-	{ u"fast_forward"_q      , Command::FastForward },
-	{ u"fast_copy"_q         , Command::FastCopy },
+	{ u"fast_forward"_q                  , Command::FastForward },
+	{ u"fast_copy"_q                     , Command::FastCopy },
 };
 
 const base::flat_map<Command, QString> &CommandNames() {
@@ -485,7 +486,7 @@ void Manager::fillDefaults() {
 	set(u"ctrl+l"_q                  , Command::Lock);
 	set(u"ctrl+m"_q                  , Command::Minimize);
 	set(u"ctrl+q"_q                  , Command::Quit);
-	set(qsl("ctrl+t"), Command::GlobalSearch);
+	set(qsl("ctrl+t")                , Command::GlobalSearch);
 	set(u"ctrl+shift+t"_q            , Command::ReopenClosedWindow);
 	set(u"ctrl+shift+w"_q            , Command::CloseOtherWindows);
 
@@ -546,8 +547,10 @@ void Manager::fillDefaults() {
 
 	set(u"ctrl+r"_q                  , Command::RecordVoice);
 
-	set(u"alt+f"_q, Command::FastForward);
-	set(u"alt+c"_q, Command::FastCopy);
+	set(u"ctrl+s"_q                  , Command::StashMessage);
+
+	set(u"alt+f"_q                   , Command::FastForward);
+	set(u"alt+c"_q                   , Command::FastCopy);
 	
 	_defaults = keysCurrents();
 }

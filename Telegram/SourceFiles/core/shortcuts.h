@@ -74,6 +74,7 @@ enum class Command {
 	ComposeAiApplyInPlace,
 	ShowRichEditor,
 	ToggleWebPagePreview,
+	StashMessage,
 
 	RecordVoice,
 	RecordRound,

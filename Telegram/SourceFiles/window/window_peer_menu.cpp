@@ -90,6 +90,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_context_menu.h"
 #include "history/view/history_view_schedule_box.h"
 #include "iv/editor/iv_editor_session.h"
+#include "wallet/wallet_panel.h"
 #include "window/window_separate_id.h"
 #include "window/window_session_controller.h"
 #include "window/window_controller.h"
@@ -143,6 +144,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_window.h" // st::windowMinWidth
 #include "styles/style_menu_icons.h"
 #include "styles/style_premium.h"
+#include "styles/style_wallet.h"
 
 #include <QAction>
 #include <QtWidgets/QApplication>
@@ -352,6 +354,7 @@ private:
 	void addDeleteContact();
 	void addTTLSubmenu(bool addSeparator);
 	void addSendGift();
+	void addSendMoney();
 	void addPinnedMessages();
 	void addFirstMessage();
 	void addViewChannel();
@@ -1712,6 +1715,12 @@ void Filler::addSendGift() {
 	}, &st::menuIconGiftPremium);
 }
 
+void Filler::addSendMoney() {
+	if (const auto user = _peer->asUser()) {
+		AddSendMoneyAction(_controller, user, _addAction);
+	}
+}
+
 void Filler::addPinnedMessages() {
 	const auto channel = _peer->asChannel();
 	if (!channel) {
@@ -2030,6 +2039,7 @@ void Filler::fillProfileActions() {
 	addBotToGroup();
 	addNewMembers();
 	addSendGift();
+	addSendMoney();
 	addViewStatistics();
 	addStoryArchive();
 	addManageChat();
@@ -4711,6 +4721,44 @@ void AddSenderUserpicModerateAction(
 			.isAttention = true,
 		});
 	}
+}
+
+void AddSendMoneyAction(
+		not_null<SessionController*> controller,
+		not_null<UserData*> user,
+		const PeerMenuCallback &addAction) {
+	const auto session = &controller->session();
+	const auto userId = peerToUser(user->id);
+	const auto weakController = base::make_weak(controller);
+	const auto weakSession = base::make_weak(session);
+	const auto canOffer = [=] {
+		return weakController
+			&& weakSession
+			&& &controller->session() == session
+			&& &user->session() == session
+			&& session->data().userLoaded(userId) == user
+			&& Wallet::CanOfferSendMoney(user);
+	};
+	if (!canOffer()) {
+		return;
+	}
+	const auto activated = std::make_shared<bool>(false);
+	const auto sent = [=] {
+		if (weakController
+			&& weakSession
+			&& &controller->session() == session
+			&& session->data().userLoaded(userId) == user) {
+			controller->showPeerHistory(
+				user,
+				SectionShow::Way::ClearStack,
+				ShowAtTheEndMsgId);
+		}
+	};
+	addAction(tr::lng_wallet_profile_send_money(tr::now), [=] {
+		if (canOffer() && !std::exchange(*activated, true)) {
+			Wallet::OpenSendMoney(controller, user, sent);
+		}
+	}, &st::walletMenuIcon);
 }
 
 void AddSeparatorAndShiftUp(const PeerMenuCallback &addAction) {

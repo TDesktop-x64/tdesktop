@@ -994,6 +994,11 @@ bool AppendRichText(
 		return AppendRichText(data.vtext(), result, context, anchorId, anchorIds)
 			&& (context->dropRichTextClickHandlers
 				|| AddEntity(&result->text, from, EntityType::BankCard));
+	}, [&](const MTPDtextTonAddress &data) {
+		const auto from = result->text.text.size();
+		return AppendRichText(data.vtext(), result, context, anchorId, anchorIds)
+			&& (context->dropRichTextClickHandlers
+				|| AddEntity(&result->text, from, EntityType::TonAddress));
 	}, [&](const MTPDtextMentionName &data) {
 		const auto from = result->text.text.size();
 		if (!AppendRichText(data.vtext(), result, context, anchorId, anchorIds)) {

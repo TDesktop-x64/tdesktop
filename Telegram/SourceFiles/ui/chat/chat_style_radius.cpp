@@ -44,6 +44,16 @@ int BubbleRadiusLarge() {
 	return result;
 }
 
+int BubbleCornerRadius(BubbleCornerRounding corner) {
+	switch (corner) {
+	case BubbleCornerRounding::None:
+	case BubbleCornerRounding::Tail: return 0;
+	case BubbleCornerRounding::Small: return BubbleRadiusSmall();
+	case BubbleCornerRounding::Large: return BubbleRadiusLarge();
+	}
+	Unexpected("Corner in BubbleCornerRadius.");
+}
+
 int MsgFileThumbRadiusSmall() {
 	return st::msgFileThumbRadiusSmall;
 }

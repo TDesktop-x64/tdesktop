@@ -400,6 +400,8 @@ std::shared_ptr<ClickHandler> UiIntegration::createLinkHandler(
 		return (my && my->session)
 			? std::make_shared<BankCardClickHandler>(my->session, data.text)
 			: nullptr;
+	case EntityType::TonAddress:
+		return std::make_shared<TonAddressClickHandler>(data.text);
 	case EntityType::FormattedDate: {
 		const auto [date, flags] = DeserializeFormattedDateData(data.data);
 		if (date) {

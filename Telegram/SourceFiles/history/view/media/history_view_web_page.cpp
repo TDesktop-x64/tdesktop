@@ -418,167 +418,167 @@ QSize WebPage::countOptimalSize() {
 	const auto mediaEditor = (_parent->context() == Context::MediaEditor);
 	_openButton = Ui::Text::String();
 	if ((_data->iv != nullptr || _data->siteName == "Ad") && HasButton(_data)) {
-	if ((!mediaEditor || _data->siteName == "Ad") && HasButton(_data)) {
-		const auto context = Core::TextContext({
-			.session = &_data->session(),
-			.customEmojiLoopLimit = 1,
-		});
-		_openButton.setMarkedText(
-			st::semiboldTextStyle,
-			PageToPhrase(_data),
-			kMarkupTextOptions,
-			context);
-	} else if (!mediaEditor
-		&& sponsored
-		&& !sponsored->buttonText.isEmpty()) {
-		auto phrase = TextWithEntities{ tr::upper(sponsored->buttonText) };
-		if (!sponsored->isLinkInternal) {
-			phrase.append(st::historyExternalLinkIcon);
-		}
-		_openButton.setMarkedText(st::semiboldTextStyle, std::move(phrase));
-	}
-
-	const auto padding = inBubblePadding() + innerMargin();
-	const auto versionChanged = (_dataVersion != _data->version);
-	if (versionChanged) {
-		_dataVersion = _data->version;
-		_openl = nullptr;
-		_previewLink = nullptr;
-		_attach = nullptr;
-		const auto item = _parent->data();
-		_collage = PrepareCollageMedia(item, _data->collage);
-		const auto min = st::minPhotoSize - rect::m::sum::h(_st.padding);
-		_siteName = Ui::Text::String(min);
-		_title = Ui::Text::String(min);
-		_description = Ui::Text::String(min);
-		if (factcheck) {
-			factcheck->footer = Ui::Text::String(
-				st::factcheckFooterStyle,
-				tr::lng_factcheck_bottom(
-					tr::now,
-					lt_country,
-					LookupFactcheckCountryName(
-						LookupFactcheckCountryIso2(item))),
-				kDefaultTextOptions,
-				min);
-		}
-	}
-	const auto lineHeight = UnitedLineHeight();
-
-	if (!_openl && (!_data->url.isEmpty() || sponsored || factcheck)) {
-		const auto original = _parent->data()->originalText();
-		const auto previewOfHiddenUrl = [&] {
-			if (_data->type == WebPageType::BotApp) {
-				// Bot Web Apps always show confirmation on hidden urls.
-				//
-				// But from the dedicated "Open App" button we don't want
-				// to request users confirmation on non-first app opening.
-				return false;
+		if ((!mediaEditor || _data->siteName == "Ad") && HasButton(_data)) {
+			const auto context = Core::TextContext({
+				.session = &_data->session(),
+				.customEmojiLoopLimit = 1,
+				});
+			_openButton.setMarkedText(
+				st::semiboldTextStyle,
+				PageToPhrase(_data),
+				kMarkupTextOptions,
+				context);
+		} else if (!mediaEditor
+			&& sponsored
+			&& !sponsored->buttonText.isEmpty()) {
+			auto phrase = TextWithEntities{ tr::upper(sponsored->buttonText) };
+			if (!sponsored->isLinkInternal) {
+				phrase.append(st::historyExternalLinkIcon);
 			}
-			const auto simplify = [](const QString &url) {
-				auto result = url.toLower();
-				if (result.endsWith('/')) {
-					result.chop(1);
-				}
-				const auto prefixes = { u"http://"_q, u"https://"_q };
-				for (const auto &prefix : prefixes) {
-					if (result.startsWith(prefix)) {
-						result = result.mid(prefix.size());
-						break;
-					}
-				}
-				return result;
-			};
-			const auto simplified = simplify(_data->url);
-			for (const auto &entity : original.entities) {
-				if (entity.type() != EntityType::Url) {
-					continue;
-				}
-				const auto link = original.text.mid(
-					entity.offset(),
-					entity.length());
-				if (simplify(link) == simplified) {
+			_openButton.setMarkedText(st::semiboldTextStyle, std::move(phrase));
+		}
+
+		const auto padding = inBubblePadding() + innerMargin();
+		const auto versionChanged = (_dataVersion != _data->version);
+		if (versionChanged) {
+			_dataVersion = _data->version;
+			_openl = nullptr;
+			_previewLink = nullptr;
+			_attach = nullptr;
+			const auto item = _parent->data();
+			_collage = PrepareCollageMedia(item, _data->collage);
+			const auto min = st::minPhotoSize - rect::m::sum::h(_st.padding);
+			_siteName = Ui::Text::String(min);
+			_title = Ui::Text::String(min);
+			_description = Ui::Text::String(min);
+			if (factcheck) {
+				factcheck->footer = Ui::Text::String(
+					st::factcheckFooterStyle,
+					tr::lng_factcheck_bottom(
+						tr::now,
+						lt_country,
+						LookupFactcheckCountryName(
+							LookupFactcheckCountryIso2(item))),
+					kDefaultTextOptions,
+					min);
+			}
+		}
+		const auto lineHeight = UnitedLineHeight();
+
+		if (!_openl && (!_data->url.isEmpty() || sponsored || factcheck)) {
+			const auto original = _parent->data()->originalText();
+			const auto previewOfHiddenUrl = [&] {
+				if (_data->type == WebPageType::BotApp) {
+					// Bot Web Apps always show confirmation on hidden urls.
+					//
+					// But from the dedicated "Open App" button we don't want
+					// to request users confirmation on non-first app opening.
 					return false;
 				}
-			}
-			return true;
-		}();
-		if (sponsored) {
-			_openl = SponsoredLink(_data->url, sponsored->isLinkInternal);
-			if (sponsored->canReport) {
-				sponsored->hint.link = AboutSponsoredClickHandler();
-			}
-		} else if (factcheck) {
-			const auto item = _parent->data();
-			const auto iso2 = LookupFactcheckCountryIso2(item);
-			if (!iso2.isEmpty()) {
-				factcheck->hint.link = AboutFactcheckClickHandler(iso2);
-			}
-		} else {
-			_openl = _data->iv
-				? IvClickHandler(_data, original)
-				: (previewOfHiddenUrl || UrlClickHandler::IsSuspicious(
-					_data->url))
-				? std::make_shared<HiddenUrlClickHandler>(_data->url)
-				: std::make_shared<UrlClickHandler>(_data->url, true);
-			if (_data->document
-				&& (_data->document->isWallPaper()
-					|| _data->document->isTheme())) {
-				_openl = std::make_shared<DocumentWrappedClickHandler>(
-					std::move(_openl),
-					_data->document,
-					_parent->data()->fullId());
-			}
-		}
-	}
-
-	if (_hasLogEntryPreview && !_previewLink) {
-		const auto contextId = _parent->data()->fullId();
-		if (_data->photo) {
-			_previewLink = std::make_shared<PhotoOpenClickHandler>(
-				_data->photo,
-				crl::guard(this, [=](FullMsgId id) {
-					_parent->delegate()->elementOpenPhoto(_data->photo, id);
-				}),
-				contextId);
-		} else if (_data->document) {
-			_previewLink = std::make_shared<LambdaClickHandler>(
-				crl::guard(this, [=] {
-					_parent->delegate()->elementOpenDocument(
+				const auto simplify = [](const QString &url) {
+					auto result = url.toLower();
+					if (result.endsWith('/')) {
+						result.chop(1);
+					}
+					const auto prefixes = { u"http://"_q, u"https://"_q };
+					for (const auto &prefix : prefixes) {
+						if (result.startsWith(prefix)) {
+							result = result.mid(prefix.size());
+							break;
+						}
+					}
+					return result;
+					};
+				const auto simplified = simplify(_data->url);
+				for (const auto &entity : original.entities) {
+					if (entity.type() != EntityType::Url) {
+						continue;
+					}
+					const auto link = original.text.mid(
+						entity.offset(),
+						entity.length());
+					if (simplify(link) == simplified) {
+						return false;
+					}
+				}
+				return true;
+				}();
+			if (sponsored) {
+				_openl = SponsoredLink(_data->url, sponsored->isLinkInternal);
+				if (sponsored->canReport) {
+					sponsored->hint.link = AboutSponsoredClickHandler();
+				}
+			} else if (factcheck) {
+				const auto item = _parent->data();
+				const auto iso2 = LookupFactcheckCountryIso2(item);
+				if (!iso2.isEmpty()) {
+					factcheck->hint.link = AboutFactcheckClickHandler(iso2);
+				}
+			} else {
+				_openl = _data->iv
+					? IvClickHandler(_data, original)
+					: (previewOfHiddenUrl || UrlClickHandler::IsSuspicious(
+						_data->url))
+					? std::make_shared<HiddenUrlClickHandler>(_data->url)
+					: std::make_shared<UrlClickHandler>(_data->url, true);
+				if (_data->document
+					&& (_data->document->isWallPaper()
+						|| _data->document->isTheme())) {
+					_openl = std::make_shared<DocumentWrappedClickHandler>(
+						std::move(_openl),
 						_data->document,
-						contextId,
-						/* showInMediaView */ true);
-				}));
+						_parent->data()->fullId());
+				}
+			}
 		}
-	}
 
-	// init layout
-	const auto title = TextUtilities::SingleLine(_data->title.isEmpty()
-		? _data->author
-		: _data->title);
-	using Flag = MediaWebPageFlag;
-	if (_data->hasLargeMedia && (_flags & Flag::ForceLargeMedia)) {
-		_asArticle = 0;
-	} else if (_data->hasLargeMedia && (_flags & Flag::ForceSmallMedia)) {
-		_asArticle = 1;
-	} else {
-		_asArticle = _data->computeDefaultSmallMedia();
-	}
-	if (sponsored && sponsored->hasMedia) {
-		_asArticle = 0;
-	}
-	if (isLogEntryOriginal()) {
-		_asArticle = 0;
-	}
+		if (_hasLogEntryPreview && !_previewLink) {
+			const auto contextId = _parent->data()->fullId();
+			if (_data->photo) {
+				_previewLink = std::make_shared<PhotoOpenClickHandler>(
+					_data->photo,
+					crl::guard(this, [=](FullMsgId id) {
+						_parent->delegate()->elementOpenPhoto(_data->photo, id);
+						}),
+					contextId);
+			} else if (_data->document) {
+				_previewLink = std::make_shared<LambdaClickHandler>(
+					crl::guard(this, [=] {
+						_parent->delegate()->elementOpenDocument(
+							_data->document,
+							contextId,
+							/* showInMediaView */ true);
+						}));
+			}
+		}
 
-	// init attach
-	if (!_attach && _data->uniqueGift) {
-		_attach = std::make_unique<MediaGeneric>(
-			_parent,
-			GenerateUniqueGiftPreview(
+		// init layout
+		const auto title = TextUtilities::SingleLine(_data->title.isEmpty()
+			? _data->author
+			: _data->title);
+		using Flag = MediaWebPageFlag;
+		if (_data->hasLargeMedia && (_flags & Flag::ForceLargeMedia)) {
+			_asArticle = 0;
+		} else if (_data->hasLargeMedia && (_flags & Flag::ForceSmallMedia)) {
+			_asArticle = 1;
+		} else {
+			_asArticle = _data->computeDefaultSmallMedia();
+		}
+		if (sponsored && sponsored->hasMedia) {
+			_asArticle = 0;
+		}
+		if (isLogEntryOriginal()) {
+			_asArticle = 0;
+		}
+
+		// init attach
+		if (!_attach && _data->uniqueGift) {
+			_attach = std::make_unique<MediaGeneric>(
 				_parent,
-				nullptr,
-				_data->uniqueGift),
+				GenerateUniqueGiftPreview(
+					_parent,
+					nullptr,
+					_data->uniqueGift),
 				MediaGenericDescriptor{
 					.maxWidth = st::msgServiceGiftPreview,
 					.paintBgFactory = [=] {
@@ -586,192 +586,193 @@ QSize WebPage::countOptimalSize() {
 					},
 					.expandCurrentWidth = true,
 				});
-	} else if (!_attach && _data->auction) {
-		const auto &gift = _data->auction->auctionGift;
-		const auto backdrop = gift->background
-			? gift->background->backdrop()
-			: Data::UniqueGiftBackdrop();
-		_attach = std::make_unique<MediaGeneric>(
-			_parent,
-			GenerateAuctionPreview(
+		} else if (!_attach && _data->auction) {
+			const auto &gift = _data->auction->auctionGift;
+			const auto backdrop = gift->background
+				? gift->background->backdrop()
+				: Data::UniqueGiftBackdrop();
+			_attach = std::make_unique<MediaGeneric>(
 				_parent,
-				nullptr,
-				gift,
-				backdrop),
-			MediaGenericDescriptor{
-				.maxWidth = st::msgServiceGiftPreview,
-				.paintBgFactory = [=] {
-					return AuctionBg(
-						_parent,
-						backdrop,
-						gift,
-						_data->auction->auctionGift->auctionStartDate,
-						_data->auction->endDate);
+				GenerateAuctionPreview(
+					_parent,
+					nullptr,
+					gift,
+					backdrop),
+				MediaGenericDescriptor{
+					.maxWidth = st::msgServiceGiftPreview,
+					.paintBgFactory = [=] {
+						return AuctionBg(
+							_parent,
+							backdrop,
+							gift,
+							_data->auction->auctionGift->auctionStartDate,
+							_data->auction->endDate);
+					},
+					.expandCurrentWidth = true,
+				});
+		} else if (!_attach
+			&& !_asArticle
+			&& (!isLogEntryOriginal()
+				|| (_data->document && !_hasLogEntryPreview))) {
+			_attach = CreateAttach(
+				_parent,
+				_data->document,
+				((!_data->document || _data->photoIsVideoCover)
+					? _data->photo
+					: nullptr),
+				_collage,
+				_data->url);
+		}
+
+		// init strings
+		if (_description.isEmpty()
+			&& !_data->description.text.isEmpty()
+			&& !_data->uniqueGift
+			&& !_data->auction) {
+			const auto &text = _data->description;
+			using Type = Core::TextContextDetails::HashtagMentionType;
+			auto context = Core::TextContext({
+				.session = &history()->session(),
+				.details = {
+					.type = ((_data->siteName == u"Twitter"_q)
+						? Type::Twitter
+						: (_data->siteName == u"Instagram"_q)
+						? Type::Instagram
+						: Type::Telegram),
 				},
-				.expandCurrentWidth = true,
-			});
-	} else if (!_attach
-		&& !_asArticle
-		&& (!isLogEntryOriginal()
-			|| (_data->document && !_hasLogEntryPreview))) {
-		_attach = CreateAttach(
-			_parent,
-			_data->document,
-			((!_data->document || _data->photoIsVideoCover)
-				? _data->photo
-				: nullptr),
-			_collage,
-			_data->url);
-	}
-
-	// init strings
-	if (_description.isEmpty()
-		&& !_data->description.text.isEmpty()
-		&& !_data->uniqueGift
-		&& !_data->auction) {
-		const auto &text = _data->description;
-		using Type = Core::TextContextDetails::HashtagMentionType;
-		auto context = Core::TextContext({
-			.session = &history()->session(),
-			.details = {
-				.type = ((_data->siteName == u"Twitter"_q)
-					? Type::Twitter
-					: (_data->siteName == u"Instagram"_q)
-					? Type::Instagram
-					: Type::Telegram),
-			},
-			.repaint = [=] { _parent->customEmojiRepaint(); },
-		});
-		_description.setMarkedText(
-			st::webPageDescriptionStyle,
-			text,
-			Ui::WebpageTextDescriptionOptions(),
-			context);
-	}
-	const auto siteName = _data->displayedSiteName();
-	if (!siteName.isEmpty()) {
-		_siteNameLines = 1;
-		_siteName.setMarkedText(
-			st::webPageTitleStyle,
-			tr::link(siteName, _data->url),
-			Ui::WebpageTextTitleOptions());
-	}
-	if (_title.isEmpty() && !title.isEmpty()) {
-		if (!_siteNameLines && !_data->url.isEmpty()) {
-			_title.setMarkedText(
+				.repaint = [=] { _parent->customEmojiRepaint(); },
+				});
+			_description.setMarkedText(
+				st::webPageDescriptionStyle,
+				text,
+				Ui::WebpageTextDescriptionOptions(),
+				context);
+		}
+		const auto siteName = _data->displayedSiteName();
+		if (!siteName.isEmpty()) {
+			_siteNameLines = 1;
+			_siteName.setMarkedText(
 				st::webPageTitleStyle,
-				tr::link(title, _data->url),
-				Ui::WebpageTextTitleOptions());
-
-		} else {
-			_title.setText(
-				st::webPageTitleStyle,
-				title,
+				tr::link(siteName, _data->url),
 				Ui::WebpageTextTitleOptions());
 		}
-	}
+		if (_title.isEmpty() && !title.isEmpty()) {
+			if (!_siteNameLines && !_data->url.isEmpty()) {
+				_title.setMarkedText(
+					st::webPageTitleStyle,
+					tr::link(title, _data->url),
+					Ui::WebpageTextTitleOptions());
 
-	// init dimensions
-	const auto skipBlockWidth = (sponsored && sponsored->hasMedia)
-		? 0
-		: _parent->skipBlockWidth();
-	auto maxWidth = skipBlockWidth;
-	auto minHeight = 0;
+			} else {
+				_title.setText(
+					st::webPageTitleStyle,
+					title,
+					Ui::WebpageTextTitleOptions());
+			}
+		}
 
-	const auto siteNameHeight = _siteName.isEmpty() ? 0 : lineHeight;
-	const auto titleMinHeight = _title.isEmpty() ? 0 : lineHeight;
-	const auto factcheckMetrics = factcheck
-		? computeFactcheckMetrics(_description.minHeight())
-		: FactcheckMetrics();
-	const auto descMaxLines = factcheck
-		? factcheckMetrics.lines
-		: isLogEntryOriginal()
-		? kMaxOriginalEntryLines
-		: (3 + (siteNameHeight ? 0 : 1) + (titleMinHeight ? 0 : 1));
-	const auto descriptionMinHeight = _description.isEmpty()
-		? 0
-		: std::min(_description.minHeight(), descMaxLines * lineHeight);
-	const auto articleMinHeight = siteNameHeight
-		+ titleMinHeight
-		+ descriptionMinHeight;
-	const auto articlePhotoMaxWidth = _asArticle
-		? (st::webPagePhotoDelta
-			+ std::max(
-				ArticleThumbWidth(_data->photo, articleMinHeight),
-				lineHeight))
-		: specialRightPix
-		? (st::webPagePhotoDelta
-			+ (lineHeight
-				* (stickerSet
-					? kStickerSetLines
-					: kSponsoredUserpicLines)))
-		: _hasLogEntryPreview
-		? (st::webPagePhotoDelta + lineHeight * kLogEntryPreviewLines)
-		: 0;
+		// init dimensions
+		const auto skipBlockWidth = (sponsored && sponsored->hasMedia)
+			? 0
+			: _parent->skipBlockWidth();
+		auto maxWidth = skipBlockWidth;
+		auto minHeight = 0;
 
-	if (!_siteName.isEmpty()) {
-		accumulate_max(maxWidth, _siteName.maxWidth() + articlePhotoMaxWidth);
-		minHeight += lineHeight;
-	}
-	if (!_title.isEmpty()) {
-		accumulate_max(maxWidth, _title.maxWidth() + articlePhotoMaxWidth);
-		minHeight += titleMinHeight;
-	}
-	if (!_description.isEmpty()) {
-		accumulate_max(
-			maxWidth,
-			_description.maxWidth() + articlePhotoMaxWidth);
-		minHeight += descriptionMinHeight;
-	}
-	if (factcheck && factcheck->expanded) {
-		accumulate_max(maxWidth, factcheck->footer.maxWidth());
-		minHeight += st::factcheckFooterSkip + factcheck->footer.minHeight();
-	}
-	if (_attach) {
-		const auto attachAtTop = (_siteName.isEmpty()
+		const auto siteNameHeight = _siteName.isEmpty() ? 0 : lineHeight;
+		const auto titleMinHeight = _title.isEmpty() ? 0 : lineHeight;
+		const auto factcheckMetrics = factcheck
+			? computeFactcheckMetrics(_description.minHeight())
+			: FactcheckMetrics();
+		const auto descMaxLines = factcheck
+			? factcheckMetrics.lines
+			: isLogEntryOriginal()
+			? kMaxOriginalEntryLines
+			: (3 + (siteNameHeight ? 0 : 1) + (titleMinHeight ? 0 : 1));
+		const auto descriptionMinHeight = _description.isEmpty()
+			? 0
+			: std::min(_description.minHeight(), descMaxLines * lineHeight);
+		const auto articleMinHeight = siteNameHeight
+			+ titleMinHeight
+			+ descriptionMinHeight;
+		const auto articlePhotoMaxWidth = _asArticle
+			? (st::webPagePhotoDelta
+				+ std::max(
+					ArticleThumbWidth(_data->photo, articleMinHeight),
+					lineHeight))
+			: specialRightPix
+			? (st::webPagePhotoDelta
+				+ (lineHeight
+					* (stickerSet
+						? kStickerSetLines
+						: kSponsoredUserpicLines)))
+			: _hasLogEntryPreview
+			? (st::webPagePhotoDelta + lineHeight * kLogEntryPreviewLines)
+			: 0;
+
+		if (!_siteName.isEmpty()) {
+			accumulate_max(maxWidth, _siteName.maxWidth() + articlePhotoMaxWidth);
+			minHeight += lineHeight;
+		}
+		if (!_title.isEmpty()) {
+			accumulate_max(maxWidth, _title.maxWidth() + articlePhotoMaxWidth);
+			minHeight += titleMinHeight;
+		}
+		if (!_description.isEmpty()) {
+			accumulate_max(
+				maxWidth,
+				_description.maxWidth() + articlePhotoMaxWidth);
+			minHeight += descriptionMinHeight;
+		}
+		if (factcheck && factcheck->expanded) {
+			accumulate_max(maxWidth, factcheck->footer.maxWidth());
+			minHeight += st::factcheckFooterSkip + factcheck->footer.minHeight();
+		}
+		if (_attach) {
+			const auto attachAtTop = (_siteName.isEmpty()
 				&& _title.isEmpty()
 				&& _description.isEmpty())
-			|| (sponsored && sponsored->hasMedia);
-		if (!attachAtTop) {
-			minHeight += st::mediaInBubbleSkip;
+				|| (sponsored && sponsored->hasMedia);
+			if (!attachAtTop) {
+				minHeight += st::mediaInBubbleSkip;
+			}
+
+			_attach->initDimensions();
+			const auto bubble = _attach->bubbleMargins();
+			const auto maxMediaWidth = _attach->maxWidth()
+				- rect::m::sum::h(bubble);
+			accumulate_max(maxWidth, maxMediaWidth);
+			minHeight += _attach->minHeight() - rect::m::sum::v(bubble);
 		}
+		if (_data->type == WebPageType::Video
+			&& _data->duration
+			&& !mediaEditor) {
+			_duration = Ui::FormatDurationText(_data->duration);
+			_durationWidth = st::msgDateFont->width(_duration);
+		}
+		if (!_openButton.isEmpty()) {
+			const auto w = rect::m::sum::h(st::historyPageButtonPadding)
+				+ _openButton.maxWidth();
+			accumulate_max(maxWidth, w);
+		}
+		maxWidth += rect::m::sum::h(padding);
+		minHeight += rect::m::sum::v(padding);
 
-		_attach->initDimensions();
-		const auto bubble = _attach->bubbleMargins();
-		const auto maxMediaWidth = _attach->maxWidth()
-			- rect::m::sum::h(bubble);
-		accumulate_max(maxWidth, maxMediaWidth);
-		minHeight += _attach->minHeight() - rect::m::sum::v(bubble);
+		if (_asArticle) {
+			minHeight = resizeGetHeight(maxWidth);
+		}
+		if (const auto hint = hintData()) {
+			hint->widthBefore = st::webPageTitleStyle.font->width(siteName);
+			const auto &font = st::webPageSponsoredHintFont;
+			hint->text = sponsored
+				? tr::lng_sponsored_message_revenue_button(tr::now)
+				: tr::lng_factcheck_whats_this(tr::now);
+			hint->size = QSize(
+				font->width(hint->text) + font->height,
+				font->height);
+			maxWidth += hint->size.width();
+		}
+		return { maxWidth, minHeight };
 	}
-	if (_data->type == WebPageType::Video
-		&& _data->duration
-		&& !mediaEditor) {
-		_duration = Ui::FormatDurationText(_data->duration);
-		_durationWidth = st::msgDateFont->width(_duration);
-	}
-	if (!_openButton.isEmpty()) {
-		const auto w = rect::m::sum::h(st::historyPageButtonPadding)
-			+ _openButton.maxWidth();
-		accumulate_max(maxWidth, w);
-	}
-	maxWidth += rect::m::sum::h(padding);
-	minHeight += rect::m::sum::v(padding);
-
-	if (_asArticle) {
-		minHeight = resizeGetHeight(maxWidth);
-	}
-	if (const auto hint = hintData()) {
-		hint->widthBefore = st::webPageTitleStyle.font->width(siteName);
-		const auto &font = st::webPageSponsoredHintFont;
-		hint->text = sponsored
-			? tr::lng_sponsored_message_revenue_button(tr::now)
-			: tr::lng_factcheck_whats_this(tr::now);
-		hint->size = QSize(
-			font->width(hint->text) + font->height,
-			font->height);
-		maxWidth += hint->size.width();
-	}
-	return { maxWidth, minHeight };
 }
 
 QSize WebPage::countCurrentSize(int newWidth) {

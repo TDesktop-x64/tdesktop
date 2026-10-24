@@ -550,17 +550,11 @@ void AddPostLinkAction(
 		&& !request.link->copyToClipboardContextItemText().isEmpty()) {
 		return;
 	}
-	const auto itemId = item->fullId();
-	const auto context = request.view
-		? request.view->context()
-		: Context::History;
-	const auto controller = request.navigation->parentController();
-	menu->addAction(
-		(item->history()->peer->isMegagroup()
-			? tr::lng_context_copy_message_link
-			: tr::lng_context_copy_post_link)(tr::now),
-		[=] { CopyPostLink(controller, itemId, context); },
-		&st::menuIconLink);
+	AddPostLinkAction(
+		menu,
+		request.navigation->parentController(),
+		item,
+		(request.view ? request.view->context() : Context::History));
 }
 
 MessageIdsList ExtractIdsList(const SelectedItems &items) {
@@ -1140,7 +1134,7 @@ bool AddReplyToMessageAction(
 	const auto &quote = request.quote;
 	auto text = (todoListTaskId
 		? tr::lng_context_reply_to_task
-		: quote.highlight.quote.empty()
+		: !quote
 		? tr::lng_context_reply_msg
 		: tr::lng_context_quote_and_reply)(
 			tr::now,
@@ -1151,6 +1145,7 @@ bool AddReplyToMessageAction(
 			.quote = quote.highlight.quote,
 			.quoteOffset = quote.highlight.quoteOffset,
 			.todoItemId = todoListTaskId,
+			.richQuote = quote.highlight.richQuote,
 		}, base::IsCtrlPressed());
 	}, &st::menuIconReply);
 	return true;
@@ -1938,6 +1933,23 @@ void EditTagBox(
 }
 
 } // namespace
+
+void AddPostLinkAction(
+		not_null<Ui::PopupMenu*> menu,
+		not_null<Window::SessionController*> controller,
+		not_null<HistoryItem*> item,
+		Context context) {
+	if (!item->hasDirectLink() || IsAnchoredEphemeral(item)) {
+		return;
+	}
+	const auto itemId = item->fullId();
+	menu->addAction(
+		(item->history()->peer->isMegagroup()
+			? tr::lng_context_copy_message_link
+			: tr::lng_context_copy_post_link)(tr::now),
+		[=] { CopyPostLink(controller, itemId, context); },
+		&st::menuIconLink);
+}
 
 std::optional<QString> CurrentVoiceTimecode(FullMsgId itemId) {
 	const auto state = ::Media::Player::instance()->getState(

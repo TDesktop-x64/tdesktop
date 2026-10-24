@@ -24,6 +24,9 @@ Read these files completely before phase work:
   mappings before assigning phase workers;
 - On Codex, [child completion and recovery](../../shared/codex-delegation.md)
   for result-driven waits and recovery of stopped agents;
+- On Claude Code, unless the invocation opted out of Codex reviews,
+  [Codex CLI leaves](../../shared/codex-cli-leaves.md) for the review and
+  assessment phases;
 - `references/pipeline.md` for the authoritative end-to-end runner contract;
 - `references/phase-prompts.md` for exact leaf prompts and retry rules;
 - `.agents/shared/test-loop.md` for the implementation/test state machine;
@@ -35,6 +38,12 @@ Read these files completely before phase work:
 The pipeline reference adapts conflicting generic test-loop mechanics for the
 external AI worktree and exact-path safety. Its named adapter wins at those
 points; retain every other test-loop rule.
+
+A task whose `task.md` has a `## Code health` section with class Q0, Q1 or
+Q2 runs the [mechanical lane](references/mechanical-lane.md) instead. For it,
+read that file and, from `pipeline.md`, the Contract, Preflight, Telegram
+commits and Final AI state sections; skip the test-loop and Computer Use
+references.
 
 ## Resolve the workspace and task
 
@@ -99,6 +108,12 @@ Inspect the resolved task, readiness, `other_active_task`, status, and owner.
 - If it is already `in-progress` and owned by this checkout, resume it without
   another state commit.
 
+Without `--batch`, `start` records this task alone as the checkout's soft
+batch mark, `batches/<checkout-tag>.yaml`, inside its `Start` commit. A
+`continue` scheduler passes its own ordered `--batch` instead. `retry` stays
+local and leaves the mark untouched. The mark never claims or reserves any
+task.
+
 Refresh with `resolve` after each mutation. The source pipeline begins only
 after the slot state shows this task `in-progress` for this checkout. For a new
 task, canonical master must already contain its `Start` commit.
@@ -131,7 +146,7 @@ New and unfinished tasks use the single adaptive `implement` path. Assessment
 must first confirm that the request is one cohesive implementation/review/test
 unit. If it contains independently useful and independently testable product
 boundaries, record `Scope: split-required` and a concrete split proposal before
-source edits. The same result may arise later from the bounded convergence
+source edits. The same result may arise later from the review convergence
 assessment when the retained implementation proves that one review/evidence
 campaign is not coherent. Do not force the broad request through smaller
 implementation phases and call it one task. The independent assessment has
@@ -165,11 +180,13 @@ and evidence checks it actually affects. Review fixes receive a focused general
 delta review plus only those invalidated specialists; they do not restart the
 full review or evidence design.
 
-Automatic replay is bounded. If two review verdicts need changes, findings are
-not converging, or a fix expands the architecture or owned paths, run the
-pipeline's independent convergence assessment instead of another broad round.
-It chooses a bounded focused repair, a coherent replan, or `RESCOPE_REQUIRED`;
-unresolved findings are never approved merely to meet the bound. A task whose
+The review loop runs until the reviewers agree, with no round limit and no
+human stop. At the fifth verdict that needs changes, at each later checkpoint,
+or when the loop cycles or a fix outgrows the plan, the pipeline's independent
+convergence assessment diagnoses it instead of another ordinary fix. It
+continues the loop with rulings that settle reopened questions, replans the
+failing mechanism, or chooses `RESCOPE_REQUIRED`; unresolved findings are never
+approved to end the loop. A task whose
 desired outcome was already present may finish without a source commit only
 after the same general review and evidence loop prove
 `Outcome: already-satisfied`.

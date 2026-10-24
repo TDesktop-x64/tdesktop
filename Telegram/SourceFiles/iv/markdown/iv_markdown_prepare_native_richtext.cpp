@@ -269,13 +269,25 @@ void AppendCanonicalNativeIvRichText(
 	auto buttons = std::vector<InlineLinkButtonSpan>();
 	if (!state->editMode && TextHasInlineLinkButton(text.text)) {
 		const auto &runtime = state->result.mediaRuntime;
+		const auto quotable = IsQuotableNativeContent(state->result);
+		auto replacements = std::vector<PreparedTextReplacement>();
+		auto labelDates = std::vector<PreparedTextReplacement>();
 		spliced = text.text;
 		buttons = ExpandInlineLinkButtons(
 			&*spliced,
 			RichButtonLabelDates::Resolve,
 			runtime
 				? runtime->textContext().formattedDateFactory
-				: Ui::Text::FormattedDateFactory());
+				: Ui::Text::FormattedDateFactory(),
+			quotable ? &replacements : nullptr,
+			quotable ? &labelDates : nullptr);
+		if (!replacements.empty()) {
+			state->result.linkSplices.push_back({
+				.source = &text.text,
+				.replacements = std::move(replacements),
+				.labelDates = std::move(labelDates),
+			});
+		}
 	}
 	const auto &source = spliced ? *spliced : text.text;
 	const auto shift = result->text.text.size();

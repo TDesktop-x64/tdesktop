@@ -87,12 +87,16 @@ PRIVATE
     iv/markdown/iv_markdown_common.h
     iv/markdown/iv_markdown_article.cpp
     iv/markdown/iv_markdown_article.h
+    iv/markdown/iv_markdown_article_caption_hit.cpp
+    iv/markdown/iv_markdown_article_caption_hit.h
     iv/markdown/iv_markdown_article_layout_blocks.cpp
     iv/markdown/iv_markdown_article_layout_blocks.h
     iv/markdown/iv_markdown_article_layout_structure.cpp
     iv/markdown/iv_markdown_article_layout_structure.h
     iv/markdown/iv_markdown_article_paint.cpp
     iv/markdown/iv_markdown_article_paint.h
+    iv/markdown/iv_markdown_article_quote.cpp
+    iv/markdown/iv_markdown_article_quote.h
     iv/markdown/iv_markdown_article_scroll_forwarder.cpp
     iv/markdown/iv_markdown_article_scroll_forwarder.h
     iv/markdown/iv_markdown_article_selection.cpp

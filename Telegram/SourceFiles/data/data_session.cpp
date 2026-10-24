@@ -560,6 +560,9 @@ void Session::clear() {
 	_contactsList.clear();
 	for (const auto &[id, folder] : _folders) {
 		folder->clearChatsList();
+
+		// Folders outlive clear(), don't leave them with dangling rows.
+		removeChatListEntry(folder.get());
 	}
 	_chatsList.clear();
 	_chatsFilters->clear();
@@ -839,7 +842,7 @@ not_null<UserData*> Session::processUser(const MTPUser &data) {
 				? result->phone()
 				: qs(data.vphone().value_or_empty());
 			const auto uname = minimal
-				? result->username()
+				? result->editableUsername()
 				: TextUtilities::SingleLine(
 					qs(data.vusername().value_or_empty()));
 
@@ -2018,24 +2021,6 @@ void Session::requestDocumentViewRepaint(
 	if (i != end(_documentItems)) {
 		for (const auto &item : i->second) {
 			requestItemRepaint(item);
-		}
-	}
-}
-
-void Session::requestPollViewRepaint(not_null<const PollData*> poll) {
-	if (const auto i = _pollViews.find(poll); i != _pollViews.end()) {
-		for (const auto &view : i->second) {
-			requestViewResize(view);
-		}
-	}
-}
-
-void Session::requestTodoListViewRepaint(
-		not_null<const TodoListData*> todolist) {
-	if (const auto i = _todoListViews.find(todolist)
-		; i != _todoListViews.end()) {
-		for (const auto &view : i->second) {
-			requestViewResize(view);
 		}
 	}
 }
@@ -3706,13 +3691,6 @@ bool Session::unreadBadgeMutedIgnoreOne(Dialogs::Key key) const {
 		? key.entry()->chatListUnreadState()
 		: Dialogs::UnreadState();
 	return computeUnreadBadgeMuted(_chatsList.unreadState() - remove);
-}
-
-int Session::unreadOnlyMutedBadge() const {
-	const auto state = _chatsList.unreadState();
-	return Core::App().settings().countUnreadMessages()
-		? state.messagesMuted
-		: state.chatsMuted;
 }
 
 rpl::producer<> Session::unreadBadgeChanges() const {

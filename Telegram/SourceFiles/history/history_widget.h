@@ -496,7 +496,6 @@ private:
 	void setMembersShowAreaActive(bool active);
 	void handleHistoryChange(not_null<const History*> history);
 	void showAboutTopPromotion();
-	void hideFieldIfVisible();
 	void unreadCountUpdated();
 	void closeCurrent();
 
@@ -618,7 +617,6 @@ private:
 	// Request to show results in the emoji panel.
 	void applyInlineBotQuery(UserData *bot, const QString &query);
 
-	void cancelReplyAfterMediaSend(bool lastKeyboardUsed);
 	[[nodiscard]] HistoryItem *lookupReplyNavItem(FullMsgId itemId) const;
 	bool replyToPreviousMessage();
 	bool replyToNextMessage();

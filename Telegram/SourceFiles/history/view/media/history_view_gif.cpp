@@ -1108,7 +1108,10 @@ void Gif::draw(Painter &p, const PaintContext &context) const {
 			auto fastShareTop = fullBottom
 				- st::historyFastShareBottom
 				- (size ? size->height() : 0);
-			if (fastShareLeft + rightActionWidth > maxRight) {
+			const auto fitRight = _parent->hasFromPhoto()
+				? maxRight
+				: _parent->width();
+			if (fastShareLeft + rightActionWidth > fitRight) {
 				const auto hidesBottomInfo = _parent->hidesBottomInfo();
 				fastShareLeft = fullRight
 					- rightActionWidth
@@ -1597,7 +1600,10 @@ TextState Gif::textState(QPoint point, StateRequest request) const {
 			auto fastShareTop = fullBottom
 				- st::historyFastShareBottom
 				- size->height();
-			if (fastShareLeft + rightActionWidth > maxRight) {
+			const auto fitRight = _parent->hasFromPhoto()
+				? maxRight
+				: _parent->width();
+			if (fastShareLeft + rightActionWidth > fitRight) {
 				const auto hidesBottomInfo = _parent->hidesBottomInfo();
 				fastShareLeft = fullRight
 					- rightActionWidth

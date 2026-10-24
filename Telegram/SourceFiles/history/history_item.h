@@ -188,7 +188,6 @@ public:
 	void dependencyItemRemoved(not_null<HistoryItem*> dependency);
 	void dependencyStoryRemoved(not_null<Data::Story*> dependency);
 	void updateDependencyItem();
-	[[nodiscard]] MsgId dependencyMsgId() const;
 	[[nodiscard]] bool notificationReady() const;
 	[[nodiscard]] PeerData *specialNotificationPeer() const;
 	void checkStoryForwardInfo();
@@ -246,7 +245,6 @@ public:
 	void setMainView(not_null<HistoryView::Element*> view) {
 		_mainView = view;
 	}
-	void refreshMainView();
 	void clearMainView();
 	void removeMainView(
 		Data::ViewRemovalReason reason = Data::ViewRemovalReason::Removed);
@@ -397,7 +395,6 @@ public:
 	void setCommentsPossibleMaxId(MsgId possibleMaxId);
 	[[nodiscard]] bool areCommentsUnread() const;
 
-	[[nodiscard]] FullMsgId commentsItemId() const;
 	void setCommentsItemId(FullMsgId id);
 
 	[[nodiscard]] bool needCheck() const;
@@ -610,6 +607,7 @@ public:
 
 	[[nodiscard]] bool showForwardsFromSender(
 		not_null<const HistoryMessageForwarded*> forwarded) const;
+	[[nodiscard]] bool displayForwardedFrom() const;
 
 	[[nodiscard]] bool isEmpty() const;
 	[[nodiscard]] MessageGroupId groupId() const;

@@ -282,6 +282,15 @@ launches with `-testagent -noupdate`, so no task needs to require either flag.
 Every such criterion costs a performer real time and proves nothing about the
 product.
 
+Plan a harness or testing-infrastructure task for its consumers. Say in
+`task.md` that it is harness work, and name the tasks, tests or agents that
+will use it. Write its acceptance as the few results those consumers need,
+each shown by the harness's own self-test or one consumer run. Leave the
+mechanism, the framework internals it relies on and the edge cases no consumer
+reaches to the performer's plan. A harness task that specifies framework
+internals or exhaustive edge cases is over-specified: the performer builds,
+reviews and tests every line of it.
+
 Never write an acceptance criterion that can only be satisfied by adding
 debug machinery to production code — `#ifdef _DEBUG` blocks, debug-only
 types, observation structs, counters, or hooks in product translation units.
@@ -325,7 +334,13 @@ The checkout tag belongs in the receipt only.
 
 Every new task uses `type: implement`. Do not predict a cheap or expensive
 execution profile while routing: the performer selects review specialists and
-evidence instruments after inspecting the real code and risks. Keep acceptance
+evidence instruments after inspecting the real code and risks. Requests
+written by the code-health skill carry a `## Code health` section; keep it
+verbatim in the task, because its class selects the performer's lane, and
+never add one to any other request. A Q0, Q1 or Q2 request is already
+planned and sized: route it as one standalone task (`project: null`, no
+dependencies), copy its title, paragraph and sections verbatim, and never
+merge or split it. Q3–Q5 requests are planned like any other. Keep acceptance
 criteria outcome-focused. Name a required build, probe, app run, interaction,
 or screenshot only when that instrument is itself part of the requested result
 or no other instrument could decide the claim from the facts already known to

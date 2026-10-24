@@ -132,12 +132,10 @@ public:
 
 	void activateInitialNode();
 	void activateInitialNodeAtEnd();
-	void activateSegment(int segmentIndex, int cursorOffset);
 	[[nodiscard]] State::ApplyResult commitInlineField();
 	[[nodiscard]] State::ApplyResult commitInlineFieldForClose();
 	[[nodiscard]] bool closeSearch();
 	void refreshPreparedContent();
-	void refreshPreparedLeafAtActiveSource();
 	void applyExternalRichPageMutation(Fn<bool(RichPage&)> mutation);
 	void syncInlineFieldGeometry();
 	[[nodiscard]] bool canInsertListAtCaret() const;
@@ -158,14 +156,10 @@ public:
 		std::shared_ptr<const RichPage> page);
 	[[nodiscard]] TextWithEntities textSpanForCurrentSelection();
 	void replaceCurrentSelectionWithText(TextWithEntities text);
-	void pastePreparedBlock(
-		RichPage::Block block,
-		PreparedMediaPasteTarget target);
 	void pastePreparedBlocks(
 		std::vector<RichPage::Block> blocks,
 		PreparedMediaPasteTarget target);
 	void groupBlocksIntoGroup(State::BlockPath anchor, int insertedCount);
-	void insertHeading1();
 	void insertBlockquote();
 	void insertEmoji(EmojiPtr emoji);
 	void insertCustomEmoji(not_null<DocumentData*> document);
@@ -594,7 +588,6 @@ private:
 		Fn<void()> afterRefresh);
 	bool showLastLimitToast();
 	void hideInlineField();
-	void acceptInlineField();
 	void hideInlineFieldAndRefresh();
 	void toggleSearch();
 	void createSearchController();
@@ -780,6 +773,11 @@ private:
 		const State::LeafPath &leaf,
 		State::FieldMode mode,
 		const InlineFieldStyleKey &styleKey);
+	void restoreInlineFieldAfterMutation(
+		const std::optional<State::LeafPath> &restoreLeaf,
+		const std::optional<InlineFieldStyleKey> &restoreStyleKey,
+		State::FieldMode restoreMode,
+		const std::optional<HistoryLeafSelection> &restoreSelection);
 	void pruneRetainedLeafFields();
 	void removeRetainedLeafFieldsAfter(int historyIndex);
 	void moveRetainedLeafFields(

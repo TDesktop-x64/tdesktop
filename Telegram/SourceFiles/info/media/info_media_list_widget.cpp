@@ -38,6 +38,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_helpers.h"
+#include "history/view/history_view_context_menu.h"
 #include "media/stories/media_stories_controller.h" // ...TogglePinnedToast.
 #include "media/stories/media_stories_share.h" // PrepareShareBox.
 #include "media/stories/media_stories_stealth.h"
@@ -1484,11 +1485,12 @@ void ListWidget::showContextMenu(
 	if (item->isHistoryEntry()) {
 		_contextMenu->addAction(
 			tr::lng_context_to_msg(tr::now),
-			[=] {
+			crl::guard(this, [=] {
 				if (const auto item = MessageByGlobalId(globalId)) {
+					_controller->notifyJumpToMessage();
 					JumpToMessageClickHandler(item)->onClick({});
 				}
-			},
+			}),
 			&st::menuIconShowInChat);
 	}
 
@@ -1640,6 +1642,11 @@ void ListWidget::showContextMenu(
 						(unpin ? &st::menuIconUnpin : &st::menuIconPin));
 				}
 			}
+			HistoryView::AddPostLinkAction(
+				_contextMenu.get(),
+				_controller->parentController(),
+				item,
+				HistoryView::Context::History);
 			if (selectionData.canForward) {
 				_contextMenu->addAction(
 					tr::lng_context_forward_msg(tr::now),
@@ -2493,6 +2500,13 @@ void ListWidget::performDrag() {
 		pressedHandler->property(
 			kDocumentLinkMediaProperty).toULongLong());
 	if (document) {
+		const auto peer = (_controller->isDownloads() && _pressState.item)
+			? _pressState.item->history()->peer.get()
+			: _controller->key().peer();
+		if ((peer && !peer->allowsForwarding())
+			|| (_pressState.item && _pressState.item->forbidsForward())) {
+			return;
+		}
 		const auto filepath = document->filepath(true);
 		if (filepath.isEmpty()) {
 			return;

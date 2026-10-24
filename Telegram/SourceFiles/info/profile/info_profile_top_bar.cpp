@@ -50,6 +50,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "info/info_memento.h"
 #include "info/profile/info_profile_badge.h"
+#include "info/profile/info_profile_balance_pill.h"
 #include "info/profile/info_profile_birthday_effect.h"
 #include "info/profile/info_profile_cover.h" // LargeCustomEmojiMargins
 #include "info/profile/info_profile_status_label.h"
@@ -97,6 +98,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/shadow.h"
 #include "ui/widgets/tooltip.h"
 #include "ui/wrap/fade_wrap.h"
+#include "wallet/wallet_card_view.h"
 #include "window/themes/window_theme.h"
 #include "window/window_peer_menu.h"
 #include "window/window_session_controller.h"
@@ -382,13 +384,22 @@ TopBar::TopBar(
 	&& descriptor.source != Source::Stories
 	&& descriptor.source != Source::Preview
 	&& (_wrap.current() != Wrap::Side || !_peer->isNotificationsUser()))
+, _hasBalance(_peer->isUser()
+	&& !_savedMessages
+	&& !_topic
+	&& (_source == Source::Profile
+		|| (_source == Source::Stories && _peer->isSelf())))
+// Without the action buttons the pill fits the gap below the status.
+, _balanceReserve((_hasBalance && _hasActions)
+	? st::infoProfileTopBarBalanceReserve
+	: 0)
 , _minForProgress([&] {
 	QWidget::setMinimumHeight(st::infoLayerTopBarHeight);
-	QWidget::setMaximumHeight(_savedMessages
+	QWidget::setMaximumHeight(_balanceReserve + (_savedMessages
 		? st::infoLayerTopBarHeight
 		: _hasActions
 		? st::infoProfileTopBarHeightMax
-		: st::infoProfileTopBarNoActionsHeightMax);
+		: st::infoProfileTopBarNoActionsHeightMax));
 	return QWidget::minimumHeight()
 		+ (!_hasActions
 			? 0
@@ -486,6 +497,19 @@ TopBar::TopBar(
 	}
 
 	bindStatus();
+	if (_hasBalance) {
+		const auto user = _peer->asUser();
+		_balancePill = std::make_unique<BalancePill>(
+			this,
+			user,
+			_edgeColor.value());
+		const auto pill = _balancePill.get();
+		pill->setClickedCallback([=] {
+			if (pill->actionable()) {
+				Wallet::ShowCardView(controller, user, pill);
+			}
+		});
+	}
 
 	_title->setContextCopyText(tr::lng_profile_copy_fullname(tr::now));
 	_title->setSelectable(true);
@@ -2123,6 +2147,9 @@ void TopBar::updateStatusPosition(float64 progressCurrent) {
 		* std::clamp((progressCurrent) / 0.15, 0., 1.);
 
 	_status->moveToLeft(statusLeft + statusShift, statusTop);
+	if (_balancePill) {
+		_balancePill->place(width(), statusTop - swapShift, progressCurrent);
+	}
 
 	if (_showLastSeen->toggled()) {
 		_showLastSeen->moveToLeft(
@@ -2839,9 +2866,6 @@ void TopBar::paintUserpic(QPainter &p, const QRect &geometry) {
 		if (!frame.isNull()) {
 			auto hq = PainterHighQualityEnabler(p);
 			p.drawImage(geometry, frame);
-			if (!paused) {
-				update();
-			}
 			return;
 		}
 	}
@@ -2920,11 +2944,10 @@ void TopBar::paintEvent(QPaintEvent *e) {
 	if (_hasGradientBg && _cachedGradient.isNull()) {
 		const auto collectible = effectiveCollectible();
 		const auto colorProfile = effectiveColorProfile();
-		const auto offset = QPoint(
-			0,
-			_hasActions
-				? -st::infoProfileTopBarPhotoBgShift
-				: -st::infoProfileTopBarPhotoBgNoActionsShift);
+		const auto shift = _balanceReserve / 2 + (_hasActions
+			? st::infoProfileTopBarPhotoBgShift
+			: st::infoProfileTopBarPhotoBgNoActionsShift);
+		const auto offset = QPoint(0, -shift);
 		if (collectible) {
 			_cachedGradient = Ui::CreateTopBgGradient(
 				QSize(width(), maximumHeight()),
@@ -3244,7 +3267,11 @@ void TopBar::updateVideoUserpic() {
 		return;
 	}
 	if (!_videoUserpicPlayer) {
-		_videoUserpicPlayer = std::make_unique<Ui::VideoUserpicPlayer>();
+		_videoUserpicPlayer = std::make_unique<Ui::VideoUserpicPlayer>([=] {
+			if (!_gifPausedChecker()) {
+				update();
+			}
+		});
 	}
 	_videoUserpicPlayer->setup(_peer, photo);
 }

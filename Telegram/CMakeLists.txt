@@ -199,6 +199,8 @@ PRIVATE
     api/api_sending.h
     api/api_sensitive_content.cpp
     api/api_sensitive_content.h
+    api/api_share_themes.cpp
+    api/api_share_themes.h
     api/api_single_message_search.cpp
     api/api_single_message_search.h
     api/api_statistics.cpp
@@ -342,6 +344,8 @@ PRIVATE
     boxes/gift_credits_box.h
     boxes/gift_premium_box.cpp
     boxes/gift_premium_box.h
+    boxes/keys_legend.cpp
+    boxes/keys_legend.h
     boxes/language_box.cpp
     boxes/language_box.h
     boxes/max_invite_box.cpp
@@ -773,6 +777,7 @@ PRIVATE
     data/data_peer_common.h
     data/data_peer_id.cpp
     data/data_peer_id.h
+    data/data_peer_share_theme.h
     data/data_peer_values.cpp
     data/data_peer_values.h
     data/data_photo.cpp
@@ -833,6 +838,8 @@ PRIVATE
     data/data_user_photos.h
     data/data_user_names.cpp
     data/data_user_names.h
+    data/data_user_wallet_card.cpp
+    data/data_user_wallet_card.h
     data/data_wall_paper.cpp
     data/data_wall_paper.h
     data/data_web_page.cpp
@@ -1122,6 +1129,8 @@ PRIVATE
     history/view/history_view_contact_status.h
     history/view/history_view_context_menu.cpp
     history/view/history_view_context_menu.h
+    history/view/history_view_copy_selection.cpp
+    history/view/history_view_copy_selection.h
     history/view/history_view_corner_buttons.cpp
     history/view/history_view_corner_buttons.h
     history/view/history_view_cursor_state.cpp
@@ -1174,6 +1183,8 @@ PRIVATE
     history/view/history_view_reply_button.h
     history/view/history_view_requests_bar.cpp
     history/view/history_view_requests_bar.h
+    history/view/history_view_rich_quote.cpp
+    history/view/history_view_rich_quote.h
     history/view/history_view_schedule_box.cpp
     history/view/history_view_schedule_box.h
     history/view/history_view_scheduled_section.cpp
@@ -1194,6 +1205,8 @@ PRIVATE
     history/view/history_view_summary_header.h
     history/view/history_view_text_helper.cpp
     history/view/history_view_text_helper.h
+    history/view/history_view_touch_scroll.cpp
+    history/view/history_view_touch_scroll.h
     history/view/history_view_transcribe_button.cpp
     history/view/history_view_transcribe_button.h
     history/view/history_view_translate_bar.cpp
@@ -1322,12 +1335,16 @@ PRIVATE
     info/profile/info_profile_actions.h
     info/profile/info_profile_badge.cpp
     info/profile/info_profile_badge.h
+    info/profile/info_profile_balance_pill.cpp
+    info/profile/info_profile_balance_pill.h
     info/profile/info_profile_birthday_effect.cpp
     info/profile/info_profile_birthday_effect.h
     info/profile/info_profile_cover.cpp
     info/profile/info_profile_cover.h
     info/profile/info_profile_emoji_status_panel.cpp
     info/profile/info_profile_emoji_status_panel.h
+    info/profile/info_profile_free_codes.cpp
+    info/profile/info_profile_free_codes.h
     info/profile/info_profile_inner_widget.cpp
     info/profile/info_profile_inner_widget.h
     info/profile/info_profile_members.cpp
@@ -1336,8 +1353,16 @@ PRIVATE
     info/profile/info_profile_members_controllers.h
     info/profile/info_profile_phone_menu.cpp
     info/profile/info_profile_phone_menu.h
+    info/profile/info_profile_qr_emoji.cpp
+    info/profile/info_profile_qr_emoji.h
+    info/profile/info_profile_qr_gifts.cpp
+    info/profile/info_profile_qr_gifts.h
+    info/profile/info_profile_qr_link.cpp
+    info/profile/info_profile_qr_link.h
     info/profile/info_profile_section_stack.cpp
     info/profile/info_profile_section_stack.h
+    info/profile/info_profile_share_theme.cpp
+    info/profile/info_profile_share_theme.h
     info/profile/info_profile_shared_media_classic.cpp
     info/profile/info_profile_shared_media_classic.h
     info/profile/info_profile_status_label.cpp
@@ -1491,6 +1516,10 @@ PRIVATE
     iv/iv_rich_message_serializer.h
     iv/iv_rich_page.cpp
     iv/iv_rich_page.h
+    iv/iv_rich_page_quote.cpp
+    iv/iv_rich_page_quote.h
+    iv/iv_rich_page_quote_builder.cpp
+    iv/iv_rich_page_quote_builder.h
     lang/lang_cloud_manager.cpp
     lang/lang_cloud_manager.h
     lang/lang_instance.cpp
@@ -2035,6 +2064,8 @@ PRIVATE
     test/test_box_button.h
     test/test_capture.cpp
     test/test_capture.h
+    test/test_chat_menu.cpp
+    test/test_chat_menu.h
     test/test_clipboard.cpp
     test/test_clipboard.h
     test/test_console_lock.cpp
@@ -2063,6 +2094,7 @@ PRIVATE
     test/test_log.h
     test/test_log_lines.cpp
     test/test_log_lines.h
+    test/test_log_scan_internal.h
     test/test_mapped_target.cpp
     test/test_mapped_target.h
     test/test_marking_read.cpp
@@ -2075,12 +2107,21 @@ PRIVATE
     test/test_notify_override.h
     test/test_open_handoff.cpp
     test/test_open_handoff.h
+    test/test_palette.cpp
+    test/test_palette.h
     test/test_panel.cpp
     test/test_panel.h
     test/test_post_paint.cpp
     test/test_post_paint.h
+    test/test_press_origin.cpp
+    test/test_press_origin.h
     test/test_probe.cpp
     test/test_probe.h
+    test/test_publication_identity_scan.cpp
+    test/test_publication_identity_scan.h
+    test/test_publication_identity_scan_self_test.cpp
+    test/test_queued_drag.cpp
+    test/test_queued_drag.h
     test/test_rpc_fixture.cpp
     test/test_rpc_fixture.h
     test/test_rpc_retry.cpp
@@ -2090,6 +2131,8 @@ PRIVATE
     test/test_scenario.cpp
     test/test_secrecy_scan.cpp
     test/test_secrecy_scan.h
+    test/test_session_gate.cpp
+    test/test_session_gate.h
     test/test_style.cpp
     test/test_style.h
     test/test_text_drop.cpp
@@ -2136,6 +2179,8 @@ PRIVATE
     ui/controls/custom_emoji_toast_icon.h
     ui/controls/emoji_button_factory.cpp
     ui/controls/emoji_button_factory.h
+    ui/controls/keys_legend.cpp
+    ui/controls/keys_legend.h
     ui/controls/location_picker.cpp
     ui/controls/location_picker.h
     ui/controls/silent_toggle.cpp
@@ -2155,6 +2200,22 @@ PRIVATE
     ui/effects/message_sending_animation_common.h
     ui/effects/message_sending_animation_controller.cpp
     ui/effects/message_sending_animation_controller.h
+    ui/effects/peer_qr_colors_panel.cpp
+    ui/effects/peer_qr_colors_panel.h
+    ui/effects/peer_qr_emoji_field.cpp
+    ui/effects/peer_qr_emoji_field.h
+    ui/effects/peer_qr_gift_field.cpp
+    ui/effects/peer_qr_gift_field.h
+    ui/effects/peer_qr_gifts_panel.cpp
+    ui/effects/peer_qr_gifts_panel.h
+    ui/effects/peer_qr_layer.cpp
+    ui/effects/peer_qr_layer.h
+    ui/effects/peer_qr_panel.cpp
+    ui/effects/peer_qr_panel.h
+    ui/effects/peer_qr_pill.cpp
+    ui/effects/peer_qr_pill.h
+    ui/effects/peer_qr_surface.cpp
+    ui/effects/peer_qr_surface.h
     ui/effects/reaction_fly_animation.cpp
     ui/effects/reaction_fly_animation.h
     ui/effects/thanos_effect.cpp
@@ -2204,18 +2265,50 @@ PRIVATE
     ui/peer/video_userpic_player.h
     wallet/wallet_address.cpp
     wallet/wallet_address.h
+    wallet/wallet_address_label.cpp
+    wallet/wallet_address_label.h
     wallet/wallet_amount_field.cpp
     wallet/wallet_amount_field.h
     wallet/wallet_amount_painter.cpp
     wallet/wallet_amount_painter.h
     wallet/wallet_api.cpp
     wallet/wallet_api.h
+    wallet/wallet_card_colors.cpp
+    wallet/wallet_card_colors.h
+    wallet/wallet_card_drag.cpp
+    wallet/wallet_card_drag.h
+    wallet/wallet_card_editor.cpp
+    wallet/wallet_card_editor.h
+    wallet/wallet_card_flight.cpp
+    wallet/wallet_card_flight.h
+    wallet/wallet_card_float.cpp
+    wallet/wallet_card_float.h
+    wallet/wallet_card_foreground.cpp
+    wallet/wallet_card_foreground.h
+    wallet/wallet_card_look.cpp
+    wallet/wallet_card_look.h
+    wallet/wallet_card_space.cpp
+    wallet/wallet_card_space.h
+    wallet/wallet_card_stickers.cpp
+    wallet/wallet_card_stickers.h
+    wallet/wallet_card_transition.cpp
+    wallet/wallet_card_transition.h
+    wallet/wallet_card_view.cpp
+    wallet/wallet_card_view.h
+    wallet/wallet_card_view_motion.cpp
+    wallet/wallet_card_view_motion.h
     wallet/wallet_chat_show.cpp
     wallet/wallet_chat_show.h
     wallet/wallet_collectible_media.cpp
     wallet/wallet_collectible_media.h
+    wallet/wallet_collectible_record.cpp
+    wallet/wallet_collectible_record.h
     wallet/wallet_collectibles.cpp
     wallet/wallet_collectibles.h
+    wallet/wallet_collectibles_hint.cpp
+    wallet/wallet_collectibles_hint.h
+    wallet/wallet_collectibles_viewport.cpp
+    wallet/wallet_collectibles_viewport.h
     wallet/wallet_comment.cpp
     wallet/wallet_comment.h
     wallet/wallet_content.cpp
@@ -2228,10 +2321,16 @@ PRIVATE
     wallet/wallet_engine.h
     wallet/wallet_fiat.cpp
     wallet/wallet_fiat.h
+    wallet/wallet_gift_move_presentation.cpp
+    wallet/wallet_gift_move_presentation.h
     wallet/wallet_key_protection.cpp
     wallet/wallet_key_protection.h
+    wallet/wallet_move_to_gifts.cpp
+    wallet/wallet_move_to_gifts.h
     wallet/wallet_onramp.cpp
     wallet/wallet_onramp.h
+    wallet/wallet_own_card.cpp
+    wallet/wallet_own_card.h
     wallet/wallet_palette.cpp
     wallet/wallet_palette.h
     wallet/wallet_panel.cpp
@@ -2240,8 +2339,16 @@ PRIVATE
     wallet/wallet_phrase_shares.h
     wallet/wallet_rates.cpp
     wallet/wallet_rates.h
+    wallet/wallet_send_preparation.cpp
+    wallet/wallet_send_preparation.h
     wallet/wallet_session.cpp
     wallet/wallet_session.h
+    wallet/wallet_session_deposit.cpp
+    wallet/wallet_session_deposit.h
+    wallet/wallet_session_gift_moves.cpp
+    wallet/wallet_session_gift_moves.h
+    wallet/wallet_session_waits.cpp
+    wallet/wallet_session_waits.h
     wallet/wallet_stream.cpp
     wallet/wallet_stream.h
     wallet/wallet_ton_connect.cpp
@@ -2254,6 +2361,8 @@ PRIVATE
     wallet/wallet_ton_connect_emulation.h
     wallet/wallet_ton_connect_link.cpp
     wallet/wallet_ton_connect_link.h
+    wallet/wallet_ton_connect_login.cpp
+    wallet/wallet_ton_connect_login.h
     wallet/wallet_ton_connect_request.cpp
     wallet/wallet_ton_connect_request.h
     wallet/wallet_ton_connect_request_box.cpp
@@ -2268,6 +2377,8 @@ PRIVATE
     wallet/wallet_user_addresses.h
     wallet/wallet_vault.cpp
     wallet/wallet_vault.h
+    wallet/wallet_window_transition.cpp
+    wallet/wallet_window_transition.h
     webauthn/cable.h
     webauthn/cable_box.cpp
     webauthn/cable_box.h
@@ -2309,6 +2420,8 @@ PRIVATE
     window/window_main_menu_helpers.h
     window/window_media_preview.cpp
     window/window_media_preview.h
+    window/window_no_paid_token.cpp
+    window/window_no_paid_token.h
     window/window_peer_menu.cpp
     window/window_peer_menu.h
     window/window_restore_shell.cpp
@@ -2321,6 +2434,7 @@ PRIVATE
     window/session/window_session_media.cpp
     window/window_session_controller.cpp
     window/window_session_controller.h
+    window/window_session_controller_contact.cpp
     window/window_session_controller_link_info.h
     window/window_setup_email.cpp
     window/window_setup_email.h
@@ -2443,11 +2557,37 @@ if (WIN32)
     #     $<IF:${release},"Appending compatibility manifest.","Finalizing build.">
     # )
 
-    if (QT_VERSION LESS 6)
+    if (QT_VERSION LESS 6 OR DESKTOP_APP_WIN7_BASELINE)
         target_link_libraries(Telegram PRIVATE desktop-app::win_directx_helper)
     endif()
 
+    if (DESKTOP_APP_WIN7_BASELINE)
+        # ANGLE loads d3dcompiler_47.dll from modules folder next to exe.
+        if (build_win64)
+            set(d3d_modules_subdir x64)
+        else()
+            set(d3d_modules_subdir x86)
+        endif()
+        set(d3d_modules_dir $<TARGET_FILE_DIR:Telegram>/modules/${d3d_modules_subdir}/d3d)
+        add_custom_command(TARGET Telegram POST_BUILD
+        COMMAND
+            ${CMAKE_COMMAND} -E make_directory ${d3d_modules_dir}
+        COMMAND
+            ${CMAKE_COMMAND} -E copy_if_different
+            ${cmake_helpers_loc}/win_directx_helper/modules/${d3d_modules_subdir}/d3d/d3dcompiler_47.dll
+            ${d3d_modules_dir}/d3dcompiler_47.dll
+        COMMENT
+            "Copying d3dcompiler_47.dll for ANGLE."
+        VERBATIM
+        )
+    endif()
+
     target_link_options(Telegram PRIVATE /PDBPAGESIZE:8192)
+
+    if (DESKTOP_APP_WIN7_BASELINE)
+        # The loader reads the subsystem version as the minimal Windows.
+        target_link_options(Telegram PRIVATE /SUBSYSTEM:WINDOWS,6.01)
+    endif()
 elseif (APPLE)
     if (NOT DESKTOP_APP_USE_PACKAGED)
         target_link_libraries(Telegram PRIVATE desktop-app::external_iconv)
@@ -2629,6 +2769,8 @@ if (MSVC)
     )
     target_link_options(Telegram
     PRIVATE
+        # Keep delay-load protection across Qt variants with different imports.
+        /IGNORE:4199
         /DELAYLOAD:secur32.dll
         # /DELAYLOAD:winmm.dll
         /DELAYLOAD:ws2_32.dll
@@ -2647,12 +2789,15 @@ if (MSVC)
         /DELAYLOAD:uxtheme.dll
         /DELAYLOAD:crypt32.dll
         /DELAYLOAD:bcrypt.dll
+        /DELAYLOAD:ncrypt.dll
         /DELAYLOAD:netapi32.dll
         /DELAYLOAD:mpr.dll
         /DELAYLOAD:imm32.dll
+        /DELAYLOAD:hid.dll
         /DELAYLOAD:userenv.dll
         /DELAYLOAD:wtsapi32.dll
         /DELAYLOAD:propsys.dll
+        /DELAYLOAD:uiautomationcore.dll
     )
     if (QT_VERSION GREATER 6)
         if (NOT build_winarm)
@@ -2738,6 +2883,9 @@ if (NOT DESKTOP_APP_DISABLE_AUTOUPDATE AND NOT build_macstore AND NOT build_wins
         else()
             target_link_options(Updater PRIVATE -municode)
         endif()
+        if (DESKTOP_APP_WIN7_BASELINE)
+            target_link_options(Updater PRIVATE /SUBSYSTEM:WINDOWS,6.01)
+        endif()
     elseif (APPLE)
         # Keep the launch API available to macOS 10.13 release builds.
         target_compile_options(Updater PRIVATE -Wno-error=deprecated-declarations)
@@ -2774,6 +2922,12 @@ if (NOT DESKTOP_APP_DISABLE_AUTOUPDATE AND NOT build_macstore AND NOT build_wins
 
         if (DESKTOP_APP_USE_PACKAGED)
             target_compile_definitions(Packer PRIVATE PACKER_USE_PACKAGED)
+        endif()
+
+        if (WIN32 AND DESKTOP_APP_WIN7_BASELINE)
+            # WindowsApp.lib is off the link line, WinRT stubs come from lib_base.
+            target_link_libraries(Packer PRIVATE desktop-app::lib_base)
+            target_link_options(Packer PRIVATE /SUBSYSTEM:CONSOLE,6.01)
         endif()
 
         set_target_properties(Packer PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${output_folder})

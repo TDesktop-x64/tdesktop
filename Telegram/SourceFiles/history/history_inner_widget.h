@@ -24,11 +24,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_cursor_state.h"
 #include "history/view/history_view_keyboard_text_selection.h"
 #include "history/view/history_view_top_bar_widget.h"
+#include "history/view/history_view_touch_scroll.h"
 
 #include <QtGui/QPainterPath>
 
 struct ClickContext;
 struct ClickHandlerContext;
+struct HistorySelectedTextParts;
 
 namespace Data {
 struct Group;
@@ -474,6 +476,7 @@ private:
 		not_null<HistoryItem*> item) const;
 	[[nodiscard]] MessageSelection getSelectedTextSelection(
 		not_null<HistoryItem*> item) const;
+	[[nodiscard]] HistorySelectedTextParts getSelectedTextParts() const;
 	[[nodiscard]] bool isPressInSelectedText(
 		not_null<const Element*> view,
 		TextState state) const;
@@ -545,7 +548,7 @@ private:
 	void reportAsGroup(FullMsgId itemId);
 	void blockSenderItem(FullMsgId itemId);
 	void blockSenderAsGroup(FullMsgId itemId);
-	void copySelectedText();
+	void copySelectedText(bool withImageText = false);
 	void editCaptionUploadLayer(not_null<HistoryItem*> item);
 	void setupShortcuts();
 
@@ -704,6 +707,7 @@ private:
 	crl::time _touchAccelerationTime = 0;
 	crl::time _touchTime = 0;
 	base::Timer _touchScrollTimer;
+	HistoryView::TouchScroll _touchElastic;
 	Ui::MiddleClickAutoscroll _middleClickAutoscroll;
 
 	Ui::Controls::SwipeContextData _gestureHorizontal;

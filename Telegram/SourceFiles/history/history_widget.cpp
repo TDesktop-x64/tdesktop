@@ -1035,6 +1035,10 @@ HistoryWidget::HistoryWidget(
 		if (flags & PeerUpdateFlag::StarsPerMessage) {
 			updateFieldPlaceholder();
 			updateSendButtonType();
+			if (_list && _peer->isUser()) {
+				_list->refreshAboutView(true);
+				_list->updateBotInfo();
+			}
 		}
 		if (flags & PeerUpdateFlag::GiftSettings) {
 			refreshSendGiftToggle();
@@ -4630,18 +4634,6 @@ void HistoryWidget::updateControlsVisibility() {
 	updateMouseTracking();
 }
 
-void HistoryWidget::hideFieldIfVisible() {
-	if (_field->isHidden() && _richDraftPreview->isHidden()) {
-		return;
-	} else if (Ui::InFocusChain(_field)) {
-		setFocus();
-	}
-	_field->hide();
-	_richDraftPreview->hide();
-	updateControlsGeometry();
-	update();
-}
-
 void HistoryWidget::showAboutTopPromotion() {
 	Expects(_history != nullptr);
 	Expects(_list != nullptr);
@@ -5809,7 +5801,8 @@ Api::SendAction HistoryWidget::prepareSendAction(
 	if (const auto forum = _history->asForum()) {
 		if (forum->bot() && Data::IsBotUserCreatesTopics(_history->peer)) {
 			const auto readyRootId = [&]() -> MsgId {
-				if (const auto id = result.replyTo.messageId) {
+				const auto id = result.replyTo.messageId;
+				if (id.peer == _history->peer->id) {
 					if (const auto item = session().data().message(id)) {
 						return item->topicRootId();
 					}
@@ -5830,8 +5823,13 @@ Api::SendAction HistoryWidget::prepareSendAction(
 							std::move(draft));
 					}
 				}
-				result = Api::SendAction(_creatingBotTopic, options);
-				result.replyTo.topicRootId = _creatingBotTopic->rootId();
+				const auto rootId = _creatingBotTopic->rootId();
+				if (!result.replyTo.messageId) {
+					result.replyTo.messageId = FullMsgId(
+						_history->peer->id,
+						rootId);
+				}
+				result.replyTo.topicRootId = rootId;
 			}
 		}
 	}
@@ -8216,14 +8214,6 @@ bool HistoryWidget::confirmSendingFiles(
 				list.files.push_back(Storage::PrepareFolderArchive(folder));
 				confirmSendingFiles(std::move(list), QString());
 			}
-			return true;
-		}
-		if (overrideSendImagesAsPhotos == true
-			&& (Storage::ComputeMimeDataState(data)
-				== Storage::MimeDataState::FilesArchive)) {
-			auto list = Ui::PreparedList();
-			list.files.push_back(Storage::PrepareFilesArchive(urls));
-			confirmSendingFiles(std::move(list), QString());
 			return true;
 		}
 		auto list = Storage::PrepareMediaList(
@@ -10973,12 +10963,6 @@ bool HistoryWidget::cancelReply(bool lastKeyboardUsed) {
 	return wasReply;
 }
 
-void HistoryWidget::cancelReplyAfterMediaSend(bool lastKeyboardUsed) {
-	if (cancelReplyOrSuggest(lastKeyboardUsed)) {
-		saveCloudDraft();
-	}
-}
-
 int HistoryWidget::countMembersDropdownHeightMax() const {
 	auto result = height()
 		- rect::m::sum::v(st::membersInnerDropdown.padding);
@@ -11449,9 +11433,10 @@ void HistoryWidget::updateReplyEditText(not_null<HistoryItem*> item) {
 				return answer->text;
 			}
 		}
-		return (_editMsgId || _replyTo.quote.empty())
+		const auto &quote = HistoryView::Reply::ComposePreviewQuote(_replyTo);
+		return (_editMsgId || quote.empty())
 			? item->inReplyText()
-			: _replyTo.quote;
+			: quote;
 	}();
 	_replyEditMsgText.setMarkedText(
 		st::defaultTextStyle,
@@ -11657,9 +11642,11 @@ void HistoryWidget::drawField(Painter &p, const QRect &rect) {
 		if (_suggestOptions) {
 			_suggestOptions->paintIcon(p, 0, backy, width());
 		} else {
+			const auto quoted = _replyTo
+				&& !HistoryView::Reply::ComposePreviewQuote(_replyTo).empty();
 			(_editMsgId
 				? st::historyEditIcon
-				: (_replyTo && !_replyTo.quote.empty())
+				: quoted
 				? st::historyQuoteIcon
 				: st::historyReplyIcon).paint(
 					p,

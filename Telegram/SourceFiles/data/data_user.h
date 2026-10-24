@@ -21,6 +21,7 @@ namespace Data {
 class Forum;
 struct BotCommand;
 struct BusinessDetails;
+struct WalletCard;
 } // namespace Data
 
 namespace Api {
@@ -233,7 +234,6 @@ public:
 	[[nodiscard]] Data::StarsRating starsRating() const;
 
 	[[nodiscard]] bool canShareThisContact() const;
-	[[nodiscard]] bool canAddContact() const;
 
 	// In Data::Session::processUsers() we check only that.
 	// When actually trying to share contact we perform
@@ -288,16 +288,15 @@ public:
 	[[nodiscard]] int peerGiftsCount() const;
 	void setPeerGiftsCount(int count);
 
-	[[nodiscard]] bool hasPrivateForwardName() const;
-	[[nodiscard]] QString privateForwardName() const;
-	void setPrivateForwardName(const QString &name);
-
 	// Disengaged means no source has answered about this user yet; engaged
 	// and empty means a source answered and this user has no wallet; engaged
 	// and non-empty is the canonical raw address. Every write is an answer,
 	// never a nullopt: answers come from wallet.getUserAddresses.
 	[[nodiscard]] const std::optional<QString> &gramAddress() const;
 	void setGramAddress(QString address);
+
+	[[nodiscard]] const Data::WalletCard *walletCard() const;
+	void setWalletCard(std::optional<Data::WalletCard> card);
 
 	[[nodiscard]] bool hasActiveStories() const;
 	[[nodiscard]] bool hasUnreadStories() const;
@@ -360,9 +359,9 @@ private:
 	std::unique_ptr<Data::BusinessDetails> _businessDetails;
 	std::vector<Data::UnavailableReason> _unavailableReasons;
 	QString _phone;
-	QString _privateForwardName;
 	std::optional<QString> _gramAddress;
 	std::unique_ptr<Ui::BotVerifyDetails> _botVerifyDetails;
+	std::unique_ptr<Data::WalletCard> _walletCard;
 	Data::StarsRating _starsRating;
 
 	ChannelId _personalChannelId = 0;

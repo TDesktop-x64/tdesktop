@@ -155,6 +155,38 @@ jobs:
           cmake --build build
           cmake --install build
 
+      - name: Build tlottie.
+        run: |
+          cd $LibrariesPath
+
+          rm -rf tlottie
+          mkdir tlottie
+          cd tlottie
+
+          git init .
+          git remote add origin $GIT/dkaraush/tlottie.git
+          git fetch --depth=1 origin a9164a08318bec7451cb78b79ef1d8660e2f737e
+          git reset --hard FETCH_HEAD
+
+          RUST_TOOLCHAIN=1.96.1
+          export RUSTUP_HOME=$LibrariesPath/local/rust/rustup
+          export CARGO_HOME=$LibrariesPath/local/rust/cargo
+          export RUSTUP_TOOLCHAIN=$RUST_TOOLCHAIN
+          export PATH=$CARGO_HOME/bin:$PATH
+          wget -q -O rustup-init.sh https://sh.rustup.rs
+          sh rustup-init.sh -y --no-modify-path --profile minimal --default-toolchain $RUST_TOOLCHAIN
+          rm rustup-init.sh
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+          export RUSTFLAGS="-C linker=clang -C link-arg=-arch -C link-arg=arm64"
+          cargo rustc --lib --release --locked --features c-api --crate-type staticlib --target aarch64-apple-darwin -- --print native-static-libs
+          export RUSTFLAGS="-C linker=clang -C link-arg=-arch -C link-arg=x86_64"
+          cargo rustc --lib --release --locked --features c-api --crate-type staticlib --target x86_64-apple-darwin -- --print native-static-libs
+
+          mkdir -p $LibrariesPath/local/tlottie/lib $LibrariesPath/local/tlottie/include/tlottie
+          lipo -create target/aarch64-apple-darwin/release/libtlottie.a target/x86_64-apple-darwin/release/libtlottie.a -output $LibrariesPath/local/tlottie/lib/libtlottie.a
+          cp include/tlottie.h $LibrariesPath/local/tlottie/include/tlottie/tlottie.h
+
       - name: Telegram Desktop build.
         if: env.ONLY_CACHE == 'false'
         run: |
@@ -165,22 +197,30 @@ jobs:
           if [ -n "${{ matrix.defines }}" ]; then
             DEFINE="-D ${{ matrix.defines }}=ON"
             echo Define from matrix: $DEFINE
-            echo "ARTIFACT_NAME=Telegram ${{ matrix.defines }}" >> $GITHUB_ENV
+            echo "ARTIFACT_NAME=64Gram ${{ matrix.defines }}" >> $GITHUB_ENV
           else
-            echo "ARTIFACT_NAME=Telegram" >> $GITHUB_ENV
+            echo "ARTIFACT_NAME=64Gram" >> $GITHUB_ENV
           fi
 
           cmake -Bbuild . -DTDESKTOP_API_TEST=ON $DEFINE
           cmake --build build
-          macdeployqt build/Telegram.app
-          codesign --remove-signature build/Telegram.app
+          macdeployqt build/64Gram.app
+          codesign --remove-signature build/64Gram.app
 
       - name: Move artifact.
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
           cd $REPO_NAME/build
           mkdir artifact
-          mv Telegram.app artifact/
+          mv 64Gram.app artifact/
+
+      - name: Create DMG.
+        if: env.UPLOAD_ARTIFACT == 'true'
+        run: |
+          cd $REPO_NAME/build/artifact
+          hdiutil create -volname "64Gram" -srcfolder 64Gram.app -ov -format UDZO 64Gram.dmg
+          rm -rf 64Gram.app
+
       - uses: actions/upload-artifact@v7
         if: env.UPLOAD_ARTIFACT == 'true'
         name: Upload artifact.

@@ -13,6 +13,9 @@ target_compile_options(td_iv_reorder_warning_off
 INTERFACE
     $<$<CXX_COMPILER_ID:Clang,AppleClang>:-Wno-reorder-ctor>
     $<$<CXX_COMPILER_ID:GNU>:-Wno-reorder>
+    $<$<CXX_COMPILER_ID:MSVC>:/wd5038>
+    $<$<CXX_COMPILER_ID:MSVC>:/wd4265>
+    $<$<CXX_COMPILER_ID:MSVC>:/wd4005>
 )
 
 if (MSVC AND CMAKE_GENERATOR MATCHES "^Visual Studio ")

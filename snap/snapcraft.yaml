@@ -10,8 +10,8 @@ compression: lzo
 apps:
   telegram-desktop:
     command: usr/bin/telegram-desktop
-    common-id: org.telegram.desktop
-    desktop: usr/share/applications/org.telegram.desktop.desktop
+    common-id: io.github.tdesktop_x64.TDesktop
+    desktop: usr/share/applications/io.github.tdesktop_x64.TDesktop.desktop
     autostart: telegram-desktop_telegram-desktop.desktop
     extensions: [gnome]
     plugs:
@@ -38,7 +38,7 @@ parts:
     plugin: cmake
     source: .
     source-type: git
-    parse-info: [usr/share/metainfo/org.telegram.desktop.metainfo.xml]
+    parse-info: [usr/share/metainfo/io.github.tdesktop_x64.TDesktop.metainfo.xml]
     build-environment:
       - LDFLAGS: ${LDFLAGS:+$LDFLAGS} -Wl,--push-state,--no-as-needed,-ldav1d,--pop-state
     build-packages:
@@ -70,13 +70,18 @@ parts:
       craftctl set version="$version"
     override-build: |
       craftctl default
-      "$CRAFT_PART_SRC/Telegram/build/minidebug.sh" "$CRAFT_PART_INSTALL/usr/bin/Telegram"
-      mv "$CRAFT_PART_INSTALL"/usr/bin/{Telegram,telegram-desktop}
+      "$CRAFT_PART_SRC/Telegram/build/minidebug.sh" "$CRAFT_PART_INSTALL/usr/bin/64Gram"
+      mv "$CRAFT_PART_INSTALL"/usr/bin/{64Gram,telegram-desktop}
 
-      APP_ID=org.telegram.desktop
-      sed -i "s/^Icon=$APP_ID$/Icon=snap.$CRAFT_PROJECT_NAME./g" "$CRAFT_PART_INSTALL/usr/share/applications/$APP_ID.desktop"
-      for i in $(find "$CRAFT_PART_INSTALL/usr/share/icons" -name "$APP_ID*.svg" -o -name "$APP_ID*.png"); do
-        PREFIXED="$(dirname "$i")/snap.$CRAFT_PROJECT_NAME.$(basename "$i" | sed "s/$APP_ID//")"
+      APP_ID=io.github.tdesktop_x64.TDesktop
+      ICON_ID=org.telegram.desktop
+      desktop="$CRAFT_PART_INSTALL/usr/share/applications/$APP_ID.desktop"
+      service="$CRAFT_PART_INSTALL/usr/share/dbus-1/services/$APP_ID.service"
+      sed -i "s/^Icon=$ICON_ID$/Icon=snap.$CRAFT_PROJECT_NAME./g" "$desktop"
+      sed -i 's/^TryExec=Telegram$/TryExec=telegram-desktop/; s/^Exec=Telegram /Exec=telegram-desktop /' "$desktop"
+      sed -i 's|/Telegram$|/telegram-desktop|' "$service"
+      for i in $(find "$CRAFT_PART_INSTALL/usr/share/icons" -name "$ICON_ID*.svg" -o -name "$ICON_ID*.png"); do
+        PREFIXED="$(dirname "$i")/snap.$CRAFT_PROJECT_NAME.$(basename "$i" | sed "s/$ICON_ID//")"
         mv "$i" "$PREFIXED"
         DEST="$(echo "$PREFIXED" | sed 's@usr/share@meta/gui@')"
         DESTDIR="$(dirname "$DEST")"

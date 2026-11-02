@@ -6,11 +6,15 @@ on:
   schedule:
     - cron: '30 0 * * *'
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   waiting-for-answer:
     runs-on: ubuntu-slim
     steps:
-      - uses: lee-dohm/no-response@v0.5.0
+      - uses: godofredoc/no-response@v0.5.1
         with:
           token: ${{ github.token }}
           responseRequiredLabel: waiting for answer

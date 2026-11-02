@@ -13,7 +13,7 @@ jobs:
     if: github.ref_name == github.event.repository.default_branch
 
     env:
-      IMAGE_TAG: ghcr.io/${{ github.repository }}/centos_env:latest
+      IMAGE_TAG: ghcr.io/fmz200/64gram/centos_env:latest
 
     steps:
       - name: Clone.

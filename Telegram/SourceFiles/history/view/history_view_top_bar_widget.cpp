@@ -2097,11 +2097,11 @@ void TopBarWidget::updateOnlineDisplay() {
 					delayUpdate = true;
 					_controller->session().api().request(MTPmessages_GetOnlines(
 							channel->input()
-					)).done([=](const MTPChatOnlines &result) {
+					)).done(crl::guard(this, [=](const MTPChatOnlines &result) {
 						const auto count = result.c_chatOnlines().vonlines().v;
 						lastChatRequest[QString::number(channel->id.value)].memberCount = count;
 						updateOnlineDisplayIn(crl::time(100)); // To slow down chat status update
-					}).fail([=](const MTP::Error &error) {
+					})).fail([=](const MTP::Error &error) {
 						// if failed, then no any changes :)
 					}).send();
 					lastChatRequest[QString::number(channel->id.value)].requestTime = now;

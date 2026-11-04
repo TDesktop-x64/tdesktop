@@ -2129,6 +2129,8 @@ void ProxiesBoxController::ShowApplyConfirmation(
 		const auto enableButton = box->addButton(
 			tr::lng_proxy_box_table_button(),
 			[=] {
+				// Starting a web proxy may run a nested loop closing the box.
+				const auto weak = base::make_weak(box);
 				auto &settings = Core::App().settings().proxy();
 				if (settings.indexInList(proxy) < 0) {
 					settings.addToList(proxy);
@@ -2137,7 +2139,9 @@ void ProxiesBoxController::ShowApplyConfirmation(
 					proxy,
 					ProxyData::Settings::Enabled);
 				Local::writeSettings();
-				box->closeBox();
+				if (weak) {
+					box->closeBox();
+				}
 			});
 		enableButton->setFullRadius(true);
 		box->events() | rpl::on_next([=](not_null<QEvent*> e) {

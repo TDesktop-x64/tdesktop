@@ -52,6 +52,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_folder.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
+#include "data/data_chat_participant_status.h"
 #include "data/data_user.h"
 #include "data/data_document.h"
 #include "data/data_document_media.h"
@@ -63,6 +64,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_forum_topic.h"
 #include "data/data_chat_filters.h"
 #include "data/data_replies_list.h"
+#include "data/data_report.h"
 #include "data/data_peer_values.h"
 #include "data/data_premium_limits.h"
 #include "data/data_web_page.h"
@@ -2355,7 +2357,14 @@ bool SessionController::showForumInDifferentWindow(
 	if (windowId().forum() == forum) {
 		return false;
 	}
-	const auto window = Core::App().windowForShowingForum(forum);
+	const auto found = Core::App().windowForShowingForum(forum);
+
+	// A separate chat window has no chats list to show the topics in.
+	const auto window = (found
+		&& params.forceTopicsList
+		&& !found->id().hasChatsList())
+		? nullptr
+		: found;
 	if (window == _window) {
 		return false;
 	} else if (window) {

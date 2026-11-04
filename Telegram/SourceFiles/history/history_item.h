@@ -707,6 +707,7 @@ private:
 	void setupForwardedComponent(const CreateConfig &config);
 	void applyInitialEffectWatched();
 
+	[[nodiscard]] MsgId notificationTopicRootId() const;
 	[[nodiscard]] bool generateLocalEntitiesByReply() const;
 	[[nodiscard]] TextWithEntities withLocalEntities(
 		const TextWithEntities &textWithEntities) const;

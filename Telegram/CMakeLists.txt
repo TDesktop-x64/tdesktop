@@ -67,6 +67,8 @@ if (DESKTOP_APP_TEST_APPS OR TDESKTOP_BUILD_UPDATE_TESTS)
         endif()
     endif()
 endif()
+include(cmake/test_iv_editor_table_grid.cmake)
+include(cmake/test_wallet_phrase_shares.cmake)
 
 set_target_properties(Telegram PROPERTIES AUTOMOC ON)
 
@@ -1130,6 +1132,7 @@ PRIVATE
     history/view/history_view_chat_preview.h
     history/view/history_view_chat_section.cpp
     history/view/history_view_chat_section.h
+    history/view/history_view_chat_section_monoforum.cpp
     history/view/history_view_contact_status.cpp
     history/view/history_view_contact_status.h
     history/view/history_view_context_menu.cpp
@@ -1794,7 +1797,6 @@ PRIVATE
     platform/linux/tray_linux.h
     platform/linux/update_install_linux.cpp
     platform/linux/update_install_linux.h
-    platform/linux/webauthn_linux.cpp
     platform/mac/file_utilities_mac.mm
     platform/mac/file_utilities_mac.h
     platform/mac/global_menu_mac.h
@@ -1994,6 +1996,7 @@ PRIVATE
     settings/settings_power_saving.h
     settings/sections/settings_premium.cpp
     settings/sections/settings_premium.h
+    settings/sections/settings_premium_common.h
     settings/settings_privacy_controllers.cpp
     settings/settings_privacy_controllers.h
     settings/settings_scale_preview.cpp

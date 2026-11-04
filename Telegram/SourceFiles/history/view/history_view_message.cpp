@@ -5531,10 +5531,14 @@ bool Message::embedReactionsInBubble() const {
 }
 
 void Message::validateFromNameText(PeerData *from) const {
-	if (!from) {
-		if (_fromNameStatus) {
-			_fromNameStatus = nullptr;
+	const auto clearStatus = [&] {
+		const auto status = base::take(_fromNameStatus);
+		if (status && status->custom) {
+			const_cast<Message*>(this)->checkHeavyPart();
 		}
+	};
+	if (!from) {
+		clearStatus();
 		return;
 	}
 	const auto version = from->nameVersion();
@@ -5555,8 +5559,8 @@ void Message::validateFromNameText(PeerData *from) const {
 			const auto emoji = Ui::Text::AdjustCustomEmojiSize(size);
 			_fromNameStatus->skip = (size - emoji) / 2;
 		}
-	} else if (_fromNameStatus) {
-		_fromNameStatus = nullptr;
+	} else {
+		clearStatus();
 	}
 }
 
@@ -7073,6 +7077,11 @@ bool Message::textAppearCheckLine() {
 				&& ((appearing->revealedLineWidth < line->width)
 					|| (appearing->shownHeight < finalLineHeight))));
 	if (!use) {
+		if (!line) {
+			// The width tick reads lines[shownLine], which is now past the end.
+			appearing->widthAnimation.stop();
+			appearing->heightAnimation.stop();
+		}
 		if (data()->isRegular()) {
 			// We are inside these animations' tick, can't destroy them now.
 			crl::on_main(this, [=] {

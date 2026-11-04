@@ -4669,6 +4669,7 @@ void History::refreshHiddenLinksItems() {
 	for (const auto &id : refresh) {
 		if (const auto item = owner->message(id)) {
 			item->setHasHiddenLinks(false);
+			item->updateDependentServiceText();
 			owner->requestItemViewRefresh(item);
 		}
 	}

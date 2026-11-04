@@ -9,13 +9,20 @@
   guarantees `TEST_COMPLETE` + quit on every exit path including timeout. `actOnWidget` waits for
   and lifetime-guards the exact target before acting once. `captureAndInspect` saves the accepted
   prepared frame and then runs numeric/raster assertions against that same widget and image.
+  `addGated(gate, compose)` gives every stage appended while `compose` runs, helper stages
+  included, an inherited fixture gate whose first refusal the whole group keeps, and
+  `addRecovery` appends a restoration stage that keeps only its own `skipReason` inside such a
+  group (see [gated groups](helpers/test_runner.md#gated-groups-and-recovery-stages)).
 - `test_log.h` — evidence dir from `TDESKTOP_TEST_EVIDENCE_DIR` (the workspace `test-run`
   helper sets it), flushed absolute-path logging, `Step/Pass/Fail/Check/Note`, `CheckNear`
   tolerance assertions, `LogGeometry`, the standard markers.
 - `test_widgets.h` — `FindAll<T>`/`FindFirst<T>`/`FindVisible<T>` (the `dynamic_cast`-based
   finders that avoid the guaranteed `findChildren<CustomWidget*>` crash), `Click`, `TypeText`,
   `CommitText`, `PressKey`, `Drag`, and `Wheel` via real Qt events, plus generation-counted,
-  lifetime-guarded `PublishLiveWidget` / `PublishLiveAction` seams for exact layer-owned objects;
+  lifetime-guarded `PublishLiveWidget` / `PublishLiveAction` seams for exact layer-owned objects,
+  and `ReadButtonState` / `ButtonStateDetails`, a `Ui::AbstractButton`'s own disabled flag read
+  beside `isEnabled()` - the readiness of a button target, because `setDisabled()` leaves
+  `isEnabled()` true ([button state](helpers/test_widgets.md#a-buttons-own-disabled-state));
   each delivered event runs with postponed-call processing
   deferred and is followed by a drain of every pending `Ui::PostponeCall` to empty, so
   postponed input fix-ups AND their own change handling are settled when the helper returns;
@@ -43,19 +50,15 @@ A minimal scenario shape:
 void SetupScenario(not_null<Runner*> runner) {
 	runner->waitEvent(u"launch_finished"_q);
 	runner->actOnWidget(
-		u"activate the published target"_q,
-		[] { return Test::ReadLiveWidget(u"task.target"_q).widget; },
+		u"click the published button"_q,
+		[] { return Test::ReadLiveWidget(u"task.button"_q).widget; },
 		[](QWidget *widget) { Test::Click(widget); },
 		[](QWidget *widget) {
-			return widget->isVisible() && widget->isEnabled();
+			return Test::ReadButtonState(widget).usable();
 		},
 		Test::kDefaultStageTimeout,
 		[](QWidget *widget) {
-			return u"visible=%1 enabled=%2 size=%3x%4"_q
-				.arg(widget->isVisible())
-				.arg(widget->isEnabled())
-				.arg(widget->width())
-				.arg(widget->height());
+			return Test::ButtonStateDetails(Test::ReadButtonState(widget));
 		});
 	runner->captureAndInspect(
 		u"target_surface"_q,

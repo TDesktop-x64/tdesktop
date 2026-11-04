@@ -44,8 +44,6 @@ constexpr auto kReadableTextColumns = 12;
 constexpr auto kReadableTextLineHeights = 4;
 constexpr auto kReadableCodeColumns = 16;
 
-thread_local const LayoutContext *CurrentLayoutContext = nullptr;
-
 [[nodiscard]] size_t CombineHash(size_t accumulator, size_t value) {
 	return (accumulator * 1315423911U) ^ value;
 }
@@ -828,39 +826,7 @@ void ClearBlockGeometry(LaidOutBlock *block) {
 	if (!block) {
 		return;
 	}
-	block->outer = QRect();
-	block->headerRect = QRect();
-	block->bodyRect = QRect();
-	block->iconRect = QRect();
-	block->textRect = QRect();
-	block->labelRect = QRect();
-	block->subtitleRect = QRect();
-	block->actionRect = QRect();
-	block->markerRect = QRect();
-	block->contentRect = QRect();
-	block->collapseControlRect = QRect();
-	block->buttonRowControlRect = QRect();
-	block->formulaRect = QRect();
-	block->tableRect = QRect();
-	block->mediaRect = QRect();
-	block->thumbnailRect = QRect();
-	block->visibleFormulaRect = QRect();
-	block->scrollViewportRect = QRect();
-	block->scrollLogicalContentRect = QRect();
-	block->scrollScrollbarTrackRect = QRect();
-	block->scrollScrollbarThumbRect = QRect();
-	block->visibleTableRect = QRect();
-	block->tableScrollbarTrackRect = QRect();
-	block->tableScrollbarThumbRect = QRect();
-	block->visibleMediaRect = QRect();
-	block->markerCenter = QPoint();
-	block->logicalGeometry = {};
-	block->textWidth = 0;
-	block->labelWidth = 0;
-	block->subtitleWidth = 0;
-	block->actionWidth = 0;
-	block->markerWidth = 0;
-	block->firstLineBaseline = -1;
+	ResetBlockGeometryFields(block);
 	block->formulaAlign = style::al_left;
 	block->overflowed = false;
 	block->insideHorizontalScroll = false;
@@ -914,6 +880,42 @@ void FinishBlockGeometry(LaidOutBlock *block) {
 }
 
 } // namespace
+
+void ResetBlockGeometryFields(LaidOutBlock *block) {
+	block->outer = QRect();
+	block->headerRect = QRect();
+	block->bodyRect = QRect();
+	block->iconRect = QRect();
+	block->textRect = QRect();
+	block->labelRect = QRect();
+	block->subtitleRect = QRect();
+	block->actionRect = QRect();
+	block->markerRect = QRect();
+	block->contentRect = QRect();
+	block->collapseControlRect = QRect();
+	block->buttonRowControlRect = QRect();
+	block->formulaRect = QRect();
+	block->tableRect = QRect();
+	block->mediaRect = QRect();
+	block->thumbnailRect = QRect();
+	block->visibleFormulaRect = QRect();
+	block->scrollViewportRect = QRect();
+	block->scrollLogicalContentRect = QRect();
+	block->scrollScrollbarTrackRect = QRect();
+	block->scrollScrollbarThumbRect = QRect();
+	block->visibleTableRect = QRect();
+	block->tableScrollbarTrackRect = QRect();
+	block->tableScrollbarThumbRect = QRect();
+	block->visibleMediaRect = QRect();
+	block->markerCenter = QPoint();
+	block->logicalGeometry = {};
+	block->textWidth = 0;
+	block->labelWidth = 0;
+	block->subtitleWidth = 0;
+	block->actionWidth = 0;
+	block->markerWidth = 0;
+	block->firstLineBaseline = -1;
+}
 
 int TableBorder(
 		bool bordered,
@@ -1195,15 +1197,6 @@ size_t CachedTextLeafKeyHasher::operator()(
 		return CombineHash(result, HashPreparedEditLeafSource(value.editLeaf));
 	}
 	return result;
-}
-
-LayoutContextScope::LayoutContextScope(const LayoutContext &context)
-: _previous(CurrentLayoutContext) {
-	CurrentLayoutContext = &context;
-}
-
-LayoutContextScope::~LayoutContextScope() {
-	CurrentLayoutContext = _previous;
 }
 
 void FillMediaCaptionContent(

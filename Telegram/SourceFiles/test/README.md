@@ -19,6 +19,10 @@ Keep the repository's `test_scenario.cpp` a no-op outside the saved overlay.
   `actOnWidget` and lifetime guards over resolving another instance.
 - `skipReason` names an inapplicable prerequisite, never a failing result.
   `timeoutDetails` reports the last identity, geometry and state.
+- Compose stages that depend on a fixture prerequisite inside
+  `Runner::addGated`, so helper-appended stages inherit its first refusal
+  before resolving anything; declare restoration with `Runner::addRecovery`
+  ([gated groups](docs/helpers/test_runner.md#gated-groups-and-recovery-stages)).
 - Assert and log measured values on both passing and failing paths. A helper
   refusal or undecidable reading is not evidence of product success.
 
@@ -39,6 +43,9 @@ Visibility alone does not prove identity, ownership or unobscured geometry.
 Publish exact live objects/actions when descendant searches are ambiguous;
 keep lifetime guards across stages and preserve a window's concrete type.
 Read [object publication and input contracts](docs/helpers/test_widgets.md).
+Resolve another account's or a separate window's controller from the window
+registry with [test_controller_ready](docs/helpers/test_controller_ready.md),
+never from activation history.
 
 ## Resolving a chat's message list
 
@@ -53,23 +60,34 @@ postponed calls does not wait for timers, network or animations. A synthetic
 click is not a lasting hover. Read [input helpers](docs/helpers/test_widgets.md#input-helpers)
 for input, [launch behavior](docs/launch.md) for activation/background painting,
 and the selected module's reference for clipboard, menu or other special input.
+Drive grabbing widgets with [QPA mouse](docs/helpers/test_qpa_mouse.md); keep
+console input out with the [console shield](docs/helpers/test_console_shield.md).
 
 ## Capture and visual assertions
 
 Capture the real paint owner and the complete requested rectangle. Keep
 readiness separate from the expected pixels; save the accepted frame before
 asserting on it. Report logical versus image pixels and DPR explicitly.
+Strict comparisons keep one render owner, origin and extent
+([strict path](docs/helpers/test_capture.md#strict-same-state-comparisons));
+crop a full-owner render only through the
+[checked crop](docs/helpers/test_capture.md#checked-full-owner-crops); bind
+child rects to their [coordinate owner](docs/helpers/test_capture.md#coordinate-owners-of-mapped-rectangles);
+coordinated samplers share a
+[capture scope](docs/helpers/test_post_paint.md#coordinated-samplers-and-receipts).
 Read [capture selection](docs/helpers/test_capture.md), then select only the
 needed [ink](docs/helpers/test_ink.md), [post-paint](docs/helpers/test_post_paint.md),
 [clocked-frame](docs/helpers/test_animation_clock.md) or
 [corner](docs/helpers/test_corner_patch.md) reference.
+Time a whole widget's paint by recording the real owner with
+[paint streams](docs/helpers/test_paint_stream.md) and replaying it in
+optimized Qt; a Debug paint timing is not a paint cost.
 
 ## Helper catalog
 
 Find modules by purpose in the [helper index](docs/helpers/README.md).
-Each entry links its detailed contract and source header. Entries marked
-**Self-test** validate the harness; do not add them to every product scenario.
-Search [failure diagnosis](docs/diagnostics.md) by observed symptom on recovery.
+Entries marked **Self-test** validate the harness; do not add them to every
+product scenario.
 
 ## Building one reliable packed scenario
 
@@ -89,6 +107,10 @@ funded wallet, including its required reconciliation and secrecy-scan links.
 For public-identity or log-coverage checks, read the separate
 [publication audit contract](docs/helpers/test_publication_identity_scan.md);
 neither establishes fixture secrecy.
+A credential the product hands to an OS launcher, such as a token URL, is
+declared with the launch fuse's
+[private expectation](docs/helpers/test_launch_fuse.md#private-expectations),
+which matches it exactly and prints only its label and `scheme://host`.
 A required missing fixture is a blocker; do not substitute fabricated proof,
 reset the funded wallet or discard a possibly unrewritten rotation.
 
@@ -98,12 +120,20 @@ Metadata alone does not establish playable media. A media-dependent scenario
 must observe real playback and preserve the validated fixture across stages.
 Read [media fixtures](docs/media-fixtures.md) before selecting one.
 
+## macOS native notifications
+
+Read [notification evidence](docs/macos-notifications.md) before a run posts
+macOS native notifications.
+
 ## Scenario teardown before quit
 
 Register idempotent release of subscriptions, watchers and timers with
 `Runner::onFinish`; a final stage can be skipped by timeout or watchdog.
 Restore asynchronous UI state in a settling stage, not during quit. Read
 [teardown](docs/teardown.md) when retaining state or changing the environment.
+Mutate and restore a server fixture only through the
+[fixture transaction](docs/helpers/test_fixture_transaction.md), which reads
+before writing, waits the server's deadline and keeps a resumable record.
 
 ## Failure diagnosis
 

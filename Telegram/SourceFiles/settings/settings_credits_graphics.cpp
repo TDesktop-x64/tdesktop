@@ -1282,9 +1282,6 @@ void FillUniqueGiftMenu(
 			if (Ui::ShowCraftLaterError(show, unique)) {
 				return;
 			}
-			if (Ui::ShowCraftAddressError(show, unique)) {
-				return;
-			}
 			const auto savedId = EntryToSavedStarGiftId(&show->session(), e);
 			if (const auto window = show->resolveWindow()) {
 				Ui::ShowGiftCraftInfoBox(window, unique, savedId);
@@ -1797,9 +1794,6 @@ void GenericCreditsEntryBody(
 			if (Ui::ShowCraftLaterError(show, unique)) {
 				return;
 			}
-			if (Ui::ShowCraftAddressError(show, unique)) {
-				return;
-			}
 			const auto savedId = EntryToSavedStarGiftId(&show->session(), e);
 			if (const auto window = show->resolveWindow()) {
 				Ui::ShowGiftCraftInfoBox(window, unique, savedId);
@@ -2102,9 +2096,12 @@ void GenericCreditsEntryBody(
 				st::creditsBoxAbout),
 			style::al_top);
 		about->setClickHandlerFilter([=](const auto &...) {
-			Core::App().iv().openWithIvPreferred(
+			HiddenUrlClickHandler::OpenTranslatedWithIv(
 				session,
-				tr::lng_paid_about_link_url(tr::now));
+				tr::lng_paid_about_link_url,
+				QVariant::fromValue(ClickHandlerContext{
+					.show = show,
+				}));
 			return false;
 		});
 		if (e.giftRefunded) {

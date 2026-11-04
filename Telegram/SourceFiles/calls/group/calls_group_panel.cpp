@@ -1256,7 +1256,8 @@ void Panel::setupVideo(not_null<Viewport*> viewport) {
 			VideoTileTrack{ GroupCall::TrackPointer(track), row },
 			GroupCall::TrackSizeValue(track),
 			std::move(pinned),
-			self);
+			self,
+			_call->shownVideoTracks().contains(endpoint));
 	};
 	for (const auto &[endpoint, track] : _call->activeVideoTracks()) {
 		setupTile(endpoint, track);

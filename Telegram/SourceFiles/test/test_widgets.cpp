@@ -14,8 +14,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/sandbox.h"
 #include "test/test_agent.h"
 #include "test/test_capture.h"
+#include "test/test_console_shield.h"
 #include "test/test_log.h"
 #include "ui/widgets/fields/input_field.h"
+#include "ui/abstract_button.h"
 
 #include <QtCore/QMimeData>
 #include <QtCore/QPointer>
@@ -556,6 +558,43 @@ bool InvokeLiveAction(const QString &key) {
 	return true;
 }
 
+ButtonStateReading ReadButtonState(QWidget *widget) {
+	auto result = ButtonStateReading();
+	if (!widget) {
+		result.identity = u"no widget"_q;
+		result.refusal = u"no widget was handed to the button-state "
+			u"reading"_q;
+		return result;
+	}
+	result.identity = WidgetDescription(widget);
+	result.enabled = widget->isEnabled();
+	result.visible = widget->isVisible();
+	const auto button = dynamic_cast<Ui::AbstractButton*>(widget);
+	if (!button) {
+		result.refusal = u"not a Ui::AbstractButton, so it carries no own "
+			u"disabled flag: %1"_q.arg(result.identity);
+		return result;
+	}
+	result.disabled = button->isDisabled();
+	return result;
+}
+
+QString ButtonStateDetails(const ButtonStateReading &reading) {
+	const auto flag = [](bool value) {
+		return value ? u"1"_q : u"0"_q;
+	};
+	const auto line = u"button=%1 ownDisabled=%2 isEnabled=%3 visible=%4 "
+		u"usable=%5"_q.arg(
+			reading.identity,
+			reading.read() ? flag(reading.disabled) : u"none"_q,
+			flag(reading.enabled),
+			flag(reading.visible),
+			flag(reading.usable()));
+	return reading.read()
+		? line
+		: (line + u" - %1"_q.arg(reading.refusal));
+}
+
 void Click(not_null<QWidget*> widget, std::optional<QPoint> point) {
 	const auto alive = base::make_weak(widget);
 	const auto local = QPointF(point.value_or(widget->rect().center()));
@@ -912,6 +951,7 @@ void Settle(Fn<void()> action) {
 		const auto guard = gsl::finally([&] {
 			sandbox.setPostponedCallsDeferred(false);
 		});
+		const auto harnessInput = HarnessInputScope();
 		action();
 	}
 	SettlePostponedCalls();

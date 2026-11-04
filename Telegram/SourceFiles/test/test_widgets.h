@@ -80,6 +80,43 @@ void PublishLiveAction(
 [[nodiscard]] LiveActionSnapshot ReadLiveAction(const QString &key);
 [[nodiscard]] bool InvokeLiveAction(const QString &key);
 
+// A button's own disabled state, read beside Qt's.
+// Ui::AbstractButton::setDisabled sets StateFlag::Disabled, which only
+// isDisabled() reads back, and it hides QWidget::setDisabled instead of
+// overriding it: called through a QWidget* the Qt slot runs instead. So a
+// button the product blocked still answers QWidget::isEnabled() true, and
+// isVisible() && isEnabled() is no readiness test for it.
+//
+// |disabled| is isDisabled(), |enabled| is QWidget::isEnabled() and
+// |visible| is QWidget::isVisible(), each read independently in one call;
+// usable() needs a read button that is visible, enabled and not disabled.
+// A null widget, or one that is not a Ui::AbstractButton, is refused by
+// name in |refusal|: |disabled| is then not read (ButtonStateDetails prints
+// it as none) and the reading is never usable(). The reading logs nothing
+// and holds no pointer; |identity| is the WidgetDescription taken in that
+// call. Reference: docs/helpers/test_widgets.md, "A button's own disabled
+// state".
+struct ButtonStateReading {
+	bool disabled = false;
+	bool enabled = false;
+	bool visible = false;
+	QString identity;
+	QString refusal;
+
+	[[nodiscard]] bool read() const {
+		return refusal.isEmpty();
+	}
+	[[nodiscard]] bool usable() const {
+		return read() && visible && enabled && !disabled;
+	}
+};
+
+[[nodiscard]] ButtonStateReading ReadButtonState(QWidget *widget);
+
+// button=<identity> ownDisabled=<0|1|none> isEnabled=<0|1> visible=<0|1>
+// usable=<0|1>, then " - <refusal>" when the reading was refused.
+[[nodiscard]] QString ButtonStateDetails(const ButtonStateReading &reading);
+
 // Input delivery and settlement contract.
 //
 // The input helpers deliver their events synchronously with
@@ -141,6 +178,14 @@ void PublishLiveAction(
 // settles once after its drag-enter + drop pair, because a drain between
 // the two could destroy a viewport QDragManager still points at (see its
 // comment).
+//
+// Provenance: Settle holds a Test::HarnessInputScope (test_console_shield.h)
+// around its action and closes it before the drain, so an armed console
+// shield passes every event delivered there as harness input - each
+// helper's sent events, the shortcut or input-method events they produce,
+// and an overlay's own spontaneous QWindowSystemInterface delivery wrapped
+// in Settle. Nothing changes while the shield is not armed. Reference:
+// docs/helpers/test_widgets.md, "Input helpers".
 //
 // Use Test::Settle for programmatic mutations; SettlePostponedCalls
 // remains the bare drain.
@@ -339,7 +384,10 @@ void CommitText(not_null<QWidget*> widget, const QString &text);
 // performDrag() with InvokeQueued once the pointer leaves the pressed item
 // or passes the drag distance - is released before that call runs, so the
 // drag never starts. Such a drag needs Test::AppendQueuedStartDrag
-// (test_queued_drag.h).
+// (test_queued_drag.h). Drag sends every event to |widget| itself,
+// bypassing Qt's window routing, so moves never follow a grabMouse() made
+// elsewhere - a child that forwards only its press to a grabbing parent.
+// Such a gesture needs Test::AppendQpaMouseDrag (test_qpa_mouse.h).
 void Drag(
 	not_null<QWidget*> widget,
 	QPoint from,
@@ -486,10 +534,11 @@ void PressKey(
 	int key,
 	Qt::KeyboardModifiers modifiers = Qt::NoModifier);
 
-// Performs the action with postponed-call processing deferred, then runs
-// every pending Ui::PostponeCall to empty. The input helpers use it
-// around each delivered event; wrap programmatic text mutations
-// (InputField::setText) in it.
+// Performs the action with postponed-call processing deferred and a
+// Test::HarnessInputScope open, then closes the scope and runs every
+// pending Ui::PostponeCall to empty. The input helpers use it around each
+// delivered event; wrap programmatic text mutations (InputField::setText),
+// and any raw input delivery that must pass an armed console shield, in it.
 void Settle(Fn<void()> action);
 
 // Runs every pending Ui::PostponeCall (see the contract above) — the

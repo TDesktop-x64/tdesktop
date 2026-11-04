@@ -111,13 +111,24 @@ design, implementation units, builds, review fixes, evidence authoring, test
 runs and failure diagnosis. The phase prompts, artifacts, completion checks,
 carry-forward rules and verdict handling are the same for both providers.
 
-The provider is `codex` unless the invocation opts out. A user who asks
-`perform-task` or `continue` not to use Codex — for example "no codex",
-"without codex" or "Claude-only reviews" — gets the `native` provider: those
-phases run as Claude `Agent` leaves exactly as before. A `continue` scheduler
-passes `Review provider: codex` or `Review provider: native` in every
-performer prompt, and the performer follows that line. When `codex_leaf.py
-check` fails, the performer uses `native` for the invocation and records why.
+The provider is one of:
+
+- `codex`, the default: Codex leaves in the `work` Codex home,
+  `~/.codex-accounts/work`;
+- `codex-default`: Codex leaves in the user's default Codex home, `~/.codex`,
+  for a user who asks for it — for example "use codex-default for review".
+  Pass `--home default` to `codex_leaf.py check` and every `start`;
+- `native`: Claude `Agent` leaves exactly as before, for a user who asks
+  `perform-task` or `continue` not to use Codex — for example "use your model
+  for review", "no codex" or "Claude-only reviews".
+
+A `continue` scheduler passes `Review provider: codex`, `Review provider:
+codex-default` or `Review provider: native` in every performer prompt, and the
+performer follows that line. When `codex_leaf.py check` fails, the performer
+uses `native` for the invocation and records why; it never switches between
+the two Codex homes on its own. Other Claude Code commands that run Codex
+leaves, such as `cross-review` and `code-health`, use the `work` home unless
+their arguments ask for `codex-default`.
 
 A Codex leaf is not an `Agent` call. Start the leaves of one step back to back
 with `codex_leaf.py start`, then block on them with foreground
@@ -157,15 +168,18 @@ boundaries in the Claude orchestrator rather than delegating the decision to a
 leaf:
 
 - The parent `continue` command runs the startup `source-lineage` scan before
-  freezing the batch. On a mismatch, report the lineage JSON and use
-  `AskUserQuestion` to pause for human direction. Do not start an Agent, switch
-  branches, or perform or route a cherry-pick, rebase, merge, backport,
+  freezing the batch. A mismatched task stays out of the batch and its lineage
+  JSON goes into the run's report; the rest of the batch proceeds. Do not
+  switch branches, or perform or route a cherry-pick, rebase, merge, backport,
   forward-port, or branch-sync task at this boundary.
 - Once the batch is frozen, the parent scheduler owns the shared skill's safe
   pre-Phase-1 branch switch. Use Bash only for the required cleanliness,
   recovery-ref, process, and `git worktree list --porcelain` checks and for
-  `git switch` to an existing compatible local branch. Never ask a performer or
-  leaf Agent to integrate history.
+  `git switch` to an existing compatible local branch. Never switch onto or off
+  a project branch (one named by a live project's slug): the owner checks those
+  out, and a project task's performer syncs it with `project-sync` and
+  `project-push` itself. Never ask a performer or leaf Agent to integrate
+  history beyond that sync.
 - When a synchronous performer returns the shared pre-Phase-1 lineage stop,
   switch safely in the parent and resume that Agent id when Claude exposes one.
   If it exposes no resumable id, start one replacement performer only after the

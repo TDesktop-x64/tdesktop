@@ -145,6 +145,40 @@ public:
 	return false;
 }
 
+void ApplySearchResultsData(
+		not_null<Data::Session*> owner,
+		const MTPmessages_Messages &result,
+		PeerData *inPeer) {
+	const auto applyPeers = [&](const auto &data) {
+		owner->processUsers(data.vusers());
+		owner->processChats(data.vchats());
+	};
+	result.match([&](const MTPDmessages_messages &data) {
+		applyPeers(data);
+		if (inPeer) {
+			inPeer->processTopics(data.vtopics());
+		}
+	}, [&](const MTPDmessages_messagesSlice &data) {
+		applyPeers(data);
+		if (inPeer) {
+			inPeer->processTopics(data.vtopics());
+		}
+	}, [&](const MTPDmessages_channelMessages &data) {
+		applyPeers(data);
+		if (const auto channel = inPeer ? inPeer->asChannel() : nullptr) {
+			channel->ptsReceived(data.vpts().v);
+		} else {
+			LOG(("API Error: "
+				"received messages.channelMessages when no channel "
+				"was passed! (Widget::searchReceived)"));
+		}
+		if (inPeer) {
+			inPeer->processTopics(data.vtopics());
+		}
+	}, [](const MTPDmessages_messagesNotModified &) {
+	});
+}
+
 [[nodiscard]] QImage UpdateIcon() {
 	const auto iconSize = st::dialogsInstallUpdateIconSize;
 	const auto ratio = style::DevicePixelRatio();
@@ -1179,7 +1213,7 @@ void Widget::chosenRow(const ChosenRow &row) {
 		if (_subsectionTopBar) {
 			_subsectionTopBar->toggleSearch(false, anim::type::instant);
 		} else {
-			escape();
+			escape({ .jumpBackToSearchedChat = true, .leaveSearch = true });
 		}
 	}
 	updateForceDisplayWide();
@@ -3099,7 +3133,11 @@ void Widget::slideFinished() {
 }
 
 void Widget::escape() {
-	if (!cancelSearch({ .jumpBackToSearchedChat = true })) {
+	escape({ .jumpBackToSearchedChat = true });
+}
+
+void Widget::escape(CancelSearchOptions options) {
+	if (!cancelSearch(options)) {
 		if (const auto forum = controller()->shownForum().current()) {
 			const auto id = controller()->windowId();
 			const auto initial = id.forum();
@@ -3464,10 +3502,18 @@ void Widget::searchTopics() {
 		MTP_int(kSearchPerPage)
 	)).done([=](const MTPmessages_ForumTopics &result) {
 		_topicSearchRequest = 0;
+		const auto weak = base::make_weak(this);
+		const auto forum = _openedForum;
+		const auto showsForum = [&] {
+			return weak && (_openedForum == forum);
+		};
 		const auto savedTopicId = _topicSearchOffsetTopicId;
 		const auto byCreation = result.data().is_order_by_create_date();
-		_openedForum->applyReceivedTopics(result, [&](
+		const auto applied = forum->applyReceivedTopics(result, [&](
 				not_null<Data::ForumTopic*> topic) {
+			if (!showsForum()) {
+				return;
+			}
 			_topicSearchOffsetTopicId = topic->rootId();
 			if (byCreation) {
 				_topicSearchOffsetDate = topic->creationDate();
@@ -3480,6 +3526,9 @@ void Widget::searchTopics() {
 			}
 			_inner->appendToFiltered(topic);
 		});
+		if (!applied || !showsForum()) {
+			return;
+		}
 		if (_topicSearchOffsetTopicId != savedTopicId) {
 			_inner->refresh();
 		} else {
@@ -3545,8 +3594,12 @@ void Widget::searchMore() {
 						MTP_int(0), // min_id
 						MTP_long(0)) // hash
 				).done([=](const MTPmessages_Messages &result) {
+					const auto weak = base::make_weak(this);
+					const auto historiesRequest = _historiesRequest;
 					searchReceived(type, result, process);
-					_historiesRequest = 0;
+					if (weak && _historiesRequest == historiesRequest) {
+						_historiesRequest = 0;
+					}
 					finish();
 				}).fail([=](const MTP::Error &error) {
 					searchFailed(type, error, process);
@@ -3599,8 +3652,12 @@ void Widget::searchMore() {
 					MTP_int(0), // min_id
 					MTP_long(0)) // hash
 			).done([=](const MTPmessages_Messages &result) {
+				const auto weak = base::make_weak(this);
+				const auto historiesRequest = _historiesRequest;
 				searchReceived(type, result, &_migratedProcess);
-				_historiesRequest = 0;
+				if (weak && _historiesRequest == historiesRequest) {
+					_historiesRequest = 0;
+				}
 				finish();
 			}).fail([=](const MTP::Error &error) {
 				searchFailed(type, error, &_migratedProcess);
@@ -3728,12 +3785,25 @@ void Widget::searchReceived(
 			process->queries.erase(i);
 		}
 	}
-	const auto inject = (type.start && !type.posts && !type.migrated)
-		? *_singleMessageSearch.lookup(_searchQuery)
-		: nullptr;
 	if (cacheResults && process->requestId) {
 		return;
 	}
+	if (!cacheResults) {
+		// Don't apply cached data!
+		const auto weak = base::make_weak(this);
+		const auto generation = _searchGeneration;
+		const auto owner = &session().data();
+		const auto inPeer = searchInPeer();
+		ApplySearchResultsData(owner, result, inPeer);
+
+		// Applying the data may destroy this widget or cancel its search.
+		if (!weak || _searchGeneration != generation) {
+			return;
+		}
+	}
+	const auto inject = (type.start && !type.posts && !type.migrated)
+		? *_singleMessageSearch.lookup(_searchQuery)
+		: nullptr;
 	if (type.start) {
 		process->lastPeer = nullptr;
 		process->lastId = 0;
@@ -3763,27 +3833,11 @@ void Widget::searchReceived(
 	};
 	auto fullCount = 0;
 	auto messages = result.match([&](const MTPDmessages_messages &data) {
-		if (!cacheResults) {
-			// Don't apply cached data!
-			session().data().processUsers(data.vusers());
-			session().data().processChats(data.vchats());
-			if (const auto peer = searchInPeer()) {
-				peer->processTopics(data.vtopics());
-			}
-		}
 		process->full = true;
 		auto list = processList(data.vmessages());
 		fullCount = list.size();
 		return list;
 	}, [&](const MTPDmessages_messagesSlice &data) {
-		if (!cacheResults) {
-			// Don't apply cached data!
-			session().data().processUsers(data.vusers());
-			session().data().processChats(data.vchats());
-			if (const auto peer = searchInPeer()) {
-				peer->processTopics(data.vtopics());
-			}
-		}
 		auto list = processList(data.vmessages());
 		const auto nextRate = data.vnext_rate();
 		const auto rateUpdated = nextRate
@@ -3800,25 +3854,6 @@ void Widget::searchReceived(
 		fullCount = data.vcount().v;
 		return list;
 	}, [&](const MTPDmessages_channelMessages &data) {
-		if (!cacheResults) {
-			// Don't apply cached data!
-			session().data().processUsers(data.vusers());
-			session().data().processChats(data.vchats());
-			if (const auto peer = searchInPeer()) {
-				if (const auto channel = peer->asChannel()) {
-					channel->ptsReceived(data.vpts().v);
-				} else {
-					LOG(("API Error: "
-						"received messages.channelMessages when no channel "
-						"was passed! (Widget::searchReceived)"));
-				}
-				peer->processTopics(data.vtopics());
-			} else {
-				LOG(("API Error: "
-					"received messages.channelMessages when no channel "
-					"was passed! (Widget::searchReceived)"));
-			}
-		}
 		auto list = processList(data.vmessages());
 		if (list.empty()) {
 			process->full = true;
@@ -3884,6 +3919,9 @@ void Widget::dragEnterEvent(QDragEnterEvent *e) {
 	} else if (ComputeMimeDataState(data) != MimeDataState::None) {
 		e->setDropAction(Qt::CopyAction);
 		e->accept();
+	} else if (data->hasText()) {
+		e->setDropAction(Qt::CopyAction);
+		e->accept();
 	}
 	_chooseByDragTimer.cancel();
 }
@@ -3938,6 +3976,8 @@ void Widget::updateDragInScroll(bool inScroll) {
 }
 
 void Widget::dropEvent(QDropEvent *e) {
+	using namespace Storage;
+
 	_chooseByDragTimer.cancel();
 	if (_scroll->geometry().contains(e->pos())) {
 		const auto globalPosition = mapToGlobal(e->pos());
@@ -3947,9 +3987,14 @@ void Widget::dropEvent(QDropEvent *e) {
 		if (thread) {
 			e->setDropAction(Qt::CopyAction);
 			e->accept();
-			controller()->content()->filesOrForwardDrop(
-				thread,
-				e->mimeData());
+			const auto data = e->mimeData();
+			if (!data->hasFormat(u"application/x-td-forward"_q)
+				&& ComputeMimeDataState(data) == MimeDataState::None
+				&& data->hasText()) {
+				controller()->content()->textDrop(thread, data);
+			} else {
+				controller()->content()->filesOrForwardDrop(thread, data);
+			}
 			if (!thread->owningHistory()->isForum()) {
 				hideChildList();
 			}
@@ -4085,6 +4130,7 @@ void Widget::openChildList(
 			Layout::Child);
 		_childList->showForum(forum, copy);
 		_childListPeerId = forum->peer()->id;
+		controller()->setSearchInChat(_searchState.inChat);
 	}
 
 	_childListShadow = std::make_unique<Ui::RpWidget>(this);
@@ -4150,6 +4196,8 @@ void Widget::closeChildList(anim::type animated) {
 	}
 	_childList = nullptr;
 	_childListShown = 0.;
+	// A destroyed child can't reset the search scope it published.
+	controller()->setSearchInChat(_searchState.inChat);
 	if (hasFocus()) {
 		setInnerFocus();
 		_search->finishAnimating();
@@ -4195,6 +4243,12 @@ bool Widget::applySearchState(SearchState state) {
 	}
 
 	// Adjust state to be consistent.
+	if (const auto topic = state.inChat.topic()) {
+		if (topic->creating()) {
+			// A discarded creating topic never fires destroyed().
+			state.inChat = topic->owningHistory();
+		}
+	}
 	if (const auto peer = state.inChat.peer()) {
 		if (const auto to = peer->migrateTo()) {
 			state.inChat = peer->owner().history(to);
@@ -4342,6 +4396,7 @@ bool Widget::applySearchState(SearchState state) {
 	}
 	if (inChatChanged) {
 		controller()->setSearchInChat(_searchState.inChat);
+		trackSearchInChatDestroyed();
 	}
 	if (queryChanged || inChatChanged) {
 		updateCancelSearch();
@@ -4409,6 +4464,18 @@ bool Widget::applySearchState(SearchState state) {
 	return true;
 }
 
+void Widget::trackSearchInChatDestroyed() {
+	_searchInChatLifetime.destroy();
+	const auto cancel = [=] {
+		cancelSearch({ .forceFullCancel = true });
+	};
+	if (const auto topic = _searchState.inChat.topic()) {
+		_searchInChatLifetime = topic->destroyed() | rpl::on_next(cancel);
+	} else if (const auto sublist = _searchState.inChat.sublist()) {
+		_searchInChatLifetime = sublist->destroyed() | rpl::on_next(cancel);
+	}
+}
+
 void Widget::clearSearchCache(bool clearPosts) {
 	_searchProcess.cache.clear();
 	_singleMessageSearch.clear();
@@ -4445,20 +4512,16 @@ void Widget::showCalendar() {
 
 void Widget::showSearchFrom() {
 	if (const auto peer = searchInPeer()) {
-		const auto weak = base::make_weak(_searchState.inChat.topic());
 		const auto chat = (!_searchState.inChat && _openedForum)
 			? Key(_openedForum->history())
 			: _searchState.inChat;
+		const auto weak = base::make_weak(chat.entry());
 		auto box = SearchFromBox(
 			peer,
 			crl::guard(this, [=](not_null<PeerData*> from) {
 				controller()->hideLayer();
-				auto copy = _searchState;
-				if (!chat.topic()) {
-					copy.inChat = chat;
-					copy.fromPeer = from;
-					applySearchState(std::move(copy));
-				} else if (const auto strong = weak.get()) {
+				if (const auto strong = weak.get()) {
+					auto copy = _searchState;
 					copy.inChat = strong;
 					copy.fromPeer = from;
 					applySearchState(std::move(copy));
@@ -5033,6 +5096,7 @@ void Widget::scrollToEntry(const RowDescriptor &entry) {
 }
 
 void Widget::cancelSearchRequest() {
+	++_searchGeneration;
 	session().api().request(base::take(_searchProcess.requestId)).cancel();
 	session().api().request(base::take(_migratedProcess.requestId)).cancel();
 	session().api().request(base::take(_postsProcess.requestId)).cancel();
@@ -5121,7 +5185,7 @@ bool Widget::cancelSearch(CancelSearchOptions options) {
 			|| _suggestions->tabsOnly());
 	if (clearingSuggestionsQuery) {
 		setSearchQuery(QString());
-		if (!options.forceFullCancel) {
+		if (!options.forceFullCancel && !options.leaveSearch) {
 			return true;
 		}
 	}

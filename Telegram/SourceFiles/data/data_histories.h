@@ -142,6 +142,7 @@ public:
 	}
 
 	void checkTopicCreated(FullMsgId rootId, MsgId realRoot);
+	void discardCreatingTopic(not_null<History*> history, MsgId rootId);
 	[[nodiscard]] FullMsgId convertTopicReplyToId(
 		not_null<History*> history,
 		FullMsgId replyToId) const;

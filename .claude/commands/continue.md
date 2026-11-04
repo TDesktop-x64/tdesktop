@@ -32,10 +32,11 @@ carrier first so the helper transfers its sealed source state; do not reset or
 checkpoint that work.
 
 Apply the shared source-lineage gate in this parent scheduler. Before batch
-freeze, a missing approved prerequisite pauses through `AskUserQuestion` after
-the exact branch and compatible-branch report. After freeze but before Phase 1,
+freeze, a task missing an approved prerequisite stays out of the batch, with
+the exact branch and compatible-branch report in the run's report. After freeze but before Phase 1,
 the parent may make only the shared safe switch to an existing compatible local
-branch and then resume the returned performer. After Phase 1, let the performer
+branch, never onto or off a project branch, and then resume the returned
+performer. After Phase 1, let the performer
 publish a task-local Block and continue non-dependent batch work. Never create,
 route, or execute branch-integration work as a queue task.
 
@@ -55,9 +56,11 @@ skill or reference. Use the Agent tool for those workers; do not start Claude
 subprocesses through Bash.
 
 Decide the review provider once at startup, per the adapter's review and
-assessment provider: `native` when the arguments ask not to use Codex,
-otherwise `codex`. Put `Review provider: <codex|native>` in every performer
-prompt. A Codex opt-out is not a batch specification.
+assessment provider: `native` when the arguments ask for the host's own model
+("use your model for review") or not to use Codex, `codex-default` when they
+ask for it ("use codex-default for review"), otherwise `codex`. Put `Review
+provider: <codex|codex-default|native>` in every performer prompt. A review
+provider choice is not a batch specification.
 
 The arguments are the batch specification. They always restrict the batch to
 the tasks they select; ordering words only order those tasks:

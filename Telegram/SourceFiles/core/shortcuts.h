@@ -186,6 +186,10 @@ void Change(
 	Command command,
 	std::optional<Command> restore = {});
 void ResetToDefaults();
+void RestoreDefaultFor(
+	QKeySequence was,
+	QKeySequence now,
+	Command command);
 
 [[nodiscard]] bool AllowWithoutModifiers(int key);
 

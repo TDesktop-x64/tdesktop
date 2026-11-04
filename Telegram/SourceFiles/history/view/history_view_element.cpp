@@ -2160,6 +2160,7 @@ void Element::validateText() {
 			.tableRenderLimits = Iv::Markdown::PrepareTableRenderLimitsForRichMessage(
 				richLimits),
 			.unsupportedBlockNotices = true,
+			.disableButtons = _textItem->hideLinks(),
 		});
 		if (!prepared.supported()) {
 			clearRichPage();
@@ -2167,6 +2168,10 @@ void Element::validateText() {
 				_media = std::make_unique<UnsupportedNotice>(this);
 			}
 			return;
+		}
+		if (prepared.buttonsDisabled) {
+			data()->setHasHiddenLinks(true);
+			_textItem->setHasHiddenLinks(true);
 		}
 		ClickHandler::clearActive(this);
 		runtime->article.setContent(std::move(prepared.content));
@@ -2181,6 +2186,8 @@ void Element::validateText() {
 		runtime->handlerMediaActivation = {};
 		runtime->handlerPlaceholderId = {};
 		runtime->handlerPlaceholderPoint = QPoint();
+		runtime->pressedPlaceholderId = {};
+		runtime->pressedPlaceholderHandler = nullptr;
 		runtime->handlerButtonRow = {};
 		runtime->handlerButtonRowHandler = nullptr;
 		runtime->pressedButtonRow = {};
@@ -2341,10 +2348,10 @@ void Element::validateInlineKeyboard(HistoryMessageReplyMarkup *markup) {
 		return;
 	}
 	const auto item = data();
-	//if (item->hideLinks()) {
-	//	item->setHasHiddenLinks(true);
-	//	return;
-	//}
+	if (item->hideInlineKeyboard()) {
+		item->setHasHiddenLinks(true);
+		return;
+	}
 	markup->inlineKeyboard = std::make_unique<ReplyKeyboard>(
 		item,
 		std::make_unique<KeyboardStyle>(
@@ -3580,9 +3587,6 @@ auto Element::takeReactionAnimations()
 		return _reactions->takeAnimations();
 	}
 	return {};
-}
-
-void Element::animateUnreadEffect() {
 }
 
 auto Element::takeEffectAnimation()

@@ -29,6 +29,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_unread_things.h"
 #include "lang/lang_keys.h"
 #include "lottie/lottie_single_player.h"
+#include "settings.h"
 #include "ui/chat/chat_style.h"
 #include "ui/chat/chat_theme.h"
 #include "ui/effects/path_shift_gradient.h"
@@ -749,6 +750,12 @@ FillMenuResult FillSendMenu(
 			tr::lng_send_silent_message(tr::now),
 			[=] { action({ Api::SendOptions{ .silent = true } }, details); },
 			&icons.menuMute);
+	}
+	if (sending && GetEnhancedBool("send_unformatted")) {
+		menu->addAction(
+			tr::lng_send_unformatted(tr::now),
+			[=] { action({ Api::SendOptions{ .unformatted = true } }, details); },
+			&icons.menuUnformatted);
 	}
 	if (sending && type != Type::SilentOnly) {
 		menu->addAction(

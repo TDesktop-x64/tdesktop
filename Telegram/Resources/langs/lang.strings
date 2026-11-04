@@ -4991,6 +4991,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_stop_button" = "Stop";
 "lng_schedule_button" = "Schedule";
 "lng_send_silent_message" = "Send without sound";
+"lng_send_unformatted" = "Send unformatted";
 "lng_schedule_message" = "Schedule message";
 "lng_reminder_message" = "Set a reminder";
 "lng_schedule_title" = "Send this message on...";
@@ -8814,6 +8815,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_disable_premium_animation" = "Disable Premium Animation";
 "lng_settings_disable_global_search" = "Disable global search";
 "lng_settings_show_group_sender_avatar" = "Show sender's avatar in groups";
+"lng_settings_send_unformatted" = "Show Send unformatted option";
 "lng_settings_show_seconds" = "Time with seconds";
 "lng_settings_show_view_as_json" = "Show View As JSON";
 "lng_settings_hide_counter" = "Hide online users counter";

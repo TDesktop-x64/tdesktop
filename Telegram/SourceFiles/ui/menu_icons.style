@@ -77,6 +77,7 @@ menuIconUnmute: icon {{ "menu/unmute", menuIconColor }};
 menuIconSchedule: icon {{ "menu/calendar", menuIconColor }};
 menuIconReschedule: icon {{ "menu/reschedule", menuIconColor }};
 menuIconSend: icon {{ "menu/send", menuIconColor }};
+menuIconUnformatted: icon {{ "menu/unformatted", menuIconColor }};
 menuIconWhenOnline: icon {{ "menu/send_when_online", menuIconColor }};
 menuIconPalette: icon {{ "menu/palette", menuIconColor }};
 menuIconImportTheme: icon {{ "menu/import_theme", menuIconColor }};

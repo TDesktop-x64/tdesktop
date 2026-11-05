@@ -2025,6 +2025,14 @@ State::ListSelectionInfo State::listSelectionInfo(
 			return EffectiveOrderedListType(*owner, item)
 				== result.listOrderedType;
 		});
+	result.listRomanSupported = OrderedItemsSupportRoman(
+		*owner,
+		0,
+		int(owner->listItems.size()));
+	result.selectedRomanSupported = OrderedItemsSupportRoman(
+		*owner,
+		validated->from,
+		validated->till);
 	result.allOrderedDecimal = true;
 	result.allOrderedLowerAlpha = true;
 	result.allOrderedUpperAlpha = true;
@@ -3246,28 +3254,6 @@ State::BoundaryTarget State::boundaryTargetForLeaf(
 			}
 		}
 	}
-	const auto prioritizeStructuralStep = [&](const BoundaryTarget &target) {
-		if (target.action != BoundaryAction::StructuralSelection) {
-			return false;
-		}
-		switch (target.structuralSelection.kind) {
-		case PreparedEditSelectionKind::Blocks:
-			if (const auto range = validateBlockRange(
-					target.structuralSelection.blocks)) {
-				return leafWillBeRemoved(leaf, *range);
-			}
-			break;
-		case PreparedEditSelectionKind::ListItems:
-			if (const auto range = validateListItemRange(
-					target.structuralSelection.listItems)) {
-				return leafWillBeRemoved(leaf, *range);
-			}
-			break;
-		default:
-			break;
-		}
-		return false;
-	};
 	const auto removeDirectly = allowRemoveDirectly
 		&& descriptor
 		&& removalTargetIsEmpty(descriptor->removalTarget)
@@ -3285,10 +3271,8 @@ State::BoundaryTarget State::boundaryTargetForLeaf(
 			const auto next = (i + 1 < count)
 				? steps[i + 1]
 				: BoundaryTarget();
-			if (prioritizeStructuralStep(next)) {
-				return next;
-			}
-			if (removeDirectly) {
+			if (removeDirectly
+				&& next.action != BoundaryAction::StructuralSelection) {
 				return {
 					.action = BoundaryAction::RemoveActiveOwner,
 				};
@@ -3987,7 +3971,10 @@ bool State::canLiftActiveLineOutOfContainer() const {
 		return false;
 	}
 	const auto owner = block(descriptor->leaf.block);
+	const auto parent = block(*container);
 	return owner
+		&& parent
+		&& (parent->kind == BlockKind::Quote)
 		&& JoinableTextBlockKind(owner->kind)
 		&& (descriptor->leaf.block.index == 0);
 }
@@ -4485,6 +4472,30 @@ State::ParagraphBoundaryJoinResult State::joinActiveParagraphBoundary(
 			},
 		};
 	});
+}
+
+State::LeafPath State::shiftLeafAfterRemovedSelection(
+		const Markdown::PreparedEditSelection &selection,
+		LeafPath leaf) const {
+	if (selection.kind != PreparedEditSelectionKind::Blocks) {
+		return leaf;
+	}
+	const auto range = validateBlockRange(selection.blocks);
+	if (!range || leafWillBeRemoved(leaf, *range)) {
+		return leaf;
+	}
+	auto shifted = leaf.block;
+	for (auto i = range->till; i != range->from;) {
+		--i;
+		if (!ShiftBlockPathAfterRemovedBlock(shifted, BlockPath{
+				.container = range->container,
+				.index = i,
+			})) {
+			return leaf;
+		}
+	}
+	leaf.block = shifted;
+	return leaf;
 }
 
 std::optional<int> State::removeStructuralSelection(
@@ -8852,19 +8863,6 @@ State::TextSelectionDropResult State::moveTextSelectionToDropTarget(
 		target);
 }
 
-void State::insertHeading1AfterActive() {
-	insertBlockAfterActive({
-		.type = InsertBlockType::Heading,
-		.headingLevel = 1,
-	});
-}
-
-void State::insertBlockquoteAfterActive() {
-	insertBlockAfterActive({
-		.type = InsertBlockType::Blockquote,
-	});
-}
-
 bool State::insertBlocksAfterActiveWithContextUnchecked(
 		std::vector<Block> &blocks,
 		const ActiveTextInsertContext &context) {
@@ -9133,12 +9131,6 @@ bool State::insertBlockAfterActive(
 			.result = applied,
 		};
 	});
-}
-
-bool State::insertPreparedBlockAfterActive(Block block) {
-	auto blocks = std::vector<Block>();
-	blocks.push_back(std::move(block));
-	return insertPreparedBlocksAfterActive(std::move(blocks));
 }
 
 bool State::insertPreparedBlocksAfterActive(

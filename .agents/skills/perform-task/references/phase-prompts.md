@@ -17,7 +17,7 @@ checklists only for intentional current-session build work, Phase 7, the
 small-task fast path, or when delegation is unavailable from the start at the
 current agent depth. Replace
 every applicable placeholder: `<TASK>`, `<TASK_ID>`, `<WORK_DIR>`,
-`<PROJECT_FILE>`, `<PREVIOUS_CONTEXT>`, `<BUILD>`, `<N>`,
+`<PROJECT_FILE>`, `<BUILD>`, `<N>`,
 `<OWNED_WRITE_SET>`, `<R>`, `<R-1>`, and `<phase-name>`.
 
 ## Orchestration Rules
@@ -29,14 +29,20 @@ every applicable placeholder: `<TASK>`, `<TASK_ID>`, `<WORK_DIR>`,
 - Phase 7 runs in the current session on native, non-WSL Windows because it depends on the final local diff and touched-file set. Skip it on WSL and keep files LF/no-BOM there.
 - Write each phase prompt to `<WORK_DIR>/logs/phase-<phase-name>.prompt.md` before execution.
 - If you delegate a phase, send the prompt file contents as the initial subagent message.
-- When writing the phase prompt file, append the standard progress file contract and the standard compact reply block below so the subagent knows how to surface progress before the final artifact.
+- When writing the phase prompt file, append the standard compact reply block
+  below. Do not require heartbeat files or periodic progress reports.
 - After each phase completes, write `<WORK_DIR>/logs/phase-<phase-name>.result.md` with exact
   `STATUS:`, `ARTIFACTS:`, `TOUCHED:`, `BLOCKER:`, and `NOTES:` fields.
 - Use `fork_turns: "none"` by default. If the phase depends on thread-only context or UI attachments, pass it explicitly or use the smallest positive turn fork needed.
-- Use only fields the current spawn schema exposes; do not invent role, model, or reasoning arguments. Inherit the parent model/reasoning selection, or match it if the host explicitly supports overrides.
+- Before dispatch, select and apply [phase effort](../../../shared/phase-effort.md).
+  Record the choice and scope reason in the prompt, and the applied setting
+  or inheritance fallback in the result's `NOTES:`. Use only fields the
+  current spawn schema exposes; apply the host mapping for those fields.
 - Give each phase a unique lowercase/digit/underscore task name and tell the phase it is a leaf that must not delegate.
-- For Phase 1, Phase 3, Phase 4, and Phase 6, if delegated retries still fail, stop and ask the user rather than rerunning the phase locally.
-- Never use `codex exec`, background shell child processes, or JSONL child-session logging from this skill.
+- For Phase 1, Phase 3, Phase 4, and Phase 6, if delegated retries still fail,
+  report a recoverable hard stop to the caller instead of rerunning locally.
+- On a Codex host, delegate only through native subagents; never shell out to `codex exec` or start background shell child processes there.
+- On Claude Code, reviews and assessments run as Codex CLI leaves unless the invocation opted out, per the Claude adapter's review and assessment provider and [Codex CLI leaves](../../../shared/codex-cli-leaves.md). Their transcripts stay in `TASK_DIR/.local/codex/`, never in tracked artifacts.
 
 ### Claude Code: synchronous delegation
 
@@ -48,13 +54,18 @@ every applicable placeholder: `<TASK>`, `<TASK_ID>`, `<WORK_DIR>`,
   or assessed-disjoint Phase 4 units —
   as parallel Agent calls in a single message so they run concurrently.
 - If a returned leaf fails its completion check, retry that disposable phase
-  once in a fresh Agent with more specific instructions before stopping to
-  ask the user.
+  once in a fresh Agent with more specific instructions, then once more
+  with the failure output; never stop to ask the user.
+- With the `codex` or `codex-default` review provider, Phase 3, every Phase 6
+  review and the convergence and campaign-cap assessments run as Codex CLI
+  leaves instead: start the leaves of one step together, block on
+  `codex_leaf.py wait`, then validate the same completion checks. The general
+  reviewer's pass-2 synthesis resumes its pass-1 leaf with `--resume`.
 
 ### Grok Build: blocking spawn, depth one
 
 - Follow `.grok/ai-workflow-adapter.md`. Its substitutions win over the
-  Codex wait ladder and over any prompt that assumes nested delegation.
+  Codex completion contract and over any prompt that assumes nested delegation.
 - When this session is a top-level `/perform-task`, run each leaf as one
   blocking `spawn_subagent` (`background: false`). The call returning is
   the completion signal; validate the artifact checks below on return.
@@ -65,49 +76,32 @@ every applicable placeholder: `<TASK>`, `<TASK_ID>`, `<WORK_DIR>`,
   Run every phase as a same-session checklist. That is the supported
   depth-1 fallback, not a retry.
 - If a returned leaf fails its completion check, retry that disposable
-  phase once in a fresh `spawn_subagent` with more specific instructions
-  before stopping to ask the user.
+  phase once in a fresh `spawn_subagent` with more specific instructions,
+  then once more with the failure output; never stop to ask the user.
 
-### Codex: asynchronous spawn and wait
+### Codex: wait for child completion
 
-- Store the canonical target returned by `spawn_agent`.
-- After the initial general reviewer finishes pass 1, keep its canonical target.
-  When specialists finish, use `followup_task` on that target with the pass-2
-  synthesis prompt instead of spawning a second complete-diff reviewer.
-- Poll with `wait_agent` for at most 60 seconds per call; use elapsed wall-clock windows for stall decisions. Use 30-60 second polls when a phase appears close to landing.
-- `wait_agent` is mailbox-wide and may wake for another agent or user input. A timeout is not failure. After every wake, handle new user input if any, inspect the saved target with `list_agents`, and check the expected artifact and matching progress file.
-- If the expected artifact exists and shows progress, wait again.
-- If the expected artifact is not ready but the progress file mtime moved or its heartbeat counter increased since the previous check, wait again. Prefer mtime checks first and avoid rereading the file unless you need detail. Do not count that as a failed wait.
-- If neither the expected artifact nor progress file moved for a full five-minute blocked-check window, use `send_message` while the target is running or `followup_task` when it is idle, asking it to refresh progress, finish the artifact, and return the compact block.
-- If a second five-minute window after that follow-up still produces no usable artifact or movement, use `interrupt_agent` if needed, confirm the turn stopped, and retry the disposable phase once with a new unique name. There is no close-agent operation.
-
-## Standard Progress File Contract
-
-Append this verbatim to every delegated phase prompt:
-
-```text
-You are a leaf phase worker. Do not spawn or delegate to other agents.
-
-Before deep work, create or update the matching progress file in `<WORK_DIR>/logs/`.
-
-Use `phase-<phase-name>.progress.md` as a concise heartbeat with:
-- `Heartbeat: <N>` on the first line, incremented on each meaningful update
-- Current step
-- Files being read or edited
-- Concrete findings or decisions so far
-- Blocker or next checkpoint
-
-Update it sparingly: preferably at natural milestones, and otherwise only after a longer quiet stretch such as roughly 5-10 minutes.
-Keep it tiny so the parent can usually rely on file mtime or the heartbeat counter instead of rereading the whole file.
-Do not wait until the final artifact to write progress.
-```
+Follow [child completion and recovery](../../../shared/codex-delegation.md)
+for native waits, missing-result detection, and bounded recovery. The
+performer owns that contract; do not make leaf agents read orchestration
+references. Preserve the initial general reviewer's canonical target and use
+`followup_task` for pass-2 synthesis after the specialist reports are accepted.
 
 ## Standard Compact Reply Block
 
 Append this verbatim to every delegated phase prompt:
 
 ```text
-Before replying in chat, write the required artifact(s) to disk.
+You are a leaf phase worker. Do not spawn or delegate to other agents, and
+never commit. Complete the assigned work and await its commands before your
+final reply. If a hard stop prevents that, identify any still-active owned
+commands in the blocker. Do not end with a progress-only reply or promise to
+return later. No heartbeat or periodic progress report is required.
+
+Before your final reply, write the required artifact(s) to disk. If you cannot
+finish, return BLOCKED with the concrete failure and any partial artifacts; do
+not imply that unfinished work succeeded. This leaf status is a report to the
+performer, not authority to publish a task Block.
 
 Reply in 8 lines or fewer using exactly these keys:
 STATUS: <DONE|BLOCKED|APPROVED|NEEDS_CHANGES>
@@ -121,16 +115,16 @@ Do not restate the full context, plan, diff, or long reasoning in the chat reply
 ## Artifact-Based Completion Checks
 
 - Phase 1 is complete only when `context.md` exists and is non-empty, `plan.md`
-  exists and contains a `## Status` section, and no unintended source edits
-  were made. For a project task, `project.proposed.md` must also exist and be
-  non-empty. For a `Visual: layout` task, `visual.md` must also satisfy the
-  visual design completion check below.
+  exists, records `Code: harness` or `Code: product`, and contains a
+  `## Status` section, and no unintended source edits were made. A project
+  amendment is optional. For a `Visual: layout` task,
+  `visual.md` must also satisfy the visual design completion check below.
 - Phase 3 is complete only when `plan.md` contains both `Phases:` in the Status section and `Assessed: yes`, records a rejection outcome (`Fast-Path: rejected` or `Approach: rejected`) that sends the performer back to a fresh Phase 1 leaf, or records `Scope: split-required` and has a complete `split-proposal.md` that stops source work for queue rescoping.
 - Phase 4 is complete only when the target phase checkbox changed to checked and the touched-file list matches the owned write set, or the blocker explains any mismatch.
 - Phase 5 is complete only when the build outcome is known and the build checkbox is updated on success.
-- An initial Phase 6 lens is complete only when all five `review1-<lens>.md` reports exist with `## Verdict: NOT_APPLICABLE | CLEAN | FINDINGS` and a non-empty `## Checked` section. `NOT_APPLICABLE` must tie its proof to the complete diff; `CLEAN`/`FINDINGS` must name the relevant full files and adjacent surfaces reviewed.
-- Initial Phase 6 general review is complete only when `review1-general.md` and `review1.md` exist with a `## Verdict:` line, a non-empty `## Coverage` section, all five lens reports are accepted or an unsupported bailout has been rerun, and every evidence check is reconciled against the actual diff.
-- A focused Phase 6 review is complete only when `review<R>-focused.md` and `review<R>.md` name the fix paths and invariants, account for every carried-forward and invalidated approval, account for every rerun specialist, and reconcile only invalidated evidence checks. A convergence assessment is complete only with one exact disposition from the pipeline and its required bounded next action or split proposal.
+- An initial Phase 6 lens is complete only when all five `review1-<lens>.md` reports (on a harness task, the lenses the general reviewer named) exist with `## Verdict: NOT_APPLICABLE | CLEAN | FINDINGS` and a non-empty `## Checked` section. `NOT_APPLICABLE` must tie its proof to the complete diff; `CLEAN`/`FINDINGS` must name the relevant full files and adjacent surfaces reviewed.
+- Initial Phase 6 general review is complete only when `review1-general.md` and `review1.md` exist with a `## Verdict:` line, a non-empty `## Coverage` section, all five lens reports (on a harness task, the named ones) are accepted or an unsupported bailout has been rerun, and every evidence check is reconciled against the actual diff.
+- A focused Phase 6 review is complete only when `review<R>-focused.md` and `review<R>.md` name the fix paths and invariants, account for every carried-forward and invalidated approval, account for every rerun specialist, and reconcile only invalidated evidence checks. A convergence assessment is complete only with its loop map, one exact disposition from the pipeline and that disposition's next action: open blockers, rulings and the next checkpoint for `CONTINUE`, the boundary and replacement approach for `REPLAN_CURRENT`, or a split proposal.
 - Phase 6b is complete only when the requested fixes were applied and the post-fix build outcome is known.
 - Phase 3 is additionally incomplete until `test-design.md` exists, covers
   every acceptance surface, assigns each check a direct instrument, oracle,
@@ -151,6 +145,10 @@ planner, and Phase 3 still verifies both artifacts independently. For a
 between the context and plan steps so the leaf writes `visual.md` before
 `plan.md` and the plan consumes the derived contract.
 
+Use this entry point for both new and follow-up work. Follow the shared
+[project-context policy](../../../shared/project-context.md); when delivering
+the prompt, include its resolved source path so the leaf can read it.
+
 Small-task fast path: the performer may run this phase as a same-session
 checklist instead of a leaf, but only when the task spec itself names every
 file to touch and the change is mechanical — roughly two source files or
@@ -165,14 +163,17 @@ You are a context-gathering and planning agent for a large C++ codebase (Telegra
 
 TASK: <TASK>
 
-YOUR JOB: Read AGENTS.md, inspect the codebase, find all files and code relevant to this task, write self-contained implementation context, and then write a detailed implementation plan.
+YOUR JOB: Read AGENTS.md, inspect the relevant code, write task-specific implementation context, and then write a detailed implementation plan.
 
 Steps:
 1. Read AGENTS.md for project conventions and build instructions.
-2. When `<PROJECT_FILE>` is not `none`, read it as the current durable project
-   blueprint and preserve everything still accurate in the proposal.
+2. Read `.agents/shared/project-context.md` in the source checkout. When
+   `<PROJECT_FILE>` is not `none`, use its small shared overview to orient this
+   task; expand only concretely relevant dependencies and references under
+   that policy. Current task requirements and source govern the plan.
 3. Search the codebase for files, classes, functions, and patterns related to the task.
-4. Read all potentially relevant files. Be thorough and prefer reading more rather than less.
+4. Read the relevant source and adjacent behavior needed to resolve the task's
+   requirements and risks. Use targeted lookups for remaining ambiguities.
 5. For each relevant file, note:
    - file path
    - relevant line ranges
@@ -183,22 +184,18 @@ Steps:
 8. Check .style files if the task involves UI.
 9. Check lang.strings if the task involves user-visible text.
 
-Write `<WORK_DIR>/project.proposed.md` only when `<PROJECT_FILE>` is not
-`none`. It is not used by the current task. Describe the project as if this
-task is approved and fully working, so the performer can promote it only after
-approval. Include:
-- Project: What this project does (feature description, goals, scope)
-- Architecture: High-level architectural decisions, which modules are involved, how they interact
-- Key Design Decisions: Important choices made about the approach
-- Relevant Codebase Areas: Which parts of the codebase this project touches, key types and APIs involved
-
-Do not include temporal state like "Current State", "Pending Changes", "Not yet implemented", or "TODO". Describe the project as a complete, coherent whole.
+When `<PROJECT_FILE>` is not `none` and a useful shared fact changes, propose
+`<WORK_DIR>/project-amendment.md` under the shared policy. Do not modify
+`<PROJECT_FILE>` in this phase. No amendment or placeholder is required otherwise.
 
 Always write `<WORK_DIR>/context.md`.
 
-This is the primary task-specific implementation context. All downstream phases should be able to work from this file plus the referenced source files. It must be self-contained. Include:
+This is the primary task-specific implementation context. Give downstream
+phases enough background to work from it and the exact relevant references;
+link to detailed material instead of copying project history. Include the
+following only where relevant:
 - Task Description: The full task restated clearly
-- Relevant Files: Every file path with line ranges and descriptions
+- Relevant Files: Exact file paths with relevant sections or line ranges and descriptions
 - Key Code Patterns: How similar things are done in the codebase, with snippets when useful
 - Data Structures: Relevant types, structs, classes
 - API Methods: Any TL schema methods involved, copied from api.tl when useful
@@ -207,7 +204,8 @@ This is the primary task-specific implementation context. All downstream phases 
 - Build Info: Build command and any special notes
 - Reference Implementations: Similar features that can serve as templates
 
-Be extremely thorough. Another agent with no prior context will rely on this file.
+Resolve load-bearing questions and state remaining assumptions. Another agent
+with no prior context must understand this task's scope and where to look next.
 
 After context.md is written, create a detailed plan in: <WORK_DIR>/plan.md
 
@@ -215,6 +213,14 @@ The plan.md should contain:
 
 ## Task
 <one-line summary>
+Code: <harness | product>
+<harness only when every planned change qualifies for the `[ai]` subject
+prefix under "Commits" in AGENTS.md: the test harness in
+`Telegram/SourceFiles/test/` with its build registration, `.agents/`,
+`.claude/`, `.grok/` or other AI testing infrastructure that no user runs. For
+harness, name the tasks, tests or agents that will use it, and size the plan
+to what they need from it: no support for hypothetical callers, misuse or edge
+cases none of them reaches.>
 
 ## Approach
 <high-level description of the implementation approach. Name the closest
@@ -269,68 +275,6 @@ Number every step. Group steps into phases if there are more than about eight st
 - [ ] Phase 2: <name> (if applicable)
 - [ ] Pre-review validation
 - [ ] Code review
-
-Do not implement code in this phase.
-```
-
-## Phase 1F: Context and plan for an existing project
-
-```text
-You are a context-gathering and planning agent for a follow-up task on an existing project in a large C++ codebase (Telegram Desktop).
-
-NEW TASK: <TASK>
-
-YOUR JOB: Read the existing project state, gather any additional context needed, produce fresh documents for the new task, and then write a detailed implementation plan.
-
-Steps:
-1. Read AGENTS.md for project conventions and build instructions.
-2. Read <PROJECT_FILE>. This is the project-level blueprint describing everything done so far.
-3. Read <PREVIOUS_CONTEXT>. This is the previous task's gathered context.
-4. Understand what has already been implemented by reading the actual source files referenced in the project file and previous context.
-5. Based on the new task description, search the codebase for any additional files, classes, functions, and patterns that are relevant to the new task but not already covered.
-6. Read all newly relevant files thoroughly.
-
-Write two files.
-
-File 1: `<WORK_DIR>/project.proposed.md`
-
-Write a single coherent proposed project document that describes everything,
-including this task's changes, as fully implemented and working. Do not modify
-`<PROJECT_FILE>` during this phase.
-
-It should incorporate:
-- everything from the existing project document that is still accurate and relevant
-- the new task's functionality described as part of the project, not as a pending change
-- any changed design decisions or architectural updates from the new task requirements
-
-It should not contain:
-- temporal state such as "Current State", "Pending Changes", or "TODO"
-- history of how requirements changed between tasks
-- references to "the old approach" versus "the new approach"
-- task-by-task changelog or timeline
-- information that contradicts the new task requirements
-
-File 2: `<WORK_DIR>/context.md`
-
-This is the primary document for the new task. It must be self-contained and should include:
-- Task Description: The new task restated clearly, with enough project background that an implementation agent can understand it without reading other AI task files
-- Relevant Files: Every file path with line ranges relevant to this task
-- Key Code Patterns: How similar things are done in the codebase
-- Data Structures: Relevant types, structs, classes
-- API Methods: Any TL schema methods involved
-- UI Styles: Any relevant style definitions
-- Localization: Any relevant string keys
-- Build Info: Build command and any special notes
-- Reference Implementations: Similar features that can serve as templates
-
-Be extremely thorough. Another agent with no prior context should be able to work from this file alone.
-
-File 3: `<WORK_DIR>/plan.md`
-
-After the two documents are written, create a detailed plan with the same
-structure required by Phase 1: Task, Approach, Files to Modify, Files to
-Create, numbered Implementation Steps grouped into phases when there are more
-than about eight steps, Build Verification, and the Status checkbox section.
 
 Do not implement code in this phase.
 ```
@@ -394,10 +338,18 @@ Assess the plan:
    - New files are not the problem: a focused file bounding a coherent role
      beats both growing a mega-module and scattering through one; judge
      whether the boundary does work, not whether it is new.
+   - Harness code: check the plan's `Code:` line against its planned paths;
+     any product path makes it `Code: product`. This is harness or testing
+     code no user runs, so for `Code: harness` judge the plan against the
+     consumers it names: what they need from it, correct. Support for
+     hypothetical callers, misuse, framework edge cases and defensive teardown
+     that no consumer reaches comes out of the plan, and the self-test proves
+     what the consumers rely on, not every case the framework allows.
 5. Expected surfaces: record the surfaces this task is likely to touch and the
    escalations they would imply, as a recall note for the reviewers. Do not
    select or omit standard lenses here — all five independently scan the task
-   and complete diff, then decide their own applicability.
+   and complete diff, then decide their own applicability; on a harness task
+   the general reviewer names the lenses it needs.
 6. Evidence design: map every acceptance criterion and material shipped risk to
    the most direct practical instrument that can detect the negative. Allow
    static readings, commands/artifacts, unit tests, a standalone probe or
@@ -499,8 +451,7 @@ Rules:
 - Follow the plan precisely.
 - Follow AGENTS.md coding conventions.
 - You are not alone in the codebase. Respect existing changes and do not revert unrelated work.
-- Do not modify AI task files except the Status section in plan.md and the matching
-  `logs/phase-<phase-name>.progress.md` heartbeat required by this prompt.
+- Do not modify AI task files except the Status section in plan.md.
 - When done, update plan.md Status section: change `- [ ] Phase <N>: ...` to `- [x] Phase <N>: ...`
 - Do not work on other phases.
 
@@ -536,6 +487,9 @@ Read these files:
 
 The implementation is complete. Run the exact pre-review validation selected
 in the assessed plan and fix only task-owned failures that prevent review.
+If assigned medium execution scope, collect any failure output and return
+it to the parent before diagnosis or source repair. The parent assigns that
+follow-up at xhigh or justified high before resuming this checklist.
 
 Steps:
 1. On native Windows, run the recovery contract's exact-path proactive cleanup
@@ -572,6 +526,10 @@ review for another material risk.
 
 For the initial implementation:
 
+0. From the source checkout run
+   `python3 .agents/skills/code-health/scripts/health.py check --base refs/ai-tasks/<TASK_ID>/base`
+   and save its complete output as `<WORK_DIR>/health-check.md`. It is tool
+   output, not a review, so every reviewer may read it.
 1. Launch the general reviewer and all five standard lens reviewers together
    when capacity permits. Under a slot limit, queue every lens and start the
    next as a slot opens; none is selected away.
@@ -595,15 +553,41 @@ fix invalidated.
 The focused general reviewer confirms those reports and writes `review<R>.md`,
 explicitly carrying all other approvals forward.
 
-After two `NEEDS_CHANGES` verdicts, non-shrinking findings, architectural/scope
-expansion, or loss of a reliable carry-forward boundary, run the convergence
-prompt instead of another ordinary fix round. It permits at most one final
-focused repair before a stop, replan, or rescope. The bound never converts an
-unresolved finding into approval.
+Fix and re-review until a verdict has no blocking finding; there is no round
+limit. Run the convergence prompt instead of the next ordinary fix at the fifth
+`NEEDS_CHANGES` verdict and then at each checkpoint an assessment names, or
+when the focused reviewer returns `CONVERGENCE_REQUIRED`. Give its rulings to
+every later fix and focused review. No count converts an unresolved finding
+into approval.
 
 A wording or style suggestion is non-blocking unless it causes incorrect
 behavior, unsafe use, misleading build instructions, a repository-rule
 violation, or a material maintenance defect.
+
+### Harness tasks
+
+When plan.md says `Code: harness` (pipeline, "Harness tasks"), the initial
+review starts with the general reviewer alone. On pass 1 it writes the lenses
+it needs under `Lenses:` in `review1-general.md`, or `Lenses: none`. With
+`Lenses: none`, the same pass writes `review1.md`. Otherwise run only the
+named lenses, then call the general reviewer back for pass 2 as above. Focused
+rounds and convergence follow the ordinary rules.
+
+Append the harness bar to the prompt of every lens, general review, synthesis,
+focused re-review and convergence assessment of a harness task. On Codex these
+leaves run on `gpt-6.1-sol`.
+
+~~~text
+HARNESS BAR. This task changes harness or testing code that no user runs
+(plan.md `Code: harness`). Its users are the tests, tasks and agents plan.md
+names. A finding is BLOCKING only when the harness can give one of them a
+wrong result (a false pass or fail, a wrong reading), crash or hang a run,
+damage anything outside the run's sandbox, change product behavior, or break
+the build or a repository rule. Robustness against misuse no consumer
+performs, teardown order in cases no consumer reaches, support for
+hypothetical callers, and polish are NON_BLOCKING notes. Where this bar and
+the ordinary blocking rule differ, this bar decides.
+~~~
 
 ### Shared specialist preamble
 
@@ -624,6 +608,7 @@ non-applicability.
 
 When applicable, also read:
 - <WORK_DIR>/context.md and plan.md
+- <WORK_DIR>/health-check.md
 - AGENTS.md and REVIEW.md
 - every relevant changed file in full
 - adjacent callers, owners, consumers, or repository precedents needed for this
@@ -769,6 +754,22 @@ Independently review correctness, completeness, edge/error paths, unintended
 regressions, integration, proportionality, repository conventions, and the
 evidence design. Do not defer anything to a specialist.
 
+Read <WORK_DIR>/health-check.md on pass 1. Its errors (an include into a
+CMake target the including target does not link, where no such include
+existed before; a new file over the size limit) are blocking
+repository-rule findings unless the task explicitly owns that boundary.
+Confirm each warning against the code. Growing an oversized file by more
+than a small fix is a maintenance defect: the fix is to put the new code in
+a new file, never to split the old file inside this task. Repeating existing
+code, or making a widely included header materially heavier, is a
+maintenance defect worth changing. A removed definition still mentioned
+elsewhere is a stale declaration or a break on the platform that compiles
+the mention, and a removed last use leaves a definition to delete in the
+same task. One more include across an already crossed target pair blocks
+only when a clean alternative exists.
+Where the nearest directory `AGENTS.md` area map exists, judge placement
+against it rather than against the surrounding code.
+
 On pass 1 the five standard lenses are running independently. Complete your own
 review without predicting or selecting their verdicts. Name any extra domain
 specialist a material risk needs. Write `review1-general.md` with your complete
@@ -776,8 +777,16 @@ independent Checked, evidence reconciliation, findings, and pass-1 status, but
 do not write `review1.md` yet. Then return so the performer can call you back for
 synthesis after every standard lens report exists.
 
-On pass 2, account for all five lenses. Confirm every finding against the code
-and drop it when the concrete failure does not hold. Accept `NOT_APPLICABLE`
+When the harness bar is appended, no lens is running. On pass 1 write under
+`Lenses:` each lens this diff needs, with its concrete risk, or
+`Lenses: none`. Name security when the diff deletes or overwrites files,
+starts processes, or touches accounts, credentials or data outside the run's
+sandbox, and another lens or a domain specialist only for a risk you can
+state. With `Lenses: none`, also write `review1.md` now; there is no pass 2.
+
+On pass 2, account for all five lenses (on a harness task, the named ones).
+Confirm every finding against the code and drop it when the concrete failure
+does not hold. Accept `NOT_APPLICABLE`
 only when its complete-diff proof establishes that no owned mechanism changed.
 If that proof contradicts a hunk or is merely a severity estimate, write
 `Incomplete lens: <name> — <owned mechanism>` and return without an
@@ -840,7 +849,12 @@ Read:
 - <WORK_DIR>/review<R-1>.md and the fix result;
 - the fixed paths, containing functions/types, and affected callers;
 - test-design.md entries the fix reports invalidated;
-- only the lens or domain-specialist reports explicitly rerun for this fix.
+- only the lens or domain-specialist reports explicitly rerun for this fix;
+- the `## Rulings` of every <WORK_DIR>/review-convergence<C>.md.
+
+A ruling is settled. Drop a finding that contradicts one unless it brings a
+concrete failure scenario the ruling did not weigh; report that finding and
+return `CONVERGENCE_REQUIRED`.
 
 Do not restart the complete-diff review. Verify each repaired blocker, inspect
 the fix for regressions in its actual data/control/lifetime boundary, and check
@@ -871,9 +885,11 @@ Write <WORK_DIR>/review<R>-focused.md and <WORK_DIR>/review<R>.md with:
 ## Changes Required
 <blocking findings only>
 
-Return `CONVERGENCE_REQUIRED` rather than another ordinary fix when this is the
-second NEEDS_CHANGES verdict, findings did not shrink, the fix expanded owned
-paths/architecture, or the carry-forward boundary is unreliable.
+Return `CONVERGENCE_REQUIRED` rather than `NEEDS_CHANGES` when a finding asks
+to undo an earlier fix or ruling, a fix would grow the change into a subsystem
+or product boundary the assessed plan did not include, or the carry-forward
+boundary is unreliable, and still list its blocking findings. Never return it
+for a round count; the performer owns the count checkpoints.
 ~~~
 
 ### Review convergence assessment
@@ -883,32 +899,50 @@ You are an independent review-convergence assessor for one Telegram Desktop
 task. You are a leaf and must not delegate or edit source.
 
 Read the task, context.md, assessed plan.md, every canonical review<R>.md, every
-fix result, current owned paths, the current complete task diff, and the exact
-validation/evidence status. Read source only as needed to decide disposition.
+fix result, every earlier review-convergence<C>.md, current owned paths, the
+current complete task diff, and the exact validation/evidence status. Read
+source only as needed to decide disposition.
 
-Diagnose why review is not converging: repeated discovery in stable code,
-regressions introduced by fixes, architectural coupling, oversized intrinsic
-scope, or an external unsafe boundary. Preserve findings already resolved and
-do not run another broad review.
+The loop exists to make independent reviewers agree on the implementation; a
+round count alone is not a problem. Map the loop: each round's blocking
+findings, whether each was new, recurring, or reopening an earlier fix or
+ruling, and which fix introduced it. Decide whether the open set is narrowing,
+cycling, or regrowing in one mechanism, and why: many genuine special cases,
+regressions introduced by fixes, conflicting reviewer demands, architectural
+coupling, oversized intrinsic scope, or an external unsafe boundary. Preserve
+findings already resolved and do not run another broad review.
 
-Write <WORK_DIR>/review-convergence<C>.md with exactly one verdict:
+Write <WORK_DIR>/review-convergence<C>.md with the loop map, the diagnosis and
+exactly one verdict:
 
-## Verdict: CONTINUE_FOCUSED | REPLAN_CURRENT | RESCOPE_REQUIRED | HARD_STOP
+## Verdict: CONTINUE | REPLAN_CURRENT | RESCOPE_REQUIRED | HARD_STOP
 
-- CONTINUE_FOCUSED: one bounded list of remaining blockers, one owned write
-  set, the approvals carried forward, and at most one final focused review.
-- REPLAN_CURRENT: why the task remains cohesive, the exact validated source
-  boundary to preserve or restore, and the replacement approach. Do not use
-  this to disguise multiple independent product outcomes as phases.
+- CONTINUE: convergence is real but slow. List the open blockers with one
+  owned write set, the approvals carried forward, any rulings, and the next
+  checkpoint: by default three more NEEDS_CHANGES verdicts, at most five.
+  After an earlier assessment, show progress since it: resolved findings
+  stayed resolved and the open set narrowed or moved to new, narrower cases.
+  Without that progress choose another verdict.
+- REPLAN_CURRENT: the loop cycles or each fix breaks the same mechanism. Say
+  why the task remains cohesive, and name the mechanism, the exact validated
+  source boundary to preserve or restore, and the replacement approach. Do not
+  use this to disguise multiple independent product outcomes as phases.
 - RESCOPE_REQUIRED: why one review/evidence campaign is incoherent and a
   split-proposal.md containing independently buildable/testable replacement
   tasks, acceptance oracles, dependencies, and salvageable work.
 - HARD_STOP: the exact unsafe or unavailable condition and required human
-  action.
+  action, such as funded value, credentials or a server change. Slow
+  convergence, a round count or a difficult design is never a HARD_STOP.
 
-The verdict cannot approve code. If a permitted final focused round still has
-blocking findings, stop with its unapproved artifacts; do not begin another
-campaign automatically.
+Under `## Rulings`, settle each question the loop keeps reopening: which of two
+conflicting findings holds, or what the task requires where it is silent.
+Decide from the task, project documents and the closest repository precedent,
+preferring existing behavior, and record both sides with the reason. Later
+fixes follow a ruling; later reviewers drop a finding that contradicts it
+unless it brings a concrete failure scenario the ruling did not weigh.
+
+The verdict cannot approve code; only a later review round with no blocking
+finding does.
 ~~~
 
 On `RESCOPE_REQUIRED`, the performer validates `split-proposal.md`, inventories
@@ -922,8 +956,9 @@ the scheduler's later split worker assigns the sealed implementation carrier.
 You are a review-fix agent for one Telegram Desktop task. You are a leaf and
 must not delegate.
 
-Read context.md, plan.md, review<R>.md, AGENTS.md, REVIEW.md, and every source
-file named by a blocking finding. Implement only "Changes Required".
+Read context.md, plan.md, review<R>.md, AGENTS.md, REVIEW.md, the `## Rulings`
+of every review-convergence<C>.md, and every source file named by a blocking
+finding. Implement only "Changes Required", following those rulings.
 Do not implement Dropped or non-blocking notes. Stay inside owned-paths.txt and
 do not edit AI artifacts.
 
@@ -958,7 +993,9 @@ leaf and must not delegate.
 Read the task, final diff, plan.md, test-design.md, test.md, every prior recovery
 plan, the raw evidence for the latest run, and the universal evidence-loop
 directness rules. When an app overlay is involved, also read its saved inventory
-and Telegram/SourceFiles/test/README.md.
+and the short Telegram/SourceFiles/test/README.md. Follow its links only for the
+selected helpers and the observed failure signature, and read their headers;
+do not load all helper references or the whole diagnostic history.
 
 The latest failure signature is:
 <FAILURE_SIGNATURE>
@@ -996,10 +1033,10 @@ for independent confirmation.
 
 ## Evidence-Campaign-Cap Assessment
 
-At MAX_TEST_RUNS with an evidence flaw still open, use a fresh assessor. The
-first campaign cap may start one focused recovery campaign. A focused campaign
-cap or repeated non-converging focused signature is the final automatic
-checkpoint; it cannot start a third campaign.
+At MAX_TEST_RUNS with an evidence flaw still open, use a fresh assessor. Every
+campaign cap, and a repeated non-converging focused signature, gets this
+assessment. A further focused campaign runs only for a direct strategy no
+earlier campaign tried. Nobody waits for a human.
 
 ~~~text
 Read the task, final diff, plan.md, test-design.md, test.md, every run artifact,
@@ -1017,24 +1054,20 @@ Write <WORK_DIR>/test-cap-assessment-<C>.md:
 <each instrument or setup already attempted and forbidden, followed by the next
 safe strategy that executes the changed surface>
 
-## Verdict: FOCUSED_RECOVERY | RECOVERY_EXHAUSTED | HARD_STOP
+## Verdict: FOCUSED_RECOVERY | RECOVERY_EXHAUSTED
 
-Choose FOCUSED_RECOVERY only after the normal campaign and whenever a safer or
-more direct reading, command,
+Choose FOCUSED_RECOVERY whenever a safer or more direct reading, command,
 artifact inspection, unit, probe, component, Telegram log/overlay, physical
-interaction or visual capture can still decide an unmet check. The next
+interaction or visual capture that no earlier campaign tried can still decide
+an unmet check. Name it and forbid every technique already tried. The next
 campaign runs only unmet checks and their controls.
 
 Choose RECOVERY_EXHAUSTED only when every applicable instrument is unsafe,
-unavailable, or would bypass the task's changed surface. Time spent, a run cap,
+unavailable, already tried, or would bypass the task's changed surface, or
+when only the owner can provide what an unmet check needs (credentials,
+funded value, a server change): name exactly that. Time spent, a run cap,
 overlay complexity, a blank screenshot, or repeated identical failure is not
 exhaustion.
-
-At the focused campaign boundary, choose HARD_STOP when a plausible safe direct
-strategy remains but automatic recovery did not converge. Name that strategy,
-the exact prior proof retained, and the human/environment decision needed to
-continue. Leave the task in-progress; do not publish approval or Block and do
-not begin another campaign automatically.
 ~~~
 
 
@@ -1093,8 +1126,14 @@ When all phases, including pre-review validation, code review, evidence, and Win
 
 ## Error Handling
 
-- If any phase fails or gets stuck, follow the host-specific retry rules above. On Codex, do not close an agent solely because the final artifact is missing while its progress file is still advancing. For Phase 1, Phase 3, Phase 4, and Phase 6, do not rerun locally after delegated retries fail; ask the user instead.
-- If `context.md` or `plan.md` is not written properly by a phase, rerun that phase in a fresh subagent with more specific instructions.
+- If a phase returns incomplete or its runtime reports failure, follow the
+  host-specific completion and recovery rules above. Silence and a missing
+  final artifact do not prove a running agent has failed. For Phase 1, Phase 3,
+  Phase 4, and Phase 6, do not rerun locally after delegated retries fail;
+  report the recoverable hard stop to the caller.
+- If a returned phase left `context.md` or `plan.md` incomplete, use the same
+  bounded phase retry above with more specific instructions, after confirming
+  the original writers stopped.
 - If build errors persist after the build phase's attempts, report the remaining errors to the user.
 - If a review-fix phase introduces new build errors that it cannot resolve, report to the user.
 
@@ -1103,7 +1142,8 @@ When all phases, including pre-review validation, code review, evidence, and Win
 For each phase:
 1. Write the full prompt to `<WORK_DIR>/logs/phase-<phase-name>.prompt.md`
 2. Delegate by sending that prompt text to a fresh subagent, or use it as a same-session checklist only for the designated main-session phases or when delegation was unavailable from the start
-3. For delegated phases, expect a matching `<WORK_DIR>/logs/phase-<phase-name>.progress.md` heartbeat while work is in flight
+3. Wait for delegated completion using the host contract, then validate the
+   returned artifacts and code changes
 4. Save `<WORK_DIR>/logs/phase-<phase-name>.result.md` with `STATUS:`, `ARTIFACTS:`,
    `TOUCHED:`, `BLOCKER:`, and `NOTES:` fields.
 
@@ -1126,6 +1166,15 @@ For review iterations, include the iteration and lens in the file name, for exam
    small shell summaries and the completion checks above.
 4. Write the result log from the validated outcome and the compact reply block.
 
+For a review or assessment phase under the `codex` or `codex-default` review
+provider, replace step 2 with one `codex_leaf.py start` per leaf — working
+directory `WORK_DIR`, `workspace-write` sandbox, `--no-project-doc`, the
+selected `--effort`, `--model` where the effort policy's lens models pin one,
+`--home default` under `codex-default`, and the
+Codex CLI leaves preamble before the prompt — followed by
+foreground `codex_leaf.py wait` calls until they all finish. Steps 3 and 4 are
+unchanged; the compact reply is the leaf's `<name>.last.md`.
+
 ## Subagent Pattern (Grok Build)
 
 1. Write the phase prompt file(s).
@@ -1141,19 +1190,22 @@ For review iterations, include the iteration and lens in the file name, for exam
    reply block.
 
 Do not replace this pattern with a shell-launched `grok` process, a
-workflow script, or the Codex wait ladder.
+workflow script, or Codex-specific agent controls.
 
 ## Subagent Pattern (Codex)
 
 Use this pattern conceptually for delegated phases:
 
 1. Write the phase prompt file.
-2. Spawn a fresh leaf subagent with a unique tool-valid task name and `fork_turns: "none"` unless a small recent-turn fork is required.
-3. Require the agent to create the matching progress file early and refresh it sparingly: at natural milestones when possible, otherwise only after a longer quiet stretch such as roughly 5-10 minutes.
-4. Poll for at most 60 seconds at a time. After any mailbox wake, inspect the saved target with `list_agents`; use elapsed five-minute windows rather than poll count for stall checks.
-5. Prefer filesystem mtime checks on the progress file first. If its mtime moved or the heartbeat counter increased, keep waiting; do not treat that as a stall.
-6. After a full blocked-check window with no movement, use `send_message` for a running target or `followup_task` for an idle one. After a second unchanged window, interrupt if needed and retry the disposable phase once with a unique task name.
-7. Validate the expected artifact or code changes with small shell summaries and the completion checks above.
-8. Write the result log from the validated outcome and the compact reply block.
+2. Spawn a fresh leaf subagent with a unique tool-valid task name and
+   `fork_turns: "none"` unless a small recent-turn fork is required. Pass
+   the selected `reasoning_effort` when supported, per the shared phase
+   effort policy; omit `model` to inherit the parent model, except where
+   the policy's lens models pin one.
+3. Wait for the child's final result under the shared Codex completion and
+   recovery contract. Keep heartbeat and progress checks out of the parent.
+4. Validate the expected artifacts or code changes after completion with small
+   shell summaries and the completion checks above.
+5. Write the result log from the validated outcome and the compact reply block.
 
 Do not replace this pattern with shell-launched `codex exec`.

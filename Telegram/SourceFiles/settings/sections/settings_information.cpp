@@ -509,31 +509,7 @@ void SetupChatAutomation(
 		controller->showSettings(Settings::ChatbotsId());
 	});
 
-	{
-		const auto badge = Ui::NewBadge::CreateNewBadge(
-			button,
-			tr::lng_premium_summary_new_badge()).get();
-		rpl::combine(
-			std::move(title),
-			button->widthValue()
-		) | rpl::on_next([=, &st](
-				const QString &text,
-				int width) {
-			const auto space = st.style.font->spacew;
-			const auto left = st.padding.left()
-				+ st.style.font->width(text)
-				+ space;
-			const auto available = width - left - st.padding.right();
-			badge->setVisible(available >= badge->width());
-			if (!badge->isHidden()) {
-				const auto top = st.padding.top()
-					+ st.style.font->ascent
-					- st::settingsPremiumNewBadge.style.font->ascent
-					- st::settingsPremiumNewBadgePadding.top();
-				badge->moveToLeft(left, top, width);
-			}
-		}, badge->lifetime());
-	}
+	Ui::NewBadge::AddAfterButtonText(button, std::move(title), st);
 
 	if (targets) {
 		targets->chatAutomation = button;
@@ -620,10 +596,17 @@ void SetupRows(
 		const auto phoneButton = AddRow(
 			container,
 			tr::lng_settings_phone_label(),
-			Info::Profile::PhoneValue(self),
+			Info::Profile::PhoneWithSpoilerValue(
+				self,
+				Info::Profile::PhoneValue(self)),
 			tr::lng_profile_copy_phone(tr::now),
 			showChangePhone,
-			{ &st::menuIconPhone });
+			{ &st::menuIconPhone },
+			true,
+			[=](not_null<Ui::PopupMenu*> menu) {
+				Info::Profile::AddPhoneSpoilerMenu(menu, self);
+			},
+			&st::menuIconCopy);
 		if (targets) {
 			targets->phone = phoneButton;
 		}
@@ -949,7 +932,8 @@ void SetupAccountsWrap(
 				};
 				window->show(
 					Ui::MakeConfirmBox({
-						.text = tr::lng_sure_logout(),
+						.text = Window::LogoutConfirmationText(
+							&session->account()),
 						.confirmed = crl::guard(session, callback),
 						.confirmText = tr::lng_settings_logout(),
 						.confirmStyle = &st::attentionBoxButton,

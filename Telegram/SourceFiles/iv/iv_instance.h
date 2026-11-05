@@ -147,7 +147,12 @@ private:
 		not_null<Window::SessionController*> controller,
 		not_null<HistoryItem*> item,
 		std::shared_ptr<const RichPage> page,
-		QString initialFragment = QString());
+		QString initialFragment = QString(),
+		bool refresh = false);
+	void refreshRichMessageButtons(
+		not_null<Main::Session*> session,
+		FullMsgId itemId);
+	void refreshPendingRichMessageButtons(not_null<Main::Session*> session);
 	void finishRichMessageRequest(
 		not_null<Main::Session*> session,
 		FullMsgId itemId,
@@ -237,6 +242,8 @@ private:
 	struct MarkdownBinding {
 		Main::Session *session = nullptr;
 		FullMsgId itemId;
+		base::weak_ptr<Window::SessionController> window;
+		std::shared_ptr<const RichPage> disabledButtonsPage;
 	};
 
 	base::flat_map<

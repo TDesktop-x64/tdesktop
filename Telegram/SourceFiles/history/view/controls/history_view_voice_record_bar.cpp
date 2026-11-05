@@ -738,7 +738,7 @@ private:
 	const style::font &_durationFont;
 	QString _duration;
 	int _durationWidth = 0;
-	const style::MediaPlayerButton &_playPauseSt;
+	const style::MediaPlayerPlayIcon &_playPauseSt;
 	const base::unique_qptr<Ui::AbstractButton> _playPauseButton;
 	const QColor _activeWaveformBar;
 	const QColor _inactiveWaveformBar;
@@ -791,7 +791,7 @@ ListenWrap::ListenWrap(
 , _durationFont(font)
 , _duration(FormatTrimDuration(_data->duration))
 , _durationWidth(_durationFont->width(_duration))
-, _playPauseSt(st::mediaPlayerButton)
+, _playPauseSt(st::historyRecordCenterControlIcon)
 , _playPauseButton(base::make_unique_q<Ui::AbstractButton>(parent))
 , _activeWaveformBar(st::historyRecordVoiceFgActiveIcon->c)
 , _inactiveWaveformBar(
@@ -1079,7 +1079,7 @@ void ListenWrap::initPlayButton() {
 		? VoiceDocument
 		: RoundVideoDocument;
 
-	const auto &play = _playPauseSt.playOuter;
+	const auto &play = _playPauseSt.size;
 	updateControlGeometry();
 	_playPauseButton->show();
 	_playPauseButton->setAccessibleName(tr::lng_record_lock_play(tr::now));
@@ -2759,7 +2759,7 @@ void VoiceRecordBar::startRecording() {
 			}
 			switch(e->type()) {
 			case QEvent::KeyPress: {
-				if (!_warningShown
+				if (!_discardBox
 					&& isRecordingLocked()
 					&& Ui::ShouldSubmit(
 						static_cast<QKeyEvent*>(e.get()),
@@ -3241,10 +3241,6 @@ float64 VoiceRecordBar::showListenAnimationRatio() const {
 	return value;
 }
 
-void VoiceRecordBar::computeAndSetLockProgress(QPoint globalPos) {
-	_lock->requestPaintProgress(calcLockProgress(globalPos));
-}
-
 float64 VoiceRecordBar::calcLockProgress(QPoint globalPos) {
 	const auto localPos = mapFromGlobal(globalPos);
 	const auto lower = _lock->height();
@@ -3290,7 +3286,7 @@ void VoiceRecordBar::installListenStateFilter() {
 				_listen->playPause();
 				return Result::Cancel;
 			}
-			if (isEnter && !_warningShown) {
+			if (isEnter && !_discardBox) {
 				requestToSendWithOptions({});
 				return Result::Cancel;
 			}
@@ -3322,12 +3318,11 @@ void VoiceRecordBar::showDiscardBox(
 			hideAnimated();
 		}
 		close();
-		_warningShown = false;
 		if (callback) {
 			callback();
 		}
 	};
-	_show->showBox(Ui::MakeConfirmBox({
+	_discardBox = _show->show(Ui::MakeConfirmBox({
 		.text = (isListenState()
 			? (_recordingVideo
 				? tr::lng_record_listen_cancel_sure_round
@@ -3339,7 +3334,6 @@ void VoiceRecordBar::showDiscardBox(
 		.confirmText = tr::lng_record_lock_discard(),
 		.confirmStyle = &st::attentionBoxButton,
 	}));
-	_warningShown = true;
 }
 
 bool VoiceRecordBar::createVideoRecorder() {

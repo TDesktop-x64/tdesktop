@@ -189,6 +189,9 @@ private:
 	void finishDialogsList();
 	void requestSinglePeerDialog();
 	mtpRequestId requestSinglePeerMigrated(const Data::DialogInfo &info);
+	void requestSinglePeerMigratedFromHistory(
+		const MTPInputPeer &peer,
+		ChannelId channelId);
 	void appendSinglePeerDialogs(Data::DialogsInfo &&info);
 
 	void requestLeftChannelsIfNeeded();
@@ -244,7 +247,6 @@ private:
 		Data::File *file,
 		const QString &relativePath);
 	bool loadMessageEmojiProgress(FileProgress progress);
-	void loadMessageEmojiDone(uint64 id, const QString &relativePath);
 	void finishMessagesSlice();
 	void finishMessages();
 

@@ -21,6 +21,7 @@ apps:
       - camera
       - hardware-observe
       - home
+      - login-session-observe
       - network
       - network-bind
       - network-status
@@ -95,7 +96,7 @@ parts:
       - qt
       - rnnoise
       - tde2e
-      - tlottie
+      - tdesktop_rust
       - webrtc
 
   pkgs:
@@ -123,7 +124,7 @@ parts:
   patches:
     source: https://github.com/desktop-app/patches.git
     source-depth: 1
-    source-commit: 519aaa084608fa6f9a2bfbd1959d133c44d94227
+    source-commit: a59fc82462fb2987e9f0ee1498e2db694410ae81
     plugin: nil
     override-pull: |
       craftctl default
@@ -134,7 +135,7 @@ parts:
   ada:
     source: https://github.com/ada-url/ada.git
     source-depth: 1
-    source-tag: v3.2.4
+    source-tag: v3.2.9
     plugin: cmake
     cmake-generator: Ninja
     cmake-parameters:
@@ -367,7 +368,7 @@ parts:
   openssl:
     source: https://github.com/openssl/openssl.git
     source-depth: 1
-    source-tag: openssl-3.2.1
+    source-tag: openssl-3.5.9
     plugin: make
     build-packages:
       - perl
@@ -425,12 +426,14 @@ parts:
       - -DINSTALL_LIBDIR=/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR
       - -DBUILD_SHARED_LIBS=OFF
       - -DQT_QPA_PLATFORMS="wayland;xcb"
+      - -DFEATURE_brotli=OFF
       - -DFEATURE_eglfs=OFF
       - -DINPUT_openssl=linked
     override-pull: |
       craftctl default
       QT="$(grep 'set(QT_REPO_MODULE_VERSION' qtbase/.cmake.conf | sed -r 's/.*"(.*)".*/\1/')"
       find $CRAFT_STAGE/patches/qtbase_${QT} -type f -print0 | sort -z | xargs -r0 git -C qtbase apply
+      find $CRAFT_STAGE/patches/qtsvg_${QT} -type f -print0 | sort -z | xargs -r0 git -C qtsvg apply
       find $CRAFT_STAGE/patches/qtwayland_${QT} -type f -print0 | sort -z | xargs -r0 git -C qtwayland apply
     prime: [-./*]
     after:
@@ -473,33 +476,52 @@ parts:
     after:
       - openssl
 
+  tdesktop_rust:
+    source: ''
+    plugin: rust
+    build-environment:
+      - LD_LIBRARY_PATH: ''
+      - CARGO_BUILD_JOBS: ${CRAFT_PARALLEL_BUILD_COUNT}
+      - CARGO_PROFILE_RELEASE_OPT_LEVEL: 3
+      - CARGO_PROFILE_RELEASE_LTO: 'off'
+      - CARGO_PROFILE_RELEASE_PANIC: unwind
+    rust-channel: 1.96.1
+    override-build: |
+      cargo init --lib --vcs none --name tdesktop_rust
+      printf 'pub use ::tlottie;\npub use ::wallet_engine;\n' > src/lib.rs
+      cargo add --path ../../tlottie/src --features c-api
+      cargo add --path ../../wallet-engine/src
+      cargo rustc --lib --release \
+        --crate-type staticlib --crate-type cdylib \
+        -- --print native-static-libs
+      LIBDIR="$CRAFT_PART_INSTALL/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR"
+      INCLUDEDIR="$CRAFT_PART_INSTALL/usr/include"
+      mkdir -p "$LIBDIR" "$INCLUDEDIR/tlottie" "$INCLUDEDIR/wallet_engine"
+      objcopy --strip-debug target/release/libtdesktop_rust.a "$LIBDIR/libtdesktop_rust.a"
+      cp ../../tlottie/src/include/tlottie.h "$INCLUDEDIR/tlottie/tlottie.h"
+      cargo run --manifest-path ../../wallet-engine/src/bindgen/cpp/bindgen/Cargo.toml --locked -- \
+        --library --out-dir "$INCLUDEDIR/wallet_engine" \
+        target/release/libtdesktop_rust.so
+    after:
+      - tlottie
+      - wallet-engine
+    prime: [-./*]
+
   tlottie:
     source: https://github.com/dkaraush/tlottie.git
     source-depth: 1
-    source-commit: 31f1b542f88e7b4be9a01e749920d857535fc715
+    source-commit: 92df98dc209bc39b1e567ec74a8c86a0af5239de
     plugin: nil
-    build-packages:
-      - wget
+    prime: [-./*]
+
+  wallet-engine:
+    source: https://github.com/i582/wallet-engine.git
+    source-depth: 1
+    source-commit: e59e0d89d7ee90c388bf36e3334c5b276f396697
+    plugin: nil
     override-pull: |
       craftctl default
-      git apply "$CRAFT_STAGE/patches/tlottie.patch"
-    override-build: |
-      RUST_TOOLCHAIN=1.96.1
-      export RUSTUP_HOME="$CRAFT_PART_BUILD/rustup"
-      export CARGO_HOME="$CRAFT_PART_BUILD/cargo"
-      wget -O rustup-init.sh https://sh.rustup.rs
-      sh rustup-init.sh -y --no-modify-path --profile minimal --default-toolchain $RUST_TOOLCHAIN
-      rm rustup-init.sh
-      export RUSTUP_TOOLCHAIN=$RUST_TOOLCHAIN
-      export PATH="$CARGO_HOME/bin:$PATH"
-      cargo rustc --lib --release --locked \
-        --features c-api --crate-type staticlib \
-        -- --print native-static-libs
-      LIBDIR="$CRAFT_PART_INSTALL/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR"
-      INCLUDEDIR="$CRAFT_PART_INSTALL/usr/include/tlottie"
-      mkdir -p "$LIBDIR" "$INCLUDEDIR"
-      objcopy --strip-debug target/release/libtlottie.a "$LIBDIR/libtlottie.a"
-      cp include/tlottie.h "$INCLUDEDIR/tlottie.h"
+      git apply "$CRAFT_STAGE/patches/wallet-engine.patch"
     prime: [-./*]
     after:
       - patches
@@ -507,7 +529,7 @@ parts:
   webrtc:
     source: https://github.com/desktop-app/tg_owt.git
     source-depth: 1
-    source-commit: 26068e29bfa8d74a9dc9c8f7f94172fafbc262b8
+    source-commit: 020feec5c040fdae2cf752c2c2be62ddde7c236d
     plugin: cmake
     build-packages:
       - libopenh264-dev

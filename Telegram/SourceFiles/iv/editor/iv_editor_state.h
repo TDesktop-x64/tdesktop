@@ -139,6 +139,8 @@ public:
 		bool allOrderedUpperAlpha = false;
 		bool allOrderedLowerRoman = false;
 		bool allOrderedUpperRoman = false;
+		bool listRomanSupported = false;
+		bool selectedRomanSupported = false;
 		int selectedItems = 0;
 		RichPage::ListKind listKind = RichPage::ListKind::Bullet;
 		Markdown::PreparedOrderedListType listOrderedType
@@ -239,6 +241,9 @@ public:
 	[[nodiscard]] std::optional<int> removeStructuralSelection(
 		const Markdown::PreparedEditSelection &selection,
 		bool forward);
+	[[nodiscard]] LeafPath shiftLeafAfterRemovedSelection(
+		const Markdown::PreparedEditSelection &selection,
+		LeafPath leaf) const;
 	[[nodiscard]] bool toggleTaskState(
 		const Markdown::PreparedEditListItemSource &source);
 	[[nodiscard]] bool toggleDetailsOpen(
@@ -336,8 +341,6 @@ public:
 	[[nodiscard]] std::optional<int> insertLeadingParagraphActive(
 		bool focusInserted);
 	void resyncAfterExternalRichPageMutation();
-	void insertHeading1AfterActive();
-	void insertBlockquoteAfterActive();
 	struct ActiveTextInsertContext {
 		TextWithEntities before;
 		TextWithEntities selected;
@@ -409,7 +412,6 @@ public:
 		replaceActiveTextSelectionWithText(
 			TextWithEntities text,
 			ActiveTextInsertContext context);
-	[[nodiscard]] bool insertPreparedBlockAfterActive(RichPage::Block block);
 	[[nodiscard]] bool insertPreparedBlocksAfterActive(
 		std::vector<RichPage::Block> blocks,
 		std::optional<ActiveTextInsertContext> context = std::nullopt);

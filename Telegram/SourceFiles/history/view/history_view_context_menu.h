@@ -153,7 +153,6 @@ void AddCopyFilename(
 enum class EmojiPacksSource {
 	Message,
 	Reaction,
-	Reactions,
 	Tag,
 	PollOption,
 };

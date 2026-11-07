@@ -174,6 +174,18 @@ void BottomControls::updateControlsVisibility() {
 	} else {
 		toggle(nullptr);
 	}
+	if (_discuss) {
+		const auto shown = active
+			&& !isReportMessages()
+			&& !isBlocked()
+			&& (isJoinChannel() || isMuteUnmute())
+			&& hasDiscussionGroup();
+		if (shown && _discuss->isHidden()) {
+			_discuss->clearState();
+		}
+		_discuss->setVisible(shown);
+	}
+	updateButtonsGeometry();
 	_isButtonActive = active;
 	recomputeContentHeight();
 }
@@ -241,6 +253,10 @@ void BottomControls::setupButtons() {
 			this,
 			tr::lng_channel_mute(tr::now).toUpper(),
 			st::historyComposeButton);
+		_discuss = std::make_unique<Ui::FlatButton>(
+			this,
+			tr::lng_channel_discuss(tr::now).toUpper(),
+			st::historyComposeButton);
 		_reportMessages = std::make_unique<Ui::FlatButton>(
 			this,
 			QString(),
@@ -249,6 +265,7 @@ void BottomControls::setupButtons() {
 		_botStart->hide();
 		_joinChannel->hide();
 		_muteUnmute->hide();
+		_discuss->hide();
 		_reportMessages->hide();
 		_unblock->setClickedCallback([=] {
 			_actionRequests.fire(BottomControlsAction::Unblock);
@@ -261,6 +278,9 @@ void BottomControls::setupButtons() {
 		});
 		_muteUnmute->setClickedCallback([=] {
 			_actionRequests.fire(BottomControlsAction::MuteUnmute);
+		});
+		_discuss->setClickedCallback([=] {
+			_actionRequests.fire(BottomControlsAction::Discuss);
 		});
 		_reportMessages->setClickedCallback([=] {
 			_actionRequests.fire(BottomControlsAction::Report);
@@ -327,18 +347,25 @@ void BottomControls::setupOverlayIconButton(
 		not_null<Ui::IconButton*> button,
 		bool alignRight,
 		Fn<void()> refresh) {
-	widthValue() | rpl::on_next([=](int width) {
+	rpl::merge(
+		_muteUnmute->widthValue(),
+		_joinChannel->widthValue(),
+		_discuss->widthValue()
+	) | rpl::on_next([=] {
 		if (alignRight) {
-			button->moveToRight(0, 0, width);
+			button->moveToRight(0, 0);
 		} else {
-			button->moveToLeft(0, 0, width);
+			button->moveToLeft(0, 0);
 		}
 	}, button->lifetime());
 	rpl::combine(
 		_muteUnmute->shownValue(),
-		_joinChannel->shownValue()
-	) | rpl::on_next([=](bool muteUnmute, bool joinChannel) {
-		const auto newParent = (muteUnmute && !joinChannel)
+		_joinChannel->shownValue(),
+		_discuss->shownValue()
+	) | rpl::on_next([=](bool muteUnmute, bool joinChannel, bool discuss) {
+		const auto newParent = (alignRight && discuss)
+			? _discuss.get()
+			: (muteUnmute && !joinChannel)
 			? _muteUnmute.get()
 			: (joinChannel && !muteUnmute)
 			? _joinChannel.get()
@@ -573,6 +600,15 @@ bool BottomControls::isMuteUnmute() const {
 		|| _peer->isVerifyCodes();
 }
 
+bool BottomControls::hasDiscussionGroup() const {
+	const auto channel = _peer ? _peer->asChannel() : nullptr;
+	return channel
+		&& channel->isBroadcast()
+		&& (channel->discussionLinkKnown()
+			? channel->discussionLink() != nullptr
+			: bool(channel->flags() & ChannelDataFlag::HasLink));
+}
+
 bool BottomControls::isReportMessages() const {
 	return (_mode == BottomControlsMode::History) && _inReportMode;
 }
@@ -583,6 +619,10 @@ bool BottomControls::isChoosingTheme() const {
 
 void BottomControls::resizeEvent(QResizeEvent *e) {
 	RpWidget::resizeEvent(e);
+	updateButtonsGeometry();
+}
+
+void BottomControls::updateButtonsGeometry() {
 	const auto w = width();
 	if (_openChatButton) {
 		_openChatButton->setGeometry(0, 0, w, _openChatButton->height());
@@ -599,14 +639,22 @@ void BottomControls::resizeEvent(QResizeEvent *e) {
 	if (_unblock) {
 		_unblock->setGeometry(fullRect);
 	}
+	const auto discussShown = _discuss && !_discuss->isHidden();
+	const auto primaryRect = discussShown
+		? myrtlrect(0, 0, w / 2, fullRect.height())
+		: fullRect;
+	if (_discuss) {
+		_discuss->setGeometry(myrtlrect(
+			w / 2, 0, w - w / 2, fullRect.height()));
+	}
 	if (_joinChannel) {
-		_joinChannel->setGeometry(fullRect);
+		_joinChannel->setGeometry(primaryRect);
 	}
 	if (_joinGroup) {
 		_joinGroup->setGeometry(fullRect);
 	}
 	if (_muteUnmute) {
-		_muteUnmute->setGeometry(fullRect);
+		_muteUnmute->setGeometry(primaryRect);
 	}
 	if (_reportMessages) {
 		_reportMessages->setGeometry(fullRect);

@@ -872,6 +872,15 @@ ChatWidget::ChatWidget(
 		case BottomControlsAction::MuteUnmute:
 			toggleMuteUnmute();
 			break;
+		case BottomControlsAction::Discuss:
+			if (const auto channel = _peer->asChannel()) {
+				if (const auto discussion = channel->discussionLink()) {
+					controller->showPeerHistory(
+						discussion,
+						Window::SectionShow::Way::Forward);
+				}
+			}
+			break;
 		case BottomControlsAction::Report:
 			reportSelectedMessages();
 			break;
@@ -897,6 +906,7 @@ ChatWidget::ChatWidget(
 			| PeerUpdateFlag::IsBlocked
 			| PeerUpdateFlag::Notifications
 			| PeerUpdateFlag::ChannelAmIn
+			| PeerUpdateFlag::DiscussionLink
 			| PeerUpdateFlag::BotStartToken
 			| PeerUpdateFlag::FullInfo
 			| PeerUpdateFlag::Members

@@ -95,6 +95,14 @@ constexpr auto kCustomColorButtonParts = 7;
 	return Window::Theme::SystemAccentColor().has_value();
 }
 
+constexpr auto kOmarchyThemeSyncKey = std::string_view("omarchy.theme.sync");
+
+[[nodiscard]] bool IsOmarchyPresent() {
+	return Platform::IsLinux() && (
+		QFile::exists(u"/usr/share/omarchy"_q)
+		|| QDir(QDir::homePath() + u"/.config/omarchy"_q).exists());
+}
+
 class ColorsPalette final {
 public:
 	using Type = Window::Theme::EmbeddedType;
@@ -2110,6 +2118,38 @@ void SetupDefaultThemes(
 		st::settingsCheckboxPadding);
 	systemAccentWrap->setDuration(0);
 
+	const auto isRussian = Lang::Id().startsWith(u"ru"_q);
+	const auto omarchySyncWrap = IsOmarchyPresent()
+		? container->add(
+			object_ptr<Ui::SlideWrap<Ui::Checkbox>>(
+				container,
+				object_ptr<Ui::Checkbox>(
+					container,
+					(isRussian
+						? u"Синхронизировать с темой Omarchy"_q
+						: u"Sync with Omarchy theme"_q),
+					Core::App().settings().readPref<bool>(kOmarchyThemeSyncKey, true),
+					st::settingsCheckbox)),
+			st::settingsCheckboxPadding)
+		: nullptr;
+	if (omarchySyncWrap) {
+		omarchySyncWrap->setDuration(0);
+		omarchySyncWrap->entity()->checkedChanges(
+		) | rpl::on_next([=](bool checked) {
+			Core::App().settings().writePref<bool>(kOmarchyThemeSyncKey, checked);
+			Local::writeSettings();
+			if (checked) {
+				const auto cachedTheme = QDir::homePath()
+					+ u"/.cache/omarchy/telegram.tdesktop-theme"_q;
+				if (QFile::exists(cachedTheme)) {
+					if (Window::Theme::Apply(cachedTheme)) {
+						Window::Theme::KeepApplied();
+					}
+				}
+			}
+		}, container->lifetime());
+	}
+
 	const auto chosen = [] {
 		const auto &object = Background()->themeObject();
 		if (object.cloud.id) {
@@ -2125,6 +2165,11 @@ void SetupDefaultThemes(
 	const auto group = std::make_shared<Ui::RadioenumGroup<Type>>(chosen());
 
 	const auto apply = [=](const Scheme &scheme) {
+		if (omarchySyncWrap && omarchySyncWrap->entity()->checked()) {
+			omarchySyncWrap->entity()->setChecked(false);
+			Core::App().settings().writePref<bool>(kOmarchyThemeSyncKey, false);
+			Local::writeSettings();
+		}
 		const auto isNight = [](const Scheme &scheme) {
 			const auto type = scheme.type;
 			return (type != Type::DayBlue) && (type != Type::Default);

@@ -40,6 +40,7 @@ DeclareSetting(bool, AutoStart);
 DeclareSetting(bool, StartMinimized);
 DeclareSetting(bool, StartInTray);
 DeclareSetting(bool, SendToMenu);
+DeclareSetting(QString, ApplyTheme);
 enum LaunchMode {
 	LaunchModeNormal = 0,
 	LaunchModeAutoStart,

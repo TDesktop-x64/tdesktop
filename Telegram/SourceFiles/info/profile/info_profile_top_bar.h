@@ -54,8 +54,6 @@ struct InfoPeerBadge;
 struct FlatLabel;
 } //namespace style
 
-class QGraphicsOpacityEffect;
-
 namespace Ui {
 class AnimatedString;
 class FlatLabel;
@@ -321,7 +319,6 @@ private:
 	object_ptr<Ui::FadeWrap<Ui::RoundButton>> _showLastSeen = { nullptr };
 	object_ptr<Ui::RoundButton> _forumButton = { nullptr };
 	object_ptr<Ui::FlatLabel> _id;
-	QGraphicsOpacityEffect *_idOpacity = nullptr;
 
 	std::shared_ptr<style::FlatLabel> _statusSt;
 	std::shared_ptr<style::FlatLabel> _idSt;

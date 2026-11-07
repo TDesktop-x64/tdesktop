@@ -109,7 +109,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
 
-#include <QGraphicsOpacityEffect>
 #include <QtGui/QClipboard>
 #include <QtGui/QGuiApplication>
 
@@ -770,9 +769,6 @@ void TopBar::adjustColors(const std::optional<QColor> &edgeColor) {
 		}
 		_id->show();
 		setupChatId();
-		_id->widthValue() | rpl::on_next([=] {
-			updateStatusPosition(_progress.current());
-		}, _id->lifetime());
 		_id->setTextColorOverride(shouldOverrideId
 			? std::optional<QColor>(st::groupCallVideoSubTextFg->c)
 			: std::nullopt);
@@ -2207,9 +2203,7 @@ void TopBar::updateStatusPosition(float64 progressCurrent) {
 			progressCurrent);
 	}
 
-	if (_idOpacity) {
-		_idOpacity->setOpacity(progressCurrent);
-	}
+	_id->setOpacity(progressCurrent);
 	_id->setAttribute(
 		Qt::WA_TransparentForMouseEvents,
 		!progressCurrent);
@@ -4026,9 +4020,11 @@ void TopBar::setupChatId() {
 		Ui::Toast::Show(tr::lng_copy_profile_id(tr::now));
 	}));
 
-	_idOpacity = Ui::CreateChild<QGraphicsOpacityEffect>(_id.get());
-	_id->setGraphicsEffect(_idOpacity);
-	_idOpacity->setOpacity(0.);
+	_id->setOpacity(_progress.current());
+
+	_id->widthValue() | rpl::on_next([=] {
+		updateStatusPosition(_progress.current());
+	}, _id->lifetime());
 }
 
 const style::FlatLabel &TopBar::statusStyle() const {

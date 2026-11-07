@@ -2075,10 +2075,6 @@ void FillContextMenuItems(
 	const auto hasWhoReactedItem = item
 		&& Api::WhoReactedExists(item, Api::WhoReactedList::All);
 
-	if (hasWhoReactedItem) {
-		AddWhoReactedAction(result, list, item, list->controller());
-	}
-
 	AddReplyToMessageAction(result, request, list);
 	if (item) {
 		const auto media = item->media();

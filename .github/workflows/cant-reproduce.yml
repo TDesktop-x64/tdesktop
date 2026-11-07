@@ -4,11 +4,15 @@ on:
   schedule:
     - cron: '0 3 * * *'
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   cant-reproduce:
     runs-on: ubuntu-slim
     steps:
-      - uses: lee-dohm/no-response@v0.5.0
+      - uses: godofredoc/no-response@v0.5.1
         with:
           token: ${{ github.token }}
           responseRequiredLabel: cant reproduce

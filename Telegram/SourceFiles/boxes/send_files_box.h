@@ -314,7 +314,7 @@ private:
 	[[nodiscard]] auto prepareSendMenuCallback()
 		-> Fn<void(MenuAction, MenuDetails)>;
 
-	[[nodiscard]] TextWithTags fieldText() const;
+	[[nodiscard]] TextWithTags fieldText(bool unformatted = false) const;
 
 	const std::shared_ptr<ChatHelpers::Show> _show;
 	const style::ComposeControls &_st;

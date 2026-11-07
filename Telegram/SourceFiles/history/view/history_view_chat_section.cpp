@@ -2465,9 +2465,12 @@ void ChatWidget::send(Api::SendOptions options) {
 		sendRichDraft(page, options);
 		return;
 	}
+	const auto text = options.unformatted
+		? _composeControls->getTextWithTags()
+		: _composeControls->getTextWithAppliedMarkdown();
 	if (!options.scheduled) {
 		auto message = Api::MessageToSend(prepareSendAction(options));
-		message.textWithTags = _composeControls->getTextWithAppliedMarkdown();
+		message.textWithTags = text;
 		if (!session().ephemeralMessages().wouldSend(message)
 			&& showSlowmodeError()) {
 			return;
@@ -2475,7 +2478,7 @@ void ChatWidget::send(Api::SendOptions options) {
 	}
 
 	sendTextWithTags(
-		_composeControls->getTextWithAppliedMarkdown(),
+		text,
 		true,
 		options,
 		nullptr);

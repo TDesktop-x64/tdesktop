@@ -296,6 +296,7 @@ public:
 	void tryProcessKeyInput(not_null<QKeyEvent*> e);
 
 	[[nodiscard]] TextWithTags getTextWithAppliedMarkdown() const;
+	[[nodiscard]] TextWithTags getTextWithTags() const;
 	[[nodiscard]] Data::WebPageDraft webPageDraft() const;
 	[[nodiscard]] std::shared_ptr<const Iv::RichPage> shownRichMessage() const;
 	void setText(const TextWithTags &text);

@@ -2173,12 +2173,6 @@ void TopBar::updateStatusPosition(float64 progressCurrent) {
 		* std::clamp((progressCurrent) / 0.15, 0., 1.);
 
 	_status->moveToLeft(statusLeft + statusShift, statusTop);
-	if (_pills && !_hasActions) {
-		_pills->place(
-			statusTop - swapShift + st::infoProfileTopBarBalanceSkip,
-			progressCurrent);
-	}
-
 	if (_showLastSeen->toggled()) {
 		_showLastSeen->moveToLeft(
 			statusLeft
@@ -2206,6 +2200,12 @@ void TopBar::updateStatusPosition(float64 progressCurrent) {
 	_id->moveToLeft(
 		idLeft,
 		idTop);
+
+	if (_pills && !_hasActions) {
+		_pills->place(
+			idTop + st::infoProfileTopBarBalanceSkip,
+			progressCurrent);
+	}
 
 	if (_idOpacity) {
 		_idOpacity->setOpacity(progressCurrent);

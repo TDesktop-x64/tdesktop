@@ -86,17 +86,15 @@ PillsRow::PillsRow(
 		}
 	}, _lifetime);
 
-	// Without the action buttons the row fits the gap below the status.
-	if (underButtons) {
-		_reserve = rpl::combine(
-			balance->shownValue(),
-			music->shownValue()
-		) | rpl::map([](bool hasBalance, bool hasMusic) {
-			return (hasBalance || hasMusic)
-				? st::infoProfileTopBarPillsReserve
-				: 0;
-		});
-	}
+	const auto reserve = underButtons
+		? st::infoProfileTopBarPillsReserve
+		: (st::infoProfileTopBarChatIdTop - st::infoProfileTopBarStatusTop);
+	_reserve = rpl::combine(
+		balance->shownValue(),
+		music->shownValue()
+	) | rpl::map([=](bool hasBalance, bool hasMusic) {
+		return (hasBalance || hasMusic) ? reserve : 0;
+	});
 
 	rpl::merge(
 		balance->naturalWidthValue() | rpl::to_empty,

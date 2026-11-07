@@ -406,6 +406,7 @@ void SetupExperimental(
 				HistoryView::Controls::kOptionMacCmdReplyImmediately,
 				Ui::kOptionHideAiButton,
 				kForceComposeSearchOneColumn,
+				Ui::kOptionUncoloredQuote,
 			}
 		},
 		{

@@ -158,7 +158,7 @@ Credits::Credits(
 , _creditsType(type)
 , _star(Ui::GenerateStars(st::creditsTopupButton.height, 1))
 , _balanceStar((_creditsType == CreditsType::Ton)
-		? Ui::Earn::IconCurrencyColored(
+		? Ui::Earn::IconCurrencyTwoTone(
 			st::tonFieldIconSize,
 			st::currencyFg->c)
 		: Ui::GenerateStars(st::creditsBalanceStarHeight, 1)) {
@@ -541,8 +541,13 @@ void Credits::setupContent() {
 						tr::marked)));
 		const auto show = controller()->uiShow();
 		if (isCurrency) {
-			const auto url = tr::lng_suggest_low_ton_fragment_url(tr::now);
-			button->setClickedCallback([=] { UrlClickHandler::Open(url); });
+			button->setClickedCallback([=] {
+				HiddenUrlClickHandler::OpenTranslated(
+					tr::lng_suggest_low_ton_fragment_url,
+					QVariant::fromValue(ClickHandlerContext{
+						.show = show,
+					}));
+			});
 		} else {
 			const auto paid = [parent = QPointer<QWidget>(_parent)] {
 				if (parent) {
@@ -573,7 +578,7 @@ void Credits::setupContent() {
 				isCurrency
 					? std::make_unique<Ui::CustomEmoji::Internal>(
 						u"currency_icon:%1"_q.arg(height),
-						Ui::Earn::IconCurrencyColored(
+						Ui::Earn::IconCurrencyTwoTone(
 							st::tonFieldIconSize,
 							st::currencyFg->c))
 					: Ui::MakeCreditsIconEmoji(height, 1),
@@ -700,6 +705,11 @@ base::weak_qptr<Ui::RpWidget> Credits::createPinnedToTop(
 				.use3dDiamond = isCurrency,
 				.gradientStops = Ui::Premium::CreditsIconGradientStops(),
 				.showFinished = _showFinished.events(),
+				.lottie = isCurrency ? u"gram"_q : QString(),
+				.lottieSize = (isCurrency
+					? st::creditsCurrencyCoverLottieSize
+					: QSize()),
+				.lottieTop = isCurrency ? st::creditsCurrencyCoverLottieTop : 0,
 			});
 	}();
 	controller()->boxShownValue(

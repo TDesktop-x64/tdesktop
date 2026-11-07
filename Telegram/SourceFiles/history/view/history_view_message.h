@@ -83,6 +83,7 @@ struct InstantViewMediaRuntime
 struct HistoryMessageRichPage
 : RuntimeComponent<HistoryMessageRichPage, Element> {
 	HistoryMessageRichPage();
+	[[nodiscard]] QMargins edgeSkips() const;
 
 	struct Host final : Iv::Markdown::MediaBlockHost {
 		base::weak_ptr<Message> owner;
@@ -105,6 +106,9 @@ struct HistoryMessageRichPage
 	rpl::lifetime highlightReadyLifetime;
 	int paletteVersion = -1;
 	TimeId registeredFormattedDateUpdate = 0;
+	// Probing at the max width again would undo the final bubble layout.
+	mutable int textualWidth = 0;
+	mutable uint16 demandedTextWidth = 0;
 	bool hasUnsupportedBlocks = false;
 	mutable ClickHandlerPtr handler;
 	mutable std::optional<Iv::Markdown::MarkdownArticleHorizontalScrollHit> handlerHorizontalScrollHit;
@@ -116,6 +120,8 @@ struct HistoryMessageRichPage
 	mutable Iv::Markdown::MediaActivation handlerMediaActivation;
 	mutable Iv::Markdown::PreparedPlaceholderBlockId handlerPlaceholderId;
 	mutable QPoint handlerPlaceholderPoint;
+	mutable Iv::Markdown::PreparedPlaceholderBlockId pressedPlaceholderId;
+	mutable ClickHandlerPtr pressedPlaceholderHandler;
 	mutable Iv::Markdown::MarkdownArticleButtonRowHit handlerButtonRow;
 	mutable ClickHandlerPtr handlerButtonRowHandler;
 	mutable Iv::Markdown::MarkdownArticleButtonRowHit pressedButtonRow;
@@ -230,6 +236,8 @@ public:
 		const MessageSelection &selection) const override;
 	TextSelection selectionFromQuote(
 		const SelectedQuote &quote) const override;
+	HighlightYRange richQuoteHighlightYRange(
+		const Ui::ChatPaintRichQuote &quote) const override;
 	TextSelection adjustSelection(
 		TextSelection selection,
 		TextSelectType type) const override;
@@ -286,8 +294,6 @@ public:
 	[[nodiscard]] bool isSignedAuthorElided() const override;
 
 	void itemDataChanged() override;
-
-	VerticalRepaintRange verticalRepaintRange() const override;
 
 	void applyGroupAdminChanges(
 		const base::flat_set<UserId> &changes) override;
@@ -445,6 +451,10 @@ private:
 		StateRequest request) const;
 
 	void updateMediaInBubbleState();
+	void updateRichPageInBubbleState();
+	[[nodiscard]] auto countRichPageBubbleEdges() const
+	-> Iv::Markdown::MarkdownArticleBubbleEdges;
+	[[nodiscard]] bool richPageInfoRow() const;
 	QRect countGeometry() const;
 	[[nodiscard]] Ui::BubbleRounding countMessageRounding() const;
 	[[nodiscard]] Ui::BubbleRounding countBubbleRounding(
@@ -527,6 +537,8 @@ private:
 	void validateFromNameText(PeerData *from) const;
 	void validateForwardedNameText(HistoryItem* item) const;
 	void ensureFromNameStatusLink(not_null<PeerData*> peer) const;
+	[[nodiscard]] EmojiStatusId fromNameStatusId(
+		not_null<PeerData*> from) const;
 
 	mutable std::unique_ptr<RightAction> _rightAction;
 	mutable ClickHandlerPtr _fastReplyLink;

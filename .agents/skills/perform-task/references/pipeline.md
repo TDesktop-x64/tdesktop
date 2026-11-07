@@ -21,6 +21,9 @@ stateful runner. Treat the external `task.md`, its referenced inputs, project
 context, and repository as sufficient unless the request expressly requires
 unavailable exact bytes or content.
 
+Use the shared [project-context policy](../../../shared/project-context.md)
+for selective reading, task-specific context, and optional durable amendments.
+
 Use visual evidence in this order: explicit task facts; supplied inputs;
 adjacent current UI/code/styles and the pre-task baseline; repository history
 and legacy implementations; then the closest established desktop convention
@@ -39,7 +42,6 @@ WORK_DIR = TASK_DIR/work
 LOCAL_DIR = TASK_DIR/.local
 TASK_SPEC = TASK_DIR/task.md plus referenced TASK_DIR/input files
 PROJECT_FILE = AI_SLOT/projects/<project>/project.md, or none
-PREVIOUS_CONTEXT = latest approved project task's work/context.md, or none
 BASE_REF = refs/ai-tasks/TASK_ID/base
 GREEN_REF = refs/ai-tasks/TASK_ID/green
 RUN_REF = refs/ai-tasks/TASK_ID/run
@@ -63,7 +65,7 @@ out/Debug/Telegram.app/Contents/MacOS/Telegram
 
 MAX_ATTEMPTS = 4
 MAX_TEST_RUNS = 12 per test campaign
-MAX_TEST_CAMPAIGNS = 2 total: one normal and at most one focused recovery
+MAX_TEST_CAMPAIGNS = 2: one normal and one focused recovery; each further focused campaign needs a cap assessment naming an untried direct strategy
 COMPUTER_USE_POLICY = auto | overlay-only | required
 ```
 
@@ -91,8 +93,25 @@ Before planning or editing:
    Require `current_satisfies: true`. A mismatch before Phase 1 returns the
    clean pre-phase routing stop defined below; a mismatch first established
    after Phase 1 follows the task-local Block rule.
-4. Run the scripted preflight report and act on its JSON instead of composing
-   the equivalent shell checks by hand:
+4. For a new run or a pre-Phase-1 resume with no owned source changes, prepare
+   the source checkout after the lineage gate passes:
+
+   ```bash
+   python3 SOURCE_ROOT/.agents/skills/process-inbox/scripts/workspace.py \
+     source-prepare --source-root SOURCE_ROOT
+   ```
+
+   This automatically initializes or updates stale submodules recursively to
+   recorded gitlinks with a non-force checkout, preserving staged and local
+   edits. Source checks ignore only verified registered linked worktrees nested
+   in the checkout or its submodules and leave their contents untouched. Other
+   untracked or tracked changes still block. Preparation refuses a submodule
+   target that would enter a registered worktree, including an ignored one. AI
+   worktrees stay strict. Do not prepare a carried implementation or synchronize
+   modules containing owned implementation or disposable overlay changes on resume.
+
+   Run the read-only scripted preflight report and act on its JSON instead of
+   composing the equivalent shell checks by hand:
 
    ```bash
    python3 SOURCE_ROOT/.agents/skills/process-inbox/scripts/workspace.py \
@@ -108,8 +127,30 @@ Before planning or editing:
    unselected instrument is irrelevant. An unavailable selected platform or
    stage is either replaced by an equally direct instrument or recorded under
    `Unverified:` with its expected exposure; never silently weaken the oracle.
-7. For a new run require a clean tracked Telegram worktree, clean submodules,
-   and no unrelated untracked files, then initialize local recovery state:
+   A selected check that must pass the account's two-step verification has
+   the `2svpassword.txt` fixture as a prerequisite (see
+   `Telegram/SourceFiles/test/docs/account-fixtures.md`). Gate its presence —
+   existence only, never its value — before Phase 4 editing and again before the
+   evidence campaign. When it is absent, do not author, build, launch, or
+   degrade the campaign around it and do not export the legs as coverage
+   debt: publish the task-local `Block` at once — `Blocker-Type: test`,
+   `Unverified:` naming the password-gated checks, `work/test.md` carrying a
+   `## Recovery exhaustion` section that states no automatic strategy can
+   supply an account secret and that a hand-built SRP or a driven answer is
+   not a substitute for those legs — with any retained implementation intact,
+   so a retry after the file appears resumes at the first incomplete boundary.
+   A selected check that the task declares needs the funded golden wallet
+   additionally has the `test_gram_account.txt` fixture (same README
+   section) as a prerequisite, gated by existence only at the same two
+   points; at campaign start the served `walletState.address` must equal the
+   file's address or the run FAILS — never repaired by `/wallet_reset` or a
+   minted wallet — and the balance must cover every planned live leg plus a
+   margin, checked before anything is spent. A missing file or a shortfall
+   is the same task-local `Block` — `Blocker-Type: test`, naming the address
+   and the amount required, `Unverified:` naming the funded-wallet checks —
+   never a driven workaround and never a minted wallet.
+7. For a new run require successful source preparation, then initialize local
+   recovery state (`source-begin` also prepares a fresh baseline):
 
    ```bash
    python3 SOURCE_ROOT/.agents/skills/process-inbox/scripts/workspace.py \
@@ -136,7 +177,7 @@ Use tracked, resumable task artifacts:
 
 ```text
 work/context.md
-work/project.proposed.md       # project tasks only
+work/project-amendment.md      # optional narrow durable change for a project
 work/visual.md                 # layout tasks only
 work/plan.md
 work/split-proposal.md         # only when assessment rejects intrinsic scope
@@ -145,15 +186,13 @@ work/review1-<lens>.md         # all five standard lens applicability/reviews
 work/review1.md                # canonical first-review verdict
 work/review<R>-focused.md      # mandatory focused general re-review, R > 1
 work/review<R>-<specialist>.md # only specialists invalidated by the fix
-work/review-convergence<C>.md  # bounded loop disposition when needed
+work/review-convergence<C>.md  # loop diagnosis at a checkpoint or cycle
 work/test-design.md            # assessed evidence contract, reconciled after diff
 work/test.md
 work/test-cap-assessment-*.md  # independent focused-recovery decision at a campaign cap
 work/result.md
 work/owned-paths.txt
-work/progress.md
 work/logs/phase-*.prompt.md
-work/logs/phase-*.progress.md
 work/logs/phase-*.result.md
 work/test-overlay.patch
 evidence/                      # selected durable proof
@@ -171,21 +210,26 @@ Keep complete portable accounts, browser/Computer Use profiles, downloaded
 components, raw run directories, full build output, and temporary files under
 `.local/` or the checkout's existing ignored build tree. Never commit them.
 
-At startup read `phase` plus the existing progress, plan, review, test, and
-result artifacts. Resume at the first incomplete validated boundary. Do not
-repeat an approved phase merely because the prior agent session disappeared.
+At startup read `phase` plus the existing plan, review, test, and result
+artifacts. Legacy progress files may supply recovery hints but are not
+required and never prove completion. Resume at the first incomplete validated
+boundary. Do not repeat an approved phase merely because the prior agent
+session disappeared.
 Treat a compact subagent reply as a notification; the artifact and repository
 state are proof.
 
-At each stable boundary update `work/progress.md` and record the current phase
-locally:
+Apply the shared policy on resume too: an old full project proposal is not a
+completion requirement or a replacement to promote. Revalidate any useful
+durable fact against the current task and source before proposing an amendment.
+
+At each stable boundary record the current phase locally:
 
 ```bash
 python3 SOURCE_ROOT/.agents/skills/process-inbox/scripts/workspace.py \
   checkpoint --source-root SOURCE_ROOT --task TASK_ID --phase PHASE
 ```
 
-Record progress after context, assessed plan, each completed implementation
+Checkpoint after context, assessed plan, each completed implementation
 phase when useful for recovery, the retained implementation commit, review,
 and each material test attempt. Never mark a half-written artifact complete.
 The helper changes only task-scoped files in the slot worktree and publishes no
@@ -218,7 +262,15 @@ prompts, plus the host-specific orchestration rules.
   source edits so queue planning can replace the task.
 - Use `fork_turns: "none"` with explicit paths. Fork the smallest turn window
   only for genuinely unavailable chat-only visual context.
-- Inherit the parent's model and reasoning level. Do not invent tool fields.
+- Select effort using [phase effort](../../../shared/phase-effort.md):
+  `medium` for routine execution, otherwise favor `xhigh`; use `high` only
+  with the parent's concrete justification that the phase has no complexity.
+  Apply the host mapping, including Claude's `opus` pin for `medium` or
+  justified `high` work.
+- On Claude Code, assessment, every review and the convergence and
+  campaign-cap assessments run as Codex CLI leaves unless the invocation opted
+  out; see the Claude adapter's review and assessment provider. Prompts,
+  artifacts, completion checks and verdict handling are unchanged.
 - Keep implementation units sequential unless the assessed plan proves
   disjoint write sets and capacity makes parallel edits safe.
 - Never duplicate the performer or an implementation unit with uncertain
@@ -230,12 +282,12 @@ leaf as a synchronous foreground call and validate its artifacts when the call
 returns; run independent leaves of one step as parallel calls in a single
 message. On Grok Build, follow `.grok/ai-workflow-adapter.md`: blocking
 `spawn_subagent` leaves from a top-level performer, same-session checklists
-from a `/continue` child, no Codex wait ladder. On Codex, use the
-asynchronous wait ladder from the phase prompts: poll no longer than 60
-seconds, treat a timeout as not-failure, use artifact mtimes and heartbeat
-counters, message the target after five minutes without movement, and
-interrupt and retry that disposable phase once after a second unchanged
-window. On any host, never replace a live stateful performer.
+from a `/continue` child. On Codex, follow
+[child completion and recovery](../../../shared/codex-delegation.md). Keep
+waiting in the performer turn until each child returns or recovery reaches a
+hard stop, then validate the phase artifacts. Never end the turn with a
+progress-only result while children or commands are pending. On any host,
+never replace a live stateful performer.
 
 ## Implementation phases
 
@@ -246,10 +298,10 @@ Run sequentially:
    then `work/plan.md` with exact files, functions, ordered steps, bounded
    phases, owned write sets, adaptive review/evidence plans, the selected
    pre-review validation, and status checkboxes.
-   For project work it also writes `work/project.proposed.md` as a coherent
-   finished-state blueprint; use the Phase 1F prompt when prior task context
-   exists, otherwise Phase 1 with the project file. Do not promote the
-   proposal yet; blocked work must not become project truth.
+   Use the same Phase 1 prompt for standalone, new-project, and follow-up work,
+   with the selected small overview and explicitly relevant references. A
+   useful durable change may warrant `work/project-amendment.md` under the
+   shared policy; its absence does not make the phase incomplete.
    The visual contract derives every dimension from request relationships,
    supplied images, font metrics, style tokens, sibling geometry, or a cited
    desktop analogue, with ordered calculations, tolerances, relationship
@@ -280,7 +332,7 @@ Run sequentially:
    first exact implementation/evidence plan. It cannot create replacement tasks;
    the performer publishes the proposal as the task's `split-required` result,
    and the scheduler independently owns the deep split transaction. The same
-   result may be produced after source edits by the bounded convergence
+   result may be produced after source edits by the review convergence
    assessment when the retained implementation exposes several independently
    shippable/testable boundaries.
 3. **Implement.** Run one leaf per assessed plan phase. Before each edit,
@@ -296,19 +348,20 @@ Run sequentially:
    build tree.
 5. **Review.** Run the adaptive review/fix loop from the phase prompts. Launch
    the first independent general reviewer and all five standard lens reviewers
-   against the task and complete diff without sharing findings. The general
-   reviewer examines every changed file in full; each lens either proves
-   `NOT_APPLICABLE` from the complete diff or performs its relevant focused
-   review. General synthesis confirms or drops findings, rejects unsupported
+   against the task and complete diff without sharing findings; a harness task
+   starts with the general reviewer alone (see [Harness tasks](#harness-tasks)).
+   The general reviewer examines every changed file in full; each lens either
+   proves `NOT_APPLICABLE` from the complete diff or performs its relevant
+   focused review. General synthesis confirms or drops findings, rejects unsupported
    bailouts, and writes the single `review1.md` the fix phase implements. Only
    material blocking findings cause a fix. After a fix, preserve every prior
    approval that the fix did not invalidate: run one focused general review of
    the fix and affected invariants, plus only the specialists that originated a
    repaired blocker or whose exact review question the fix changed. Presence of
    a broad surface is not enough to replay it. Reconcile only invalidated
-   evidence checks and rerun only affected validation. At the convergence
-   triggers below, stop the ordinary loop and obtain an explicit repair,
-   replan, or rescope disposition.
+   evidence checks and rerun only affected validation. The loop runs until
+   the reviewers agree; at the convergence checkpoints below an independent
+   assessor diagnoses it and continues, replans or rescopes it.
 6. **Normalize.** On native non-WSL Windows, normalize only task-owned source,
    header, style, localization, and build/config text to CRLF without BOM,
    preserving content and trailing-newline state, then rerun the selected
@@ -331,7 +384,9 @@ Run sequentially:
    optional `tasks/TASK_ID.md` source note), stages exactly those paths,
    writes and validates the exact three-line message, and with `--mark-green`
    moves the retained-implementation refs — replacing manual staging and the
-   separate `source-mark-green` call. An implementation bug creates the next
+   separate `source-mark-green` call. It then mirrors the new tip to the
+   checkout's `ai-<checkout-tag>` branch (see [Telegram commits](#telegram-commits)).
+   An implementation bug creates the next
    committed attempt through the same helper; keep the same `Task:` locator on
    every attempt. When assessment and general review prove the requested
    outcome was already present, leave the source checkout at `BASE_REF`, skip
@@ -342,8 +397,12 @@ Run sequentially:
 
 Every unfinished task follows one adaptive implementation path. Task size,
 repository location, and whether Telegram is eventually launched do not select
-a profile. Before editing, Phase 2 assessment records the task's actual failure
-surfaces and writes both of these contracts:
+a profile. The one exception is a code-health task of class Q0, Q1 or Q2,
+which runs the [mechanical lane](mechanical-lane.md): its class bounds the
+change to what a tool can prove. A [harness task](#harness-tasks) keeps this
+path, with its review scaled to code no user runs. Before editing, Phase 2
+assessment records the task's actual failure surfaces and writes both of these
+contracts:
 
 ```text
 Expected surfaces:
@@ -366,11 +425,51 @@ a recall checklist for their initial applicability scan. Assessment rejects
 ceremony as well as under-testing: it removes evidence checks that cannot be
 affected by the task.
 
+### Harness tasks
+
+A harness task changes test or workflow infrastructure, not the product. Every
+change it retains qualifies for the `[ai]` subject prefix under "Commits" in
+`AGENTS.md`: the permanent test harness in `Telegram/SourceFiles/test/` with
+the build lines that register its files, `.agents/`, `.claude/`, `.grok/`, and
+other AI testing infrastructure. No user runs this code; its users are the
+tests and agents that call it. Phase 1 records `Code: harness` or
+`Code: product` in the plan, and assessment checks that against the planned
+owned paths. When the work turns out to need a product change, the task
+becomes `Code: product`, and its next review round is the complete initial
+fanout over the whole diff.
+
+A harness task runs the same phases and the same review-to-agreement loop,
+scaled to what the code is for:
+
+- **Plan.** Build the smallest helper that gives the consumers it names
+  (tasks, tests, agents) correct results. Support for hypothetical callers,
+  misuse no consumer performs, framework edge cases no consumer reaches, and
+  defensive teardown for them stay out. Assessment rejects a plan whose
+  machinery is several times what those consumers need.
+- **Review.** The initial review is the general reviewer alone. It adds the
+  security lens when the diff deletes or overwrites files, starts processes, or
+  touches accounts, credentials or data outside the run's sandbox, and any
+  other lens or domain specialist only for a concrete risk it names. Focused
+  rounds follow the ordinary rules.
+- **Blocking bar.** A finding blocks only when the harness can give a consumer
+  a wrong result (a false pass or fail, a wrong reading), crash or hang a run,
+  damage anything outside the run's sandbox, change product behavior, or break
+  the build or a repository rule. Robustness against misuse no consumer
+  performs, teardown order in cases no consumer reaches, and polish are
+  non-blocking notes. Every review, synthesis, focused review and convergence
+  prompt of a harness task carries this bar (phase prompts, "Harness tasks").
+- **Models.** On Codex, the plan assessment, every review and synthesis, the
+  convergence assessments and the evidence assessments of a harness task run
+  on `gpt-6.1-sol` ([phase effort](../../../shared/phase-effort.md#lens-models)).
+- **Evidence.** The harness self-test, or one consumer run, shows that the
+  helper gives its consumers what they need.
+
 ### Initial review fanout
 
 The initial review of a task **that produced a source diff** includes one
-independent **general** reviewer and all five standard lenses. Start them
-together when capacity permits; under a slot limit, keep the complete set
+independent **general** reviewer and all five standard lenses; a
+[harness task](#harness-tasks) starts with the general reviewer alone. Start
+them together when capacity permits; under a slot limit, keep the complete set
 queued and start the next lens as soon as a slot opens. The general reviewer
 and lenses do not read one another's findings.
 
@@ -466,28 +565,60 @@ every lens that could describe it. It reads the complete task diff only when the
 made the previous review boundary unreliable, in which case it triggers the
 convergence assessment rather than silently restarting the initial review.
 
-Stop the ordinary fix loop and run a fresh independent convergence assessment
-when any of these holds:
+Review exists to make independent reviewers, often from different vendors,
+agree on the implementation. Fix and re-review until a round's canonical
+verdict has no blocking finding. A round count never ends the loop and never
+asks a human; never approve unresolved findings to end it, and never restart
+the broad initial review because rounds accumulate.
 
-- two canonical review verdicts have required changes;
-- blocker count or affected scope did not materially shrink after a fix;
-- a fix adds owned paths, a subsystem, a build/platform boundary, or a new
-  ownership, concurrency, persistence, or trust mechanism; or
+Instead of the next ordinary fix, run a fresh independent convergence
+assessment when any of these holds:
+
+- the fifth canonical review verdict requires changes, and afterwards the
+  checkpoint the previous assessment named;
+- a finding asks to undo an earlier fix or a recorded ruling, so the loop is
+  cycling instead of settling new findings;
+- a fix would grow the change into a subsystem or product boundary the
+  assessed plan did not include; or
 - the reviewer can no longer state which prior approvals remain valid.
 
-The assessor writes `review-convergence<C>.md` with exactly one disposition:
+The assessor reads the whole loop: which findings were new, which recur or
+reopen earlier ones, which fixes introduced the next round's defects, and
+whether the open set is narrowing. It writes `review-convergence<C>.md` with
+exactly one disposition:
 
-- `CONTINUE_FOCUSED` — one bounded fix list and at most one final focused
-  review round;
-- `REPLAN_CURRENT` — the task remains cohesive, but implementation returns to
-  an explicitly named validated boundary and a replacement plan before review;
+- `CONTINUE` — convergence is real but slow, such as a mechanism with many
+  special cases where each round finds new, narrower defects and resolved
+  ones stay resolved. It lists the open blockers, any rulings, and the next
+  checkpoint: by default three more verdicts that require changes, at most
+  five. The ordinary loop resumes with no final-round limit.
+- `REPLAN_CURRENT` — the loop cycles, or each fix breaks the same mechanism,
+  so the mechanism is wrong. Implementation returns to an explicitly named
+  validated boundary and a replacement plan for that mechanism. The replanned
+  code gets a focused general review plus the lenses it touches, approvals
+  outside it carry forward, and the verdict count restarts.
 - `RESCOPE_REQUIRED` — the task contains independently testable product
-  boundaries; write or update `split-proposal.md` and stop automatic work; or
-- `HARD_STOP` — an exact unsafe or unavailable condition needs human action.
+  boundaries; write or update `split-proposal.md` and stop automatic work.
+- `HARD_STOP` — an exact unsafe or unavailable condition needs human action,
+  such as a fix that needs funded value, credentials or a server change. Slow
+  convergence, a round count or a hard design is never a hard stop. The task
+  publishes a `Block` naming that condition and is set aside for the owner;
+  the run continues with other work.
 
-If the allowed final focused round still has blocking findings, stop with the
-unapproved convergence artifact. Never approve unresolved findings and never
-start another broad review campaign merely because time remains.
+A ruling settles a question the loop keeps reopening: which of two
+conflicting findings holds, or what the task requires where it is silent. The
+assessor decides it from the task, project documents and the closest
+repository precedent, preferring existing behavior, and records both sides.
+Later fixes follow it and later reviewers receive it. A finding that
+contradicts a ruling is dropped unless it brings a concrete failure scenario
+the ruling did not weigh; such a finding triggers a fresh assessment.
+
+A later assessment reads every earlier one. It may choose `CONTINUE` again
+only when the loop progressed since the previous checkpoint: resolved findings
+stayed resolved and the open set narrowed or moved to new, narrower cases.
+Otherwise it chooses `REPLAN_CURRENT` or `RESCOPE_REQUIRED`. An older
+assessment that allowed only one final focused round reads as `CONTINUE` with
+the default checkpoint; its final round no longer stops the loop.
 
 ### Evidence selection
 
@@ -602,6 +733,18 @@ its preflight was clean and all of its changes belong to this task, then stage
 the superproject pointer; the helper refuses dirty submodule pointers so an
 unintended one can never slip into an attempt.
 
+After every commit, `source-commit` force-pushes the checkout's `HEAD` to
+`refs/heads/ai-<checkout-tag>` on the `private` remote, for example
+`ai-pc-d-tdesktop`. That branch only mirrors the checkout's latest task commit,
+pre-approval attempts and fixes after testing included, so other checkouts can
+look at work in progress. Nobody works on it and it is never a lineage source:
+the checkout stays on whatever branch it has checked out, and the next commit
+from any branch overwrites the mirror. A checkout without a `private` remote
+skips the mirror. A failed or timed-out push only shows up in the helper's
+`mirror` result: it never fails the commit or blocks the task, so note it in
+the result `NOTES:` and continue. Do not push the mirror by hand, with a lease,
+or from any other point in the workflow.
+
 Every implementation or implementation-fix commit message is exactly:
 
 ```text
@@ -666,15 +809,32 @@ Before an instrument runs, gate only its own prerequisites:
 - a Telegram build needs the matching configured Debug tree;
 - a Telegram launch additionally needs the exact executable, golden portable
   account, safe path-scoped process control, and test harness;
+- a check that must pass the account's two-step verification needs the
+  `2svpassword.txt` fixture, read at runtime through `Test::TwoStepPassword()`
+  (`Telegram/SourceFiles/test/docs/account-fixtures.md`); its
+  absence is the task blocker of Phase 3 step 5, never a degraded run, and
+  the value never enters overlay code, artifacts, logs, or prompts;
+- a check that the task declares needs the funded golden wallet needs the
+  `test_gram_account.txt` fixture, read at runtime through
+  `Test::GramAccount()` (same account-fixtures guide): the file present, the served
+  `walletState.address` equal to the file's at campaign start (a mismatch
+  FAILS the run, never `/wallet_reset`), and the balance covering every
+  planned live leg plus a margin before any spend — a missing file or a
+  shortfall is the task-local `Block` of Phase 3 step 5 (`Blocker-Type:
+  test`, the address and the amount required), never a driven workaround
+  and never a minted wallet, and the words never enter overlay code,
+  artifacts, logs, or prompts;
 - Computer Use needs the separate capability gate;
 - another platform's unavailable toolchain is recorded as an exact
   `Unverified:` exposure, not simulated by an unrelated local command.
 
-When a Telegram overlay or app launch is selected, read
-`Telegram/SourceFiles/test/README.md` completely and then the chosen helper
-headers. Read `references/computer-use-testing.md` when selecting or operating
-a UI driver. Retain all shared task-derived oracle, layout measurement,
-watchdog, crash/assertion, hang, account, and evidence rules, with these
+When a Telegram overlay or app launch is selected, read the short
+`Telegram/SourceFiles/test/README.md`, then the task-relevant references it
+links and the chosen helper headers. Do not load the whole helper catalog or
+diagnostic history; required fixture and instrument prerequisites still apply.
+For permanent helper changes, follow `test/docs/adding-helpers.md`.
+Read `references/computer-use-testing.md` when selecting or operating a UI
+driver. Retain all shared task-derived oracle, layout measurement, watchdog, crash/assertion, hang, account, and evidence rules, with these
 external-task adaptations:
 
 - Prefer an overlay in
@@ -736,11 +896,12 @@ For every instrument, assessment returns exactly one of:
 A `TEST_FLAW` recovery must remove an assumption or move closer to the changed
 surface. Do not repeat the same command, fixture, or overlay wording. The normal
 campaign cap is an assessment checkpoint: carry prior passes, isolate unmet
-checks, and choose at most one focused recovery campaign or document recovery
-exhaustion. A focused campaign that does not converge stops automatic work with
-an exact recoverable hard stop; it never starts a third campaign or converts the
-cap into approval/Block. An `IMPL_BUG` fix creates a new retained attempt, uses the same
-focused general/invalidated-specialist review and convergence triggers as the
+checks, and choose a focused recovery campaign or document recovery
+exhaustion. A focused campaign that does not converge goes to the final
+assessment in `.agents/shared/test-loop.md`, which names an untried direct
+strategy for one more campaign or records recovery exhaustion; it never waits
+for the owner and never converts the cap itself into approval or a Block. An `IMPL_BUG` fix creates a new retained attempt, uses the same
+focused general/invalidated-specialist review and convergence checkpoints as the
 pre-commit loop, and reruns only invalidated checks. It never restarts the
 initial complete-diff review simply because the attempt number changed.
 
@@ -770,6 +931,55 @@ implementation. Require current task base/run refs, keep the owned diff and any
 green commit in place, and inventory every owned path in `work/owned-paths.txt`.
 The publication helper seals that work in `work/carried-work.json`; the later
 split transaction rechecks the seal before assigning an implementation carrier.
+
+### Project branches
+
+Every project is performed on the branch named by its slug, in tdesktop and
+in each top-level submodule the project changes, and several checkouts may
+work on one project at once. A nested submodule's commit must already be on
+one of its remote branches; `project-push` refuses otherwise. Before publishing a project task's `Approve`:
+
+1. Run `workspace.py project-sync --task <TASK_ID>`, adding
+   `--onto <remote>/<branch>` when the scheduler passed `Base:` for this task.
+   It fetches `private`, replays only this task's own commits onto
+   `private/<slug>`, rebases the task's submodule commits onto each
+   submodule's `<slug>` branch and rewrites their pins, and refreshes
+   `BASE_REF`, `GREEN_REF` and `RUN_REF`. With `--onto` it then rebases the
+   whole project branch onto that base, its submodule commits onto the
+   commits the base pins. A replay conflict leaves the checkout as it was;
+   resolve it by reading both sides' intent, as the `/rebase` skill does,
+   then run `project-sync` again.
+2. When it reports `build_required`, build Debug. Nothing is rebuilt
+   otherwise. A failure in the project's own code is fixed by amending the
+   commit that introduced it: this task's commits after an ordinary sync, any
+   project commit after a base rebase. Use `git commit --fixup` and a
+   non-interactive autosquash rebase, then `source-begin` to refresh the
+   task refs. A failure in the base's own code, which does not build by
+   itself, is fixed in one new commit with a plain `Fix build.`-style subject
+   that touches only files no project commit changes; run `source-begin` so
+   the task refs include it, then
+   `project-sync --onto <base> --base-fix <commit>`, which moves it first on
+   the branch, directly on the base, and reports it as `base_fix`. When a sync
+   reports `rewrite_discarded`, another checkout published first and the base
+   rebase was undone: redo it with `--onto`, and redo its build fixes.
+3. Run `workspace.py project-push --task <TASK_ID>`, with `--rewritten` after
+   a base rebase, and `--base-fix <base_fix> --base <remote>/<branch>` when a
+   base fix exists: that fix is fast-forwarded onto the base branch first.
+   Submodule branches are pushed before tdesktop. After a base rebase the
+   new submodule commits go first to this checkout's own staging branch
+   `_staging/<slug>/<checkout-tag>`, so every pin is fetchable, then tdesktop
+   moves under its lease, then the submodule project branches; if one of
+   those fails, rerun `project-push` until it completes. A rejected push
+   means another checkout published first: go back to step 1.
+4. Only then run `finish`.
+
+A project task that is set aside with `Block` publishes nothing to the
+project branch. After its `Block` is published, keep each changed
+submodule's pinned commit with
+`git -C <submodule> update-ref refs/ai-tasks/<TASK_ID>/green <pin>`, then
+reset the branch to `BASE_REF` (`GREEN_REF` keeps the tdesktop commits) and
+update the submodules, so the next task starts clean. A retry first replays `BASE_REF..GREEN_REF` onto the
+current tip with `git cherry-pick`, then runs `source-begin`.
 
 Write `work/result.md` with exactly one value for every field:
 
@@ -809,9 +1019,29 @@ name its paths under `Touched:` when owned source work exists; otherwise use
 `Checkout: source-state-retained` and does not require a test report, because
 each replacement receives its own complete review and evidence campaign.
 
-For approved project work, promote `work/project.proposed.md` to the project's
-`project.md` immediately before final AI publication. For blocked work, retain
-the proposal only as a task artifact.
+For approved project work with a still-useful amendment, apply the shared
+policy immediately before final AI publication:
+
+1. Require a clean canonical AI main worktree. When `origin` exists, fetch it
+   there and fast-forward its `master` to `origin/master`. Read the latest
+   canonical target section and reconcile the proposed fact with it.
+2. Author only the task's narrow edit in its own
+   `AI_SLOT/projects/<project>/project.md`, validated against those fresh
+   canonical facts. Keep unrelated slot text unchanged; the final rebase
+   brings in independent canonical edits. Never copy the fresh whole file
+   into a stale slot and replay those edits as this task's change. Skip a
+   redundant or unsupported amendment. If section changes prevent a safe
+   task-only edit, retain the proposal task-locally and finish without the
+   optional amendment unless the conflict invalidates task correctness. Do not
+   sync, rebase, stash, or copy other files into the dirty task slot.
+3. Use ordinary `finish` below. It commits the task artifacts and optional
+   own-project file before fetching/rebasing the now-clean slot. Its existing
+   rebase handles later independent edits; preserve the final commit and stop
+   on a semantic conflict. Do not broaden its path scope to indexes, other
+   projects, or reference files.
+
+Without an amendment, publish the task normally. Blocked and split-required
+results must leave shared project files unchanged; proposals remain task-local.
 
 Publish final AI state only after the Telegram commit and result are final:
 
@@ -937,7 +1167,8 @@ delays finishing the work actually in hand.
   owned and disposable changes, publish a clean task-local `blocked` boundary
   naming the missing source task and branch evidence, and let `continue` run
   non-dependent batch work. Never perform branch integration inside the task.
-- A disposable phase may be retried once through the wait ladder. Never fresh
+- A stopped disposable phase may be retried once under the host completion
+  and recovery contract, after confirming no old writers remain. Never fresh
   retry the performer within the same attempt. An interruption leaves local
   task state `in-progress`; a later `continue` invocation resumes it. A later
   invocation reopens a published blocked task locally without a `Resume`
@@ -949,12 +1180,17 @@ delays finishing the work actually in hand.
 - A test campaign cap is not a clean blocked attempt. Preserve the overlay and
   evidence and run the cap assessment. The normal campaign may authorize one
   focused campaign; the focused campaign boundary either proves recovery
-  exhaustion or returns a recoverable hard stop instead of looping. The
+  exhaustion or goes to a fresh convergence assessment instead of looping;
+  it never waits for the owner. The
   publication helper rejects a test block whose report still says `TEST_FLAW`,
   cites the run cap, or lacks the required recovery-exhaustion record.
 - A Windows file-lock build error follows the shared bounded exact-checkout
-  recovery. Only exhaustion or an unsafe/non-owned holder stops the run and
-  asks the human; the task remains `in-progress`.
+  recovery, including its delayed retries. Only its exhausted or unsafe outcome
+  stops the run; the task remains `in-progress`.
+- Never ask the owner during a `continue` run. Decide, record the decision in
+  `work/decisions.md`, and continue. The only global stops are a server scheme
+  mismatch and a missing golden test account; unexplained dirty source goes to
+  `workspace.py wip-save` instead.
 - A locked macOS session and the resulting unavailable Computer Use driver
   never stop or block the task; continue with the complete in-binary overlay
   flow.

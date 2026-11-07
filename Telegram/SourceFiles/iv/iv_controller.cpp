@@ -358,7 +358,7 @@ void Controller::createWebview(const Webview::StorageId &storageId) {
 		}
 	}, _container->lifetime());
 
-	raw->setNavigationStartHandler([=](const QString &uri, bool newWindow) {
+	raw->setNavigationPolicyHandler([=](const QString &uri, bool newWindow) {
 		Q_UNUSED(newWindow);
 
 		if (uri == u"about:blank"_q
@@ -411,6 +411,7 @@ void Controller::activate() {
 	_window->activateWindow();
 	_window->setFocus();
 	setInnerFocus();
+	_delegate->ivActivated(_window.get());
 }
 
 void Controller::setInnerFocus() {

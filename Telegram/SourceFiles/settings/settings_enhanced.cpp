@@ -286,7 +286,7 @@ namespace Settings {
 		}, container->lifetime());
 
 		QString langPackBaseId = Lang::GetInstance().baseId();
-		if (langPackBaseId == "zh-hant-raw" || langPackBaseId == "zh-hans-raw") {
+		if (langPackBaseId.contains("zh-han")) {
 			AddButtonWithIcon(
 					inner,
 					tr::lng_settings_translate_to_tc(),

@@ -19,6 +19,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/call_delayed.h"
 #include "base/platform/base_platform_info.h"
 #include "boxes/language_box.h"
+#include "boxes/keys_legend.h"
 #include "boxes/star_gift_box.h"
 #include "boxes/username_box.h"
 #include "core/application.h"
@@ -29,10 +30,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_cloud_themes.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
+#include "info/info_memento.h"
 #include "info/profile/info_profile_badge.h"
 #include "info/profile/info_profile_emoji_status_panel.h"
 #include "info/profile/info_profile_phone_menu.h"
 #include "info/profile/info_profile_values.h"
+#include "info/stories/info_stories_widget.h"
 #include "lang/lang_cloud_manager.h"
 #include "lang/lang_instance.h"
 #include "lang/lang_keys.h"
@@ -74,6 +77,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/toast/toast.h"
 #include "ui/vertical_list.h"
 #include "ui/widgets/buttons.h"
+#include "ui/effects/ripple_animation.h"
 #include "ui/widgets/continuous_sliders.h"
 #include "ui/widgets/menu/menu_add_action_callback.h"
 #include "ui/widgets/menu/menu_item_base.h"
@@ -81,15 +85,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/wrap/slide_wrap.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
+
+#include <QtGui/QClipboard>
+#include <QtGui/QGuiApplication>
+#include <QtGui/QWindow>
+
 #include "styles/style_chat_helpers.h"
 #include "styles/style_info.h"
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
-
-#include <QtGui/QClipboard>
-#include <QtGui/QGuiApplication>
-#include <QtGui/QWindow>
 
 namespace Settings {
 namespace {
@@ -227,13 +232,9 @@ Cover::Cover(
 	_qrButton->setClickedCallback([=, show = controller->uiShow()] {
 		Ui::DefaultShowFillPeerQrBoxCallback(show, _user);
 	});
-	Info::Profile::UsernamesValue(
-		_user
-	) | rpl::on_next([=](const auto &usernames) {
-		_qrButton->setVisible(!usernames.empty());
-		refreshNameGeometry(width());
-		refreshQrButtonGeometry(width());
-	}, _qrButton->lifetime());
+	_qrButton->show();
+	refreshNameGeometry(width());
+	refreshQrButtonGeometry(width());
 }
 
 Cover::~Cover() = default;
@@ -265,11 +266,11 @@ void Cover::initViewers() {
 		_user
 	) | rpl::on_next([=](const TextWithEntities &value) {
 		if (GetEnhancedBool("show_phone_number")) {
-			_phone->setText(value.text);
+			_phoneText = value.text;
 		} else {
-			_phone->setText(tr::lng_info_mobile_hidden(tr::now));
+			_phoneText = tr::lng_info_mobile_hidden(tr::now);
 		}
-		refreshPhoneGeometry(width());
+		updatePhoneText();
 	}, lifetime());
 
 	_user->session().settings().phoneNumberHiddenValue(
@@ -371,10 +372,13 @@ void BuildSectionButtons(SectionBuilder &builder) {
 	const auto showOther = builder.showOther();
 
 	if (!session->supportMode()) {
-		builder.addSectionButton({
+		builder.addButton({
 			.title = tr::lng_settings_my_account(),
-			.targetSection = InformationId(),
 			.icon = { &st::menuIconProfile },
+			.onClick = [=] {
+				controller->showSection(
+					Info::Stories::MakeMyProfile(session->user()));
+			},
 			.keywords = { u"profile"_q, u"edit"_q, u"information"_q },
 		});
 	}
@@ -585,26 +589,60 @@ void BuildPremiumSection(SectionBuilder &builder) {
 	builder.addSkip();
 }
 
+class CircleRippleIconButton final : public Ui::IconButton {
+public:
+	using Ui::IconButton::IconButton;
+
+protected:
+	QImage prepareRippleMask() const override {
+		return Ui::RippleAnimation::EllipseMask(size());
+	}
+};
+
 void BuildHelpSection(SectionBuilder &builder) {
 	builder.addDivider();
 	builder.addSkip();
 
 	const auto controller = builder.controller();
-	builder.addButton({
+	const auto faq = builder.addButton({
 		.id = u"main/faq"_q,
 		.title = tr::lng_settings_faq(),
 		.icon = { &st::menuIconFaq },
 		.onClick = [=] { OpenFaq(controller); },
-		.keywords = { u"help"_q, u"support"_q, u"questions"_q },
+		.keywords = {
+			u"help"_q,
+			u"support"_q,
+			u"questions"_q,
+			u"shortcuts"_q,
+			u"keyboard"_q,
+			u"hotkeys"_q,
+			u"legend"_q,
+			u"gestures"_q,
+		},
 	});
+	if (faq) {
+		const auto legend = Ui::CreateChild<CircleRippleIconButton>(
+			faq,
+			st::settingsFaqKeysLegend);
+		legend->setAccessibleName(tr::lng_keys_legend_title(tr::now));
+		faq->sizeValue(
+		) | rpl::on_next([=](const QSize &size) {
+			const auto right = st::settingsButtonRightSkip
+				- st::settingsFaqKeysLegend.iconPosition.x();
+			legend->moveToRight(
+				right,
+				(size.height() - legend->height()) / 2);
+		}, legend->lifetime());
+		legend->setClickedCallback([=] {
+			ShowKeysLegend(&controller->window());
+		});
+	}
 
 	builder.addButton({
 		.id = u"main/features"_q,
 		.title = tr::lng_settings_features(),
 		.icon = { &st::menuIconEmojiObjects },
-		.onClick = [] {
-			UrlClickHandler::Open(tr::lng_telegram_features_url(tr::now));
-		},
+		.onClick = [=] { OpenFeatures(controller); },
 		.keywords = { u"tips"_q, u"tutorial"_q },
 	});
 
@@ -875,8 +913,8 @@ void SetupValidatePhoneNumberSuggestion(
 		st::boxRowPadding);
 	label->setClickHandlerFilter([=, weak = base::make_weak(controller)](
 			const auto &...) {
-		UrlClickHandler::Open(
-			tr::lng_settings_suggestion_phone_number_about_link(tr::now),
+		HiddenUrlClickHandler::OpenTranslated(
+			tr::lng_settings_suggestion_phone_number_about_link,
 			QVariant::fromValue(ClickHandlerContext{
 				.sessionWindow = weak,
 			}));
@@ -1187,8 +1225,16 @@ Type MainId() {
 }
 
 void OpenFaq(base::weak_ptr<Window::SessionController> weak) {
-	UrlClickHandler::Open(
-		tr::lng_settings_faq_link(tr::now),
+	HiddenUrlClickHandler::OpenTranslated(
+		tr::lng_settings_faq_link,
+		QVariant::fromValue(ClickHandlerContext{
+			.sessionWindow = weak,
+		}));
+}
+
+void OpenFeatures(base::weak_ptr<Window::SessionController> weak) {
+	HiddenUrlClickHandler::OpenTranslated(
+		tr::lng_telegram_features_url,
 		QVariant::fromValue(ClickHandlerContext{
 			.sessionWindow = weak,
 		}));

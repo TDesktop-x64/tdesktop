@@ -24,11 +24,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_cursor_state.h"
 #include "history/view/history_view_keyboard_text_selection.h"
 #include "history/view/history_view_top_bar_widget.h"
+#include "history/view/history_view_touch_scroll.h"
 
 #include <QtGui/QPainterPath>
 
 struct ClickContext;
 struct ClickHandlerContext;
+struct HistorySelectedTextParts;
 
 namespace Data {
 struct Group;
@@ -46,6 +48,7 @@ enum class ElementChatMode : char;
 class ElementOverlayHost;
 class EmptyPainter;
 class Element;
+class GramReadLine;
 class TranslateTracker;
 class ReadMetricsTracker;
 struct PinnedId;
@@ -129,6 +132,7 @@ public:
 	QString accessibilityChildName(int index) const override;
 	QAccessible::State accessibilityChildState(int index) const override;
 	QAccessible::Role accessibilityChildRole() const override;
+	QAccessible::Role accessibilityChildRoleAt(int index) const override;
 	QRect accessibilityChildRect(int index) const override;
 	int accessibilityChildColumnCount(int row) const override;
 	QAccessible::Role accessibilityChildSubItemRole() const override;
@@ -239,6 +243,7 @@ public:
 	void elementStartEffect(
 		not_null<const Element*> view,
 		Element *replacing);
+	HistoryView::GramReadLine *elementGramReadLine();
 
 	void startEffectOnRead(not_null<HistoryItem*> item);
 	void updateBotInfo(bool recount = true);
@@ -315,10 +320,6 @@ protected:
 private:
 	[[nodiscard]] std::vector<Element*> accessibleElements() const;
 	[[nodiscard]] int accessibilityUnreadBarIndex() const;
-	[[nodiscard]] HistoryItem *accessibilityItemAtIndex(
-		int index,
-		const std::vector<Element*> &elements,
-		int barIndex) const;
 	void toggleMessageSelection();
 	void playPauseFocusedMedia();
 	void setAccessibilityFocusedItem(int index, HistoryItem *item);
@@ -471,6 +472,7 @@ private:
 		not_null<HistoryItem*> item) const;
 	[[nodiscard]] MessageSelection getSelectedTextSelection(
 		not_null<HistoryItem*> item) const;
+	[[nodiscard]] HistorySelectedTextParts getSelectedTextParts() const;
 	[[nodiscard]] bool isPressInSelectedText(
 		not_null<const Element*> view,
 		TextState state) const;
@@ -542,7 +544,7 @@ private:
 	void reportAsGroup(FullMsgId itemId);
 	void blockSenderItem(FullMsgId itemId);
 	void blockSenderAsGroup(FullMsgId itemId);
-	void copySelectedText();
+	void copySelectedText(bool withImageText = false);
 	void editCaptionUploadLayer(not_null<HistoryItem*> item);
 	void setupShortcuts();
 
@@ -635,6 +637,7 @@ private:
 	std::optional<Data::ReportInput> _chooseForReportReason;
 
 	const std::unique_ptr<Ui::PathShiftGradient> _pathGradient;
+	std::unique_ptr<HistoryView::GramReadLine> _gramReadLine;
 	QPainterPath _highlightPathCache;
 	bool _isChatWide = false;
 	bool _removeFromUserpics = false;
@@ -700,6 +703,7 @@ private:
 	crl::time _touchAccelerationTime = 0;
 	crl::time _touchTime = 0;
 	base::Timer _touchScrollTimer;
+	HistoryView::TouchScroll _touchElastic;
 	Ui::MiddleClickAutoscroll _middleClickAutoscroll;
 
 	Ui::Controls::SwipeContextData _gestureHorizontal;

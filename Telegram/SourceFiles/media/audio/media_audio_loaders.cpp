@@ -340,7 +340,10 @@ void Loaders::loadData(AudioMsgId audio, crl::time positionMs) {
 		return;
 	}
 
-	alSourcef(track->stream.source, AL_GAIN, ComputeVolume(type));
+	alSourcef(
+		track->stream.source,
+		AL_GAIN,
+		ComputeVolume(type) * track->volume);
 	if (!internal::audioCheckError()) {
 		setStoppedState(track, State::StoppedAtError);
 		emitError(type);
@@ -368,6 +371,21 @@ void Loaders::loadData(AudioMsgId audio, crl::time positionMs) {
 	}
 
 	needToCheck();
+}
+
+int64 Loaders::freshSpeedDependentPosition(Mixer::Track *track) {
+	if (!track->isStreamCreated()) {
+		return track->withSpeed.fineTunedPosition;
+	}
+	ALint sampleOffset = 0;
+	ALint state = AL_INITIAL;
+	alGetSourcei(track->stream.source, AL_SAMPLE_OFFSET, &sampleOffset);
+	alGetSourcei(track->stream.source, AL_SOURCE_STATE, &state);
+	if (alGetError() != AL_NO_ERROR
+		|| (state != AL_PLAYING && state != AL_PAUSED)) {
+		return track->withSpeed.fineTunedPosition;
+	}
+	return track->withSpeed.bufferedPosition + sampleOffset;
 }
 
 Loaders::SetupLoaderResult Loaders::setupLoader(
@@ -447,7 +465,7 @@ Loaders::SetupLoaderResult Loaders::setupLoader(
 			.oldSpeed = track->speed,
 			.newSpeed = track->nextSpeed,
 			.fadeStartPosition = track->withSpeed.fadeStartPosition,
-			.position = track->withSpeed.fineTunedPosition,
+			.position = freshSpeedDependentPosition(track),
 			.normalLength = track->state.length,
 			.frequency = track->state.frequency,
 		};

@@ -72,10 +72,6 @@ base::options::toggle MediaTabsExpandedOption({
 	}
 }
 
-[[nodiscard]] QString MediaTabId(SharedMediaType type) {
-	return u"media:"_q + QString::number(int(type));
-}
-
 [[nodiscard]] Data::ProfileTab MediaProfileTab(SharedMediaType type) {
 	switch (type) {
 	case SharedMediaType::PhotoVideo:
@@ -94,9 +90,7 @@ public:
 	MediaTabAdapter(MediaTabContext context, SharedMediaType type)
 	: _context(context)
 	, _type(type)
-	, _countPeer(context.sublist
-		? context.sublist->sublistPeer()
-		: context.peer)
+	, _countPeer(context.peer)
 	, _topicRootId(context.topic ? context.topic->rootId() : MsgId())
 	, _monoforumPeerId(context.sublist
 		? context.sublist->sublistPeer()->id
@@ -297,6 +291,10 @@ private:
 };
 
 } // namespace
+
+QString MediaTabId(Storage::SharedMediaType type) {
+	return u"media:"_q + QString::number(int(type));
+}
 
 const char kOptionProfileMediaTabsExpanded[] = "profile-media-tabs-expanded";
 

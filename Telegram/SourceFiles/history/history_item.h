@@ -188,7 +188,7 @@ public:
 	void dependencyItemRemoved(not_null<HistoryItem*> dependency);
 	void dependencyStoryRemoved(not_null<Data::Story*> dependency);
 	void updateDependencyItem();
-	[[nodiscard]] MsgId dependencyMsgId() const;
+	void updateDependentServiceText();
 	[[nodiscard]] bool notificationReady() const;
 	[[nodiscard]] PeerData *specialNotificationPeer() const;
 	void checkStoryForwardInfo();
@@ -203,6 +203,7 @@ public:
 	[[nodiscard]] bool isGuestChatBotMessage() const;
 	[[nodiscard]] UserData *getMessageBot() const;
 	[[nodiscard]] bool hideLinks() const;
+	[[nodiscard]] bool hideInlineKeyboard() const;
 	[[nodiscard]] bool isHistoryEntry() const;
 	[[nodiscard]] bool isAdminLogEntry() const;
 	[[nodiscard]] bool isFromScheduled() const;
@@ -246,7 +247,6 @@ public:
 	void setMainView(not_null<HistoryView::Element*> view) {
 		_mainView = view;
 	}
-	void refreshMainView();
 	void clearMainView();
 	void removeMainView(
 		Data::ViewRemovalReason reason = Data::ViewRemovalReason::Removed);
@@ -276,6 +276,7 @@ public:
 	void setHasUnreadPollVote();
 	[[nodiscard]] bool hasUnwatchedEffect() const;
 	bool markEffectWatched();
+	bool markEmojiInteractionWatched();
 	[[nodiscard]] bool isUnreadMedia() const;
 	[[nodiscard]] bool isIncomingUnreadMedia() const;
 	[[nodiscard]] bool hasUnreadMediaFlag() const;
@@ -354,6 +355,12 @@ public:
 	[[nodiscard]] bool isEphemeral() const {
 		return _flags & MessageFlag::Ephemeral;
 	}
+	[[nodiscard]] bool isFakeHistoryItem() const {
+		return _flags & MessageFlag::FakeHistoryItem;
+	}
+	[[nodiscard]] bool isLegacyMessage() const {
+		return _flags & MessageFlag::Legacy;
+	}
 	[[nodiscard]] bool canBeSelected() const;
 	[[nodiscard]] bool isFakeAboutView() const {
 		return _flags & MessageFlag::FakeAboutView;
@@ -390,7 +397,6 @@ public:
 	void setCommentsPossibleMaxId(MsgId possibleMaxId);
 	[[nodiscard]] bool areCommentsUnread() const;
 
-	[[nodiscard]] FullMsgId commentsItemId() const;
 	void setCommentsItemId(FullMsgId id);
 
 	[[nodiscard]] bool needCheck() const;
@@ -407,6 +413,7 @@ public:
 		const TextWithEntities &textWithEntities,
 		const MTPMessageMedia *media,
 		const MTPRichMessage *richMessage);
+	void applyStreamedDraftFinish(const MTPDmessage &data);
 	void applySentMessage(const MTPDmessage &data);
 	void applySentMessage(
 		const QString &text,
@@ -602,6 +609,7 @@ public:
 
 	[[nodiscard]] bool showForwardsFromSender(
 		not_null<const HistoryMessageForwarded*> forwarded) const;
+	[[nodiscard]] bool displayForwardedFrom() const;
 
 	[[nodiscard]] bool isEmpty() const;
 	[[nodiscard]] MessageGroupId groupId() const;
@@ -699,15 +707,13 @@ private:
 	void setupForwardedComponent(const CreateConfig &config);
 	void applyInitialEffectWatched();
 
+	[[nodiscard]] MsgId notificationTopicRootId() const;
 	[[nodiscard]] bool generateLocalEntitiesByReply() const;
 	[[nodiscard]] TextWithEntities withLocalEntities(
 		const TextWithEntities &textWithEntities) const;
 	void detectTextLinks(const TextWithEntities &textWithEntities);
 	void setTextValue(TextWithEntities text, bool force = false);
 	[[nodiscard]] bool isTooOldForEdit(TimeId now) const;
-	[[nodiscard]] bool isLegacyMessage() const {
-		return _flags & MessageFlag::Legacy;
-	}
 
 	[[nodiscard]] bool checkDiscussionLink(ChannelId id) const;
 	void updateSentContent(
@@ -735,7 +741,6 @@ private:
 	[[nodiscard]] HistoryServiceDependentData *GetServiceDependentData();
 	[[nodiscard]] auto GetServiceDependentData() const
 		-> const HistoryServiceDependentData *;
-	void updateDependentServiceText();
 	void updateServiceDependent(bool force = false);
 	void setServiceText(PreparedServiceText &&prepared);
 
@@ -746,6 +751,9 @@ private:
 	void clearDependencyMessage();
 	void setupChatThemeChange();
 	void setupTTLChange();
+	void setupTonConnectRequest();
+	void armTonConnectRequestExpiry();
+	void updateTonConnectRequestText();
 
 	void translationToggle(
 		not_null<HistoryMessageTranslation*> translation,
@@ -792,6 +800,9 @@ private:
 	[[nodiscard]] PreparedServiceText preparePinnedText();
 	[[nodiscard]] PreparedServiceText prepareGameScoreText();
 	[[nodiscard]] PreparedServiceText preparePaymentSentText();
+	[[nodiscard]] PreparedServiceText prepareGramTransferText(
+		bool includeComment = true);
+	[[nodiscard]] PreparedServiceText prepareTonConnectRequestText();
 	[[nodiscard]] PreparedServiceText prepareStoryMentionText();
 	[[nodiscard]] PreparedServiceText prepareInvitedToCallText(
 		const std::vector<not_null<UserData*>> &users,
@@ -833,6 +844,8 @@ private:
 	int _boostsApplied = 0;
 	int _starsPaid = 0;
 	BusinessShortcutId _shortcutId = 0;
+	// Service-styled regular messages still accept ordinary content updates.
+	bool _isServiceMessage = false;
 
 	MessageGroupId _groupId = MessageGroupId();
 	EffectId _effectId = 0;

@@ -131,8 +131,6 @@ public:
 
 	void setVoiceChatPinned(bool isPinned);
 
-	[[nodiscard]] const ConferenceInvites &conferenceInvites(
-		CallId conferenceId) const;
 	void registerConferenceInvite(
 		CallId conferenceId,
 		not_null<UserData*> user,

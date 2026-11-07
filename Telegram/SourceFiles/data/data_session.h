@@ -11,9 +11,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/timer.h"
 #include "data/data_cloud_file.h"
 #include "data/data_groups.h"
+#include "data/data_location.h"
 #include "data/data_star_gift.h"
 #include "dialogs/dialogs_main_list.h"
-#include "history/history_location_manager.h"
 #include "storage/storage_databases.h"
 
 class Image;
@@ -107,6 +107,7 @@ struct GiftUpdate {
 		Unpin,
 		ResaleChange,
 		Upgraded,
+		HostChange,
 	};
 
 	Data::SavedStarGiftId id;
@@ -652,8 +653,6 @@ public:
 		not_null<const DocumentData*> document);
 	void requestDocumentViewRepaint(not_null<const DocumentData*> document);
 	void markMediaRead(not_null<const DocumentData*> document);
-	void requestPollViewRepaint(not_null<const PollData*> poll);
-	void requestTodoListViewRepaint(not_null<const TodoListData*> todolist);
 
 	void photoLoadProgress(not_null<PhotoData*> photo);
 	void photoLoadDone(not_null<PhotoData*> photo);
@@ -688,7 +687,6 @@ public:
 	[[nodiscard]] bool unreadWithMentionsBadgeMuted() const;
 	[[nodiscard]] int unreadBadgeIgnoreOne(Dialogs::Key key) const;
 	[[nodiscard]] bool unreadBadgeMutedIgnoreOne(Dialogs::Key key) const;
-	[[nodiscard]] int unreadOnlyMutedBadge() const;
 	[[nodiscard]] rpl::producer<> unreadBadgeChanges() const;
 	void notifyUnreadBadgeChanged();
 
@@ -757,8 +755,6 @@ public:
 		const MTPWebDocument &data,
 		const ImageLocation &thumbnailLocation,
 		const ImageLocation &videoThumbnailLocation);
-	[[nodiscard]] not_null<DocumentData*> venueIconDocument(
-		const QString &icon);
 
 	[[nodiscard]] not_null<WebPageData*> webpage(WebPageId id);
 	not_null<WebPageData*> processWebpage(const MTPWebPage &data);
@@ -1343,7 +1339,6 @@ private:
 		FullStoryId,
 		base::flat_set<not_null<HistoryItem*>>> _storyItems;
 	base::flat_map<uint64, not_null<HistoryItem*>> _highlightings;
-	base::flat_map<QString, not_null<DocumentData*>> _venueIcons;
 
 	base::flat_set<not_null<WebPageData*>> _webpagesUpdated;
 	base::flat_set<not_null<GameData*>> _gamesUpdated;

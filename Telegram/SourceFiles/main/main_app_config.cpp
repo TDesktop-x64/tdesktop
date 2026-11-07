@@ -141,14 +141,6 @@ int AppConfig::pinnedGiftsLimit() const {
 	return get<int>(u"stargifts_pinned_to_top_limit"_q, 6);
 }
 
-int AppConfig::giftCollectionsLimit() const {
-	return get<int>(u"stargifts_collections_limit"_q, 10);
-}
-
-int AppConfig::giftCollectionGiftsLimit() const {
-	return get<int>(u"stargifts_collection_gifts_limit"_q, 500);
-}
-
 bool AppConfig::callsDisabledForSession() const {
 	const auto authorizations = _account->sessionExists()
 		? &_account->session().api().authorizations()
@@ -278,8 +270,12 @@ QString AppConfig::ageVerifyBotUsername() const {
 	return get<QString>(u"verify_age_bot_username"_q, QString());
 }
 
-int AppConfig::storiesAlbumsLimit() const {
-	return get<int>(u"stories_albums_limit"_q, 100);
+QString AppConfig::oldWalletBotUsername() const {
+	return get<QString>(u"old_wallet_bot_username"_q, u"wallet"_q);
+}
+
+bool AppConfig::walletAvailable() const {
+	return get<bool>(u"wallet_available"_q, true);
 }
 
 int AppConfig::storiesAlbumLimit() const {

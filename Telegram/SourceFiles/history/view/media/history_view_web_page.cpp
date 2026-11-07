@@ -415,18 +415,21 @@ QSize WebPage::countOptimalSize() {
 		|| (sponsored && !sponsored->hasMedia && _data->photo));
 
 	// Detect _openButtonWidth before counting paddings.
+	const auto mediaEditor = (_parent->context() == Context::MediaEditor);
 	_openButton = Ui::Text::String();
-	if ((_data->iv != nullptr || _data->siteName == "Ad") && HasButton(_data)) {
+	if ((!mediaEditor || _data->siteName == "Ad") && HasButton(_data)) {
 		const auto context = Core::TextContext({
 			.session = &_data->session(),
 			.customEmojiLoopLimit = 1,
-		});
+			});
 		_openButton.setMarkedText(
 			st::semiboldTextStyle,
 			PageToPhrase(_data),
 			kMarkupTextOptions,
 			context);
-	} else if (sponsored && !sponsored->buttonText.isEmpty()) {
+	} else if (!mediaEditor
+		&& sponsored
+		&& !sponsored->buttonText.isEmpty()) {
 		auto phrase = TextWithEntities{ tr::upper(sponsored->buttonText) };
 		if (!sponsored->isLinkInternal) {
 			phrase.append(st::historyExternalLinkIcon);
@@ -471,22 +474,22 @@ QSize WebPage::countOptimalSize() {
 				// to request users confirmation on non-first app opening.
 				return false;
 			}
-			const auto simplify = [](const QString &url) {
+			const auto simplify = [](const QString& url) {
 				auto result = url.toLower();
 				if (result.endsWith('/')) {
 					result.chop(1);
 				}
 				const auto prefixes = { u"http://"_q, u"https://"_q };
-				for (const auto &prefix : prefixes) {
+				for (const auto& prefix : prefixes) {
 					if (result.startsWith(prefix)) {
 						result = result.mid(prefix.size());
 						break;
 					}
 				}
 				return result;
-			};
+				};
 			const auto simplified = simplify(_data->url);
-			for (const auto &entity : original.entities) {
+			for (const auto& entity : original.entities) {
 				if (entity.type() != EntityType::Url) {
 					continue;
 				}
@@ -498,7 +501,7 @@ QSize WebPage::countOptimalSize() {
 				}
 			}
 			return true;
-		}();
+			}();
 		if (sponsored) {
 			_openl = SponsoredLink(_data->url, sponsored->isLinkInternal);
 			if (sponsored->canReport) {
@@ -535,7 +538,7 @@ QSize WebPage::countOptimalSize() {
 				_data->photo,
 				crl::guard(this, [=](FullMsgId id) {
 					_parent->delegate()->elementOpenPhoto(_data->photo, id);
-				}),
+					}),
 				contextId);
 		} else if (_data->document) {
 			_previewLink = std::make_shared<LambdaClickHandler>(
@@ -544,7 +547,7 @@ QSize WebPage::countOptimalSize() {
 						_data->document,
 						contextId,
 						/* showInMediaView */ true);
-				}));
+					}));
 		}
 	}
 
@@ -575,13 +578,13 @@ QSize WebPage::countOptimalSize() {
 				_parent,
 				nullptr,
 				_data->uniqueGift),
-				MediaGenericDescriptor{
-					.maxWidth = st::msgServiceGiftPreview,
-					.paintBgFactory = [=] {
-						return UniqueGiftBg(_parent, _data->uniqueGift);
-					},
-					.expandCurrentWidth = true,
-				});
+			MediaGenericDescriptor{
+				.maxWidth = st::msgServiceGiftPreview,
+				.paintBgFactory = [=] {
+					return UniqueGiftBg(_parent, _data->uniqueGift);
+				},
+				.expandCurrentWidth = true,
+			});
 	} else if (!_attach && _data->auction) {
 		const auto &gift = _data->auction->auctionGift;
 		const auto backdrop = gift->background
@@ -637,7 +640,7 @@ QSize WebPage::countOptimalSize() {
 					: Type::Telegram),
 			},
 			.repaint = [=] { _parent->customEmojiRepaint(); },
-		});
+			});
 		_description.setMarkedText(
 			st::webPageDescriptionStyle,
 			text,
@@ -725,8 +728,8 @@ QSize WebPage::countOptimalSize() {
 	}
 	if (_attach) {
 		const auto attachAtTop = (_siteName.isEmpty()
-				&& _title.isEmpty()
-				&& _description.isEmpty())
+			&& _title.isEmpty()
+			&& _description.isEmpty())
 			|| (sponsored && sponsored->hasMedia);
 		if (!attachAtTop) {
 			minHeight += st::mediaInBubbleSkip;
@@ -739,7 +742,9 @@ QSize WebPage::countOptimalSize() {
 		accumulate_max(maxWidth, maxMediaWidth);
 		minHeight += _attach->minHeight() - rect::m::sum::v(bubble);
 	}
-	if (_data->type == WebPageType::Video && _data->duration) {
+	if (_data->type == WebPageType::Video
+		&& _data->duration
+		&& !mediaEditor) {
 		_duration = Ui::FormatDurationText(_data->duration);
 		_durationWidth = st::msgDateFont->width(_duration);
 	}
@@ -1053,7 +1058,9 @@ void WebPage::draw(Painter &p, const PaintContext &context) const {
 				*backgroundEmojiCache,
 				backgroundEmojiData->firstGiftFrame);
 		}
-	} else if (factcheck && factcheck->expandable) {
+	} else if (factcheck
+		&& factcheck->expandable
+		&& (_parent->context() != Context::MediaEditor)) {
 		const auto &icon = factcheck->expanded ? _st.collapse : _st.expand;
 		const auto &position = factcheck->expanded
 			? _st.collapsePosition
@@ -1337,7 +1344,8 @@ void WebPage::draw(Painter &p, const PaintContext &context) const {
 			&& _collage.empty()
 			&& _data->photo
 			&& !_data->document) {
-			if (_attach->isReadyForOpen()) {
+			if (_attach->isReadyForOpen()
+				&& (_parent->context() != Context::MediaEditor)) {
 				if (_data->siteName == u"YouTube"_q) {
 					st->youtubeIcon().paint(
 						p,
@@ -1432,7 +1440,9 @@ WebPage::FactcheckData *WebPage::factcheckData() const {
 }
 
 WebPage::HintData *WebPage::hintData() const {
-	if (const auto sponsored = sponsoredData()) {
+	if (_parent->context() == Context::MediaEditor) {
+		return nullptr;
+	} else if (const auto sponsored = sponsoredData()) {
 		return sponsored->hint.link ? &sponsored->hint : nullptr;
 	} else if (const auto factcheck = factcheckData()) {
 		return factcheck->hint.link ? &factcheck->hint : nullptr;

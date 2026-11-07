@@ -1706,6 +1706,16 @@ else: # qt > '6'
         scriptPath, '../../../cmake/external/angle/qt.cmake')).replace('\\', '/')
     # checkouts share Libraries, so the cache key gets the content, not the path
     modifiedEnv['QT_ANGLE_CMAKE'] = qtAngleCmake
+    localQtPatchesPath = os.path.join(scriptPath, 'patches', 'qtbase_' + qt)
+    localQtPatches = sorted(glob.glob(os.path.join(localQtPatchesPath, '*.patch'))) if win else []
+    modifiedEnv['QT_LOCAL_PATCHES'] = localQtPatchesPath
+    localQtPatchCommands = ''
+    for patch in localQtPatches:
+        localQtPatchCommands += 'depends:' + os.path.relpath(patch, libsDir).replace('\\', '/') + '\n'
+        quotedPatch = '"%QT_LOCAL_PATCHES%\\' + os.path.basename(patch) + '"'
+        localQtPatchCommands += (
+            '    git apply --reverse --check --ignore-whitespace ' + quotedPatch
+            + ' >nul 2>&1 || git apply ' + quotedPatch + ' --ignore-whitespace -v\n')
     branch = 'v$QT' + ('-lts-lgpl' if qt.startswith('6.2.') else '')
     stage('qt_' + qt, """
     git clone -b """ + branch + """ https://github.com/qt/qt5.git qt_$QT
@@ -1776,6 +1786,7 @@ win:
             exit /b 1
         )
     )
+""" + localQtPatchCommands + """
     cd ..\\qtsvg
     for /r %%i in (..\\..\\patches\\qtsvg_%QT%\\*) do (
         git apply %%i --ignore-whitespace -v

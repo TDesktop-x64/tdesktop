@@ -1,0 +1,37 @@
+Subject: [PATCH] Restore Qt 5 font engine selection for synthesized styles
+
+Stop forcing synthesized bold and italic fonts through DirectWrite in the
+Windows GDI font database. Keep the existing DirectWrite selection for
+hinting, scaling, color fonts and the MingLiU workaround.
+
+This reverts only the GDI database routing portion of Qt commit
+05de036a8855adbdd882942d2fb61c231b02bf5a (QTBUG-119995).
+DirectWrite's own synthesis support is unchanged. Qt Quick distance-field
+text may again miss synthesized styles; validate such consumers separately.
+This does not force anti-aliasing or bypass Windows font smoothing settings.
+
+diff --git a/src/gui/text/windows/qwindowsfontdatabase.cpp b/src/gui/text/windows/qwindowsfontdatabase.cpp
+--- a/src/gui/text/windows/qwindowsfontdatabase.cpp
++++ b/src/gui/text/windows/qwindowsfontdatabase.cpp
+@@ -1239,7 +1239,6 @@
+             HRESULT hr = data->directWriteGdiInterop->CreateFontFaceFromHdc(data->hdc, &directWriteFontFace);
+             if (SUCCEEDED(hr)) {
+                 bool isColorFont = false;
+-                bool needsSimulation = false;
+ #if QT_CONFIG(direct2d)
+                 IDWriteFontFace2 *directWriteFontFace2 = nullptr;
+                 if (SUCCEEDED(directWriteFontFace->QueryInterface(__uuidof(IDWriteFontFace2),
+@@ -1247,12 +1246,10 @@
+                     if (directWriteFontFace2->IsColorFont())
+                         isColorFont = directWriteFontFace2->GetPaletteEntryCount() > 0;
+ 
+-                    needsSimulation = directWriteFontFace2->GetSimulations() != DWRITE_FONT_SIMULATIONS_NONE;
+-
+                     directWriteFontFace2->Release();
+                 }
+ #endif // direct2d
+-                useDw = useDw || useDirectWrite(hintingPreference, fam, isColorFont) || needsSimulation;
++                useDw = useDw || useDirectWrite(hintingPreference, fam, isColorFont);
+                 qCDebug(lcQpaFonts)
+                         << __FUNCTION__ << request.families.first() << request.pointSize << "pt"
+                         << "hintingPreference=" << hintingPreference << "color=" << isColorFont

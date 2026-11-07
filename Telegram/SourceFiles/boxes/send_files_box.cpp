@@ -2424,10 +2424,13 @@ void SendFilesBox::setupCaptionAutocomplete() {
 	}
 }
 
-TextWithTags SendFilesBox::fieldText() const {
-	return !_caption->isHidden()
-		? _caption->getTextWithAppliedMarkdown()
-		: TextWithTags();
+TextWithTags SendFilesBox::fieldText(bool unformatted) const {
+	if (_caption->isHidden()) {
+		return {};
+	}
+	return unformatted
+		? _caption->getTextWithTags()
+		: _caption->getTextWithAppliedMarkdown();
 }
 
 void SendFilesBox::checkCharsLimitation() {
@@ -2893,7 +2896,7 @@ void SendFilesBox::send(
 
 	_confirmed = true;
 	if (_confirmedCallback) {
-		auto caption = fieldText();
+		auto caption = fieldText(options.unformatted);
 		if (!validateLength(caption.text)) {
 			return;
 		}

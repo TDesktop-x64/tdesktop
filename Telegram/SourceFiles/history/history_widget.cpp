@@ -5933,11 +5933,14 @@ void HistoryWidget::send(Api::SendOptions options) {
 		sendRichDraft(page, options);
 		return;
 	}
+	const auto text = options.unformatted
+		? _field->getTextWithTags()
+		: _field->getTextWithAppliedMarkdown();
 	if (!options.scheduled) {
 		auto action = Api::SendAction(_history, options);
 		action.replyTo = replyTo();
 		auto message = Api::MessageToSend(std::move(action));
-		message.textWithTags = _field->getTextWithAppliedMarkdown();
+		message.textWithTags = text;
 		if (!session().ephemeralMessages().wouldSend(message)
 			&& showSlowmodeError()) {
 			return;
@@ -5949,7 +5952,7 @@ void HistoryWidget::send(Api::SendOptions options) {
 	}
 
 	sendTextWithTags(
-		_field->getTextWithAppliedMarkdown(),
+		text,
 		true,
 		options,
 		nullptr);

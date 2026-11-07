@@ -285,6 +285,20 @@ namespace Settings {
 			EnhancedSettings::Write();
 		}, container->lifetime());
 
+		AddButtonWithIcon(
+				inner,
+				tr::lng_settings_send_unformatted(),
+				st::settingsButtonNoIcon
+		)->toggleOn(
+				rpl::single(GetEnhancedBool("send_unformatted"))
+		)->toggledChanges(
+		) | rpl::filter([=](bool toggled) {
+			return (toggled != GetEnhancedBool("send_unformatted"));
+		}) | rpl::on_next([=](bool toggled) {
+			SetEnhancedValue("send_unformatted", toggled);
+			EnhancedSettings::Write();
+		}, container->lifetime());
+
 		QString langPackBaseId = Lang::GetInstance().baseId();
 		if (langPackBaseId.contains("zh-han")) {
 			AddButtonWithIcon(

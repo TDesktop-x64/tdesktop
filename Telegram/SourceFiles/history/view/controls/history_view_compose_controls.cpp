@@ -2467,6 +2467,10 @@ TextWithTags ComposeControls::getTextWithAppliedMarkdown() const {
 	return _field->getTextWithAppliedMarkdown();
 }
 
+TextWithTags ComposeControls::getTextWithTags() const {
+	return _field->getTextWithTags();
+}
+
 void ComposeControls::clear(bool keepReply) {
 	// Otherwise cancelReplyMessage() will save the draft.
 	const auto saveTextDraft = keepReply || !replyingToMessage();

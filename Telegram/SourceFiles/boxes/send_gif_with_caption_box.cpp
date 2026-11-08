@@ -541,7 +541,11 @@ void CaptionBox(
 		aiButton->raise();
 	}, aiButton->lifetime());
 
-	const auto sendMenuDetails = [=] { return details; };
+	const auto sendMenuDetails = [=] {
+		auto boxed = details;
+		boxed.sendUnformattedPossible = HasSendText(input);
+		return boxed;
+	};
 	struct Autocomplete {
 		std::unique_ptr<ChatHelpers::FieldAutocomplete> dropdown;
 		bool geometryUpdateScheduled = false;
@@ -599,7 +603,9 @@ void CaptionBox(
 	const auto confirmed = box->lifetime().make_state<bool>(false);
 	const auto send = [=, show = controller->uiShow()](
 			Api::SendOptions options) {
-		const auto textWithTags = input->getTextWithTags();
+		const auto textWithTags = options.unformatted
+			? input->getTextWithTags()
+			: input->getTextWithAppliedMarkdown();
 		const auto remove = Ui::ComputeFieldCharacterCount(input)
 			- Data::PremiumLimits(&show->session()).captionLengthCurrent();
 		if (remove > 0) {

@@ -1817,7 +1817,9 @@ void MusicAttachBox(
 		auto action = actionFactory();
 		ApplySendOptions(action.options, options);
 
-		auto text = caption->getTextWithAppliedMarkdown();
+		auto text = options.unformatted
+			? caption->getTextWithTags()
+			: caption->getTextWithAppliedMarkdown();
 		const auto items = MakeMusicSelectionItems(
 			&controller->session(),
 			state->savedSelection,
@@ -1893,9 +1895,12 @@ void MusicAttachBox(
 				send.data(),
 				show,
 				[=] {
-					return state->selection.empty()
-						? SendMenu::Details()
-						: show->sendMenuDetails();
+					if (state->selection.empty()) {
+						return SendMenu::Details();
+					}
+					auto details = show->sendMenuDetails();
+					details.sendUnformattedPossible = HasSendText(caption);
+					return details;
 				},
 				SendMenu::DefaultCallback(show, [=](Api::SendOptions options) {
 					state->sendSelected(options);

@@ -6332,6 +6332,7 @@ SendMenu::Details HistoryWidget::sendButtonDefaultDetails() const {
 	if (!hasSendableContent() && !_previewDrawPreview) {
 		result.effectAllowed = false;
 	}
+	result.sendUnformattedPossible = fieldHasSendText();
 	return result;
 }
 

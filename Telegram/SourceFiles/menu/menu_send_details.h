@@ -63,6 +63,7 @@ struct Details {
 	const style::EmojiPan *effectsPan = nullptr;
 	bool effectAllowed = false;
 	bool saveUnformattedPossible = false;
+	bool sendUnformattedPossible = false;
 };
 
 } // namespace SendMenu

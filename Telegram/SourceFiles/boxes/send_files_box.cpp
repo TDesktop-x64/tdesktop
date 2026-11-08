@@ -842,6 +842,7 @@ Fn<SendMenu::Details()> SendFilesBox::prepareSendMenuDetails(
 		result.price = canChangePrice()
 			? _price.current()
 			: std::optional<uint64>();
+		result.sendUnformattedPossible = HasSendText(_caption);
 		return result;
 	});
 }

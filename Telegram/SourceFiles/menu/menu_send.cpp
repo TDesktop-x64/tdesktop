@@ -752,7 +752,9 @@ FillMenuResult FillSendMenu(
 			[=] { action({ Api::SendOptions{ .silent = true } }, details); },
 			&icons.menuMute);
 	}
-	if (sending && GetEnhancedBool("send_unformatted")) {
+	if (sending
+		&& details.sendUnformattedPossible
+		&& GetEnhancedBool("send_unformatted")) {
 		menu->addAction(
 			tr::lng_send_unformatted(tr::now),
 			[=] { action({ Api::SendOptions{ .unformatted = true } }, details); },
@@ -912,7 +914,8 @@ void SetupMenuAndShortcuts(
 			}))
 		||
 		(GetEnhancedBool("send_unformatted")
-			&& (sending || now.saveUnformattedPossible)
+			&& ((sending && now.sendUnformattedPossible)
+				|| (!sending && now.saveUnformattedPossible))
 			&& request->check(Command::SendUnformatted, shortcutPriority)
 			&& request->handle([=] {
 				action({ Api::SendOptions{ .unformatted = true } }, details());

@@ -81,7 +81,8 @@ void SetupMenuAndShortcuts(
 	Fn<Details()> details,
 	Fn<void(Action, Details)> action,
 	const style::PopupMenu *stOverride = nullptr,
-	const style::ComposeIcons *iconsOverride = nullptr);
+	const style::ComposeIcons *iconsOverride = nullptr,
+	int shortcutPriority = 0);
 
 void SetupUnreadMentionsMenu(
 	not_null<Ui::RpWidget*> button,

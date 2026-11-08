@@ -1268,7 +1268,8 @@ void SendFilesBox::refreshButtons() {
 			_sendMenuDetails,
 			_sendMenuCallback,
 			&_st.tabbed.menu,
-			&_st.tabbed.icons);
+			&_st.tabbed.icons,
+			1);
 	}
 	addButton(tr::lng_cancel(), [=] {
 		requestToTakeTextWithTags();

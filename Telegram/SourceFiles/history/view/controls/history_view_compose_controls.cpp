@@ -1102,11 +1102,14 @@ MessageToEdit FieldHeader::queryToEdit() {
 
 SendMenu::Details FieldHeader::saveMenuDetails(bool hasSendText) const {
 	const auto item = _data->message(_editMsgId.current());
-	return isEditingMessage()
+	if (!(isEditingMessage()
 		&& item
-		&& !item->richPage()
-		? _mediaEditManager.sendMenuDetails(hasSendText)
-		: SendMenu::Details();
+		&& !item->richPage())) {
+		return {};
+	}
+	auto result = _mediaEditManager.sendMenuDetails(hasSendText);
+	result.saveUnformattedPossible = true;
+	return result;
 }
 
 struct ComposeControls::StarEffect {
@@ -2230,7 +2233,14 @@ rpl::producer<MessageToEdit> ComposeControls::editRequests() const {
 	});
 	return rpl::merge(
 		_send->clicks() | filter | toValue,
-		_field->submits() | filter | toValue);
+		_field->submits() | filter | toValue,
+		_editUnformattedRequests.events()
+			| filter
+			| rpl::map([=] {
+				auto result = _header->queryToEdit();
+				result.options.unformatted = true;
+				return result;
+			}));
 }
 
 rpl::producer<std::optional<bool>> ComposeControls::attachRequests() const {
@@ -4157,7 +4167,12 @@ void ComposeControls::setupSendMenu(
 		Fn<void(Api::SendOptions)> send) {
 	using namespace SendMenu;
 	const auto sendAction = [=](Action action, Details details) {
-		if (action.type == ActionType::ChangePrice) {
+		if (action.type == ActionType::Send
+			&& action.options.unformatted
+			&& isEditingMessage()) {
+			_editUnformattedRequests.fire({});
+			return;
+		} else if (action.type == ActionType::ChangePrice) {
 			_chosenStarsCount = details.price.value_or(0);
 			updateSendButtonType();
 		} else if (action.type == ActionType::CaptionUp
@@ -6592,11 +6607,14 @@ void ComposeControls::selectAllFieldText() {
 	_field->selectAll();
 }
 
-TextWithEntities ComposeControls::prepareTextForEditMsg() const {
+TextWithEntities ComposeControls::prepareTextForEditMsg(
+		bool unformatted) const {
 	if (!_history) {
 		return {};
 	}
-	const auto textWithTags = getTextWithAppliedMarkdown();
+	const auto textWithTags = unformatted
+		? _field->getTextWithTags()
+		: getTextWithAppliedMarkdown();
 	const auto prepareFlags = Ui::ItemTextOptions(
 		_history,
 		session().user()).flags;

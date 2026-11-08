@@ -406,6 +406,9 @@ void ScheduleBox(
 		if (action.options.silent) {
 			options.silent = action.options.silent;
 		}
+		if (action.options.unformatted) {
+			options.unformatted = true;
+		}
 		if (action.options.effectId) {
 			options.effectId = action.options.effectId;
 		}
@@ -415,7 +418,10 @@ void ScheduleBox(
 		descriptor.submit.data(),
 		maybeShow,
 		[=] { return childDetails; },
-		sendAction);
+		sendAction,
+		nullptr,
+		nullptr,
+		1);
 
 	if (details.type == Type::ScheduledToUser) {
 		const auto sendUntilOnline = box->addTopButton(*style.topButtonStyle);

@@ -525,7 +525,7 @@ void EffectPreview::setupSend(Details details) {
 		const auto type = details.type;
 		SetupMenuAndShortcuts(_send.get(), _show, [=] {
 			return Details{ .type = type };
-		}, _actionWithEffect);
+		}, _actionWithEffect, nullptr, nullptr, 1);
 	} else {
 		_premiumPromoLabel->entity()->setClickHandlerFilter([=](auto&&...) {
 			const auto window = _show->resolveWindow();
@@ -729,7 +729,8 @@ FillMenuResult FillSendMenu(
 		&& (details.caption == CaptionState::None)
 		&& (details.photoQuality == PhotoQualityState::None)
 		&& (details.cover == CoverState::None)
-		&& !details.price.has_value();
+		&& !details.price.has_value()
+		&& !details.saveUnformattedPossible;
 	if (empty || !action) {
 		return FillMenuResult::Skipped;
 	} else if (type == Type::EditCommentPrice) {
@@ -757,6 +758,14 @@ FillMenuResult FillSendMenu(
 			[=] { action({ Api::SendOptions{ .unformatted = true } }, details); },
 			&icons.menuUnformatted);
 	}
+	if (!sending
+		&& details.saveUnformattedPossible
+		&& GetEnhancedBool("send_unformatted")) {
+		menu->addAction(
+			tr::lng_edit_save_unformatted(tr::now),
+			[=] { action({ Api::SendOptions{ .unformatted = true } }, details); },
+			&icons.menuUnformatted);
+	}
 	if (sending && type != Type::SilentOnly) {
 		menu->addAction(
 			((type == Type::Reminder)
@@ -774,7 +783,7 @@ FillMenuResult FillSendMenu(
 			&icons.menuWhenOnline);
 	}
 
-	if ((type != Type::Disabled)
+	if ((sending || details.saveUnformattedPossible)
 		&& ((details.spoiler != SpoilerState::None)
 			|| (details.caption != CaptionState::None)
 			|| (details.photoQuality != PhotoQualityState::None)
@@ -858,7 +867,8 @@ void SetupMenuAndShortcuts(
 		Fn<Details()> details,
 		Fn<void(Action, Details)> action,
 		const style::PopupMenu *stOverride,
-		const style::ComposeIcons *iconsOverride) {
+		const style::ComposeIcons *iconsOverride,
+		int shortcutPriority) {
 	const auto menu = std::make_shared<base::unique_qptr<Ui::PopupMenu>>();
 	const auto showMenu = [=] {
 		*menu = base::make_unique_q<Ui::PopupMenu>(
@@ -889,18 +899,27 @@ void SetupMenuAndShortcuts(
 	}) | rpl::on_next([=](not_null<Shortcuts::Request*> request) {
 		using Command = Shortcuts::Command;
 
-		const auto now = details().type;
-		if (now == Type::Disabled) {
+		const auto now = details();
+		const auto sending = (now.type != Type::Disabled);
+		if (!sending && !now.saveUnformattedPossible) {
 			return;
 		}
-		((now != Type::Reminder)
+		((sending && now.type != Type::Reminder)
 			&& request->check(Command::SendSilentMessage)
 			&& request->handle([=] {
 				action({ Api::SendOptions{ .silent = true } }, details());
 				return true;
 			}))
 		||
-		((now != Type::SilentOnly)
+		(GetEnhancedBool("send_unformatted")
+			&& (sending || now.saveUnformattedPossible)
+			&& request->check(Command::SendUnformatted, shortcutPriority)
+			&& request->handle([=] {
+				action({ Api::SendOptions{ .unformatted = true } }, details());
+				return true;
+			}))
+		||
+		((sending && now.type != Type::SilentOnly)
 			&& request->check(Command::ScheduleMessage)
 			&& request->handle([=] {
 				action({ .type = ActionType::Schedule }, details());

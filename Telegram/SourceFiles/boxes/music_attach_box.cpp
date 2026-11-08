@@ -1899,7 +1899,10 @@ void MusicAttachBox(
 				},
 				SendMenu::DefaultCallback(show, [=](Api::SendOptions options) {
 					state->sendSelected(options);
-				}));
+				}),
+				nullptr,
+				nullptr,
+				1);
 		}
 		box->addButton(tr::lng_cancel(), [=] {
 			box->closeBox();

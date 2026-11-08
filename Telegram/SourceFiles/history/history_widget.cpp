@@ -472,6 +472,11 @@ HistoryWidget::HistoryWidget(
 
 	setupSendMenu(_send.get(), [=](SendMenu::Action action, SendMenu::Details) {
 		if (action.type == SendMenu::ActionType::Send) {
+			const auto unformatted = action.options.unformatted;
+			const auto layerShown = this->controller()->isLayerShown();
+			if (unformatted && layerShown) {
+				return;
+			}
 			send(action.options);
 		} else {
 			sendScheduled(action.options);
@@ -5615,8 +5620,11 @@ void HistoryWidget::windowIsVisibleChanged() {
 	});
 }
 
-TextWithEntities HistoryWidget::prepareTextForEditMsg() const {
-	const auto textWithTags = _field->getTextWithAppliedMarkdown();
+TextWithEntities HistoryWidget::prepareTextForEditMsg(
+		bool unformatted) const {
+	const auto textWithTags = unformatted
+		? _field->getTextWithTags()
+		: _field->getTextWithAppliedMarkdown();
 	const auto prepareFlags = Ui::ItemTextOptions(
 		_history,
 		session().user()).flags;
@@ -5723,7 +5731,7 @@ void HistoryWidget::saveEditMessage(Api::SendOptions options) {
 		return;
 	}
 	const auto webPageDraft = _preview->draft();
-	const auto sending = prepareTextForEditMsg();
+	const auto sending = prepareTextForEditMsg(options.unformatted);
 
 	const auto hasMediaWithCaption = item
 		&& item->media()
@@ -5966,7 +5974,7 @@ void HistoryWidget::send(Api::SendOptions options) {
 	if (!_history) {
 		return;
 	} else if (_editMsgId) {
-		saveEditMessage({});
+		saveEditMessage(options);
 		return;
 	} else if (const auto page = shownRichMessage()) {
 		sendRichDraft(page, options);
@@ -6270,9 +6278,12 @@ SendMenu::Details HistoryWidget::sendMenuDetails() const {
 }
 
 SendMenu::Details HistoryWidget::saveMenuDetails() const {
-	return (_editMsgId && _replyEditMsg && !_replyEditMsg->richPage())
-		? _mediaEditManager.sendMenuDetails(fieldHasSendText())
-		: SendMenu::Details();
+	if (!(_editMsgId && _replyEditMsg && !_replyEditMsg->richPage())) {
+		return {};
+	}
+	auto result = _mediaEditManager.sendMenuDetails(fieldHasSendText());
+	result.saveUnformattedPossible = true;
+	return result;
 }
 
 auto HistoryWidget::computeSendButtonType() const {

@@ -322,7 +322,8 @@ public:
 	[[nodiscard]] Ui::RpWidget *likeAnimationTarget() const;
 	[[nodiscard]] int fieldCharacterCount() const;
 
-	[[nodiscard]] TextWithEntities prepareTextForEditMsg() const;
+	[[nodiscard]] TextWithEntities prepareTextForEditMsg(
+		bool unformatted = false) const;
 
 	void applyCloudDraft();
 	void applyDraft(
@@ -627,6 +628,7 @@ private:
 	const Fn<void(not_null<DocumentData*>)> _unavailableEmojiPasted;
 
 	rpl::event_stream<Api::SendOptions> _sendCustomRequests;
+	rpl::event_stream<> _editUnformattedRequests;
 	rpl::event_stream<Qt::KeyboardModifiers> _fieldSubmits;
 	rpl::event_stream<Api::SendOptions> _scrollToMaxRequests;
 	rpl::event_stream<> _cancelRequests;

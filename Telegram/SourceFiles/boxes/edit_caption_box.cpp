@@ -433,10 +433,17 @@ void EditCaptionBox::prepare() {
 			: _sendLargePhotos
 			? SendMenu::PhotoQualityState::High
 			: SendMenu::PhotoQualityState::Standard;
+		result.saveUnformattedPossible = true;
 		return result;
 	});
 	const auto callback = [=](SendMenu::Action action, const auto &) {
 		using Type = SendMenu::ActionType;
+		if (action.type == Type::Send) {
+			if (action.options.unformatted) {
+				save(true);
+			}
+			return;
+		}
 		switch (action.type) {
 		case Type::PhotoQualityOn: _sendLargePhotos = true; break;
 		case Type::PhotoQualityOff: _sendLargePhotos = false; break;
@@ -448,7 +455,10 @@ void EditCaptionBox::prepare() {
 		button,
 		nullptr,
 		details,
-		crl::guard(this, callback));
+		crl::guard(this, callback),
+		nullptr,
+		nullptr,
+		1);
 
 	updateBoxSize();
 
@@ -1285,7 +1295,7 @@ void EditCaptionBox::applyChanges() {
 	}
 }
 
-void EditCaptionBox::save() {
+void EditCaptionBox::save(bool unformatted) {
 	if (_saveRequestId) {
 		return;
 	}
@@ -1298,7 +1308,9 @@ void EditCaptionBox::save() {
 		return;
 	}
 
-	const auto textWithTags = _field->getTextWithAppliedMarkdown();
+	auto textWithTags = unformatted
+		? _field->getTextWithTags()
+		: _field->getTextWithAppliedMarkdown();
 	if (!validateLength(textWithTags.text)) {
 		return;
 	}
@@ -1337,7 +1349,7 @@ void EditCaptionBox::save() {
 		_controller->session().api().editMedia(
 			std::move(_preparedList),
 			(compressed ? SendMediaType::Photo : SendMediaType::File),
-			_field->getTextWithAppliedMarkdown(),
+			std::move(textWithTags),
 			action);
 		closeAfterSave();
 		return;

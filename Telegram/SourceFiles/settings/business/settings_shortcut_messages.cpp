@@ -1237,9 +1237,13 @@ void ShortcutMessages::edit(
 	if (*saveEditMsgRequestId) {
 		return;
 	}
+	if (options.unformatted && _controller->isLayerShown()) {
+		return;
+	}
 	const auto webpage = _composeControls->webPageDraft();
 	auto sending = TextWithEntities();
-	auto left = _composeControls->prepareTextForEditMsg();
+	auto left = _composeControls->prepareTextForEditMsg(
+		options.unformatted);
 
 	const auto originalLeftSize = left.text.size();
 	const auto hasMediaWithCaption = item

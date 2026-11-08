@@ -1199,7 +1199,10 @@ object_ptr<Ui::RpWidget> EditTodoListBox::setupContent() {
 		submit.data(),
 		_controller->uiShow(),
 		sendMenuDetails,
-		sendAction);
+		sendAction,
+		nullptr,
+		nullptr,
+		1);
 	addButton(tr::lng_cancel(), [=] { closeBox(); });
 
 	return result;

@@ -313,7 +313,7 @@ void WelcomeMessagesWidget::setupComposeControls() {
 	) | rpl::on_next([=](auto data) {
 		if (const auto item = session().data().message(data.fullId)) {
 			if (item->isWelcomeTemplate()) {
-				edit(item);
+				edit(item, data.options.unformatted);
 			}
 		}
 	}, lifetime());
@@ -627,11 +627,16 @@ void WelcomeMessagesWidget::send() {
 	finishSending();
 }
 
-void WelcomeMessagesWidget::edit(not_null<HistoryItem*> item) {
+void WelcomeMessagesWidget::edit(
+		not_null<HistoryItem*> item,
+		bool unformatted) {
 	if (!_history->peer->canManageWelcomeMessages()) {
 		return;
 	}
-	auto sending = _composeControls->prepareTextForEditMsg();
+	if (unformatted && controller()->isLayerShown()) {
+		return;
+	}
+	auto sending = _composeControls->prepareTextForEditMsg(unformatted);
 	TextUtilities::Trim(sending);
 	const auto hasMediaWithCaption = item->media()
 		&& item->media()->allowsEditCaption();

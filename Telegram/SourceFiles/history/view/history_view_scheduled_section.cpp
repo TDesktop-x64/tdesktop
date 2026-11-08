@@ -837,8 +837,12 @@ void ScheduledWidget::edit(
 	if (*saveEditMsgRequestId) {
 		return;
 	}
+	if (options.unformatted && controller()->isLayerShown()) {
+		return;
+	}
 	const auto webpage = _composeControls->webPageDraft();
-	const auto sending = _composeControls->prepareTextForEditMsg();
+	const auto sending = _composeControls->prepareTextForEditMsg(
+		options.unformatted);
 
 	const auto hasMediaWithCaption = item
 		&& item->media()

@@ -625,7 +625,10 @@ void CaptionBox(
 		confirm,
 		controller->uiShow(),
 		sendMenuDetails,
-		SendMenu::DefaultCallback(controller->uiShow(), send));
+		SendMenu::DefaultCallback(controller->uiShow(), send),
+		nullptr,
+		nullptr,
+		1);
 	box->setShowFinishedCallback([=] {
 		if (const auto raw = autocomplete->dropdown.get()) {
 			InvokeQueued(raw, [=] {

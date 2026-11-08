@@ -29,6 +29,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "platform/mac/touchbar/mac_touchbar_manager.h"
 #include "platform/platform_specific.h"
 #include "platform/platform_notifications_manager.h"
+#include "ui/platform/mac/ui_window_title_mac.h"
 #include "base/platform/base_platform_info.h"
 #include "base/options.h"
 #include "boxes/peer_list_controllers.h"
@@ -36,6 +37,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "base/platform/mac/base_utilities_mac.h"
 
+#include <QtCore/QPointer>
 #include <QtWidgets/QLineEdit>
 #include <QtWidgets/QTextEdit>
 
@@ -148,6 +150,68 @@ QString strNotificationAboutScreenLocked() {
 	return Platform::MakeFromLetters(letters);
 }
 
+[[nodiscard]] QRect TitleControlsRect(NSWindow *window) {
+	auto united = QRect();
+	if (!window) {
+		return united;
+	}
+	const auto windowHeight = [window frame].size.height;
+	const NSWindowButton buttons[] = {
+		NSWindowCloseButton,
+		NSWindowMiniaturizeButton,
+		NSWindowZoomButton,
+	};
+	for (const auto type : buttons) {
+		const auto button = [window standardWindowButton:type];
+		if (!button) {
+			continue;
+		}
+		const auto frame = [button convertRect:[button bounds] toView:nil];
+		united = united.united(QRect(
+			int(base::SafeRound(NSMinX(frame))),
+			int(base::SafeRound(windowHeight - NSMaxY(frame))),
+			int(base::SafeRound(NSWidth(frame))),
+			int(base::SafeRound(NSHeight(frame)))));
+	}
+	return united;
+}
+
+void PlaceIntegratedTitle(not_null<Window::MainWindow*> window) {
+	const auto title = static_cast<Ui::Platform::TitleWidget*>(
+		window->titleWidget());
+	if (!title || title->shouldBeHidden()) {
+		return;
+	}
+	const auto view = reinterpret_cast<NSView*>(window->internalWinId());
+	const auto nsWindow = view ? [view window] : nil;
+	const auto controls = TitleControlsRect(nsWindow);
+	if (!controls.isEmpty()) {
+		title->setControlsRect(controls);
+	}
+	if (window->windowState() & Qt::WindowFullScreen) {
+		return;
+	}
+	// WHY: hiding this strip put the menu under the traffic lights and
+	// dropped the dialog title. The buttons occupy the left of the row,
+	// so the title starts after them.
+	title->show();
+	title->update();
+}
+
+void ApplyIntegratedTitlebar(not_null<QWidget*> widget) {
+	const auto view = reinterpret_cast<NSView*>(widget->internalWinId());
+	const auto window = view ? [view window] : nil;
+	if (!window) {
+		return;
+	}
+	[window setTitlebarAppearsTransparent:YES];
+	[window setTitleVisibility:NSWindowTitleHidden];
+	if (@available(macOS 11.0, *)) {
+		[window setTitlebarSeparatorStyle:NSTitlebarSeparatorStyleNone];
+	}
+	[window setStyleMask:[window styleMask] | NSWindowStyleMaskFullSizeContentView];
+}
+
 QString strNotificationAboutScreenUnlocked() {
 	const uint32 letters[] = { 0xF897900B, 0x19A04630, 0x144DA6DF, 0x643CA7ED, 0x81DDA343, 0x88C6B149, 0x5F9A3A15, 0x31804E13, 0xDF2202B8, 0x9BD1B500, 0x61B92735, 0x7DDF5D43, 0xB74E06C3, 0x16FF1665, 0x9098F702, 0x4461DAF0, 0xA3134FA5, 0x52B01D3C, 0x6BC35769, 0xA7CC945D, 0x8B5327C0, 0x7630B9A0, 0x4E52E3CE, 0xED7765E3, 0xCEB7862D, 0xA06B34F0 };
 	return Platform::MakeFromLetters(letters);
@@ -245,10 +309,25 @@ void MainWindow::stateChangedHook(Qt::WindowState state) {
 	if (_hideAfterFullScreenTimer.isActive()) {
 		_hideAfterFullScreenTimer.callOnce(0);
 	}
+	ApplyIntegratedTitlebar(this);
+	PlaceIntegratedTitle(this);
 }
 
 void MainWindow::initHook() {
 	_customTitleHeight = 0;
+
+	// Stock Qt keeps a separate title bar unless the client area is expanded.
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+	auto flags = windowFlags();
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+	flags |= Qt::ExpandedClientAreaHint;
+#endif
+	flags |= Qt::NoTitleBarBackgroundHint;
+	if (flags != windowFlags()) {
+		setWindowFlags(flags);
+	}
+#endif
+
 	if (auto view = reinterpret_cast<NSView*>(winId())) {
 		if (auto window = [view window]) {
 			_private->setNativeWindow(window, view);
@@ -260,6 +339,21 @@ void MainWindow::initHook() {
 			}
 		}
 	}
+	ApplyIntegratedTitlebar(this);
+	PlaceIntegratedTitle(this);
+	const auto weak = QPointer<MainWindow>(this);
+	dispatch_async(dispatch_get_main_queue(), ^{
+		if (const auto window = weak.data()) {
+			PlaceIntegratedTitle(window);
+		}
+	});
+	winIdValue(
+	) | rpl::on_next([=](WId winId) {
+		if (winId) {
+			ApplyIntegratedTitlebar(this);
+			PlaceIntegratedTitle(this);
+		}
+	}, lifetime());
 
 	Platform::GlobalMenuMarkdownState(
 	) | rpl::on_next([this](Ui::MarkdownEnabledState state) {

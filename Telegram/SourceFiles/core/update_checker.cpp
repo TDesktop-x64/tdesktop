@@ -737,6 +737,8 @@ void HttpChecker::start() {
 	auto url = QUrl(path);
 	DEBUG_LOG(("Update Info: requesting update state"));
 	auto request = QNetworkRequest(url);
+	request.setRawHeader("td-version", AppVersionStr);
+	request.setRawHeader("beta", cInstallBetaVersion() ? "1" : "0");
 	// Qt's HTTP/2 backend does not apply the read-buffer limit.
 	request.setAttribute(QNetworkRequest::Http2AllowedAttribute, false);
 	_manager = std::make_unique<QNetworkAccessManager>();

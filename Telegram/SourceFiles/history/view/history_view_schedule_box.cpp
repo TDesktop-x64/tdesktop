@@ -395,10 +395,14 @@ void ScheduleBox(
 	const auto childType = (details.type == Type::Disabled)
 		? Type::Disabled
 		: Type::SilentOnly;
-	const auto childDetails = Details{
+	auto childDetails = Details{
 		.type = childType,
 		.effectAllowed = details.effectAllowed,
 	};
+	childDetails.sendUnformattedPossible
+		= details.sendUnformattedPossible;
+	childDetails.saveUnformattedPossible
+		= details.saveUnformattedPossible;
 	const auto sendAction = crl::guard(box, [=](Action action, Details) {
 		Expects(action.type == ActionType::Send);
 

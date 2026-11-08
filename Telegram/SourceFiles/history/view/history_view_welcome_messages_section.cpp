@@ -267,8 +267,12 @@ void WelcomeMessagesWidget::setupComposeControls() {
 	}, lifetime());
 
 	_composeControls->sendRequests(
-	) | rpl::on_next([=] {
-		send();
+	) | rpl::on_next([=](Api::SendOptions options) {
+		if (options.unformatted) {
+			send(true);
+		} else {
+			send();
+		}
 	}, lifetime());
 
 	_composeControls->attachRequests(
@@ -608,9 +612,10 @@ void WelcomeMessagesWidget::finishSending() {
 	doSetInnerFocus();
 }
 
-void WelcomeMessagesWidget::send() {
-	const auto textWithTags
-		= _composeControls->getTextWithAppliedMarkdown();
+void WelcomeMessagesWidget::send(bool unformatted) {
+	const auto textWithTags = unformatted
+		? _composeControls->getTextWithTags()
+		: _composeControls->getTextWithAppliedMarkdown();
 	auto text = TextWithEntities{
 		textWithTags.text,
 		TextUtilities::ConvertTextTagsToEntities(textWithTags.tags),

@@ -64,6 +64,7 @@ struct Details {
 	bool effectAllowed = false;
 	bool replyToForward = false;
 	bool saveUnformattedPossible = false;
+	bool sendUnformattedPossible = false;
 };
 
 } // namespace SendMenu

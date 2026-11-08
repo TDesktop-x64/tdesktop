@@ -5008,6 +5008,7 @@ SendMenu::Details ComposeControls::sendButtonMenuDetails() const {
 	if (!hasSendableContent() && !_previewShown) {
 		result.effectAllowed = false;
 	}
+	result.sendUnformattedPossible = _field->isVisible() && HasSendText(_field);
 	return result;
 }
 

@@ -217,9 +217,12 @@ jobs:
           fi
           echo "TDESKTOP_BUILD_API=$API" >> $GITHUB_ENV
 
+      # wallet_engine.cpp is a CMake input, and the Rust sources are what
+      # rebuilds it. The prune used to delete both, then the next cache hit
+      # could not recreate them.
       - name: Free up some disk space.
         shell: bash
-        run: find $LibrariesPath '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -path '*/nv-codec-headers/*' ')' -type f ')' -o -empty ')' -delete
+        run: find $LibrariesPath '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -path '*/nv-codec-headers/*' -o -path '*/src/wallet_engine/*' -o '(' '(' -path '*/tlottie/*' -o -path '*/wallet-engine/*' ')' ! -path '*/target/*' ')' ')' -type f ')' -o '(' -empty ! -path '*/tlottie/*' ! -path '*/wallet-engine/*' ')' ')' -delete
 
       - name: Telegram Desktop build.
         if: env.ONLY_CACHE == 'false'

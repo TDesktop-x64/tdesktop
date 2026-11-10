@@ -62,7 +62,8 @@ of this repository.
 CMake adds the `Packer_zstd` target alongside `Packer` for special-target
 builds. Bundled builds fetch pinned zstd 1.5.7 with multithreading; an offline
 build may set `FETCHCONTENT_SOURCE_DIR_UPDATE_ZSTD` to verified source.
-Packaged builds use `libzstd >= 1.5.0` via pkg-config.
+Packaged builds prefer `libzstd >= 1.5.0` via pkg-config and fall back to
+the same pinned source when the package is unavailable.
 
 ## Wire format
 

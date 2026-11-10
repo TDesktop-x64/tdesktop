@@ -130,6 +130,8 @@
 
   "lng_send_unformatted": "Send unformatted",
   "lng_settings_send_unformatted": "Show Send unformatted option",
+  "lng_shortcuts_send_unformatted": "Send unformatted",
+  "lng_edit_save_unformatted": "Save unformatted",
 
   "lng_proxy_remove_all": "Remove all proxies",
 

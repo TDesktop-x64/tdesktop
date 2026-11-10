@@ -34,8 +34,9 @@ retain their directory name. All inputs must be under the first input's
 parent directory. On macOS pass the app bundle; on Unix pass `Telegram` and
 `Updater` along with runtime files required by your release.
 
-The default compression level is 9 with up to eight workers, capped by CPU
-count. Override with `-compression-level 1..19` and `-threads 1..32`.
+The default compression level is 17, with one worker per logical CPU
+reported by the machine (falling back to one if detection fails). Override
+with `-compression-level 1..19` and `-threads <positive count>`.
 Existing output files are never overwritten.
 
 Publish the package and point the existing stable/beta HTTP feed at its

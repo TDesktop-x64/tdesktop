@@ -33,7 +33,7 @@ QByteArray PackUpdate(
 	};
 	if (files.isEmpty() || files.size() > kMaxUncompressedSize
 		|| compressionLevel < 1 || compressionLevel > 19
-		|| threads < 1 || threads > 32) {
+		|| threads < 1) {
 		return fail("Invalid package size or compression settings.");
 	}
 	const auto bio = std::unique_ptr<BIO, decltype(&BIO_free)>(

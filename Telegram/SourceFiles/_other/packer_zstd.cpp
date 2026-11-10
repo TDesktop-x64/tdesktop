@@ -48,9 +48,9 @@ int main(int argc, char *argv[]) {
 		{ "arch", "macOS architecture: x86_64 or arm64.", "arch" },
 		{ "beta", "Pack a beta update using the beta key." },
 		{ "channel", "Release channel: stable or beta.", "channel" },
-		{ "compression-level", "Zstd compression level (1-19).", "level", "9" },
-		{ "threads", "Compression workers (1-32).", "count",
-			QString::number(std::clamp(QThread::idealThreadCount(), 1, 8)) },
+		{ "compression-level", "Zstd compression level (1-19).", "level", "17" },
+		{ "threads", "Compression workers (positive count; defaults to all logical cores).", "count",
+			QString::number(std::max(QThread::idealThreadCount(), 1)) },
 		{ "private-key", "Override the compiled-in private key with a PEM file.", "pem" },
 		{ "public-key", "Public key PEM for checking an overridden private key.", "pem" },
 	});

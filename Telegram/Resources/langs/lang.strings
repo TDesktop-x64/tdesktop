@@ -773,6 +773,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_shortcuts_just_send" = "Just send";
 "lng_shortcuts_silent_send" = "Silent send";
 "lng_shortcuts_schedule" = "Schedule";
+"lng_shortcuts_send_unformatted" = "Send unformatted";
 "lng_shortcuts_ai_compose_apply" = "Apply AI style to text";
 "lng_shortcuts_rich_editor" = "Open article editor";
 "lng_shortcuts_toggle_link_preview" = "Toggle link preview";
@@ -4927,6 +4928,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_schedule_button" = "Schedule";
 "lng_send_silent_message" = "Send without sound";
 "lng_send_unformatted" = "Send unformatted";
+"lng_edit_save_unformatted" = "Save unformatted";
 "lng_schedule_message" = "Schedule message";
 "lng_reminder_message" = "Set a reminder";
 "lng_schedule_title" = "Send this message on...";

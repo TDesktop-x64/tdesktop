@@ -267,8 +267,12 @@ void WelcomeMessagesWidget::setupComposeControls() {
 	}, lifetime());
 
 	_composeControls->sendRequests(
-	) | rpl::on_next([=] {
-		send();
+	) | rpl::on_next([=](Api::SendOptions options) {
+		if (options.unformatted) {
+			send(true);
+		} else {
+			send();
+		}
 	}, lifetime());
 
 	_composeControls->attachRequests(
@@ -313,7 +317,7 @@ void WelcomeMessagesWidget::setupComposeControls() {
 	) | rpl::on_next([=](auto data) {
 		if (const auto item = session().data().message(data.fullId)) {
 			if (item->isWelcomeTemplate()) {
-				edit(item);
+				edit(item, data.options.unformatted);
 			}
 		}
 	}, lifetime());
@@ -608,9 +612,10 @@ void WelcomeMessagesWidget::finishSending() {
 	doSetInnerFocus();
 }
 
-void WelcomeMessagesWidget::send() {
-	const auto textWithTags
-		= _composeControls->getTextWithAppliedMarkdown();
+void WelcomeMessagesWidget::send(bool unformatted) {
+	const auto textWithTags = unformatted
+		? _composeControls->getTextWithTags()
+		: _composeControls->getTextWithAppliedMarkdown();
 	auto text = TextWithEntities{
 		textWithTags.text,
 		TextUtilities::ConvertTextTagsToEntities(textWithTags.tags),
@@ -627,11 +632,16 @@ void WelcomeMessagesWidget::send() {
 	finishSending();
 }
 
-void WelcomeMessagesWidget::edit(not_null<HistoryItem*> item) {
+void WelcomeMessagesWidget::edit(
+		not_null<HistoryItem*> item,
+		bool unformatted) {
 	if (!_history->peer->canManageWelcomeMessages()) {
 		return;
 	}
-	auto sending = _composeControls->prepareTextForEditMsg();
+	if (unformatted && controller()->isLayerShown()) {
+		return;
+	}
+	auto sending = _composeControls->prepareTextForEditMsg(unformatted);
 	TextUtilities::Trim(sending);
 	const auto hasMediaWithCaption = item->media()
 		&& item->media()->allowsEditCaption();

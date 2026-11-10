@@ -8856,7 +8856,13 @@ bool OverlayWidget::filterApplicationEvent(
 		const auto event = static_cast<QKeyEvent*>(e.get());
 		const auto key = LayoutIndependentKey(event);
 		const auto ctrl = event->modifiers().testFlag(Qt::ControlModifier);
+		const auto alt = event->modifiers().testFlag(Qt::AltModifier);
 		if (key == Qt::Key_F && ctrl && _streamed) {
+			playbackToggleFullScreen();
+			return true;
+		} else if ((alt || ctrl)
+			&& (key == Qt::Key_Enter || key == Qt::Key_Return)
+			&& _streamed) {
 			playbackToggleFullScreen();
 			return true;
 		} else if (key == Qt::Key_0 && ctrl) {

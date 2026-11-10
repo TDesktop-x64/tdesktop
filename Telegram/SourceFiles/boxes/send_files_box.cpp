@@ -842,6 +842,7 @@ Fn<SendMenu::Details()> SendFilesBox::prepareSendMenuDetails(
 		result.price = canChangePrice()
 			? _price.current()
 			: std::optional<uint64>();
+		result.sendUnformattedPossible = HasSendText(_caption);
 		return result;
 	});
 }
@@ -1268,7 +1269,8 @@ void SendFilesBox::refreshButtons() {
 			_sendMenuDetails,
 			_sendMenuCallback,
 			&_st.tabbed.menu,
-			&_st.tabbed.icons);
+			&_st.tabbed.icons,
+			1);
 	}
 	addButton(tr::lng_cancel(), [=] {
 		requestToTakeTextWithTags();

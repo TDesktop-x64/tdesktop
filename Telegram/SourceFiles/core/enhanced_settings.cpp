@@ -319,6 +319,7 @@ namespace EnhancedSettings {
 		settings.insert(qsl("screenshot_mode"), false);
 		settings.insert(qsl("update_url"), "");
 		settings.insert(qsl("send_unformatted"), false);
+		settings.insert(qsl("who_reacted_top"), false);
 
 		auto document = QJsonDocument();
 		document.setObject(settings);
@@ -374,6 +375,7 @@ namespace EnhancedSettings {
 		settings.insert(qsl("screenshot_mode"), GetEnhancedBool("screenshot_mode"));
 		settings.insert(qsl("update_url"), GetEnhancedString("update_url"));
 		settings.insert(qsl("send_unformatted"), GetEnhancedBool("send_unformatted"));
+		settings.insert(qsl("who_reacted_top"), GetEnhancedBool("who_reacted_top"));
 
 		auto document = QJsonDocument();
 		document.setObject(settings);

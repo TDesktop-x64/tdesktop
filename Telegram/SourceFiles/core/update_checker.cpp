@@ -20,6 +20,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/update_channel.h"
 #include "core/update_keys.h"
 #include "core/update_unpack.h"
+#include "core/update_zstd.h"
 #include "core/update_verify.h"
 #include "core/version.h"
 #include "data/data_channel.h"
@@ -353,7 +354,8 @@ QString FindUpdateFile() {
 			"(-beta|-canary-\\d+(-private)?)?$",
 			QRegularExpression::CaseInsensitiveOption
 		);
-		if (RegExpV2.match(info.fileName()).hasMatch()) {
+		if (RegExpV2.match(info.fileName()).hasMatch()
+			|| Updates::Zstd::IsUpdateFileName(info.fileName())) {
 			return info.absoluteFilePath();
 		}
 	}
@@ -458,10 +460,49 @@ enum class ManifestAdoption {
 	return true;
 }
 
+[[nodiscard]] bool UnpackUpdateZstd(
+		const QString &filepath,
+		const QByteArray &content) {
+	auto error = QString();
+	const auto verified = Updates::Zstd::VerifyUpdate(
+		content,
+		AppVersion,
+		Updates::Zstd::PublicKey(),
+		Updates::Zstd::PublicBetaKey(),
+		&error);
+	if (!verified) {
+		LOG(("Update Error: zstd update rejected: %1").arg(error));
+		return false;
+	}
+	const auto tempDirPath = cWorkingDir() + u"tupdates/temp"_q;
+	base::Platform::DeleteDirectory(tempDirPath);
+	auto tempDir = QDir(tempDirPath);
+	if (tempDir.exists() || !tempDir.mkpath(tempDirPath)) {
+		return false;
+	}
+	if (!Updates::ExtractUpdateFiles(
+			verified->files,
+			Updates::MakeUpdateVersion(verified->version, 0),
+			tempDirPath,
+			&error)) {
+		LOG(("Update Error: %1").arg(error));
+		return false;
+	}
+	if (!WriteUpdateVersionFile(tempDir, tempDirPath, verified->version, 0)
+		|| !WriteUpdateReadyFile(tempDirPath + u"/ready"_q)) {
+		return false;
+	}
+	QFile(filepath).remove();
+	return true;
+}
+
 [[nodiscard]] bool UnpackUpdateV2(
 		const QString &filepath,
 		const QByteArray &content,
 		ManifestAdoption adoption) {
+	if (Updates::Zstd::IsUpdateFile(content)) {
+		return UnpackUpdateZstd(filepath, content);
+	}
 	// The expected target follows the feed key, not the build: an x64
 	// build under Rosetta asks for armac and must accept that package.
 	const auto target = Updates::TargetFromPlatformKey(
@@ -594,8 +635,9 @@ bool UnpackUpdate(const QString &filepath) {
 	input.close();
 #endif // Q_OS_WIN || Q_OS_MAC
 
-	if (!Updates::IsV2UpdateFile(compressed)) {
-		LOG(("Update Error: unsupported update format (missing v2 magic)."));
+	if (!Updates::IsV2UpdateFile(compressed)
+		&& !Updates::Zstd::IsUpdateFile(compressed)) {
+		LOG(("Update Error: unsupported update format."));
 		return false;
 	}
 	return UnpackUpdateV2(filepath, compressed, ManifestAdoption::Queued);

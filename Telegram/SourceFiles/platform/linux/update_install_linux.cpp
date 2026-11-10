@@ -13,6 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/update_keys.h"
 #include "core/update_unpack.h"
 #include "core/update_verify.h"
+#include "core/update_zstd.h"
 
 #ifndef TDESKTOP_DISABLE_AUTOUPDATE
 #include "mtproto/dedicated_file_loader.h"
@@ -41,6 +42,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <memory>
 #include <unistd.h>
 #include <utility>
+#include <variant>
 #include <vector>
 
 namespace Platform {
@@ -373,10 +375,22 @@ void ReportProgress(const char *message) {
 	return result;
 }
 
-[[nodiscard]] std::optional<Core::Updates::VerifiedUpdate> VerifyPackage(
+using VerifiedPackage = std::variant<
+	Core::Updates::VerifiedUpdate,
+	Core::Updates::Zstd::VerifiedUpdate>;
+
+[[nodiscard]] std::optional<VerifiedPackage> VerifyPackage(
 		const QByteArray &bytes,
 		bool beta,
 		QString &error) {
+	if (Core::Updates::Zstd::IsUpdateFile(bytes)) {
+		return Core::Updates::Zstd::VerifyUpdate(
+			bytes,
+			AppVersion,
+			Core::Updates::Zstd::PublicKey(),
+			Core::Updates::Zstd::PublicBetaKey(),
+			&error);
+	}
 	const auto root = Core::Updates::RootPublicKeyPem();
 	const auto held = Core::Updates::ParseVerifiedManifest(
 		Core::Updates::EmbeddedManifest(),
@@ -992,8 +1006,14 @@ const QString &PrivateDirectory::path() const {
 		return ReportError(error);
 	}
 	ReportProgress("Extracting the authenticated package into private staging.");
-	const auto version = verified->envelope.version;
-	auto uncompressed = Core::Updates::DecompressUpdatePayload(*verified, &error);
+	const auto zstd = std::get_if<Core::Updates::Zstd::VerifiedUpdate>(&*verified);
+	const auto v2 = std::get_if<Core::Updates::VerifiedUpdate>(&*verified);
+	const auto version = zstd
+		? Core::Updates::MakeUpdateVersion(zstd->version, 0)
+		: v2->envelope.version;
+	auto uncompressed = zstd
+		? std::make_optional(std::move(zstd->files))
+		: Core::Updates::DecompressUpdatePayload(*v2, &error);
 	verified.reset();
 	if (!uncompressed) {
 		return ReportError(error);

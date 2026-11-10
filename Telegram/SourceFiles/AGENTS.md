@@ -36,7 +36,7 @@ This atlas divides Telegram Desktop's sources into named areas, ordered from fou
 
 ### core/updates — self-update
 - Paths: `SourceFiles/core/update_*`, `SourceFiles/_other/updater*`, `SourceFiles/_other/packer*`, `SourceFiles/platform/linux/update_install_linux*`
-- Checking, downloading, verifying, unpacking and installing new versions per channel, the standalone Updater, the Linux protected install and the release Packer. It must not own changelogs or settings UI.
+- Checking, downloading, verifying, unpacking and installing new versions per channel, the standalone Updater, the Linux protected install and the release Packer. `packer_zstd` and `update_zstd*` add the v1-style zstd format alongside the original Packer and updater protocol. It must not own changelogs or settings UI.
 
 ### accounts — accounts and sessions
 - Paths: `SourceFiles/main/`

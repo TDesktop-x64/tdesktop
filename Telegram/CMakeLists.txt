@@ -1,4 +1,4 @@
-﻿# This file is part of Telegram Desktop,
+# This file is part of Telegram Desktop,
 # the official desktop application for the Telegram messaging service.
 #
 # For license and copyright information please follow this link:
@@ -30,6 +30,7 @@ include(cmake/lib_stripe.cmake)
 include(cmake/lib_tgcalls.cmake)
 include(cmake/lib_prisma.cmake)
 include(cmake/lib_fido2.cmake)
+include(cmake/lib_update_zstd.cmake)
 include(cmake/lib_zxcvbn.cmake)
 include(cmake/lib_litehtml.cmake)
 include(cmake/lib_quickjs.cmake)
@@ -79,6 +80,7 @@ set_target_properties(Telegram PROPERTIES AUTOMOC ON)
 
 target_link_libraries(Telegram
 PRIVATE
+    tdesktop::update_zstd
     tdesktop::lib_fido2
     tdesktop::lib_litehtml
     tdesktop::lib_quickjs
@@ -643,6 +645,8 @@ PRIVATE
     core/update_unpack.h
     core/update_verify.cpp
     core/update_verify.h
+    core/update_zstd.cpp
+    core/update_zstd.h
     core/utils.cpp
     core/utils.h
     core/version.h
@@ -3049,6 +3053,8 @@ if (NOT DESKTOP_APP_DISABLE_AUTOUPDATE AND NOT build_macstore AND NOT build_wins
     endif()
 
     if (DESKTOP_APP_SPECIAL_TARGET)
+        include(cmake/packer_zstd.cmake)
+
         add_executable(Packer)
         init_target(Packer)
 

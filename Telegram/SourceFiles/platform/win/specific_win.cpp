@@ -250,7 +250,7 @@ QString psAppDataPath() {
 #ifdef OS_WIN_STORE
 		return appData.absolutePath() + u"/Telegram Desktop UWP/"_q;
 #else // OS_WIN_STORE
-		return appData.absolutePath() + '/' + AppName.utf16() + '/';
+		return appData.absolutePath() + u"/64Gram Desktop/"_q;
 #endif // OS_WIN_STORE
 	}
 	return QString();
@@ -483,8 +483,8 @@ void AutostartToggle(bool enabled, Fn<void(bool)> done) {
 		silent,
 		FOLDERID_Startup,
 		L"-autostart",
-		L"Telegram autorun link.\n"
-		"You can disable autorun in Telegram settings.");
+		L"64Gram autorun link.\n"
+		"You can disable autorun in 64Gram settings.");
 	if (done) {
 		done(enabled && success);
 	}
@@ -798,8 +798,8 @@ void psSendToMenu(bool send, bool silent) {
 		silent,
 		FOLDERID_SendTo,
 		L"--",
-		L"Telegram send to link.\n"
-		"You can disable send to menu item in Telegram settings.");
+		L"64Gram send to link.\n"
+		"You can disable send to menu item in 64Gram settings.");
 }
 
 // Stub while we still support Windows 7.

@@ -20,7 +20,7 @@ cd $HomePath
 
 ProjectPath="$HomePath/../out"
 ReleasePath="$ProjectPath/Release"
-BinaryName="Telegram"
+BinaryName="64Gram"
 
 if ! command -v cmake >/dev/null 2>&1; then
   ln -s cmake3 /usr/bin/cmake

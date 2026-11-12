@@ -757,8 +757,7 @@ void start() {
 
 		if (KSandbox::isSnap()) {
 			return qEnvironmentVariable("SNAP_INSTANCE_NAME")
-				+ '_'
-				+ cExeName();
+				+ u"_telegram-desktop"_q;
 		}
 
 		//if (!Core::UpdaterDisabled()) {
@@ -790,6 +789,14 @@ void start() {
 		u"TD"_q).toStdString());
 
 	InstallLauncher();
+	if (cExeName() == u"64Gram"_q) {
+		const auto legacy = QFileInfo(cExeDir() + u"Telegram"_q);
+		if (legacy.isSymLink()
+			&& legacy.symLinkTarget() == cExeDir() + cExeName()
+			&& !QFile::remove(legacy.absoluteFilePath())) {
+			LOG(("Update Error: could not remove the legacy relaunch link."));
+		}
+	}
 }
 
 void finish() {

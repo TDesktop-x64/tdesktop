@@ -142,7 +142,7 @@ def resource_content(path):
 
 
 def assemble(builds, destination, toolchain, target, configuration):
-    binary_name = 'Telegram Lite' if target == 'macstore' else 'Telegram'
+    binary_name = '64Gram'
     app_name = binary_name + '.app'
     apps = {arch: folder / app_name for arch, folder in builds.items()}
     swift_runtime = pathlib.Path('Contents/Frameworks')

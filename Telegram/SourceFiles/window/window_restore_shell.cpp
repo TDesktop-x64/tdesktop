@@ -28,7 +28,7 @@ RestoreShell::RestoreShell(
 	const QString &title,
 	Core::WindowPosition position)
 : _window(base::make_unique_q<Ui::RpWindow>()) {
-	_window->setTitle(title.isEmpty() ? u"Telegram"_q : title);
+	_window->setTitle(title.isEmpty() ? u"64Gram"_q : title);
 	_window->setMinimumSize(
 		QSize(st::windowShellMinWidth, st::windowShellMinHeight));
 	setupBody();

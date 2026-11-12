@@ -8,7 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #import <Cocoa/Cocoa.h>
 #include <sys/xattr.h>
 
-NSString *appName = @"Telegram.app";
+NSString *appName = @"64Gram.app";
 NSString *appDir = nil;
 NSString *workDir = nil;
 
@@ -56,7 +56,7 @@ void RemoveQuarantineAttribute(NSString *path) {
 
 void RemoveQuarantineFromBundle(NSString *path) {
 	RemoveQuarantineAttribute(path);
-	RemoveQuarantineAttribute([path stringByAppendingString:@"/Contents/MacOS/Telegram"]);
+	RemoveQuarantineAttribute([path stringByAppendingString:@"/Contents/MacOS/64Gram"]);
 	RemoveQuarantineAttribute([path stringByAppendingString:@"/Contents/Helpers/crashpad_handler"]);
 	RemoveQuarantineAttribute([path stringByAppendingString:@"/Contents/Frameworks/Updater"]);
 }
@@ -152,93 +152,52 @@ int main(int argc, const char * argv[]) {
 	if (update) {
 		NSFileManager *fileManager = [NSFileManager defaultManager];
 		NSString *readyFilePath = [workDir stringByAppendingString:@"tupdates/temp/ready"];
-		NSString *srcDir = [workDir stringByAppendingString:@"tupdates/temp/"], *srcEnum = [workDir stringByAppendingString:@"tupdates/temp"];
+		NSString *srcDir = [workDir stringByAppendingString:@"tupdates/temp/"];
 		if ([fileManager fileExistsAtPath:readyFilePath]) {
-			writeLog([@"Ready file found! Using new path: " stringByAppendingString: srcEnum]);
+			writeLog([@"Ready file found! Using new path: " stringByAppendingString: srcDir]);
 		} else {
 			srcDir = [workDir stringByAppendingString:@"tupdates/ready/"]; // old
-			srcEnum = [workDir stringByAppendingString:@"tupdates/ready"];
-			writeLog([@"Ready file not found! Using old path: " stringByAppendingString: srcEnum]);
+			writeLog([@"Ready file not found! Using old path: " stringByAppendingString: srcDir]);
 		}
 
-		writeLog([@"Starting update files iteration, path: " stringByAppendingString: srcEnum]);
-
-		// Take the Updater (this currently running binary) from the place where it was placed by Telegram
-		// and copy it to the folder with the new version of the app (ready),
-		// so it won't be deleted when we will clear the "Telegram.app/Contents" folder.
-		NSString *oldVersionUpdaterPath = [appDirFull stringByAppendingString: @"/Contents/Frameworks/Updater" ];
-		NSString *newVersionUpdaterPath = [srcEnum stringByAppendingString:[[NSArray arrayWithObjects:@"/", appName, @"/Contents/Frameworks/Updater", nil] componentsJoinedByString:@""]];
-		writeLog([[NSArray arrayWithObjects: @"Copying Updater from old path ", oldVersionUpdaterPath, @" to new path ", newVersionUpdaterPath, nil] componentsJoinedByString:@""]);
-		if (![fileManager fileExistsAtPath:newVersionUpdaterPath]) {
-			if (![fileManager copyItemAtPath:oldVersionUpdaterPath toPath:newVersionUpdaterPath error:nil]) {
-				writeLog([[NSArray arrayWithObjects: @"Failed to copy file from ", oldVersionUpdaterPath, @" to ", newVersionUpdaterPath, nil] componentsJoinedByString:@""]);
-				delFolder();
-				return -1;
-			}
+		if (![fileManager fileExistsAtPath:[srcDir stringByAppendingString:appName]]) {
+			appName = @"Telegram.app";
 		}
-
-
-		NSString *contentsPath = [appDirFull stringByAppendingString: @"/Contents"];
-		writeLog([[NSArray arrayWithObjects: @"Clearing dir ", contentsPath, nil] componentsJoinedByString:@""]);
-		if (![fileManager removeItemAtPath:contentsPath error:nil]) {
-			writeLog([@"Failed to clear path for directory " stringByAppendingString:contentsPath]);
-			delFolder();
+		NSString *sourceBundle = [srcDir stringByAppendingString:appName];
+		NSString *oldVersionUpdaterPath = [appDirFull stringByAppendingString:@"/Contents/Frameworks/Updater"];
+		NSString *newVersionUpdaterPath = [sourceBundle stringByAppendingString:@"/Contents/Frameworks/Updater"];
+		if (![fileManager fileExistsAtPath:newVersionUpdaterPath]
+			&& ![fileManager copyItemAtPath:oldVersionUpdaterPath toPath:newVersionUpdaterPath error:nil]) {
+			writeLog(@"Failed to restore the staged update helper.");
 			return -1;
 		}
-
-		NSArray *keys = [NSArray arrayWithObject:NSURLIsDirectoryKey];
-		NSDirectoryEnumerator *enumerator = [fileManager
-											 enumeratorAtURL:[NSURL fileURLWithPath:srcEnum]
-											 includingPropertiesForKeys:keys
-											 options:0
-											 errorHandler:^(NSURL *url, NSError *error) {
-												 writeLog([[[@"Error in enumerating " stringByAppendingString:[url absoluteString]] stringByAppendingString: @" error is: "] stringByAppendingString: [error description]]);
-												 return NO;
-											 }];
-		for (NSURL *url in enumerator) {
-			NSString *srcPath = [url path];
-			writeLog([@"Handling file " stringByAppendingString:srcPath]);
-			NSRange r = [srcPath rangeOfString:srcDir];
-			if (r.location != 0) {
-				writeLog([@"Bad file found, no base path " stringByAppendingString:srcPath]);
-				delFolder();
-				break;
-			}
-			NSString *pathPart = [srcPath substringFromIndex:r.length];
-			r = [pathPart rangeOfString:appName];
-			if (r.location != 0) {
-				writeLog([@"Skipping not app file " stringByAppendingString:srcPath]);
-				continue;
-			}
-			NSString *dstPath = [appDirFull stringByAppendingString:[pathPart substringFromIndex:r.length]];
-			NSError *error;
-			NSNumber *isDirectory = nil;
-			if (![url getResourceValue:&isDirectory forKey:NSURLIsDirectoryKey error:&error]) {
-				writeLog([@"Failed to get IsDirectory for file " stringByAppendingString:[url path]]);
-				delFolder();
-				break;
-			}
-			if ([isDirectory boolValue]) {
-				writeLog([[NSArray arrayWithObjects: @"Copying dir ", srcPath, @" to ", dstPath, nil] componentsJoinedByString:@""]);
-				if (![fileManager createDirectoryAtPath:dstPath withIntermediateDirectories:YES attributes:nil error:nil]) {
-					writeLog([@"Failed to force path for directory " stringByAppendingString:dstPath]);
-					delFolder();
-					break;
-				}
-			} else if ([srcPath isEqualToString:readyFilePath]) {
-				writeLog([[NSArray arrayWithObjects: @"Skipping ready file ", srcPath, nil] componentsJoinedByString:@""]);
-			} else if ([fileManager fileExistsAtPath:dstPath]) {
-				if (![[NSData dataWithContentsOfFile:srcPath] writeToFile:dstPath atomically:YES]) {
-					writeLog([@"Failed to edit file " stringByAppendingString:dstPath]);
-					delFolder();
-					break;
-				}
+		BOOL renamed = [appRealName isEqualToString:@"Telegram.app"]
+			&& [fileManager fileExistsAtPath:[sourceBundle stringByAppendingString:@"/Contents/MacOS/64Gram"]];
+		NSString *destination = renamed ? [appDir stringByAppendingString:@"64Gram.app"] : appDirFull;
+		if (renamed && [fileManager fileExistsAtPath:destination]) {
+			writeLog(@"Cannot rename the bundle: 64Gram.app already exists.");
+			return -1;
+		}
+		NSString *prepared = [appDir stringByAppendingString:
+			[NSString stringWithFormat:@".64Gram-update-%@.app", [[NSUUID UUID] UUIDString]]];
+		NSError *error = nil;
+		if (![fileManager copyItemAtPath:sourceBundle toPath:prepared error:&error]) {
+			writeLog([@"Could not prepare the new bundle: " stringByAppendingString:[error description]]);
+			[fileManager removeItemAtPath:prepared error:nil];
+			return -1;
+		}
+		if (![fileManager replaceItemAtURL:[NSURL fileURLWithPath:appDirFull]
+			withItemAtURL:[NSURL fileURLWithPath:prepared]
+			backupItemName:nil options:0 resultingItemURL:nil error:&error]) {
+			writeLog([@"Could not install the new bundle: " stringByAppendingString:[error description]]);
+			[fileManager removeItemAtPath:prepared error:nil];
+			return -1;
+		}
+		if (renamed) {
+			if ([fileManager moveItemAtPath:appDirFull toPath:destination error:&error]) {
+				appRealName = @"64Gram.app";
 			} else {
-				if (![fileManager copyItemAtPath:srcPath toPath:dstPath error:nil]) {
-					writeLog([@"Failed to copy file to " stringByAppendingString:dstPath]);
-					delFolder();
-					break;
-				}
+				writeLog([@"Could not rename the installed bundle: " stringByAppendingString:[error description]]);
 			}
 		}
 		delFolder();

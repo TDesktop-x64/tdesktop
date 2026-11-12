@@ -17,7 +17,7 @@ set "SignAppxPath=%HomePath%\..\..\DesktopPrivate\AppxSign.bat"
 set "ResourcesPath=%HomePath%\Resources"
 set "SolutionPath=%HomePath%\.."
 set "ReleasePath=%HomePath%\..\out\Debug"
-set "BinaryName=Telegram"
+set "BinaryName=64Gram"
 
 if exist %ReleasePath%\AppX\ (
   echo Result folder out\Debug\AppX already exists!

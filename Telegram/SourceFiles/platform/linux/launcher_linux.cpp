@@ -142,6 +142,11 @@ bool Launcher::launchUpdater(UpdaterLaunch action) {
 		return false;
 	}
 
+	const auto executableName = (action == UpdaterLaunch::JustRelaunch && _updating
+		&& cExeName() == u"Telegram"_q
+		&& !QFile::exists(cExeDir() + cExeName())
+		&& QFile::exists(cExeDir() + u"64Gram"_q))
+		? u"64Gram"_q : cExeName();
 	const auto justRelaunch = action == UpdaterLaunch::JustRelaunch
 		|| KSandbox::isInside();
 
@@ -165,7 +170,7 @@ bool Launcher::launchUpdater(UpdaterLaunch action) {
 		argumentsList.push_back((cExeDir() + cExeName()).toStdString());
 	} else if (justRelaunch) {
 		// What we are launching.
-		const auto launching = (cExeDir() + cExeName());
+		const auto launching = (cExeDir() + executableName);
 		argumentsList.push_back(launching.toStdString());
 		// argv[0] that is passed to what we are launching.
 		// It should be added explicitly in case of FILE_AND_ARGV_ZERO_.

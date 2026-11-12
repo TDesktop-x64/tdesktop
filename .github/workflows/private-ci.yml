@@ -120,7 +120,7 @@ jobs:
 
       - name: Verify build.
         run: |
-          test -f out/Debug/Telegram
+          test -f out/Debug/64Gram
           echo "Linux x64 Debug build succeeded."
 
   windows:
@@ -294,7 +294,7 @@ jobs:
 
       - name: Verify build.
         run: |
-          if not exist %TBUILD%\%REPO_NAME%\out\Debug\Telegram.exe exit /b 1
+          if not exist %TBUILD%\%REPO_NAME%\out\Debug\64Gram.exe exit /b 1
           echo Windows x64 Debug build succeeded.
 
   macos:
@@ -398,5 +398,5 @@ jobs:
 
       - name: Verify build.
         run: |
-          test -f $REPO_NAME/out/Debug/Telegram.app/Contents/MacOS/Telegram
+          test -f $REPO_NAME/out/Debug/64Gram.app/Contents/MacOS/64Gram
           echo "macOS ${{ matrix.arch }} Debug build succeeded."

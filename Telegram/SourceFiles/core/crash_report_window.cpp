@@ -245,7 +245,7 @@ NotStartedWindow::NotStartedWindow()
 : _label(this)
 , _log(this)
 , _close(this) {
-	_label.setText(u"Could not start 64Gram Desktop!\nYou can see complete log below:"_q);
+	_label.setText(u"Could not start 64Gram!\nYou can see complete log below:"_q);
 
 	_log.setPlainText(Logs::full());
 
@@ -391,9 +391,9 @@ LastCrashedWindow::LastCrashedWindow(
 		[=] { networkSettings(); });
 
 	if (_sendingState == SendingNoReport) {
-		_label.setText(u"Last time 64Gram Desktop was not closed properly."_q);
+		_label.setText(u"Last time 64Gram was not closed properly."_q);
 	} else {
-		_label.setText(u"Last time 64Gram Desktop crashed :("_q);
+		_label.setText(u"Last time 64Gram crashed :("_q);
 	}
 
 	if (_updaterData) {
@@ -912,7 +912,7 @@ void LastCrashedWindow::updateControls() {
 		h += _networkSettings.height() + padding;
 	}
 
-	QSize s(2 * padding + QFontMetrics(_label.font()).horizontalAdvance(u"Last time 64Gram Desktop was not closed properly."_q) + padding + _networkSettings.width(), h);
+	QSize s(2 * padding + QFontMetrics(_label.font()).horizontalAdvance(u"Last time 64Gram was not closed properly."_q) + padding + _networkSettings.width(), h);
 	if (s == size()) {
 		resizeEvent(0);
 	} else {

@@ -58,7 +58,7 @@ fi
 echo "Uploading version $AppVersionStrFull to Mac App Store.."
 ProjectPath="$HomePath/../out"
 ReleasePath="$ProjectPath/Release"
-BinaryName="Telegram Lite"
+BinaryName="64Gram"
 DeployPath="$ReleasePath/deploy/$AppVersionStrMajor/$AppVersionStrFull"
 PackageFile="$DeployPath/$BinaryName.pkg"
 

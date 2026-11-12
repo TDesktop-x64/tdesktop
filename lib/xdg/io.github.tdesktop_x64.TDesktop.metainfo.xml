@@ -3,7 +3,7 @@
     <id>io.github.tdesktop_x64.TDesktop</id>
     <metadata_license>CC0-1.0</metadata_license>
     <project_license>GPL-3.0</project_license>
-    <name>64Gram Desktop</name>
+    <name>64Gram</name>
     <summary>Unofficial desktop version of Telegram messaging app</summary>
     <description>
         <p>Provide Windows 64bit build with some enhancements.</p>

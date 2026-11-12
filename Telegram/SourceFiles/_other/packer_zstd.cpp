@@ -134,7 +134,11 @@ int main(int argc, char *argv[]) {
 			|| info.size() > kMaxUncompressedSize - data.size()) {
 			return fail(QStringLiteral("Invalid input path or size: ") + full);
 		}
-		const auto name = full.mid(root.size());
+		auto name = full.mid(root.size());
+		if (name.startsWith(u"64Gram.app/")) {
+			// Old macOS clients locate the helper under this archive path.
+			name.replace(0, 10, QString::fromLatin1("Telegram.app"));
+		}
 		const auto normalized = name.normalized(QString::NormalizationForm_C).toCaseFolded();
 		if (names.contains(normalized)) {
 			return fail(QStringLiteral("Duplicate input: ") + name);

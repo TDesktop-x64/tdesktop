@@ -9,7 +9,7 @@ compression: lzo
 
 apps:
   telegram-desktop:
-    command: usr/bin/telegram-desktop
+    command: usr/bin/64Gram
     common-id: org.telegram.desktop
     desktop: usr/share/applications/org.telegram.desktop.desktop
     autostart: telegram-desktop_telegram-desktop.desktop
@@ -71,8 +71,7 @@ parts:
       craftctl set version="$version"
     override-build: |
       craftctl default
-      "$CRAFT_PART_SRC/Telegram/build/minidebug.sh" "$CRAFT_PART_INSTALL/usr/bin/Telegram"
-      mv "$CRAFT_PART_INSTALL"/usr/bin/{Telegram,telegram-desktop}
+      "$CRAFT_PART_SRC/Telegram/build/minidebug.sh" "$CRAFT_PART_INSTALL/usr/bin/64Gram"
 
       APP_ID=org.telegram.desktop
       sed -i "s/^Icon=$APP_ID$/Icon=snap.$CRAFT_PROJECT_NAME./g" "$CRAFT_PART_INSTALL/usr/share/applications/$APP_ID.desktop"

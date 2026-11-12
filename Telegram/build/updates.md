@@ -2,7 +2,8 @@
 
 `Packer_zstd` packages stable and beta updates on Windows, macOS and other
 Unix platforms using the v1 layout with zstd instead of LZMA. The original
-`Packer` and standalone `Updater` sources and release scripts remain unchanged.
+`Packer` remains available for v2 packages. The standalone `Updater` installs
+files prepared by either decoder and handles the executable-name migration.
 The client dispatches zstd packages separately and retains its original v2 path.
 Users with the already-shipped v2-only client must install the first build
 supporting zstd manually.
@@ -13,7 +14,7 @@ Use the same arguments, changing only the executable name:
 
 ```bat
 set PackVersion=1002012
-Packer_zstd.exe -path Telegram.exe -path Updater.exe -path "modules\x64\d3d\d3dcompiler_47.dll" -version %PackVersion%
+Packer_zstd.exe -path 64Gram.exe -path Updater.exe -path "modules\x64\d3d\d3dcompiler_47.dll" -version %PackVersion%
 ```
 
 This produces `tupdate1002012`, keeping the original Packer filename.
@@ -30,8 +31,11 @@ Platform selection follows v1:
 
 Add `-beta` to use the existing beta key; the filename stays the same as v1.
 Repeated `-path` arguments include files or directories. Directory inputs
-retain their directory name. All inputs must be under the first input's
-parent directory. On macOS pass the app bundle; on Unix pass `Telegram` and
+retain their directory name, except `64Gram.app` is stored as `Telegram.app`
+so existing macOS clients can find the packaged Updater. The new helper installs
+it as `64Gram.app` and removes the previous bundle contents. All inputs must
+be under the first input's parent directory. On macOS pass the app bundle;
+on Unix pass `64Gram` and
 `Updater` along with runtime files required by your release.
 
 The default compression level is 17, with one worker per logical CPU
@@ -89,3 +93,11 @@ decompression, and rejects equal/older versions. Limits are 256 MiB per
 package and 1 GiB uncompressed. The decoder requires exactly one complete
 frame, a matching known content size and no external dictionary. Extraction
 reuses the existing filename, duplicate, size and protected-install checks.
+
+The application binaries are now `64Gram.exe`, `64Gram.app`, and `64Gram`.
+The CMake target remains `Telegram`, and update archive filenames are unchanged.
+The helpers migrate the old executable after copying the new files. Windows
+repairs matching shortcuts and registered protocol paths before cleanup. Linux
+uses a temporary relaunch symlink for older clients, removed by the new app.
+Clients that cannot read zstd still need a manual installation. Old protected
+Linux installers that require a `Telegram` payload also need a manual upgrade. User-data paths and application IDs are unchanged.

@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <limits>
 #include <memory>
+#include <wrl/client.h>
 
 bool _debug = false;
 
@@ -235,6 +236,140 @@ void delFolder() {
 	RemoveDirectory(delFolder.c_str());
 }
 
+bool MigrateShortcuts(const wstring &oldPath, const wstring &newPath) {
+	const auto initialized = CoInitialize(nullptr);
+	if (FAILED(initialized)) {
+		return false;
+	}
+	auto success = true;
+	auto dirs = deque<wstring>();
+	for (const auto folder : { CSIDL_DESKTOPDIRECTORY, CSIDL_COMMON_DESKTOPDIRECTORY,
+			CSIDL_PROGRAMS, CSIDL_COMMON_PROGRAMS, CSIDL_STARTUP, CSIDL_SENDTO,
+			CSIDL_APPDATA }) {
+		WCHAR path[MAX_PATH] = {};
+		if (SUCCEEDED(SHGetFolderPath(nullptr, folder, nullptr, SHGFP_TYPE_CURRENT, path))) {
+			dirs.push_back(wstring(path) + (folder == CSIDL_APPDATA
+				? L"\\Microsoft\\Internet Explorer\\Quick Launch"
+				: L""));
+		}
+	}
+	while (!dirs.empty()) {
+		const auto dir = dirs.front();
+		dirs.pop_front();
+		auto data = WIN32_FIND_DATA();
+		const auto find = FindFirstFile((dir + L"\\*").c_str(), &data);
+		if (find == INVALID_HANDLE_VALUE) {
+			continue;
+		}
+		do {
+			const auto name = wstring(data.cFileName);
+			if (name == L"." || name == L".."
+				|| (data.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)) {
+				continue;
+			}
+			const auto path = dir + L"\\" + name;
+			if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+				dirs.push_back(path);
+				continue;
+			} else if (!equal(PathFindExtension(name.c_str()), L".lnk")) {
+				continue;
+			}
+			auto link = Microsoft::WRL::ComPtr<IShellLink>();
+			auto file = Microsoft::WRL::ComPtr<IPersistFile>();
+			WCHAR target[MAX_PATH] = {};
+			if (FAILED(CoCreateInstance(CLSID_ShellLink, nullptr,
+					CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&link)))
+				|| FAILED(link.As(&file))
+				|| FAILED(file->Load(path.c_str(), STGM_READ))
+				|| FAILED(link->GetPath(target, MAX_PATH, nullptr, SLGP_RAWPATH))
+				|| !equal(target, oldPath)) {
+				continue;
+			}
+			WCHAR icon[MAX_PATH] = {};
+			auto index = 0;
+			const auto changeIcon = SUCCEEDED(link->GetIconLocation(icon, MAX_PATH, &index))
+				&& equal(icon, oldPath);
+			if (FAILED(link->SetPath(newPath.c_str()))
+				|| (changeIcon && FAILED(link->SetIconLocation(newPath.c_str(), index)))
+				|| FAILED(file->Save(path.c_str(), TRUE))) {
+				writeLog(L"Could not migrate shortcut: " + path);
+				success = false;
+			}
+		} while (FindNextFile(find, &data));
+		FindClose(find);
+	}
+	CoUninitialize();
+	return success;
+}
+
+bool MigrateRegisteredPath(
+		const wstring &keyPath,
+		const WCHAR *valueName,
+		const wstring &oldPath,
+		const wstring &newPath) {
+	auto key = HKEY();
+	if (RegOpenKeyEx(HKEY_CURRENT_USER, keyPath.c_str(), 0,
+			KEY_QUERY_VALUE | KEY_SET_VALUE, &key) != ERROR_SUCCESS) {
+		return true;
+	}
+	WCHAR buffer[32768] = {};
+	auto size = DWORD(sizeof(buffer) - sizeof(WCHAR));
+	auto type = DWORD();
+	auto success = true;
+	if (RegQueryValueEx(key, valueName, nullptr, &type,
+			reinterpret_cast<BYTE*>(buffer), &size) == ERROR_SUCCESS
+		&& type == REG_SZ) {
+		auto value = wstring(buffer);
+		const auto offset = !value.empty() && value.front() == L'"' ? 1 : 0;
+		const auto end = offset + oldPath.size();
+		if (equal(value.substr(offset, oldPath.size()), oldPath)
+			&& (value.size() == end || value[end] == L'"'
+				|| value[end] == L',' || value[end] == L' ')) {
+			value.replace(offset, oldPath.size(), newPath);
+			success = RegSetValueEx(key, valueName, 0, REG_SZ,
+				reinterpret_cast<const BYTE*>(value.c_str()),
+				DWORD((value.size() + 1) * sizeof(WCHAR))) == ERROR_SUCCESS;
+		}
+	}
+	RegCloseKey(key);
+	return success;
+}
+
+bool MigrateInstalledName() {
+	const auto oldPath = updateTo + L"Telegram.exe";
+	const auto newPath = updateTo + L"64Gram.exe";
+	const auto attributes = GetFileAttributes(newPath.c_str());
+	if (attributes == INVALID_FILE_ATTRIBUTES
+		|| (attributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT))) {
+		return false;
+	}
+	auto success = MigrateShortcuts(oldPath, newPath);
+	for (const auto scheme : { L"tg", L"64Gram.tg", L"ton", L"tdesktop.ton",
+			L"tonsite", L"tdesktop.tonsite" }) {
+		for (const auto suffix : { L"\\shell\\open\\command", L"\\DefaultIcon" }) {
+			if (!MigrateRegisteredPath(wstring(L"Software\\Classes\\") + scheme + suffix,
+					nullptr, oldPath, newPath)) {
+				success = false;
+			}
+		}
+	}
+	if (!MigrateRegisteredPath(
+			L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\"
+			L"{9DB6C981-7FD2-41B5-AEF2-20C933FD3F21}_is1",
+			L"DisplayIcon", oldPath, newPath)) {
+		success = false;
+	}
+	if (!success) {
+		writeLog(L"Keeping the old executable because some launch paths could not be migrated.");
+		return false;
+	}
+	if (!DeleteFile(oldPath.c_str()) && GetLastError() != ERROR_FILE_NOT_FOUND) {
+		writeLog(FormatUpdateError(L"Could not remove the old executable", GetLastError()));
+		return false;
+	}
+	return true;
+}
+
 DWORD versionNum = 0, versionLen = 0, readLen = 0;
 WCHAR versionStr[32] = { 0 };
 
@@ -277,6 +412,7 @@ bool update() {
 	dirs.push_back(updDir);
 
 	deque<wstring> from, to, forcedirs;
+	auto renamed = false;
 
 	do {
 		wstring dir = dirs.front();
@@ -317,6 +453,12 @@ bool update() {
 					writeLog(L"Error: bad update, has Updater.exe! '" + tofname + L"' equal '" + updaterName + L"'");
 					delFolder();
 					return false;
+				} else if (equal(tofname, updateTo + L"64Gram.exe")) {
+					if (equal(exeName, L"Telegram.exe") || equal(exeName, L"64Gram.exe")) {
+						renamed = true;
+					} else {
+						tofname = updateTo + exeName;
+					}
 				} else if (equal(tofname, updateTo + L"Telegram.exe") && exeName != L"Telegram.exe") {
 					wstring fullBinaryPath = updateTo + exeName;
 					writeLog(L"Target binary found: '" + tofname + L"', changing to '" + fullBinaryPath + L"'");
@@ -375,7 +517,7 @@ bool update() {
 			} while (copyTries < 100);
 			if (!copyResult) {
 				const auto error = FormatUpdateError(
-					L"Failed to update Telegram :(\nCould not copy:\n"
+					L"Failed to update 64Gram :(\nCould not copy:\n"
 						+ fname + L"\nTo:\n" + tofname,
 					errorCode);
 				writeLog(error);
@@ -391,6 +533,12 @@ bool update() {
 		} while (!copyResult);
 	}
 
+	if (renamed) {
+		exeName = L"64Gram.exe";
+		if (!MigrateInstalledName()) {
+			writeLog(L"Executable name migration needs a retry.");
+		}
+	}
 	writeLog(L"Update succeed! Clearing folder..");
 	delFolder();
 	return true;
@@ -422,13 +570,17 @@ void updateRegistry() {
 					if (PathCanonicalize(exp, locationStr)) {
 						memcpy(locationStr, exp, bufSize * sizeof(WCHAR));
 						if (GetFullPathName(L".", bufSize, exp, 0) < bufSize) {
-							wstring installpath = locationStr, mypath = exp;
-							if (installpath == mypath + L"\\" || true) { // always update reg info, if we found it
+							wstring installpath = locationStr;
+							if (equal(installpath, updateTo) || equal(installpath + L"\\", updateTo)) {
 								WCHAR nameStr[bufSize], dateStr[bufSize], publisherStr[bufSize], icongroupStr[bufSize];
 								SYSTEMTIME stLocalTime;
 								GetLocalTime(&stLocalTime);
 								RegSetValueEx(rkey, L"DisplayVersion", 0, REG_SZ, (const BYTE*)versionStr, ((versionLen / 2) + 1) * sizeof(WCHAR));
-								wsprintf(nameStr, L"64Gram Desktop");
+								const auto icon = updateTo + exeName;
+								RegSetValueEx(rkey, L"DisplayIcon", 0, REG_SZ,
+									reinterpret_cast<const BYTE*>(icon.c_str()),
+									DWORD((icon.size() + 1) * sizeof(WCHAR)));
+								wsprintf(nameStr, L"64Gram");
 								RegSetValueEx(rkey, L"DisplayName", 0, REG_SZ, (const BYTE*)nameStr, (wcslen(nameStr) + 1) * sizeof(WCHAR));
 								wsprintf(publisherStr, L"64Gram");
 								RegSetValueEx(rkey, L"Publisher", 0, REG_SZ, (const BYTE*)publisherStr, (wcslen(publisherStr) + 1) * sizeof(WCHAR));
@@ -466,6 +618,7 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPWSTR cmdPara
 	auto processCreated = ULONGLONG(0);
 	auto processArgumentsValid = true;
 
+	bool migrateOnly = false;
 	bool needupdate = false, autostart = false, debug = false, writeprotected = false, startintray = false;
 	const auto args = CommandLineToArgvW(GetCommandLine(), &argsCount);
 	const auto argsGuard = std::unique_ptr<void, decltype(&LocalFree)>(
@@ -476,6 +629,8 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPWSTR cmdPara
 			writeLog(std::wstring(L"Argument: ") + args[i]);
 			if (equal(args[i], L"-update")) {
 				needupdate = true;
+			} else if (equal(args[i], L"-migrate")) {
+				migrateOnly = true;
 			} else if (equal(args[i], L"-finishprocess")) {
 				if (processId
 					|| i + 2 >= argsCount
@@ -516,14 +671,14 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPWSTR cmdPara
 				exeName = args[i];
 				for (int j = 0, l = exeName.size(); j < l; ++j) {
 					if (exeName[j] == L'/' || exeName[j] == L'\\') {
-						exeName = L"Telegram.exe";
+						exeName = L"64Gram.exe";
 						break;
 					}
 				}
 			}
 		}
 		if (exeName.empty()) {
-			exeName = L"Telegram.exe";
+			exeName = L"64Gram.exe";
 		}
 		if (!processArgumentsValid) {
 			writeLog(L"Invalid update process arguments; "
@@ -544,6 +699,11 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPWSTR cmdPara
 					updateTo = updaterDir;
 				}
 				writeLog(L"Update to: " + updateTo);
+				if (migrateOnly) {
+					const auto migrated = MigrateInstalledName();
+					closeLog();
+					return migrated ? 0 : 1;
+				}
 				if (needupdate && processId && processArgumentsValid) {
 					const auto error = FinishUpdateProcess(
 						processId,

@@ -1,8 +1,9 @@
 #define MyAppShortName "64Gram"
-#define MyAppName "64Gram Desktop"
+#define MyAppName "64Gram"
+#define MyAppInstallName "64Gram Desktop"
 #define MyAppPublisher "64Gram"
 #define MyAppURL "https://github.com/TDesktop-x64"
-#define MyAppExeName "Telegram.exe"
+#define MyAppExeName "64Gram.exe"
 #define MyAppId "9DB6C981-7FD2-41B5-AEF2-20C933FD3F21"
 #define CurrentYear GetDateTimeString('yyyy','','')
 
@@ -18,13 +19,13 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
-DefaultDirName={userappdata}\{#MyAppName}
-DefaultGroupName={#MyAppName}
+DefaultDirName={userappdata}\{#MyAppInstallName}
+DefaultGroupName={#MyAppInstallName}
 AllowNoIcons=yes
 OutputDir={#ReleasePath}
 SetupIconFile={#SourcePath}..\Resources\art\icon256.ico
 UninstallDisplayName={#MyAppName}
-UninstallDisplayIcon={app}\Telegram.exe
+UninstallDisplayIcon={app}\{#MyAppExeName}
 Compression=lzma
 SolidCompression=yes
 DisableStartupPrompt=yes
@@ -77,7 +78,7 @@ Name: "ua";      MessagesFile: "compiler:Languages\Ukrainian.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
-Source: "{#ReleasePath}\Telegram.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#ReleasePath}\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#ReleasePath}\Updater.exe"; DestDir: "{app}"; Flags: ignoreversion
 #if MyBuildTarget != "winarm"
 Source: "{#ReleasePath}\{#ModulesFolder}\d3d\d3dcompiler_47.dll"; DestDir: "{app}\{#ModulesFolder}\d3d"; Flags: ignoreversion
@@ -103,16 +104,16 @@ Type: filesandordirs; Name: "{app}\tcache"
 Type: filesandordirs; Name: "{app}\tdumps"
 Type: filesandordirs; Name: "{app}\modules"
 Type: dirifempty; Name: "{app}"
-Type: files; Name: "{userappdata}\{#MyAppName}\data"
-Type: files; Name: "{userappdata}\{#MyAppName}\data_config"
-Type: files; Name: "{userappdata}\{#MyAppName}\log.txt"
-Type: filesandordirs; Name: "{userappdata}\{#MyAppName}\DebugLogs"
-Type: filesandordirs; Name: "{userappdata}\{#MyAppName}\tupdates"
-Type: filesandordirs; Name: "{userappdata}\{#MyAppName}\tdata"
-Type: filesandordirs; Name: "{userappdata}\{#MyAppName}\tcache"
-Type: filesandordirs; Name: "{userappdata}\{#MyAppName}\tdumps"
-Type: filesandordirs; Name: "{userappdata}\{#MyAppName}\modules"
-Type: dirifempty; Name: "{userappdata}\{#MyAppName}"
+Type: files; Name: "{userappdata}\{#MyAppInstallName}\data"
+Type: files; Name: "{userappdata}\{#MyAppInstallName}\data_config"
+Type: files; Name: "{userappdata}\{#MyAppInstallName}\log.txt"
+Type: filesandordirs; Name: "{userappdata}\{#MyAppInstallName}\DebugLogs"
+Type: filesandordirs; Name: "{userappdata}\{#MyAppInstallName}\tupdates"
+Type: filesandordirs; Name: "{userappdata}\{#MyAppInstallName}\tdata"
+Type: filesandordirs; Name: "{userappdata}\{#MyAppInstallName}\tcache"
+Type: filesandordirs; Name: "{userappdata}\{#MyAppInstallName}\tdumps"
+Type: filesandordirs; Name: "{userappdata}\{#MyAppInstallName}\modules"
+Type: dirifempty; Name: "{userappdata}\{#MyAppInstallName}"
 
 [Code]
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
@@ -138,6 +139,7 @@ var ResultCode: Integer;
 begin
   if CurStep = ssPostInstall then
   begin
+    Exec(ExpandConstant('{app}\Updater.exe'), '-migrate', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     HasNewKey := RegKeyExists(HKEY_CURRENT_USER, 'Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\{{#MyAppId}}_is1') or RegKeyExists(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{{#MyAppId}}_is1');
     HasOldKey := RegKeyExists(HKEY_LOCAL_MACHINE, 'SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\{{#MyAppId}}_is1') or RegKeyExists(HKEY_LOCAL_MACHINE, 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{{#MyAppId}}_is1');
     UserDesktopLnk := ExpandFileName(GetShellFolderByCSIDL(CSIDL_DESKTOPDIRECTORY, False) + '\{#MyAppShortName}.lnk');

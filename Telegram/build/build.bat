@@ -163,7 +163,7 @@ if %Build64% neq 0 (
 set "ReleasePath=%SolutionPath%\Release"
 set "DeployPath=%ReleasePath%\deploy\%AppVersionStrMajor%\%AppVersionStrFull%"
 set "SignPath=%HomePath%\..\..\DesktopPrivate\Sign.bat"
-set "BinaryName=Telegram"
+set "BinaryName=64Gram"
 set "DropboxSymbolsPath=Y:\Telegram\symbols"
 set "DropboxSymbolsPathFallback=%HomePath%\..\..\Dropbox\Telegram\symbols"
 set "FinalReleasePath=Z:\Projects\backup\tdesktop"

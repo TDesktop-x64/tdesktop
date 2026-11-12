@@ -3057,41 +3057,6 @@ if (NOT DESKTOP_APP_DISABLE_AUTOUPDATE AND NOT build_macstore AND NOT build_wins
 
     if (DESKTOP_APP_SPECIAL_TARGET)
         include(cmake/packer_zstd.cmake)
-
-        add_executable(Packer)
-        init_target(Packer)
-
-        add_dependencies(Telegram Packer)
-
-        nice_target_sources(Packer ${src_loc}
-        PRIVATE
-            _other/packer.cpp
-            _other/packer.h
-            core/update_verify.cpp
-            core/update_verify.h
-        )
-
-        target_include_directories(Packer PRIVATE ${src_loc})
-
-        target_link_libraries(Packer
-        PRIVATE
-            desktop-app::external_qt
-            desktop-app::external_zlib
-            desktop-app::external_auto_updates
-            desktop-app::external_openssl
-        )
-
-        if (DESKTOP_APP_USE_PACKAGED)
-            target_compile_definitions(Packer PRIVATE PACKER_USE_PACKAGED)
-        endif()
-
-        if (WIN32 AND DESKTOP_APP_WIN7_BASELINE)
-            # WindowsApp.lib is off the link line, WinRT stubs come from lib_base.
-            target_link_libraries(Packer PRIVATE desktop-app::lib_base)
-            target_link_options(Packer PRIVATE /SUBSYSTEM:CONSOLE,6.01)
-        endif()
-
-        set_target_properties(Packer PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${output_folder})
     endif()
 elseif (build_winstore)
     add_executable(StartupTask WIN32)

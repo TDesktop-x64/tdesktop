@@ -2,7 +2,8 @@
 
 `Packer_zstd` packages stable and beta updates on Windows, macOS and other
 Unix platforms using the v1 layout with zstd instead of LZMA. The original
-`Packer` remains available for v2 packages. The standalone `Updater` installs
+`Packer` sources are retained, but its CMake target is no longer generated.
+Only `Packer_zstd` appears in the solution and is built with the application. The standalone `Updater` installs
 files prepared by either decoder and handles the executable-name migration.
 The client dispatches zstd packages separately and retains its original v2 path.
 Users with the already-shipped v2-only client must install the first build

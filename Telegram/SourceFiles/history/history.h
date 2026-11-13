@@ -658,6 +658,7 @@ private:
 	HistoryItem *insertJoinedMessage();
 	void insertMessageToBlocks(not_null<HistoryItem*> item);
 	void checkNewPeerMessages();
+	[[nodiscard]] bool isNewPeerMessage(not_null<HistoryItem*> item) const;
 
 	[[nodiscard]] Dialogs::BadgesState computeBadgesState() const;
 	[[nodiscard]] Dialogs::BadgesState adjustBadgesStateByFolder(

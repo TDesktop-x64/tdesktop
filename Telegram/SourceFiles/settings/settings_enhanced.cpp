@@ -299,6 +299,20 @@ namespace Settings {
 			EnhancedSettings::Write();
 		}, container->lifetime());
 
+		AddButtonWithIcon(
+				inner,
+				tr::lng_settings_who_reacted_top(),
+				st::settingsButtonNoIcon
+		)->toggleOn(
+				rpl::single(GetEnhancedBool("who_reacted_top"))
+		)->toggledChanges(
+		) | rpl::filter([=](bool toggled) {
+			return (toggled != GetEnhancedBool("who_reacted_top"));
+		}) | rpl::on_next([=](bool toggled) {
+			SetEnhancedValue("who_reacted_top", toggled);
+			EnhancedSettings::Write();
+		}, container->lifetime());
+
 		QString langPackBaseId = Lang::GetInstance().baseId();
 		if (langPackBaseId.contains("zh-han")) {
 			AddButtonWithIcon(

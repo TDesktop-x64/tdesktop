@@ -105,6 +105,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/click_handler_types.h"
 #include "base/platform/base_platform_info.h"
 #include "base/call_delayed.h"
+#include "settings.h"
 #include "settings/sections/settings_premium.h"
 #include "window/window_peer_menu.h"
 #include "window/window_controller.h"
@@ -2074,6 +2075,12 @@ void FillContextMenuItems(
 		|| !request.selectedText.empty();
 	const auto hasWhoReactedItem = item
 		&& Api::WhoReactedExists(item, Api::WhoReactedList::All);
+	const auto whoReactedAtTop = !skipWhoReacted
+		&& GetEnhancedBool("who_reacted_top");
+
+	if (whoReactedAtTop && hasWhoReactedItem) {
+		AddWhoReactedAction(result, list, item, list->controller());
+	}
 
 	AddReplyToMessageAction(result, request, list);
 	if (item) {
@@ -2241,7 +2248,9 @@ void FillContextMenuItems(
 	}
 	if (!skipWhoReacted) {
 		if (hasWhoReactedItem) {
-			AddWhoReactedAction(result, list, item, list->controller());
+			if (!whoReactedAtTop) {
+				AddWhoReactedAction(result, list, item, list->controller());
+			}
 		} else if (item) {
 			MaybeAddWhenEditedForwardedAction(
 				result,

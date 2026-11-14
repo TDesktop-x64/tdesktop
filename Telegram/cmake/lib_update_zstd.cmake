@@ -39,6 +39,10 @@ block(SCOPE_FOR VARIABLES)
             set(${zstd_optional_variable} "")
         endif()
     endforeach()
+    # An empty can_fetch lets CMake 3.31's Git update script choose its default.
+    if (NOT DEFINED can_fetch)
+        set(can_fetch "")
+    endif()
     FetchContent_MakeAvailable(update_zstd)
     if (CMAKE_C_COMPILER_ARG1 AND CMAKE_ASM_COMPILER STREQUAL CMAKE_C_COMPILER)
         # Compile assembly through the complete C command, including wrappers.

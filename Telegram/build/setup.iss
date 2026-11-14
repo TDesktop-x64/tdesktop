@@ -1,6 +1,6 @@
 #define MyAppShortName "64Gram"
 #define MyAppName "64Gram"
-#define MyAppInstallName "64Gram Desktop"
+#define MyAppGroupName "64Gram Desktop"
 #define MyAppPublisher "64Gram"
 #define MyAppURL "https://github.com/TDesktop-x64"
 #define MyAppExeName "64Gram.exe"
@@ -19,8 +19,8 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
-DefaultDirName={userappdata}\{#MyAppInstallName}
-DefaultGroupName={#MyAppInstallName}
+DefaultDirName={userappdata}\{#MyAppName}
+DefaultGroupName={#MyAppGroupName}
 AllowNoIcons=yes
 OutputDir={#ReleasePath}
 SetupIconFile={#SourcePath}..\Resources\art\icon256.ico
@@ -104,16 +104,16 @@ Type: filesandordirs; Name: "{app}\tcache"
 Type: filesandordirs; Name: "{app}\tdumps"
 Type: filesandordirs; Name: "{app}\modules"
 Type: dirifempty; Name: "{app}"
-Type: files; Name: "{userappdata}\{#MyAppInstallName}\data"
-Type: files; Name: "{userappdata}\{#MyAppInstallName}\data_config"
-Type: files; Name: "{userappdata}\{#MyAppInstallName}\log.txt"
-Type: filesandordirs; Name: "{userappdata}\{#MyAppInstallName}\DebugLogs"
-Type: filesandordirs; Name: "{userappdata}\{#MyAppInstallName}\tupdates"
-Type: filesandordirs; Name: "{userappdata}\{#MyAppInstallName}\tdata"
-Type: filesandordirs; Name: "{userappdata}\{#MyAppInstallName}\tcache"
-Type: filesandordirs; Name: "{userappdata}\{#MyAppInstallName}\tdumps"
-Type: filesandordirs; Name: "{userappdata}\{#MyAppInstallName}\modules"
-Type: dirifempty; Name: "{userappdata}\{#MyAppInstallName}"
+Type: files; Name: "{userappdata}\{#MyAppName}\data"
+Type: files; Name: "{userappdata}\{#MyAppName}\data_config"
+Type: files; Name: "{userappdata}\{#MyAppName}\log.txt"
+Type: filesandordirs; Name: "{userappdata}\{#MyAppName}\DebugLogs"
+Type: filesandordirs; Name: "{userappdata}\{#MyAppName}\tupdates"
+Type: filesandordirs; Name: "{userappdata}\{#MyAppName}\tdata"
+Type: filesandordirs; Name: "{userappdata}\{#MyAppName}\tcache"
+Type: filesandordirs; Name: "{userappdata}\{#MyAppName}\tdumps"
+Type: filesandordirs; Name: "{userappdata}\{#MyAppName}\modules"
+Type: dirifempty; Name: "{userappdata}\{#MyAppName}"
 
 [Code]
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);

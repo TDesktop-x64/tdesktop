@@ -101,4 +101,20 @@ The helpers migrate the old executable after copying the new files. Windows
 repairs matching shortcuts and registered protocol paths before cleanup. Linux
 uses a temporary relaunch symlink for older clients, removed by the new app.
 Clients that cannot read zstd still need a manual installation. Old protected
-Linux installers that require a `Telegram` payload also need a manual upgrade. User-data paths and application IDs are unchanged.
+Linux installers that require a `Telegram` payload also need a manual upgrade.
+
+New installations use these default profile folders:
+
+- Windows: `%APPDATA%\64Gram\tdata`. A writable installation, including a
+  portable copy, uses the `tdata` folder beside `64Gram.exe`.
+- macOS: `~/Library/Application Support/64Gram/tdata`.
+- Linux: `$XDG_DATA_HOME/64Gram/tdata`, usually `~/.local/share/64Gram/tdata`.
+  An existing legacy profile in `~/.TelegramDesktop` still takes precedence.
+
+If the folder changes and you want to keep your session, quit 64Gram and any
+Telegram Desktop instance using the old profile. Copy the entire old `tdata`
+folder into the new `64Gram` directory before first launch. On Windows the old
+folder may be in `%APPDATA%\64Gram Desktop` (or `Telegram Desktop UWP` for
+a Store build). On macOS look under `~/Library/Application Support/` for
+`Telegram Desktop` or `64Gram Desktop`. If the destination already has a
+`tdata` folder, back it up separately before replacing it.

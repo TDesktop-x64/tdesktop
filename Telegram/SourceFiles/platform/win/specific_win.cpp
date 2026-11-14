@@ -247,11 +247,7 @@ QString psAppDataPath() {
 	WCHAR wstrPath[maxFileLen];
 	if (GetEnvironmentVariable(L"APPDATA", wstrPath, maxFileLen)) {
 		QDir appData(QString::fromStdWString(std::wstring(wstrPath)));
-#ifdef OS_WIN_STORE
-		return appData.absolutePath() + u"/Telegram Desktop UWP/"_q;
-#else // OS_WIN_STORE
-		return appData.absolutePath() + u"/64Gram Desktop/"_q;
-#endif // OS_WIN_STORE
+		return appData.absolutePath() + '/' + AppName.utf16() + '/';
 	}
 	return QString();
 }

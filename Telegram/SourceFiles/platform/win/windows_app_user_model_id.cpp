@@ -345,7 +345,7 @@ bool checkInstalled(QString path = {}) {
 		}
 	}
 
-	const auto installed = u"64Gram Desktop/64Gram.lnk"_q;
+	const auto installed = u"64Gram/64Gram.lnk"_q;
 	const auto old = u"Telegram Win (Unofficial)/Telegram.lnk"_q;
 	return validateShortcutAt(path + installed)
 		|| validateShortcutAt(path + old);

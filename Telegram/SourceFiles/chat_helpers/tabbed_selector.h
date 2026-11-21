@@ -66,6 +66,7 @@ struct FileChosen {
 	std::shared_ptr<Data::EmojiStatusCollectible> collectible;
 	TextWithTags caption;
 	bool needsCaption = false;
+	bool rightClick = false;
 };
 
 struct PhotoChosen {
@@ -76,6 +77,7 @@ struct PhotoChosen {
 struct EmojiChosen {
 	EmojiPtr emoji;
 	Ui::MessageSendingAnimationFrom messageSendingFrom;
+	bool rightClick = false;
 };
 
 using InlineChosen = InlineBots::ResultSelected;

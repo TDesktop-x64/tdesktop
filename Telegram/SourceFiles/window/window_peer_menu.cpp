@@ -3765,7 +3765,9 @@ base::weak_qptr<Ui::BoxContent> ShowForwardMessagesBox(
 	const auto field = comment->entity();
 	state->submit = [=](Api::SendOptions options) {
 		const auto peers = state->box->collectSelectedRows();
-		auto comment = field->getTextWithAppliedMarkdown();
+		auto comment = options.unformatted
+			? field->getTextWithTags()
+			: field->getTextWithAppliedMarkdown();
 		const auto checkPaid = [=] {
 			const auto withPaymentApproved = crl::guard(weak, [=](
 					int approved) {
@@ -3902,7 +3904,9 @@ base::weak_qptr<Ui::BoxContent> ShowForwardMessagesBox(
 		SendMenu::FillSendMenu(
 			state->menu.get(),
 			show,
-			SendMenu::Details{ sendMenuType() },
+			SendMenu::Details{
+				.type = sendMenuType(),
+				.sendUnformattedPossible = HasSendText(field) },
 			SendMenu::DefaultCallback(show, crl::guard(parent, [=](
 					Api::SendOptions options) {
 				if (const auto onstack = state->submit) {

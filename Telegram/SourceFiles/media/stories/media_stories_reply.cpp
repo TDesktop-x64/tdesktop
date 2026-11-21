@@ -242,7 +242,9 @@ bool ReplyArea::sendReaction(const Data::ReactionId &id) {
 }
 
 void ReplyArea::send(Api::SendOptions options) {
-	auto text = _controls->getTextWithAppliedMarkdown();
+	auto text = options.unformatted
+		? _controls->getTextWithTags()
+		: _controls->getTextWithAppliedMarkdown();
 	const auto stars = _controls->chosenStarsForMessage();
 	if (const auto stream = _videoStream.get()) {
 		if (stars > 0) {
@@ -676,7 +678,11 @@ bool ReplyArea::confirmSendingFiles(
 		.limits = DefaultLimitsForPeer(_data.peer),
 		.check = DefaultCheckForPeer(show, _data.peer),
 		.sendType = Api::SendType::Normal,
-		.sendMenuDetails = sendMenuDetails(),
+		.sendMenuDetails = [fn = sendMenuDetails()] {
+			auto result = fn();
+			result.sendUnformattedPossible = true;
+			return result;
+		},
 		.stOverride = &st::storiesComposeControls,
 		.confirmed = crl::guard(this, confirmed),
 		.cancelled = _controls->restoreTextCallback(insertTextOnCancel),

@@ -229,8 +229,8 @@ private:
 		std::shared_ptr<InlineBots::Result> result,
 		Api::SendOptions options);
 	void finishSending();
-	void send();
-	void edit(not_null<HistoryItem*> item);
+	void send(bool unformatted = false);
+	void edit(not_null<HistoryItem*> item, bool unformatted = false);
 	[[nodiscard]] not_null<HistoryItem*> noticeItem();
 	void highlightSingleNewMessage(const Data::MessagesSlice &slice);
 	[[nodiscard]] SendMenu::Details sendMenuDetails() const override;

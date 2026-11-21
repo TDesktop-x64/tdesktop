@@ -3416,7 +3416,10 @@ object_ptr<Ui::RpWidget> CreatePollBox::setupContent() {
 		submit.data(),
 		_controller->uiShow(),
 		sendMenuDetails,
-		sendAction);
+		sendAction,
+		nullptr,
+		nullptr,
+		1);
 	addButton(tr::lng_cancel(), [=] { closeBox(); });
 
 	if (showWhoVoted) {

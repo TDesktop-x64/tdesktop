@@ -1721,7 +1721,10 @@ private:
 			button,
 			show,
 			[details = _sendMenuDetails] { return details; },
-			SendMenu::DefaultCallback(show, submit));
+			SendMenu::DefaultCallback(show, submit),
+			nullptr,
+			nullptr,
+			1);
 	}
 
 	void requestMedia(

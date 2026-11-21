@@ -131,6 +131,10 @@
   "lng_send_unformatted": "Send unformatted",
   "lng_settings_send_unformatted": "Show Send unformatted option",
 
+  "lng_clear_recent_stickers_title": "Clear recent stickers",
+  "lng_clear_recent_stickers_text": "Do you want to clear all your recent stickers?",
+  "lng_clear_recent_stickers_confirm": "Clear All",
+
   "lng_proxy_remove_all": "Remove all proxies",
 
   "lng_copy_profile_id": "ID copied to clipboard.",

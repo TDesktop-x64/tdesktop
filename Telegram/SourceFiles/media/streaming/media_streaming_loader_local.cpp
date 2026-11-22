@@ -47,9 +47,10 @@ void LoaderLocal::load(int64 offset) {
 		fail();
 		return;
 	}
-	auto result = _device->read(kPartSize);
+	const auto partSize = PartSize();
+	auto result = _device->read(partSize);
 	if (result.isEmpty()
-		|| ((result.size() != kPartSize)
+		|| ((result.size() != partSize)
 			&& (offset + result.size() != size()))) {
 		fail();
 		return;

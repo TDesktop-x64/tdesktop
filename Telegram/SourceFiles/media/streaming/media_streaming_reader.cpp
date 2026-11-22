@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "media/streaming/media_streaming_common.h"
 #include "media/streaming/media_streaming_loader.h"
 #include "storage/cache/storage_cache_database.h"
+#include "settings.h"
 
 #include <QtCore/QtEndian>
 
@@ -17,17 +18,39 @@ namespace Media {
 namespace Streaming {
 namespace {
 
-constexpr auto kPartSize = Loader::kPartSize;
-constexpr auto kPartsInSlice = 64;
-constexpr auto kInSlice = uint32(kPartsInSlice * kPartSize);
-constexpr auto kMaxPartsInHeader = 64;
-constexpr auto kMaxOnlyInHeader = 80 * kPartSize;
-constexpr auto kPartsOutsideFirstSliceGood = 8;
+// Keep byte-level cache limits identical across 128KB and 1MB part sizes so
+// slices and headers never exceed Storage::Cache::Database maxDataSize (10MB).
+constexpr auto kInSlice = uint32(8 * 1024 * 1024);
+constexpr auto kMaxHeaderBytes = uint32(8 * 1024 * 1024);
+constexpr auto kMaxOnlyInHeader = int64(10 * 1024 * 1024);
+constexpr auto kMaxOutsideFirstSliceGoodBytes = uint32(1024 * 1024);
+static_assert(kInSlice <= 10 * 1024 * 1024);
+static_assert(kMaxOnlyInHeader <= 10 * 1024 * 1024);
 constexpr auto kSlicesInMemory = 2;
 
-// 1 MB of parts are requested from cloud ahead of reading demand.
-constexpr auto kPreloadPartsAhead = 8;
-constexpr auto kDownloaderRequestsLimit = 8;
+[[nodiscard]] int64 PartSize() {
+	return Loader::PartSize();
+}
+
+[[nodiscard]] int PartsInSlice() {
+	return int(kInSlice / PartSize());
+}
+
+[[nodiscard]] int MaxPartsInHeader() {
+	return int(kMaxHeaderBytes / PartSize());
+}
+
+[[nodiscard]] int PartsOutsideFirstSliceGood() {
+	return int(kMaxOutsideFirstSliceGoodBytes / PartSize());
+}
+
+[[nodiscard]] int PreloadPartsAhead() {
+	return cNetDownloadPreloadParts();
+}
+
+[[nodiscard]] int DownloaderRequestsLimit() {
+	return cNetDownloadRequestsLimit();
+}
 
 using PartsMap = base::flat_map<uint32, QByteArray>;
 
@@ -37,7 +60,7 @@ struct ParsedCacheEntry {
 };
 
 bool IsContiguousSerialization(int serializedSize, int maxSliceSize) {
-	return !(serializedSize % kPartSize) || (serializedSize == maxSliceSize);
+	return !(serializedSize % PartSize()) || (serializedSize == maxSliceSize);
 }
 
 bool IsFullInHeader(int64 size) {
@@ -54,7 +77,7 @@ bool ComputeIsGoodHeader(int64 size, const PartsMap &header) {
 		ranges::less(),
 		&PartsMap::value_type::first);
 	const auto outsideFirstSlice = end(header) - outsideFirstSliceIt;
-	return (outsideFirstSlice <= kPartsOutsideFirstSliceGood);
+	return (outsideFirstSlice <= PartsOutsideFirstSliceGood());
 }
 
 int SlicesCount(uint32 size) {
@@ -92,23 +115,28 @@ bytes::const_span ParseComplexCachedMap(
 		data = data.subspan(count);
 		return result;
 	};
+	const auto partSize = uint32(PartSize());
 	const auto maybeCount = takeInt();
 	if (!maybeCount) {
 		return {};
 	}
 	const auto count = *maybeCount;
-	if (!count || count > (kMaxOnlyInHeader / kPartSize)) {
-		return data;
+	if (!count || count > uint32(kMaxOnlyInHeader / partSize)) {
+		return {};
 	}
-	for (auto i = 0; i != count; ++i) {
+	for (auto i = uint32(0); i != count; ++i) {
 		const auto offset = takeInt().value_or(0);
 		const auto size = takeInt().value_or(0);
 		const auto bytes = takeBytes(size);
-		if (offset >= maxSize
+		if (offset >= uint32(maxSize)
 			|| !size
-			|| size > maxSize
-			|| offset + size > maxSize
-			|| bytes.size() != size) {
+			|| size > uint32(maxSize)
+			|| int64(offset) + int64(size) > int64(maxSize)
+			|| (offset % partSize) != 0
+			|| size > partSize
+			|| (size != partSize && int64(offset) + int64(size) != int64(maxSize))
+			|| bytes.size() != int(size)) {
+			result.clear();
 			return {};
 		}
 		result.try_emplace(
@@ -124,14 +152,15 @@ bytes::const_span ParseCachedMap(
 		bytes::const_span data,
 		int maxSize) {
 	const auto size = int(data.size());
+	const auto partSize = int(PartSize());
 	if (IsContiguousSerialization(size, maxSize)) {
 		if (size > maxSize) {
 			return {};
 		}
-		for (auto offset = int64(); offset < size; offset += kPartSize) {
+		for (auto offset = 0; offset < size; offset += partSize) {
 			const auto part = data.subspan(
 				offset,
-				std::min(kPartSize, size - offset));
+				std::min(partSize, size - offset));
 			result.try_emplace(
 				uint32(offset),
 				reinterpret_cast<const char*>(part.data()),
@@ -275,10 +304,11 @@ auto Reader::Slice::prepareFill(
 	auto result = PrepareFillResult();
 
 	result.ready = false;
-	const auto fromOffset = (from / kPartSize) * kPartSize;
-	const auto tillPart = (till + kPartSize - 1) / kPartSize;
-	const auto preloadTillOffset = (tillPart + kPreloadPartsAhead)
-		* kPartSize;
+	const auto partSize = uint32(PartSize());
+	const auto fromOffset = (from / partSize) * partSize;
+	const auto tillPart = (till + partSize - 1) / partSize;
+	const auto preloadTillOffset = (tillPart + uint32(PreloadPartsAhead()))
+		* partSize;
 
 	const auto after = ranges::upper_bound(
 		parts,
@@ -312,7 +342,7 @@ auto Reader::Slice::prepareFill(
 	result.start = start;
 	result.finish = finish;
 	result.offsetsFromLoader = offsetsFromLoader(
-		tillPart * kPartSize,
+		tillPart * partSize,
 		preloadTillOffset);
 	return result;
 }
@@ -320,6 +350,7 @@ auto Reader::Slice::prepareFill(
 auto Reader::Slice::offsetsFromLoader(uint32 from, uint32 till) const
 -> StackIntVector<Reader::kLoadFromRemoteMax> {
 	auto result = StackIntVector<kLoadFromRemoteMax>();
+	const auto partSize = uint32(PartSize());
 
 	const auto after = ranges::upper_bound(
 		parts,
@@ -328,7 +359,7 @@ auto Reader::Slice::offsetsFromLoader(uint32 from, uint32 till) const
 		&PartsMap::value_type::first);
 	auto check = (after == begin(parts)) ? after : (after - 1);
 	const auto end = parts.end();
-	for (auto offset = from; offset != till; offset += kPartSize) {
+	for (auto offset = from; offset != till; offset += partSize) {
 		while (check != end && check->first < offset) {
 			++check;
 		}
@@ -391,7 +422,7 @@ void Reader::Slices::headerDone(bool fromCache) {
 }
 
 int Reader::Slices::headerSize() const {
-	return _header.parts.size() * kPartSize;
+	return int(_header.parts.size() * PartSize());
 }
 
 bool Reader::Slices::fullInCache() const {
@@ -407,7 +438,7 @@ int Reader::Slices::requestSliceSizesCount() const {
 
 bool Reader::Slices::headerWontBeFilled() const {
 	return headerModeUnknown()
-		&& (_header.parts.size() >= kMaxPartsInHeader);
+		&& (int(_header.parts.size()) >= MaxPartsInHeader());
 }
 
 void Reader::Slices::applyHeaderCacheData() {
@@ -496,17 +527,18 @@ void Reader::Slices::checkSliceFullLoaded(int sliceNumber) {
 	if (!sliceNumber && !isFullInHeader()) {
 		return;
 	}
-	const auto partsCount = [&] {
+	const auto partSize = uint32(PartSize());
+	const auto partsCount = [&]() -> int {
 		if (!sliceNumber) {
-			return (_size + kPartSize - 1) / kPartSize;
+			return int((_size + partSize - 1) / partSize);
 		}
-		return (sliceNumber < _data.size())
-			? kPartsInSlice
-			: ((_size - (sliceNumber - 1) * kInSlice + kPartSize - 1)
-				/ kPartSize);
+		return (sliceNumber < int(_data.size()))
+			? PartsInSlice()
+			: int((_size - (sliceNumber - 1) * kInSlice + partSize - 1)
+				/ partSize);
 	}();
 	auto &slice = (sliceNumber ? _data[sliceNumber - 1] : _header);
-	const auto loaded = (slice.parts.size() == partsCount);
+	const auto loaded = (int(slice.parts.size()) == partsCount);
 
 	using Flag = Slice::Flag;
 	if ((slice.flags & Flag::FullInCache) && !loaded) {
@@ -602,10 +634,11 @@ auto Reader::Slices::fill(uint32 offset, bytes::span buffer) -> FillResult {
 	};
 	const auto addToHeader = [&](int slice, auto parts) {
 		if (_headerMode == HeaderMode::Unknown) {
+			const auto maxHeaderParts = MaxPartsInHeader();
 			for (const auto &part : parts) {
 				const auto totalOffset = slice * kInSlice + part.first;
 				if (!_header.parts.contains(totalOffset)
-					&& _header.parts.size() < kMaxPartsInHeader) {
+					&& int(_header.parts.size()) < maxHeaderParts) {
 					_header.addPart(totalOffset, part.second);
 				}
 			}
@@ -782,7 +815,7 @@ Reader::SerializedSlice Reader::Slices::serializeAndUnloadSlice(
 	const auto continuous = (continuousTill > slice.parts.back().first);
 	if (continuous) {
 		// All data is continuous.
-		result.data.reserve(count * kPartSize);
+		result.data.reserve(int(count * PartSize()));
 		for (const auto &[offset, part] : slice.parts) {
 			result.data.append(part);
 		}
@@ -1074,7 +1107,7 @@ void Reader::pruneDoneDownloaderRequests() {
 void Reader::sendDownloaderRequests() {
 	auto &&offsets = ranges::views::all(
 		_offsetsForDownloader
-	) | ranges::views::take(kDownloaderRequestsLimit);
+	) | ranges::views::take(DownloaderRequestsLimit());
 	for (const auto offset : offsets) {
 		if ((!_cacheHelper || !downloaderWaitForCachedSlice(offset))
 			&& _downloaderOffsetsRequested.emplace(offset).second) {
@@ -1422,7 +1455,7 @@ QByteArray SerializeComplexPartsMap(
 	auto result = QByteArray();
 	const auto count = parts.size();
 	const auto intSize = sizeof(int32);
-	result.reserve(count * kPartSize + 2 * intSize * (count + 1));
+	result.reserve(int(count * PartSize() + 2 * intSize * (count + 1)));
 	const auto appendInt = [&](int value) {
 		auto serialized = int32(value);
 		result.append(

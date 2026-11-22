@@ -15,13 +15,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_document.h"
 #include "apiwrap.h"
 #include "base/openssl_help.h"
+#include "settings.h"
 
 namespace Storage {
 namespace {
 
 constexpr auto kKillSessionTimeout = 15 * crl::time(1000);
-constexpr auto kStartWaitedInSession = 4 * kDownloadPartSize;
-constexpr auto kMaxWaitedInSession = 16 * kDownloadPartSize;
 constexpr auto kStartSessionsCount = 1;
 constexpr auto kMaxSessionsCount = 8;
 constexpr auto kMaxTrackedSessionRemoves = 64;
@@ -33,12 +32,27 @@ constexpr auto kRemoveSessionAfterTimeouts = 4;
 constexpr auto kResetDownloadPrioritiesTimeout = crl::time(200);
 constexpr auto kBadRequestDurationThreshold = 8 * crl::time(1000);
 
+// Keep default 128KB session windows identical to upstream (512KB -> 2MB),
+// while capping 1MB-part windows (2MB -> 4MB per session, max 32MB total)
+// so large file downloads stay fast without unbounded RAM growth.
+[[nodiscard]] int StartWaitedInSession() {
+	return std::max(4 * kDefaultDownloadPartSize, 2 * DownloadPartSize());
+}
+
+[[nodiscard]] int MaxWaitedInSession() {
+	return std::max(16 * kDefaultDownloadPartSize, 4 * DownloadPartSize());
+}
+
 // Each (session remove by timeouts) we wait for time:
 // kRetryAddSessionTimeout * max(removesCount, kMaxTrackedSessionRemoves)
 // and for successes in all remaining sessions:
 // kRetryAddSessionSuccesses * max(removesCount, kMaxTrackedSessionRemoves)
 
 } // namespace
+
+int DownloadPartSize() {
+	return cNetDownloadPartSize();
+}
 
 void DownloadManagerMtproto::Queue::enqueue(
 		not_null<Task*> task,
@@ -110,7 +124,7 @@ void DownloadManagerMtproto::Queue::removeSession(int index) {
 }
 
 DownloadManagerMtproto::DcSessionBalanceData::DcSessionBalanceData()
-: maxWaitedAmount(kStartWaitedInSession) {
+: maxWaitedAmount(StartWaitedInSession()) {
 }
 
 DownloadManagerMtproto::DcBalanceData::DcBalanceData()
@@ -180,14 +194,16 @@ void DownloadManagerMtproto::checkSendNextAfterSuccess(MTP::DcId dcId) {
 bool DownloadManagerMtproto::trySendNextPart(MTP::DcId dcId, Queue &queue) {
 	const auto &balanceData = _balanceData[dcId];
 	const auto &sessions = balanceData.sessions;
+	const auto partSize = DownloadPartSize();
+	const auto maxWaited = MaxWaitedInSession();
 	const auto bestIndex = [&] {
-		const auto proj = [](const DcSessionBalanceData &data) {
+		const auto proj = [maxWaited](const DcSessionBalanceData &data) {
 			return (data.requested < data.maxWaitedAmount)
 				? data.requested
-				: kMaxWaitedInSession;
+				: maxWaited;
 		};
 		const auto j = ranges::min_element(sessions, ranges::less(), proj);
-		return (j->requested + kDownloadPartSize <= j->maxWaitedAmount)
+		return (j->requested + partSize <= j->maxWaitedAmount)
 			? (j - begin(sessions))
 			: -1;
 	}();
@@ -238,9 +254,11 @@ void DownloadManagerMtproto::requestSucceeded(
 	auto &dc = i->second;
 	Assert(index < dc.sessions.size());
 	auto &data = dc.sessions[index];
+	const auto partSize = DownloadPartSize();
+	const auto maxWaited = MaxWaitedInSession();
 	const auto overloaded = (timeAtRequestStart <= dc.lastSessionRemove)
 		|| (amountAtRequestStart > data.maxWaitedAmount);
-	const auto parts = amountAtRequestStart / kDownloadPartSize;
+	const auto parts = amountAtRequestStart / partSize;
 	const auto duration = (crl::now() - timeAtRequestStart);
 	DEBUG_LOG(("Download (%1,%2) request done, duration: %3, parts: %4%5"
 		).arg(dcId
@@ -260,10 +278,10 @@ void DownloadManagerMtproto::requestSucceeded(
 		return;
 	}
 	if (amountAtRequestStart == data.maxWaitedAmount
-		&& data.maxWaitedAmount < kMaxWaitedInSession) {
+		&& data.maxWaitedAmount < maxWaited) {
 		data.maxWaitedAmount = std::min(
-			data.maxWaitedAmount + kDownloadPartSize,
-			kMaxWaitedInSession);
+			data.maxWaitedAmount + partSize,
+			maxWaited);
 		DEBUG_LOG(("Download (%1,%2) increased max waited amount %3."
 			).arg(dcId
 			).arg(index
@@ -350,9 +368,10 @@ void DownloadManagerMtproto::removeSession(MTP::DcId dcId) {
 	auto &session = dc.sessions.back();
 
 	// Make sure we don't send anything to that session while redirecting.
-	session.requested += kMaxWaitedInSession * kMaxSessionsCount;
+	const auto sentinel = MaxWaitedInSession() * kMaxSessionsCount;
+	session.requested += sentinel;
 	queue.removeSession(index);
-	Assert(session.requested == kMaxWaitedInSession * kMaxSessionsCount);
+	Assert(session.requested == sentinel);
 
 	dc.sessions.pop_back();
 	api().instance().killSession(MTP::downloadDcId(dcId, index));
@@ -512,7 +531,7 @@ void DownloadMtprotoTask::removeSession(int sessionIndex) {
 mtpRequestId DownloadMtprotoTask::sendRequest(
 		const RequestData &requestData) {
 	const auto offset = requestData.offset;
-	const auto limit = Storage::kDownloadPartSize;
+	const auto limit = Storage::DownloadPartSize();
 	const auto shiftedDcId = MTP::downloadDcId(
 		_cdnDcId ? _cdnDcId : dcId(),
 		requestData.sessionIndex);
@@ -603,7 +622,15 @@ void DownloadMtprotoTask::requestMoreCdnFileHashes() {
 		return;
 	}
 
-	const auto requestData = _cdnUncheckedParts.cbegin()->first;
+	const auto &first = *_cdnUncheckedParts.cbegin();
+	auto requestData = first.first;
+	auto missingOffset = requestData.offset;
+	if (checkCdnFileHash(
+			requestData.offset,
+			bytes::make_span(first.second),
+			&missingOffset) == CheckCdnHashResult::NoHash) {
+		requestData.offset = missingOffset;
+	}
 	const auto shiftedDcId = MTP::downloadDcId(
 		dcId(),
 		requestData.sessionIndex);
@@ -723,15 +750,35 @@ void DownloadMtprotoTask::cdnPartLoaded(const MTPupload_CdnFile &result, mtpRequ
 
 DownloadMtprotoTask::CheckCdnHashResult DownloadMtprotoTask::checkCdnFileHash(
 		int64 offset,
-		bytes::const_span buffer) {
-	const auto cdnFileHashIt = _cdnFileHashes.find(offset);
-	if (cdnFileHashIt == _cdnFileHashes.cend()) {
-		return CheckCdnHashResult::NoHash;
+		bytes::const_span buffer,
+		int64 *missingOffset) {
+	const auto total = int(buffer.size());
+	if (!total) {
+		return CheckCdnHashResult::Good;
 	}
-	const auto realHash = openssl::Sha256(buffer);
-	const auto receivedHash = bytes::make_span(cdnFileHashIt->second.hash);
-	if (bytes::compare(realHash, receivedHash)) {
-		return CheckCdnHashResult::Invalid;
+	auto checked = 0;
+	while (checked < total) {
+		const auto currentOffset = offset + int64(checked);
+		const auto cdnFileHashIt = _cdnFileHashes.find(currentOffset);
+		if (cdnFileHashIt == _cdnFileHashes.cend()) {
+			if (missingOffset) {
+				*missingOffset = currentOffset;
+			}
+			return CheckCdnHashResult::NoHash;
+		}
+		const auto hashLimit = cdnFileHashIt->second.limit;
+		if (hashLimit <= 0) {
+			return CheckCdnHashResult::Invalid;
+		}
+		const auto subSize = std::min(hashLimit, total - checked);
+		const auto realHash = openssl::Sha256(
+			buffer.subspan(checked, subSize));
+		const auto receivedHash = bytes::make_span(
+			cdnFileHashIt->second.hash);
+		if (bytes::compare(realHash, receivedHash)) {
+			return CheckCdnHashResult::Invalid;
+		}
+		checked += subSize;
 	}
 	return CheckCdnHashResult::Good;
 }
@@ -754,6 +801,7 @@ void DownloadMtprotoTask::getCdnFileHashesDone(
 	const auto requestData = finishSentRequest(
 		requestId,
 		FinishRequestReason::Redirect);
+	const auto hashesBefore = _cdnFileHashes.size();
 	addCdnHashes(result.v);
 	auto someMoreChecked = false;
 	for (auto i = _cdnUncheckedParts.begin(); i != _cdnUncheckedParts.cend();) {
@@ -786,7 +834,7 @@ void DownloadMtprotoTask::getCdnFileHashesDone(
 		default: Unexpected("Result of checkCdnFileHash()");
 		}
 	}
-	if (!someMoreChecked) {
+	if (!someMoreChecked && _cdnFileHashes.size() == hashesBefore) {
 		LOG(("API Error: "
 			"Could not find cdnFileHash for offset %1 "
 			"after getCdnFileHashes request."
@@ -807,7 +855,7 @@ void DownloadMtprotoTask::placeSentRequest(
 	const auto amount = _owner->changeRequestedAmount(
 		dcId(),
 		requestData.sessionIndex,
-		Storage::kDownloadPartSize);
+		Storage::DownloadPartSize());
 	const auto &[i, ok1] = _sentRequests.emplace(requestId, requestData);
 	const auto &[j, ok2] = _requestByOffset.emplace(
 		requestData.offset,
@@ -851,7 +899,7 @@ auto DownloadMtprotoTask::finishSentRequest(
 	_owner->changeRequestedAmount(
 		dcId(),
 		result.sessionIndex,
-		-Storage::kDownloadPartSize);
+		-Storage::DownloadPartSize());
 	_sentRequests.erase(it);
 	const auto ok = _requestByOffset.remove(result.offset);
 
@@ -919,7 +967,7 @@ void DownloadMtprotoTask::removeFromQueue() {
 bool DownloadMtprotoTask::partLoaded(
 		int64 offset,
 		const QByteArray &bytes) {
-	if (bytes.size() > Storage::kDownloadPartSize) {
+	if (bytes.size() > Storage::DownloadPartSize()) {
 		cancelOnFail();
 		return false;
 	}

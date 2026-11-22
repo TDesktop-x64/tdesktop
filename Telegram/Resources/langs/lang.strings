@@ -9158,6 +9158,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_enhanced" = "Enhanced Settings";
 "lng_settings_network" = "Network";
 "lng_settings_net_upload_speed_boost" = "Upload speed boost";
+"lng_settings_net_download_speed_boost" = "Download speed boost";
 "lng_settings_show_message_id" = "Show message ID";
 "lng_settings_button" = "Button";
 "lng_settings_show_emoji_button_as_text" = "Show emoji button as text";
@@ -9206,6 +9207,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_net_speed_boost_slight" = "Slight";
 "lng_net_speed_boost_medium" = "Medium";
 "lng_net_speed_boost_big" = "Big";
+
+"lng_net_download_speed_boost_desc" = "Warning: increases download chunk size and streaming concurrency for high-latency links. High values may use more memory or perform worse on slow networks. Use at your own risk.";
+"lng_net_download_speed_boost_default" = "Disabled (128 KB × 8)";
+"lng_net_download_speed_boost_medium" = "Medium (1 MB × 8)";
+"lng_net_download_speed_boost_high" = "High (1 MB × 16)";
 
 "lng_net_boost_restart_desc" = "You'll need to restart app to change network boost.\n\nRestart now?";
 "lng_show_messages_id_desc" = "Warning: the changes will take effect immediately with restart.";

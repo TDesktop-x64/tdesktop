@@ -64,6 +64,17 @@ namespace Settings {
 			Ui::show(Box<NetBoostBox>());
 		});
 
+		auto downloadBoostBtn = AddButtonWithLabel(
+				inner,
+				tr::lng_settings_net_download_speed_boost(),
+				rpl::single(NetDownloadBoostBox::BoostLabel(GetEnhancedInt("net_download_speed_boost"))),
+				st::settingsButtonNoIcon
+		);
+		downloadBoostBtn->setColorOverride(QColor(255, 0, 0));
+		downloadBoostBtn->addClickHandler([=] {
+			Ui::show(Box<NetDownloadBoostBox>());
+		});
+
 		AddSkip(container);
 	}
 

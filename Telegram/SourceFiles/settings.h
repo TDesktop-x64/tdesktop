@@ -150,6 +150,9 @@ DeclareSetting(EnhancedSetting, EnhancedOptions);
 DeclareSetting(int, NetRequestsCount);
 DeclareSetting(int, NetUploadSessionsCount);
 DeclareSetting(int, NetUploadRequestInterval);
+DeclareSetting(int, NetDownloadPartSize);
+DeclareSetting(int, NetDownloadRequestsLimit);
+DeclareSetting(int, NetDownloadPreloadParts);
 
 inline bool GetEnhancedBool(const QString& key) {
 	if (!gEnhancedOptions.contains(key)) {
@@ -188,6 +191,30 @@ inline void SetNetworkBoost(int boost) {
 	cSetNetRequestsCount(2 + (2 * GetEnhancedInt("net_speed_boost")));
 	cSetNetUploadSessionsCount(2 + (2 * GetEnhancedInt("net_speed_boost")));
 	cSetNetUploadRequestInterval(500 - (100 * GetEnhancedInt("net_speed_boost")));
+}
+
+inline void SetDownloadSpeedBoost(int boost, bool applyRuntime = false) {
+	const auto clamped = (boost < 0) ? 0 : (boost > 2) ? 2 : boost;
+	gEnhancedOptions.insert("net_download_speed_boost", clamped);
+
+	// Part size & streaming limits are frozen at startup so changing the
+	// option right before Core::Restart() cannot mutate active Readers/caches.
+	if (!applyRuntime) {
+		return;
+	}
+	if (clamped == 2) {
+		cSetNetDownloadPartSize(1024 * 1024);
+		cSetNetDownloadRequestsLimit(16);
+		cSetNetDownloadPreloadParts(8);
+	} else if (clamped == 1) {
+		cSetNetDownloadPartSize(1024 * 1024);
+		cSetNetDownloadRequestsLimit(8);
+		cSetNetDownloadPreloadParts(4);
+	} else {
+		cSetNetDownloadPartSize(128 * 1024);
+		cSetNetDownloadRequestsLimit(8);
+		cSetNetDownloadPreloadParts(8);
+	}
 }
 
 inline bool blockExist(int64 id) {

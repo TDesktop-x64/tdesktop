@@ -7,12 +7,18 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "media/streaming/media_streaming_loader.h"
 
+#include "storage/download_manager_mtproto.h"
+
 namespace Media {
 namespace Streaming {
 
+int64 Loader::PartSize() {
+	return int64(Storage::DownloadPartSize());
+}
+
 bool LoadedPart::valid(int64 size) const {
 	return (offset != kFailedOffset)
-		&& ((bytes.size() == Loader::kPartSize)
+		&& ((bytes.size() == Loader::PartSize())
 			|| (offset + bytes.size() == size));
 }
 

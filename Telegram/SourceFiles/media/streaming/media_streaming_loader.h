@@ -26,7 +26,7 @@ struct LoadedPart {
 
 class Loader {
 public:
-	static constexpr auto kPartSize = int64(128 * 1024);
+	[[nodiscard]] static int64 PartSize();
 
 	[[nodiscard]] virtual Storage::Cache::Key baseCacheKey() const = 0;
 	[[nodiscard]] virtual int64 size() const = 0;

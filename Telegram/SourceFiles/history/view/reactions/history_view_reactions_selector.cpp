@@ -946,7 +946,9 @@ void Selector::mouseReleaseEvent(QMouseEvent *e) {
 		expand();
 	} else if (const auto id = std::get_if<Data::ReactionId>(&selected)) {
 		if (!id->empty()) {
-			_chosen.fire(lookupChosen(*id));
+			auto chosen = lookupChosen(*id);
+			chosen.big = (e->button() == Qt::RightButton);
+			_chosen.fire(std::move(chosen));
 		}
 	}
 }
@@ -1134,6 +1136,10 @@ void Selector::createList() {
 				}));
 	}
 
+	_list->setRightClickSelects(true);
+	if (_stickers) {
+		_stickers->setRightClickSelects(true);
+	}
 	_list->escapes() | rpl::start_to_stream(_escapes, _list->lifetime());
 
 	rpl::merge(
@@ -1146,6 +1152,7 @@ void Selector::createList() {
 			.id = _unifiedFactoryOwner->lookupReactionId(data.document->id),
 			.icon = data.messageSendingFrom.frame,
 			.globalGeometry = data.messageSendingFrom.globalStartGeometry,
+			.big = data.rightClick,
 		});
 	}, _list->lifetime());
 

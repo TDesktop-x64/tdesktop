@@ -319,6 +319,10 @@ rpl::producer<FileChosen> StickersListWidget::chosen() const {
 	return _chosen.events();
 }
 
+void StickersListWidget::setRightClickSelects(bool value) {
+	_rightClickSelects = value;
+}
+
 rpl::producer<> StickersListWidget::photoRequests() const {
 	return _photoRequests.events();
 }
@@ -2505,7 +2509,8 @@ QRect StickersListWidget::removeButtonRect(const SectionInfo &info) const {
 }
 
 void StickersListWidget::mousePressEvent(QMouseEvent *e) {
-	if (e->button() != Qt::LeftButton) {
+	_rightClick = _rightClickSelects && e->button() == Qt::RightButton;
+	if (e->button() != Qt::LeftButton && !_rightClick) {
 		return;
 	}
 	_lastMousePosition = e->globalPos();
@@ -2996,6 +3001,7 @@ void StickersListWidget::mouseReleaseEvent(QMouseEvent *e) {
 						sticker->section,
 						sticker->index,
 						document),
+					.rightClick = _rightClick,
 				});
 			}
 		} else if (auto set = std::get_if<OverSet>(&pressed)) {

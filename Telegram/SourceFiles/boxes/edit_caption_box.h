@@ -112,7 +112,7 @@ private:
 
 	bool validateLength(const QString &text) const;
 	void applyChanges();
-	void save();
+	void save(bool unformatted = false);
 	void closeAfterSave();
 
 	bool fileFromClipboard(not_null<const QMimeData*> data);

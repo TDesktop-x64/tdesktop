@@ -139,6 +139,7 @@ const auto CommandByName = base::flat_map<QString, Command>{
 	{ u"message"_q                       , Command::JustSendMessage },
 	{ u"message_silently"_q              , Command::SendSilentMessage },
 	{ u"message_scheduled"_q             , Command::ScheduleMessage },
+	{ u"message_unformatted"_q           , Command::SendUnformatted },
 	{ u"ai_compose_apply"_q              , Command::ComposeAiApplyInPlace },
 	{ u"show_rich_editor"_q              , Command::ShowRichEditor },
 	{ u"toggle_webpage_preview"_q        , Command::ToggleWebPagePreview },
@@ -594,6 +595,8 @@ void Manager::fillDefaults() {
 
 	set(u"alt+f"_q                   , Command::FastForward);
 	set(u"alt+c"_q                   , Command::FastCopy);
+	set(u"alt+return"_q              , Command::SendUnformatted);
+	set(u"alt+enter"_q               , Command::SendUnformatted);
 	
 	_defaults = keysCurrents();
 }

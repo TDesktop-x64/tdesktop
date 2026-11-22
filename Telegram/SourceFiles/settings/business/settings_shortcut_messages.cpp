@@ -664,8 +664,12 @@ void ShortcutMessages::setupComposeControls() {
 	}, lifetime());
 
 	_composeControls->sendRequests(
-	) | rpl::on_next([=] {
-		send();
+	) | rpl::on_next([=](Api::SendOptions options) {
+		if (options.unformatted) {
+			send(options);
+		} else {
+			send();
+		}
 	}, lifetime());
 
 	_composeControls->sendVoiceRequests(
@@ -1218,7 +1222,9 @@ void ShortcutMessages::send(Api::SendOptions options) {
 	_cornerButtons.clearReplyReturns();
 
 	auto message = Api::MessageToSend(prepareSendAction(options));
-	message.textWithTags = _composeControls->getTextWithAppliedMarkdown();
+	message.textWithTags = options.unformatted
+		? _composeControls->getTextWithTags()
+		: _composeControls->getTextWithAppliedMarkdown();
 	message.webPage = _composeControls->webPageDraft();
 
 	_session->api().sendMessage(std::move(message));
@@ -1237,9 +1243,13 @@ void ShortcutMessages::edit(
 	if (*saveEditMsgRequestId) {
 		return;
 	}
+	if (options.unformatted && _controller->isLayerShown()) {
+		return;
+	}
 	const auto webpage = _composeControls->webPageDraft();
 	auto sending = TextWithEntities();
-	auto left = _composeControls->prepareTextForEditMsg();
+	auto left = _composeControls->prepareTextForEditMsg(
+		options.unformatted);
 
 	const auto originalLeftSize = left.text.size();
 	const auto hasMediaWithCaption = item

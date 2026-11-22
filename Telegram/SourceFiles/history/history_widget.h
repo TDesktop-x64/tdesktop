@@ -687,7 +687,8 @@ private:
 	[[nodiscard]] bool insideJumpToEndInsteadOfToUnread() const;
 	void createUnreadBarAndResize();
 
-	[[nodiscard]] TextWithEntities prepareTextForEditMsg() const;
+	[[nodiscard]] TextWithEntities prepareTextForEditMsg(
+		bool unformatted = false) const;
 	void saveEditMessage(Api::SendOptions options = {});
 
 	void setupPreview();

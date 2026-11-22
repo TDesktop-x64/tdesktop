@@ -550,7 +550,11 @@ SendMenu::Details ShareBox::sendMenuDetails() const {
 		: SendMenu::Type::Scheduled;
 
 	// We can't support effect here because we don't have ChatHelpers::Show.
-	return { .type = type, .effectAllowed = false };
+	return {
+		.type = type,
+		.effectAllowed = false,
+		.sendUnformattedPossible = HasSendText(_comment->entity())
+	};
 }
 
 void ShareBox::showMenu(not_null<Ui::RpWidget*> parent) {
@@ -692,7 +696,9 @@ void ShareBox::submit(Api::SendOptions options) {
 	auto threads = _inner->selected();
 	const auto weak = base::make_weak(this);
 	const auto field = _comment->entity();
-	auto comment = field->getTextWithAppliedMarkdown();
+	auto comment = options.unformatted
+		? field->getTextWithTags()
+		: field->getTextWithAppliedMarkdown();
 	const auto checkPaid = [=] {
 		if (!_descriptor.countMessagesCallback) {
 			return true;

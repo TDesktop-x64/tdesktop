@@ -395,16 +395,23 @@ void ScheduleBox(
 	const auto childType = (details.type == Type::Disabled)
 		? Type::Disabled
 		: Type::SilentOnly;
-	const auto childDetails = Details{
+	auto childDetails = Details{
 		.type = childType,
 		.effectAllowed = details.effectAllowed,
 	};
+	childDetails.sendUnformattedPossible
+		= details.sendUnformattedPossible;
+	childDetails.saveUnformattedPossible
+		= details.saveUnformattedPossible;
 	const auto sendAction = crl::guard(box, [=](Action action, Details) {
 		Expects(action.type == ActionType::Send);
 
 		auto options = with(descriptor.collect());
 		if (action.options.silent) {
 			options.silent = action.options.silent;
+		}
+		if (action.options.unformatted) {
+			options.unformatted = true;
 		}
 		if (action.options.effectId) {
 			options.effectId = action.options.effectId;
@@ -415,7 +422,10 @@ void ScheduleBox(
 		descriptor.submit.data(),
 		maybeShow,
 		[=] { return childDetails; },
-		sendAction);
+		sendAction,
+		nullptr,
+		nullptr,
+		1);
 
 	if (details.type == Type::ScheduledToUser) {
 		const auto sendUntilOnline = box->addTopButton(*style.topButtonStyle);

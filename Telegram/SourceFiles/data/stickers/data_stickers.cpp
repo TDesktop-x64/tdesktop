@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/stickers/data_stickers.h"
 
+#include "base/options.h"
 #include "api/api_hash.h"
 #include "chat_helpers/compose/compose_show.h"
 #include "data/data_document.h"
@@ -38,10 +39,19 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat_helpers.h"
 
 namespace Data {
+
+const char kOptionUnlimitedFavedStickers[] = "unlimited-faved-stickers";
+
 namespace {
 
 constexpr auto kPremiumToastDuration = 5 * crl::time(1000);
 constexpr auto kSlice = 65536;
+
+base::options::toggle OptionUnlimitedFavedStickers({
+	.id = kOptionUnlimitedFavedStickers,
+	.name = "Unlimited favorite stickers",
+	.description = "Display all favorite stickers available from the server",
+});
 
 using SetFlag = StickersSetFlag;
 
@@ -612,6 +622,9 @@ bool Stickers::isFaved(not_null<const DocumentData*> document) const {
 void Stickers::checkFavedLimit(
 		StickersSet &set,
 		std::shared_ptr<ChatHelpers::Show> show) {
+	if (OptionUnlimitedFavedStickers.value()) {
+		return;
+	}
 	const auto session = &_owner->session();
 	const auto limits = Data::PremiumLimits(session);
 	if (set.stickers.size() <= limits.stickersFavedCurrent()) {

@@ -31,6 +31,8 @@ namespace Data {
 class Session;
 class DocumentMedia;
 
+extern const char kOptionUnlimitedFavedStickers[];
+
 enum class StickersType : uchar {
 	Stickers,
 	Masks,

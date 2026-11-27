@@ -125,10 +125,14 @@ void VideoPreload::load() {
 	}
 	const auto prefix = ChoosePreloadPrefix(_video);
 	Assert(prefix > 0 && prefix <= _video->size);
-	const auto part = Storage::kDownloadPartSize;
-	const auto parts = (prefix + part - 1) / part;
-	for (auto i = 0; i != parts; ++i) {
-		_parts.emplace(i * part, QByteArray());
+	const auto part = int64(Storage::DownloadPartSize());
+	const auto maxParts = std::max(
+		int64(1),
+		(int64(Storage::kMaxFileInMemory) - 1 - int64(sizeof(int32)))
+			/ (part + 2 * int64(sizeof(int32))));
+	const auto parts = std::min((prefix + part - 1) / part, maxParts);
+	for (auto i = int64(0); i != parts; ++i) {
+		_parts.emplace(uint32(i * part), QByteArray());
 	}
 	addToQueue();
 }
@@ -158,34 +162,34 @@ bool VideoPreload::Can(not_null<DocumentData*> video) {
 }
 
 bool VideoPreload::readyToRequest() const {
-	const auto part = Storage::kDownloadPartSize;
-	return !_failed && (_nextRequestOffset < _parts.size() * part);
+	const auto part = int64(Storage::DownloadPartSize());
+	return !_failed && (_nextRequestOffset < int64(_parts.size()) * part);
 }
 
 int64 VideoPreload::takeNextRequestOffset() {
 	Expects(readyToRequest());
 
 	_requestedOffsets.emplace(_nextRequestOffset);
-	_nextRequestOffset += Storage::kDownloadPartSize;
+	_nextRequestOffset += Storage::DownloadPartSize();
 	return _requestedOffsets.back();
 }
 
 bool VideoPreload::feedPart(
 		int64 offset,
 		const QByteArray &bytes) {
-	Expects(offset < _parts.size() * Storage::kDownloadPartSize);
+	const auto part = int64(Storage::DownloadPartSize());
+	Expects(offset < int64(_parts.size()) * part);
 	Expects(_requestedOffsets.contains(int(offset)));
-	Expects(bytes.size() <= Storage::kDownloadPartSize);
+	Expects(bytes.size() <= part);
 
-	const auto part = Storage::kDownloadPartSize;
 	_requestedOffsets.remove(int(offset));
-	_parts[offset] = bytes;
-	if ((_nextRequestOffset + part >= _parts.size() * part)
+	_parts[uint32(offset)] = bytes;
+	if ((_nextRequestOffset + part >= int64(_parts.size()) * part)
 		&& _requestedOffsets.empty()) {
 		_finished = true;
 		removeFromQueue();
 		auto result = ::Media::Streaming::SerializeComplexPartsMap(_parts);
-		if (result.size() == _full) {
+		if (result.size() == _full || !(result.size() % part)) {
 			// Make sure it is parsed as a complex map.
 			result.push_back(char(0));
 		}

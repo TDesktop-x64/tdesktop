@@ -73,4 +73,7 @@ EnhancedSetting gEnhancedOptions;
 int gNetRequestsCount = 2;
 int gNetUploadSessionsCount = 2;
 int gNetUploadRequestInterval = 500;
+int gNetDownloadPartSize = 128 * 1024;
+int gNetDownloadRequestsLimit = 8;
+int gNetDownloadPreloadParts = 8;
 int gAlwaysDeleteFor = 0;

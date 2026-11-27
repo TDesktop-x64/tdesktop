@@ -15,8 +15,11 @@ namespace {
 
 using namespace Media::Streaming;
 
-constexpr auto kPartSize = Loader::kPartSize;
 constexpr auto kRequestPartsCount = 32;
+
+[[nodiscard]] int64 PartSize() {
+	return Loader::PartSize();
+}
 
 } // namespace
 
@@ -53,7 +56,7 @@ StreamedFileDownloader::StreamedFileDownloader(
 , _cacheKey(cacheKey)
 , _fileLocationKey(fileLocationKey)
 , _reader(std::move(reader))
-, _partsCount((size + kPartSize - 1) / kPartSize) {
+, _partsCount(int((size + PartSize() - 1) / PartSize())) {
 	_partIsSaved.resize(_partsCount, false);
 
 	_reader->partsForDownloader(
@@ -104,17 +107,18 @@ void StreamedFileDownloader::requestPart() {
 		return;
 	}
 	_nextPartIndex = index + 1;
-	_reader->loadForDownloader(this, index * kPartSize);
+	_reader->loadForDownloader(this, index * PartSize());
 	++_partsRequested;
 }
 
 QByteArray StreamedFileDownloader::readLoadedPart(int64 offset) {
+	const auto partSize = PartSize();
 	Expects(offset >= 0 && offset < _fullSize);
-	Expects(!(offset % kPartSize));
+	Expects(!(offset % partSize));
 
-	const auto index = (offset / kPartSize);
+	const auto index = (offset / partSize);
 	return _partIsSaved[index]
-		? readLoadedPartBack(offset, kPartSize)
+		? readLoadedPartBack(offset, partSize)
 		: QByteArray();
 }
 
@@ -138,15 +142,16 @@ void StreamedFileDownloader::startLoading() {
 }
 
 void StreamedFileDownloader::savePart(const LoadedPart &part) {
+	const auto partSize = PartSize();
 	Expects(part.offset >= 0 && part.offset < _reader->size());
-	Expects(part.offset % kPartSize == 0);
+	Expects(part.offset % partSize == 0);
 
 	if (_finished || _cancelled) {
 		return;
 	}
 
 	const auto offset = part.offset;
-	const auto index = offset / kPartSize;
+	const auto index = offset / partSize;
 	Assert(index >= 0 && index < _partsCount);
 	if (_partIsSaved[index]) {
 		return;

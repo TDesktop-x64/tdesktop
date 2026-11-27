@@ -86,6 +86,76 @@ void NetBoostBox::save() {
 		}));
 }
 
+NetDownloadBoostBox::NetDownloadBoostBox(QWidget *parent) {
+}
+
+void NetDownloadBoostBox::prepare() {
+	setTitle(tr::lng_settings_net_download_speed_boost());
+
+	addButton(tr::lng_settings_save(), [=] { save(); });
+	addButton(tr::lng_cancel(), [=] { closeBox(); });
+
+	auto y = st::boxOptionListPadding.top();
+	_description.create(
+			this,
+			tr::lng_net_download_speed_boost_desc(tr::now),
+			st::boxLabel);
+	_description->resizeToWidth(
+			st::boxWidth - st::boxPadding.left() - st::boxPadding.right());
+	_description->moveToLeft(st::boxPadding.left(), y);
+
+	y += _description->height() + st::boxMediumSkip;
+
+	_boostGroup = std::make_shared<Ui::RadiobuttonGroup>(
+			GetEnhancedInt("net_download_speed_boost"));
+
+	for (int i = 0; i <= 2; i++) {
+		const auto button = Ui::CreateChild<Ui::Radiobutton>(
+				this,
+				_boostGroup,
+				i,
+				BoostLabel(i),
+				st::autolockButton);
+		button->moveToLeft(st::boxPadding.left(), y);
+		y += button->heightNoMargins() + st::boxOptionListSkip;
+	}
+	showChildren();
+	setDimensions(st::boxWidth, y);
+}
+
+QString NetDownloadBoostBox::BoostLabel(int boost) {
+	switch (boost) {
+		case 0:
+			return tr::lng_net_download_speed_boost_default(tr::now);
+		case 1:
+			return tr::lng_net_download_speed_boost_medium(tr::now);
+		case 2:
+			return tr::lng_net_download_speed_boost_high(tr::now);
+		default:
+			return tr::lng_net_download_speed_boost_default(tr::now);
+	}
+}
+
+void NetDownloadBoostBox::save() {
+	if (_boostGroup->current() == GetEnhancedInt("net_download_speed_boost")) {
+		closeBox();
+		return;
+	}
+	const auto changeBoost = [=](Fn<void()> &&) {
+		SetDownloadSpeedBoost(_boostGroup->current());
+		EnhancedSettings::Write();
+		Core::Restart();
+	};
+
+	getDelegate()->show(
+		Ui::MakeConfirmBox({
+				.text = tr::lng_net_boost_restart_desc(tr::now),
+				.confirmed = changeBoost,
+				.confirmText = tr::lng_settings_restart_now(tr::now),
+				.cancelText = tr::lng_cancel(tr::now),
+		}));
+}
+
 AlwaysDeleteBox::AlwaysDeleteBox(QWidget *parent) {
 }
 

@@ -19,11 +19,11 @@ class Error;
 
 namespace Storage {
 
-// Different part sizes are not supported for now :(
-// Because we start downloading with some part size
-// and then we get a CDN-redirect where we support only
-// fixed part size download for hash checking.
-constexpr auto kDownloadPartSize = 128 * 1024;
+constexpr auto kDefaultDownloadPartSize = 128 * 1024;
+constexpr auto kMaxDownloadPartSize = 1024 * 1024;
+
+// Active download chunk size (frozen at startup from enhanced settings).
+[[nodiscard]] int DownloadPartSize();
 
 class DownloadMtprotoTask;
 
@@ -259,7 +259,8 @@ private:
 
 	[[nodiscard]] CheckCdnHashResult checkCdnFileHash(
 		int64 offset,
-		bytes::const_span buffer);
+		bytes::const_span buffer,
+		int64 *missingOffset = nullptr);
 
 	void subscribeToNonPremiumLimit();
 
